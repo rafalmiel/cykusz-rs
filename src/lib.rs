@@ -1,33 +1,29 @@
 #![no_std]
 
 #![feature(lang_items)]
-
+#![feature(const_fn)]
+#![feature(ptr_internals)]
 
 extern crate rlibc;
+extern crate x86;
+extern crate spin;
+#[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
+mod arch;
+mod drivers;
+pub mod lang_items;
+
+pub fn clear() {
+    ::arch::output::clear();
+}
 
 #[no_mangle]
 pub extern "C" fn rust_main() {
-    loop{}
 
-}
+    clear();
+    println!("Hello World!");
 
-#[cfg(not(test))]
-#[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
-
-#[cfg(not(test))]
-#[no_mangle]
-#[allow(unused_variables)]
-#[lang = "panic_fmt"]
-pub extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &str, line: u32) -> ! {
-    //println!("\n\nPANIC in {} at line {}:", file, line);
-    //println!("    {}", fmt);
-
-    loop {}
-}
-
-#[allow(non_snake_case)]
-#[no_mangle]
-pub extern "C" fn _Unwind_Resume() -> ! {
-    loop {}
+    panic!("Oh!");
 }

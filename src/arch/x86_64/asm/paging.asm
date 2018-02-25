@@ -116,7 +116,7 @@ map_p3_table_phys:
     add ebx, eax
     ; Push address of table for map_2mb_pages call
     push ebx
-    
+
     ; Mark as writable and present
     or ebx, 0b11
     mov [__p3_table_phys + 8*ecx], ebx

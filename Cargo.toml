@@ -8,4 +8,11 @@ crate-type = ["staticlib"]
 
 [dependencies]
 rlibc = "*"
+spin = "*"
+x86 = "*"
+
+[dependencies.lazy_static]
+version = "*"
+features = ["spin_no_std"]
+
 

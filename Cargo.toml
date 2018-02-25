@@ -1,0 +1,11 @@
+[package]
+name = "cykusz_rs"
+version = "0.1.0"
+authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+rlibc = "*"
+

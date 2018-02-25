@@ -1,2 +1,4 @@
 .directory
 bochslog.txt
+build
+target

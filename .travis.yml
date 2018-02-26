@@ -3,8 +3,6 @@ language: rust
 rust:
   - nightly
 
-cache: cargo
-
 before_script:
   - rustup component add rust-src
   - (test -x $HOME/.cargo/bin/cargo-install-update || cargo install cargo-update)

@@ -7,7 +7,7 @@ extern "C" fn eh_personality() {}
 #[allow(unused_variables)]
 #[lang = "panic_fmt"]
 pub extern "C" fn panic_fmt(fmt: ::core::fmt::Arguments, file: &str, line: u32) -> ! {
-    println!("\n\nPANIC in {} at line {}:", file, line);
+    println!("\nPANIC in {} at line {}:", file, line);
     println!("    {}", fmt);
 
     loop {}

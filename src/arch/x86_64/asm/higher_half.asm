@@ -1,4 +1,4 @@
-extern rust_main
+extern x86_64_rust_main
 extern __p4_table
 extern gdt64.pointer
 extern gdt64.data
@@ -34,7 +34,7 @@ higher_half_start:
     ; Jump to rust code
     mov rsi, stack_top
     mov rdx, gdt64
-    call rust_main
+    call x86_64_rust_main
 
 .loop:
     hlt

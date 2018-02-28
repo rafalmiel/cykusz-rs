@@ -9,7 +9,7 @@ crate-type = ["staticlib"]
 [dependencies]
 rlibc = "*"
 spin = "*"
-x86 = "*"
+bitflags = "1.0"
 
 [dependencies.lazy_static]
 version = "*"

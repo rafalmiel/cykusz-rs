@@ -3,6 +3,7 @@ pub mod cpuio;
 #[macro_use]
 pub mod output;
 
+pub mod baremtl;
 mod gdt;
 
 #[no_mangle]

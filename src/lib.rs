@@ -5,11 +5,13 @@
 #![feature(ptr_internals)]
 #![feature(asm)]
 
+
 extern crate rlibc;
-extern crate x86;
-extern crate spin;
+#[macro_use]
+extern crate bitflags;
 #[macro_use]
 extern crate lazy_static;
+extern crate spin;
 
 #[macro_use]
 pub mod arch;

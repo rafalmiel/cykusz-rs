@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use x86;
+use arch::baremtl::io;
 
 pub trait InOut {
     unsafe fn port_in(port: u16) -> Self;
@@ -8,28 +8,28 @@ pub trait InOut {
 
 impl InOut for u8 {
     unsafe fn port_in(port: u16) -> u8 {
-        x86::shared::io::inb(port)
+        io::inb(port)
     }
     unsafe fn port_out(port: u16, value: u8) {
-        x86::shared::io::outb(port, value);
+        io::outb(port, value);
     }
 }
 
 impl InOut for u16 {
     unsafe fn port_in(port: u16) -> u16 {
-        x86::shared::io::inw(port)
+        io::inw(port)
     }
     unsafe fn port_out(port: u16, value: u16) {
-        x86::shared::io::outw(port, value);
+        io::outw(port, value);
     }
 }
 
 impl InOut for u32 {
     unsafe fn port_in(port: u16) -> u32 {
-        x86::shared::io::inl(port)
+        io::inl(port)
     }
     unsafe fn port_out(port: u16, value: u32) {
-        x86::shared::io::outl(port, value);
+        io::outl(port, value);
     }
 }
 

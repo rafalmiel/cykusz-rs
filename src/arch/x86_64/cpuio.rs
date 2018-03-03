@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use arch::baremtl::io;
+use arch::raw::io;
 
 pub trait InOut {
     unsafe fn port_in(port: u16) -> Self;

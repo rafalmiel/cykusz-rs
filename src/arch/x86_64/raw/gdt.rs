@@ -28,9 +28,7 @@ pub struct GdtEntry {
 }
 
 impl GdtEntry {
-    pub const fn null() -> Self {
-        Self::new(dsc::Flags::MISSING, GdtFlags::MISSING)
-    }
+    pub const MISSING: Self = Self::new(dsc::Flags::MISSING, GdtFlags::MISSING);
 
     pub const fn new(access: dsc::Flags, flags: GdtFlags) -> Self {
         GdtEntry {

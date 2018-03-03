@@ -4,6 +4,7 @@
 #![feature(const_fn)]
 #![feature(ptr_internals)]
 #![feature(asm)]
+#![feature(abi_x86_interrupt)]
 
 
 extern crate rlibc;

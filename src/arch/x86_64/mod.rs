@@ -3,14 +3,17 @@ pub mod cpuio;
 #[macro_use]
 pub mod output;
 
-pub mod baremtl;
+pub mod raw;
 mod gdt;
+mod idt;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main() {
-    ::arch::output::clear();
+    output::clear();
     gdt::init();
-    println!("Hello Arch!");
+    idt::init();
 
+
+    println!("Hello Arch!");
     ::rust_main();
 }

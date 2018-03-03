@@ -48,8 +48,15 @@ bitflags! {
         // Accessed bit
         const SEG_ACCESSED = 1;
 
-        const SEG_RING0_CODE = Self::PRESENT.bits | Self::PRIV_RING0.bits | Self::SEGMENT.bits | Self::SEG_C_EXECUTABLE.bits | Self::SEG_C_READABLE.bits;
-        const SEG_RING0_DATA = Self::PRESENT.bits | Self::PRIV_RING0.bits | Self::SEGMENT.bits | Self::SEG_D_WRITABLE.bits;
+        const SEG_RING0_CODE = Self::PRESENT.bits |
+                               Self::PRIV_RING0.bits |
+                               Self::SEGMENT.bits |
+                               Self::SEG_C_EXECUTABLE.bits |
+                               Self::SEG_C_READABLE.bits;
+        const SEG_RING0_DATA = Self::PRESENT.bits |
+                               Self::PRIV_RING0.bits |
+                               Self::SEGMENT.bits |
+                               Self::SEG_D_WRITABLE.bits;
     }
 }
 

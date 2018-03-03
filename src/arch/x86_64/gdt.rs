@@ -1,28 +1,37 @@
-use arch::baremtl::gdt;
+use arch::raw::gdt;
+use arch::raw::segmentation as sgm;
+use arch::raw::descriptor as dsc;
 
 static INIT_GDT: [gdt::GdtEntry; 3] = [
     // Null
     gdt::GdtEntry::null(),
     // Kernel code
-    gdt::GdtEntry::new(gdt::GdtAccessFlags::RING0_CODE, gdt::GdtFlags::LONG_MODE),
+    gdt::GdtEntry::new(dsc::Flags::SEG_RING0_CODE, gdt::GdtFlags::LONG_MODE),
     // Kernel data
-    gdt::GdtEntry::new(gdt::GdtAccessFlags::RING0_DATA, gdt::GdtFlags::BLANK),
+    gdt::GdtEntry::new(dsc::Flags::SEG_RING0_DATA, gdt::GdtFlags::MISSING),
 ];
 
-static mut INIT_GDTR : gdt::DescriptorTablePointer = gdt::DescriptorTablePointer::empty();
+static mut INIT_GDTR : dsc::DescriptorTablePointer<gdt::GdtEntry> = dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
+
+pub const fn kernel_code_segment() -> sgm::SegmentSelector {
+    sgm::SegmentSelector::new(1, sgm::SegmentSelector::RPL_0)
+}
+
+pub const fn kernel_data_segment() -> sgm::SegmentSelector {
+    sgm::SegmentSelector::new(2, sgm::SegmentSelector::RPL_0)
+}
 
 pub fn init() {
     unsafe {
-        asm!("xchg %bx, %bx");
         INIT_GDTR.init(&INIT_GDT[..]);
-        gdt::lgdt(&INIT_GDTR);
+        dsc::lgdt(&INIT_GDTR);
 
-        gdt::set_cs(gdt::SegmentSelector::new(1 as u16, gdt::PrivilegeLevel::Ring0));
-        gdt::load_ds(gdt::SegmentSelector::new(2 as u16, gdt::PrivilegeLevel::Ring0));
-        gdt::load_es(gdt::SegmentSelector::new(2 as u16, gdt::PrivilegeLevel::Ring0));
-        gdt::load_fs(gdt::SegmentSelector::new(2 as u16, gdt::PrivilegeLevel::Ring0));
-        gdt::load_gs(gdt::SegmentSelector::new(2 as u16, gdt::PrivilegeLevel::Ring0));
-        gdt::load_ss(gdt::SegmentSelector::new(2 as u16, gdt::PrivilegeLevel::Ring0));
+        sgm::set_cs(  kernel_code_segment());
+        sgm::load_ds(kernel_data_segment());
+        sgm::load_es(kernel_data_segment());
+        sgm::load_fs(kernel_data_segment());
+        sgm::load_gs(kernel_data_segment());
+        sgm::load_ss(kernel_data_segment());
     }
 
     println!("GDT initialised");

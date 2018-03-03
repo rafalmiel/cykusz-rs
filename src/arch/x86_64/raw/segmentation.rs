@@ -37,6 +37,22 @@ impl SegmentSelector {
     }
 }
 
+pub fn cs() -> SegmentSelector {
+    let segment: u16;
+    unsafe {
+        asm!("mov %cs, $0" : "=r"(segment))
+    }
+    SegmentSelector::from_raw(segment)
+}
+
+pub fn ds() -> SegmentSelector {
+    let segment: u16;
+    unsafe {
+        asm!("mov %ds, $0" : "=r"(segment))
+    }
+    SegmentSelector::from_raw(segment)
+}
+
 pub unsafe fn set_cs(sel: SegmentSelector) {
     asm!("pushq $0; \
           leaq  1f(%rip), %rax; \

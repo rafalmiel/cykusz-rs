@@ -3,9 +3,10 @@ pub mod cpuio;
 #[macro_use]
 pub mod output;
 
+#[macro_use]
 pub mod raw;
 pub mod gdt;
-mod idt;
+pub mod idt;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main() {

@@ -11,28 +11,26 @@ static INIT_GDT: [gdt::GdtEntry; 3] = [
     gdt::GdtEntry::new(dsc::Flags::SEG_RING0_DATA, gdt::GdtFlags::MISSING),
 ];
 
-static mut INIT_GDTR : dsc::DescriptorTablePointer<gdt::GdtEntry> =
-    dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
-
-pub const fn kernel_code_segment() -> sgm::SegmentSelector {
+pub const fn ring0_cs() -> sgm::SegmentSelector {
     sgm::SegmentSelector::new(1, sgm::SegmentSelector::RPL_0)
 }
 
-pub const fn kernel_data_segment() -> sgm::SegmentSelector {
+pub const fn ring0_ds() -> sgm::SegmentSelector {
     sgm::SegmentSelector::new(2, sgm::SegmentSelector::RPL_0)
 }
 
 pub fn init() {
+    let mut gdtr= dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
+    gdtr.init(&INIT_GDT[..]);
     unsafe {
-        INIT_GDTR.init(&INIT_GDT[..]);
-        dsc::lgdt(&INIT_GDTR);
+        dsc::lgdt(&gdtr);
 
-        sgm::set_cs(  kernel_code_segment());
-        sgm::load_ds(kernel_data_segment());
-        sgm::load_es(kernel_data_segment());
-        sgm::load_fs(kernel_data_segment());
-        sgm::load_gs(kernel_data_segment());
-        sgm::load_ss(kernel_data_segment());
+        sgm::set_cs(ring0_cs());
+        sgm::load_ds(ring0_ds());
+        sgm::load_es(ring0_ds());
+        sgm::load_fs(ring0_ds());
+        sgm::load_gs(ring0_ds());
+        sgm::load_ss(ring0_ds());
     }
 
     println!("GDT initialised");

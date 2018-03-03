@@ -4,7 +4,7 @@ pub mod cpuio;
 pub mod output;
 
 pub mod raw;
-mod gdt;
+pub mod gdt;
 mod idt;
 
 #[no_mangle]

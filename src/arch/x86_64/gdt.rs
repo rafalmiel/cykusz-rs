@@ -4,14 +4,15 @@ use arch::raw::descriptor as dsc;
 
 static INIT_GDT: [gdt::GdtEntry; 3] = [
     // Null
-    gdt::GdtEntry::null(),
+    gdt::GdtEntry::MISSING,
     // Kernel code
     gdt::GdtEntry::new(dsc::Flags::SEG_RING0_CODE, gdt::GdtFlags::LONG_MODE),
     // Kernel data
     gdt::GdtEntry::new(dsc::Flags::SEG_RING0_DATA, gdt::GdtFlags::MISSING),
 ];
 
-static mut INIT_GDTR : dsc::DescriptorTablePointer<gdt::GdtEntry> = dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
+static mut INIT_GDTR : dsc::DescriptorTablePointer<gdt::GdtEntry> =
+    dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
 
 pub const fn kernel_code_segment() -> sgm::SegmentSelector {
     sgm::SegmentSelector::new(1, sgm::SegmentSelector::RPL_0)

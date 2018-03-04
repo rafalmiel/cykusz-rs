@@ -1,6 +1,5 @@
-use core::ptr::Unique;
-
 use arch::types::MappedAddr;
+use core::ptr::Unique;
 
 #[allow(unused)]
 #[repr(u8)]

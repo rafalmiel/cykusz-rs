@@ -1,8 +1,7 @@
-use spin::Mutex;
+use ::drivers::video::vga::{Color, Writer};
 use arch::cpuio::Port;
-
 use arch::types::MappedAddr;
-use ::drivers::video::vga::{Writer, Color};
+use spin::Mutex;
 
 const VGA_BUFFER: MappedAddr = MappedAddr(0xffff8000000b8000);
 

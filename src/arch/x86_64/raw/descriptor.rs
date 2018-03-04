@@ -1,7 +1,6 @@
-use core::mem;
-
-use arch::raw::idt;
 use arch::raw::gdt;
+use arch::raw::idt;
+use core::mem;
 
 bitflags! {
     pub struct Flags: u8 {

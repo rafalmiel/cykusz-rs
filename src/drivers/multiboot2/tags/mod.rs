@@ -1,9 +1,9 @@
+use arch::types::PhysAddr;
+
 pub mod memory;
 pub mod address;
 pub mod elf;
 pub mod modules;
-
-use arch::types::PhysAddr;
 
 #[repr(C)]
 pub struct Tag {

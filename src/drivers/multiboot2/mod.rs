@@ -1,8 +1,7 @@
-pub mod tags;
-
+use arch::types::{MappedAddr, PhysAddr, VirtAddr};
 pub use self::tags::*;
 
-use arch::types::{MappedAddr,PhysAddr,VirtAddr};
+pub mod tags;
 
 #[repr(C)]
 pub struct Info {

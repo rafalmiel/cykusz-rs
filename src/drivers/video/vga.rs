@@ -1,5 +1,7 @@
 use core::ptr::Unique;
 
+use arch::types::MappedAddr;
+
 #[allow(unused)]
 #[repr(u8)]
 pub enum Color {
@@ -59,12 +61,12 @@ fn mk_scr_char(c: u8, clr: ColorCode) -> ScreenChar {
 }
 
 impl Writer {
-    pub fn new(fg: Color, bg: Color, buf: usize) -> Writer {
+    pub fn new(fg: Color, bg: Color, buf: MappedAddr) -> Writer {
         Writer {
             column: 0,
             row: 0,
             color: ColorCode::new(fg, bg),
-            buffer: unsafe {Unique::new_unchecked(buf as *mut _ )},
+            buffer: unsafe {Unique::new_unchecked(buf.0 as *mut _ )},
         }
     }
 

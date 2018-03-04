@@ -1,7 +1,7 @@
 use super::iter;
 
 use spin::Mutex;
-use arch::types::*;
+use kernel::mm::{PhysAddr, MappedAddr, VirtAddr};
 use kernel::mm::Frame;
 use drivers::multiboot2;
 use drivers::multiboot2::memory::MemoryIter;

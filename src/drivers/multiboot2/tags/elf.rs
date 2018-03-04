@@ -1,6 +1,5 @@
+use arch::types::{MappedAddr, PhysAddr, VirtAddr};
 use drivers::multiboot2::tags::Tag;
-
-use arch::types::{MappedAddr,PhysAddr,VirtAddr};
 
 #[repr(packed)]
 pub struct Elf {

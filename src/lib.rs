@@ -25,7 +25,6 @@ pub extern "C" fn rust_main() {
     println!("Hello World!");
 
     unsafe {
-
         int!(80);
     }
     panic!("Oh!");

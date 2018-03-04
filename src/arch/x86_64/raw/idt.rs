@@ -44,7 +44,7 @@ macro_rules! int {
     };
 }
 
-pub type HandlerFn =       extern "x86-interrupt" fn (&mut ExceptionStackFrame);
+pub type HandlerFn =        extern "x86-interrupt" fn (&mut ExceptionStackFrame);
 pub type HandlerFnErrCode = extern "x86-interrupt" fn (&mut ExceptionStackFrame, err_code: u64);
 
 impl IdtEntry {
@@ -102,15 +102,11 @@ impl Idt {
     }
 
     unsafe fn set_handler(&mut self, idx: usize, f: HandlerFn) {
-        unsafe {
-           self.entries[idx].set_handler_fn(f, cs(), dsc::Flags::SYS_RING0_INTERRUPT_GATE);
-        }
+        self.entries[idx].set_handler_fn(f, cs(), dsc::Flags::SYS_RING0_INTERRUPT_GATE);
     }
 
     unsafe fn set_handler_err(&mut self, idx: usize, f: HandlerFnErrCode) {
-        unsafe {
-            self.entries[idx].set_handler_fn_err(f, cs(), dsc::Flags::SYS_RING0_INTERRUPT_GATE);
-        }
+        self.entries[idx].set_handler_fn_err(f, cs(), dsc::Flags::SYS_RING0_INTERRUPT_GATE);
     }
 
     pub fn load(&'static self) {

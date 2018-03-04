@@ -2,6 +2,7 @@
 pub mod newtype;
 #[macro_use]
 pub mod cpuio;
+#[macro_use]
 pub mod idt;
 pub mod gdt;
 pub mod io;

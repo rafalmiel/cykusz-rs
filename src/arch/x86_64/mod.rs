@@ -19,8 +19,5 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
 
     mm::init(&mboot);
 
-    println!("Mboot test ks: {} ke: {}",mboot.kernel_start_addr(), mboot.kernel_end_addr());
-
-    println!("Hello Arch!");
     ::rust_main();
 }

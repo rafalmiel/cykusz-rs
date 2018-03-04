@@ -8,6 +8,8 @@
 #![feature(concat_idents)]
 #![feature(step_trait)]
 #![feature(iterator_step_by)]
+#![feature(global_allocator)]
+#![feature(alloc, allocator_api)]
 
 
 extern crate rlibc;
@@ -16,6 +18,12 @@ extern crate bitflags;
 #[macro_use]
 extern crate lazy_static;
 extern crate spin;
+#[macro_use]
+extern crate alloc;
+extern crate linked_list_allocator;
+
+#[global_allocator]
+static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
 
 #[macro_use]
 pub mod arch;
@@ -25,7 +33,5 @@ pub mod lang_items;
 
 #[no_mangle]
 pub extern "C" fn rust_main() {
-    println!("Hello World!");
-
-    panic!("Oh!");
+    kernel::mm::init();
 }

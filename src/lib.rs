@@ -10,6 +10,7 @@
 #![feature(iterator_step_by)]
 #![feature(global_allocator)]
 #![feature(alloc, allocator_api)]
+#![feature(conservative_impl_trait)]
 
 
 extern crate rlibc;

@@ -1,6 +1,6 @@
+use arch::raw::descriptor as dsc;
 use arch::raw::gdt;
 use arch::raw::segmentation as sgm;
-use arch::raw::descriptor as dsc;
 
 static INIT_GDT: [gdt::GdtEntry; 3] = [
     // Null

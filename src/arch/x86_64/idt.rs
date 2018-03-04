@@ -37,83 +37,102 @@ pub fn init() {
 
 extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {
     println!("Divide By Zero error!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn debug(_frame: &mut idt::ExceptionStackFrame) {
     println!("INT: Debug exception!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn non_maskable_interrupt(_frame: &mut idt::ExceptionStackFrame) {
     println!("INT: Non Maskable Interrupt");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn breakpoint(_frame: &mut idt::ExceptionStackFrame) {
     println!("INT: Breakpoint!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn overflow(_frame: &mut idt::ExceptionStackFrame) {
     println!("Overflow error!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn bound_range_exceeded(_frame: &mut idt::ExceptionStackFrame) {
     println!("Bound Range Exceeded error!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) {
     println!("Invalid Opcode error!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn device_not_available(_frame: &mut idt::ExceptionStackFrame) {
     println!("Device Not Available error!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn double_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Double Fault error! 0x{:x}", err);
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn invalid_tss(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Invalid TSS error! 0x{:x}", err);
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn segment_not_present(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Segment Not Present error 0x{:x}", err);
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn stack_segment_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Stack Segment Failt error! 0x{:x}", err);
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn general_protection_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("General Protection Fault error! 0x{:x}", err);
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("PAGE FAULT! 0x{:x}", err);
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn x87_floating_point_exception(_frame: &mut idt::ExceptionStackFrame) {
     println!("x87 Floating Point Exception!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn alignment_check(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Alignment Check error! 0x{:x}", err);
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn machine_check(_frame: &mut idt::ExceptionStackFrame) {
     println!("Machine Check error");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn simd_floating_point_exception(_frame: &mut idt::ExceptionStackFrame) {
     println!("SIMD Floating Point Exception!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn virtualisation_exception(_frame: &mut idt::ExceptionStackFrame) {
     println!("Virtualisation Exception!");
-    loop{}
+    loop {}
 }
+
 extern "x86-interrupt" fn security_exception(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Security Exception! 0x{:x}", err);
-    loop{}
+    loop {}
 }
 
 extern "x86-interrupt" fn int80_handler(frame: &mut idt::ExceptionStackFrame) {

@@ -1,7 +1,7 @@
-pub use arch::raw::types::{PhysAddr, MappedAddr, VirtAddr};
+pub use arch::raw::types::{MappedAddr, PhysAddr, VirtAddr};
 
-const VIRT : VirtAddr = VirtAddr(0xFFFFFF0000000000);
-const PHYSMAP : MappedAddr = MappedAddr(0xFFFF800000000000);
+const VIRT: VirtAddr = VirtAddr(0xFFFFFF0000000000);
+const PHYSMAP: MappedAddr = MappedAddr(0xFFFF800000000000);
 
 impl PhysAddr {
     pub fn to_mapped(&self) -> MappedAddr {

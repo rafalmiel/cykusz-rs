@@ -1,9 +1,10 @@
 use spin::Mutex;
 use arch::cpuio::Port;
 
+use arch::types::MappedAddr;
 use ::drivers::video::vga::{Writer, Color};
 
-const VGA_BUFFER: usize = 0xffff8000000b8000;
+const VGA_BUFFER: MappedAddr = MappedAddr(0xffff8000000b8000);
 
 static CURSOR_INDEX: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D4) });
 static CURSOR_DATA: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D5) });

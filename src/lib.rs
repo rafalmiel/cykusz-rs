@@ -6,6 +6,7 @@
 #![feature(asm)]
 #![feature(abi_x86_interrupt)]
 #![feature(concat_idents)]
+#![feature(step_trait)]
 
 
 extern crate rlibc;

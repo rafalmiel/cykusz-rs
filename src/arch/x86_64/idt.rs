@@ -32,7 +32,7 @@ lazy_static! {
 pub fn init() {
     IDT.load();
 
-    println!("IDT Initialised");
+    println!("[ OK ] IDT Initialised");
 }
 
 extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {

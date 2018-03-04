@@ -1,4 +1,4 @@
-use arch::types::{MappedAddr, PhysAddr, VirtAddr};
+use kernel::mm::{MappedAddr, PhysAddr, VirtAddr};
 use drivers::multiboot2::tags::Tag;
 
 #[repr(packed)]

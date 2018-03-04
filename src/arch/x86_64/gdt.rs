@@ -33,5 +33,5 @@ pub fn init() {
         sgm::load_ss(ring0_ds());
     }
 
-    println!("GDT initialised");
+    println!("[ OK ] GDT Initialised");
 }

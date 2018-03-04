@@ -1,4 +1,4 @@
-use arch::types::PhysAddr;
+use kernel::mm::PhysAddr;
 
 pub mod memory;
 pub mod address;

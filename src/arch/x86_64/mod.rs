@@ -2,7 +2,6 @@ use drivers::multiboot2;
 
 #[macro_use]
 pub mod output;
-
 #[macro_use]
 pub mod raw;
 pub mod gdt;
@@ -22,6 +21,8 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
     mm::init(&mboot);
 
     int::init();
+
+    int::sti();
 
     ::rust_main();
 }

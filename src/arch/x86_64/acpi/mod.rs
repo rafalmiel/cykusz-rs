@@ -22,30 +22,30 @@ impl Acpi {
     }
 
     pub fn init(&mut self) {
-        unsafe {
+        let rsdp_addr = unsafe {
             let rsdp = rsdp::find_rsdt_address().expect("RSDP Not found!");
-            let rsdp_addr = match rsdp {
+            match rsdp {
                 Address::Rsdp(addr) => {
                     addr
                 },
                 Address::Xsdp(addr) => {
                     panic!("Xsdp address is not yet supported!")
                 }
-            };
+            }
+        };
 
-            self.rsdt.init(rsdp_addr);
+        self.rsdt.init(rsdp_addr);
 
-            let lapic_base = self.rsdt.local_controller_address().expect("LAPIC address not found!");
+        let lapic_base = self.rsdt.local_controller_address().expect("LAPIC address not found!");
 
-            self.lapic.init(lapic_base);
+        self.lapic.init(lapic_base);
 
-            let ioapic_base = self.rsdt.ioapic_address().expect("IOApic address not found!");
+        let ioapic_base = self.rsdt.ioapic_address().expect("IOApic address not found!");
 
-            self.ioapic.init(ioapic_base);
+        self.ioapic.init(ioapic_base);
 
-            println!("[ OK ] IOApic initialised! id: {}, ident: {}, entries: {}, version: {}",
-                             self.ioapic.id(), self.ioapic.identification(),
-                             self.ioapic.max_red_entry() + 1, self.ioapic.version());
-        }
+        println!("[ OK ] IOApic initialised! id: {}, ident: {}, entries: {}, version: {}",
+                 self.ioapic.id(), self.ioapic.identification(),
+                 self.ioapic.max_red_entry() + 1, self.ioapic.version());
     }
 }

@@ -25,6 +25,11 @@ lazy_static! {
         idt.set_simd_floating_point_exception(simd_floating_point_exception);
         idt.set_virtualisation_exception(     virtualisation_exception);
         idt.set_security_exception(           security_exception);
+        for i in 32..255 {
+            unsafe {
+                idt.set_handler(i, dummy);
+            }
+        }
         idt
     };
 }
@@ -33,6 +38,12 @@ pub fn init() {
     IDT.load();
 
     println!("[ OK ] IDT Initialised");
+}
+
+
+extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {
+    println!("Dummy int");
+    ::arch::int::end_of_interrupt();
 }
 
 extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {

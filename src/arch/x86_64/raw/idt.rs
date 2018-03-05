@@ -100,7 +100,7 @@ impl Idt {
         }
     }
 
-    unsafe fn set_handler(&mut self, idx: usize, f: HandlerFn) {
+    pub unsafe fn set_handler(&mut self, idx: usize, f: HandlerFn) {
         self.entries[idx].set_handler_fn(f, cs(), dsc::Flags::SYS_RING0_INTERRUPT_GATE);
     }
 

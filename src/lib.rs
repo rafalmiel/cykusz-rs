@@ -11,7 +11,7 @@
 #![feature(global_allocator)]
 #![feature(alloc, allocator_api)]
 #![feature(conservative_impl_trait)]
-
+#![feature(pointer_methods)]
 
 extern crate rlibc;
 #[macro_use]

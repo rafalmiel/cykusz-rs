@@ -28,6 +28,8 @@ impl Pic {
 
 pub struct ChainedPics {
     pics: [Pic; 2],
+    pitCh0: UnsafePort<u8>,
+    pitMC: UnsafePort<u8>
 }
 
 impl ChainedPics {
@@ -43,6 +45,8 @@ impl ChainedPics {
                        command: UnsafePort::new(0xA0),
                        data: UnsafePort::new(0xA1),
                    }],
+            pitCh0: UnsafePort::new(0x40),
+            pitMC : UnsafePort::new(0x43)
         }
     }
 
@@ -78,7 +82,7 @@ impl ChainedPics {
         self.pics[1].data.write(MODE_8086);
         wait();
 
-        self.pics[0].data.write(saved_mask1 | 0b00000001);//disable timer?
+        self.pics[0].data.write(saved_mask1);//disable timer?
         self.pics[1].data.write(saved_mask2);
     }
 
@@ -106,10 +110,11 @@ impl ChainedPics {
     pub unsafe fn notify_end_of_interrupt(&mut self, int_id: u8) {
         if self.handles_interrupt(int_id) {
             if self.pics[1].handles_interrupt(int_id) {
-                self.pics[1].end_of_interrupt();
             }
 
+            self.pics[1].end_of_interrupt();
             self.pics[0].end_of_interrupt();
         }
     }
+
 }

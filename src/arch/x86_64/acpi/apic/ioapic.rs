@@ -124,7 +124,7 @@ impl IOApic {
         RegVer(self.read(REG_VER)).apic_version()
     }
 
-    pub fn mask_interrupt(&mut self, i: u32, masked: bool) {
+    pub fn mask_int(&mut self, i: u32, masked: bool) {
         let mut l = RegRedTblL(self.read(reg_redtbl_low(i)));
         let h = RegRedTblH(self.read(reg_redtbl_high(i)));
 
@@ -134,16 +134,16 @@ impl IOApic {
         self.write(reg_redtbl_high(i), h.0);
     }
 
-    pub fn set_int(&mut self, i: u32, idt_idx: u32) {
-        let mut l = RegRedTblL(self.read(reg_redtbl_low(i)));
-        let mut h = RegRedTblH(self.read(reg_redtbl_high(i)));
+    pub fn set_int(&mut self, src: u32, dest: u32) {
+        let mut l = RegRedTblL(self.read(reg_redtbl_low(src)));
+        let mut h = RegRedTblH(self.read(reg_redtbl_high(src)));
 
-        l.set_vector(idt_idx);
+        l.set_vector(dest);
         l.set_masked(false);
         h.set_destination(0);
 
-        self.write(reg_redtbl_low(i), l.0);
-        self.write(reg_redtbl_high(i), h.0);
+        self.write(reg_redtbl_low(src), l.0);
+        self.write(reg_redtbl_high(src), h.0);
     }
 
     pub const fn new() -> IOApic {
@@ -155,7 +155,7 @@ impl IOApic {
         self.ioapic_base = Some(base);
 
         for i in 0..self.max_red_entry() + 1 {
-            self.mask_interrupt(i, true);
+            self.mask_int(i, true);
         }
     }
 }

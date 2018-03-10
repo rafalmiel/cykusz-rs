@@ -43,7 +43,7 @@ pub fn init() {
 
 extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {
     println!("Dummy int");
-    ::arch::int::end_of_interrupt();
+    ::arch::int::end_of_int();
 }
 
 extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {

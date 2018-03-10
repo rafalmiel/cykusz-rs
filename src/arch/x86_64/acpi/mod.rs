@@ -1,51 +1,72 @@
 mod rsdp;
-mod rsdt;
 mod util;
-mod lapic;
-mod ioapic;
+mod rsdt;
+mod apic;
 
-use arch::acpi::rsdt::Rsdt;
-use arch::acpi::lapic::LApic;
-use arch::acpi::ioapic::IOApic;
 use self::rsdp::Address;
 use kernel::mm::{PhysAddr,MappedAddr,VirtAddr};
+use self::rsdt::Rsdt;
 
 pub struct Acpi {
-    pub rsdt: Rsdt,
-    pub lapic: LApic,
-    pub ioapic: IOApic
+    rsdt: Option<&'static Rsdt>,
+    lapic: apic::lapic::LApic,
+    ioapic: apic::ioapic::IOApic
 }
 
 impl Acpi {
     pub const fn new() -> Acpi {
-        Acpi { rsdt: Rsdt::new(), lapic: LApic::new(), ioapic: IOApic::new() }
+        Acpi {
+            rsdt: None,
+            lapic: apic::lapic::LApic::new(),
+            ioapic: apic::ioapic::IOApic::new(),
+        }
     }
 
     pub fn init(&mut self) {
-        let rsdp_addr = unsafe {
-            let rsdp = rsdp::find_rsdt_address().expect("RSDP Not found!");
-            match rsdp {
-                Address::Rsdp(addr) => {
-                    addr
-                },
-                Address::Xsdp(addr) => {
-                    panic!("Xsdp address is not yet supported!")
-                }
+        let rsdt = rsdp::find_rsdt_address().expect("RSDT Addr Not Found!");
+
+        let rsdt_addr = match rsdt {
+            Address::Rsdp(addr) => {
+                addr
+            },
+            Address::Xsdp(addr) => {
+                panic!("Xsdp address is not yet supported!")
             }
         };
 
-        self.rsdt.init(rsdp_addr);
+        self.rsdt = Some(Rsdt::new(rsdt_addr));
 
-        let lapic_base = self.rsdt.local_controller_address().expect("LAPIC address not found!");
+        let apic = self.rsdt.expect("RSDT not initialized").find_apic_entry().expect("APIC Entry Not Found!");
 
-        self.lapic.init(lapic_base);
+        for l in apic.lapic_entries() {
+            println!("LAPIC: {} {}", l.apic_id, l.proc_id);
+        }
 
-        let ioapic_base = self.rsdt.ioapic_address().expect("IOApic address not found!");
+        for io in apic.ioapic_entries() {
+            println!("IOAPIC: 0x{:x} {} {}", io.ioapic_address, io.ioapic_id, io.global_int_base);
+        }
 
-        self.ioapic.init(ioapic_base);
+        self.lapic.init(apic.lapic_address());
 
-        println!("[ OK ] IOApic initialised! id: {}, ident: {}, entries: {}, version: {}",
-                 self.ioapic.id(), self.ioapic.identification(),
-                 self.ioapic.max_red_entry() + 1, self.ioapic.version());
+        for io in apic.ioapic_entries() {
+            self.ioapic.init(io.ioapic_address())
+        }
+    }
+
+    pub fn mask_int(&mut self, idx: u32, masked: bool) {
+        self.ioapic.mask_int(idx, masked);
+    }
+
+    pub fn set_int_dest(&mut self, idx: u32, dest: u32) {
+        self.ioapic.set_int(idx, dest);
+    }
+
+    pub fn find_irq_remap(&mut self, irq: u32) -> u32 {
+        let apic = self.rsdt.expect("RSDT not initialized").find_apic_entry().expect("APIC Entry Not Found!");
+        apic.find_irq_remap(irq)
+    }
+
+    pub fn end_of_int(&mut self) {
+        self.lapic.end_of_int();
     }
 }

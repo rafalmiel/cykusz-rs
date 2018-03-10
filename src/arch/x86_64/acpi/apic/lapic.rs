@@ -65,7 +65,7 @@ impl LApic {
         self.reg_write(REG_TIMINIT, 0x100000);
     }
 
-    pub fn end_of_interrupt(&self) {
+    pub fn end_of_int(&self) {
         self.reg_write(REG_EOI, 0);
     }
 }

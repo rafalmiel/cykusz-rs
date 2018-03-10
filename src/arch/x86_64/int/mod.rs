@@ -14,28 +14,33 @@ pub fn sti() {
     }
 }
 
-fn remap_irq(irq: u32) -> u32 {
-    if let Some(i) = ACPI.lock().rsdt.remap_irq(irq) {
-        return i;
-    } else {
-        panic!("Failed to remap irq!");
+pub fn cli() {
+    unsafe {
+        asm!("cli");
     }
 }
 
-pub fn end_of_interrupt() {
-    ACPI.lock().lapic.end_of_interrupt();
+fn remap_irq(irq: u32) -> u32 {
+    ACPI.lock().find_irq_remap(irq)
+}
+
+pub fn end_of_int() {
+    //ACPI.lock().end_of_int();
+    unsafe {
+        PIC.lock().notify_end_of_interrupt(32);
+    }
 }
 
 pub fn init() {
     let cp = &mut *PIC.lock();
     cp.init();
-    cp.disable();
-
+    //cp.disable();
     let acpi = &mut *ACPI.lock();
     acpi.init();
+    //let acpi3 = &mut *ACPI.lock();
+    //acpi3.init();
 
-    if let Some(i) = acpi.rsdt.remap_irq(0) {
-        acpi.ioapic.set_int(i, 32);
-        acpi.lapic.fire_timer();
-    }
+    let remap = acpi.find_irq_remap(0);
+    acpi.set_int_dest(remap, 32);
+        //cp.init_timer(50);
 }

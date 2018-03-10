@@ -10,11 +10,14 @@ static CURSOR_DATA: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D5) });
 
 fn update_cursor(offset: u16)
 {
-    CURSOR_INDEX.lock().write(0x0F);
-    CURSOR_DATA.lock().write((offset & 0xFF) as u8);
+    let idx = &mut *CURSOR_INDEX.lock();
+    let dta = &mut *CURSOR_DATA.lock();
 
-    CURSOR_INDEX.lock().write(0x0E);
-    CURSOR_DATA.lock().write((offset >> 8) as u8);
+    idx.write(0x0F);
+    dta.write((offset & 0xFF) as u8);
+
+    idx.write(0x0E);
+    dta.write((offset >> 8) as u8);
 }
 
 lazy_static! {

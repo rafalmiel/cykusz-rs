@@ -1,7 +1,13 @@
 use core::ptr::write_volatile;
 use core::ptr::read_volatile;
 
+use arch::acpi::apic::MatdHeader;
+
 use arch::mm::MappedAddr;
+
+use spin::Mutex;
+
+pub static LAPIC: Mutex<LApic> = Mutex::new(LApic::new());
 
 const REG_TRP: u32 = 0x80;
 const REG_LCR: u32 = 0xD0;
@@ -45,8 +51,8 @@ impl LApic {
         }
     }
 
-    pub fn init(&mut self, base: MappedAddr) {
-        self.lapic_base = Some(base);
+    pub fn init(&mut self, hdr: &'static MatdHeader) {
+        self.lapic_base = Some(hdr.lapic_address());
 
         // Clear task priority to enable all interrupts
         self.reg_write(REG_TRP, 0);
@@ -68,4 +74,8 @@ impl LApic {
     pub fn end_of_int(&self) {
         self.reg_write(REG_EOI, 0);
     }
+}
+
+pub fn init(hdr: &'static MatdHeader) {
+    LAPIC.lock().init(hdr);
 }

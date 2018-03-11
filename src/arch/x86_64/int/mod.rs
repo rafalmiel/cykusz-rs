@@ -5,8 +5,6 @@ use alloc::boxed::Box;
 use arch::acpi::Acpi;
 use arch::dev::pic::ChainedPics;
 
-static ACPI: Mutex<Acpi> = Mutex::new(Acpi::new());
-static PIC: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(0x20, 0x28) });
 
 pub trait InterruptController : Send + Sync {
     fn init(&mut self);
@@ -29,28 +27,18 @@ pub fn cli() {
 }
 
 pub fn remap_irq(irq: u32) -> u32 {
-    ACPI.lock().find_irq_remap(irq)
+    ::arch::acpi::ACPI.lock().find_irq_remap(irq)
 }
 
 pub fn end_of_int() {
-    ACPI.lock().end_of_int()
+    ::arch::dev::lapic::LAPIC.lock().end_of_int()
 }
 
 pub fn mask_int(int: u8, masked: bool) {
-    ACPI.lock().mask_int(int, masked);
+    ::arch::dev::ioapic::IOAPIC.lock().mask_int(int as u32, masked);
 }
 
 pub fn set_irq_dest(src: u8, dst: u8) {
-    ACPI.lock().set_int_dest(src as u32, dst as u32);
+    ::arch::dev::ioapic::IOAPIC.lock().set_int(src as u32, dst as u32);
 }
 
-pub fn init() {
-    let mut pic = PIC.lock();
-
-    pic.init();
-    pic.disable();
-
-    let mut apic = ACPI.lock();
-
-    apic.init();
-}

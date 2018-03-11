@@ -42,8 +42,6 @@ fn eoi() {
 }
 
 pub extern "x86-interrupt" fn rtc_handler(_frame: &mut ridt::ExceptionStackFrame) {
-    println!("RTC interrupt");
-
     eoi();
     int::end_of_int();
 }

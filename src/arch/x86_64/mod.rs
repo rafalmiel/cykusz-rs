@@ -7,7 +7,6 @@ pub mod raw;
 pub mod gdt;
 pub mod idt;
 pub mod mm;
-//pub mod acpi3;
 pub mod acpi;
 pub mod int;
 pub mod dev;
@@ -21,10 +20,8 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
     let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
 
     mm::init(&mboot);
-
-    int::init();
-
-    dev::rtc::init();
+    acpi::init();
+    dev::init();
 
     ::rust_main();
 }

@@ -1,7 +1,12 @@
 use core::ptr::write_volatile;
 use core::ptr::read_volatile;
 
+use arch::acpi::apic::MatdHeader;
 use kernel::mm::*;
+
+use spin::Mutex;
+
+pub static IOAPIC: Mutex<IOApic> = Mutex::new(IOApic::new());
 
 const REG_ID: u32 =	    0x00;
 const REG_VER: u32 =    0x01;
@@ -151,11 +156,19 @@ impl IOApic {
             ioapic_base: None
         }
     }
-    pub fn init(&mut self, base: MappedAddr) {
-        self.ioapic_base = Some(base);
+    pub fn init(&mut self, hdr: &'static MatdHeader) {
+        if let Some(ref io) = hdr.ioapic_entries().nth(0) {
+            self.ioapic_base = Some(io.ioapic_address());
+        } else {
+            panic!("IOApic could not be initialized");
+        }
 
         for i in 0..self.max_red_entry() + 1 {
             self.mask_int(i, true);
         }
     }
+}
+
+pub fn init(hdr: &'static MatdHeader) {
+    IOAPIC.lock().init(hdr);
 }

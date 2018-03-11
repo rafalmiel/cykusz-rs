@@ -2,7 +2,8 @@ use core::mem::size_of;
 
 use kernel::mm::{MappedAddr, PhysAddr};
 
-use super::apic::Matd;
+use super::apic::MatdHeader;
+use super::hpet::HpetHeader;
 
 #[repr(packed, C)]
 pub struct AcpiStdHeader {
@@ -85,8 +86,12 @@ impl Rsdt {
         })
     }
 
-    pub fn find_apic_entry(&'static self) -> Option<&'static Matd> {
+    pub fn find_apic_entry(&'static self) -> Option<&'static MatdHeader> {
         Some(self.find_entry(b"APIC")?.into_matd())
+    }
+
+    pub fn find_hpet_entry(&'static self) -> Option<&'static HpetHeader> {
+        Some(self.find_entry(b"HPET")?.into_hpet())
     }
 
 }
@@ -107,6 +112,7 @@ impl Iterator for RsdtIter {
     }
 }
 
+
 impl AcpiStdHeader {
     unsafe fn to<T>(&'static self) -> &'static T {
         &*(self as *const _ as *const T)
@@ -123,15 +129,27 @@ impl AcpiStdHeader {
         panic!("AcpiStd: Tried to convert into invalid RSDT Header")
     }
 
-    pub fn into_matd(&'static self) -> &'static Matd {
+    pub fn into_matd(&'static self) -> &'static MatdHeader {
         if self.is_valid() &&
             &self.signature == b"APIC" {
 
             unsafe {
-                return self.to::<Matd>();
+                return self.to::<MatdHeader>();
             }
         }
 
         panic!("AcpiStd: Tried to convert into invalid MATD Header")
+    }
+
+    pub fn into_hpet(&'static self) -> &'static HpetHeader {
+        if self.is_valid() &&
+            &self.signature == b"HPET" {
+
+            unsafe {
+                return self.to::<HpetHeader>();
+            }
+        }
+
+        panic!("AcpiStd: Tried to convert into invalid HPET Header")
     }
 }

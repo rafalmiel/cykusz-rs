@@ -11,8 +11,8 @@ pub struct Pit {
 impl Pit {
     pub const fn new() -> Pit {
         Pit {
-            pitCh0: UnsafePort::new(0x40),
-            pitMC : UnsafePort::new(0x43),
+            pitCh0: unsafe { UnsafePort::new(0x40) },
+            pitMC : unsafe { UnsafePort::new(0x43) },
             ticks: 0
         }
     }

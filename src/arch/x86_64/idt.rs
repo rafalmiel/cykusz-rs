@@ -1,43 +1,47 @@
 use arch::raw::idt;
 
-lazy_static! {
-    static ref IDT : idt::Idt = {
-        let mut idt = idt::Idt::new();
+use spin::Mutex;
 
-        //Initialise exception handler routines
-        idt.set_divide_by_zero(               divide_by_zero);
-        idt.set_debug(                        debug);
-        idt.set_non_maskable_interrupt(       non_maskable_interrupt);
-        idt.set_breakpoint(                   breakpoint);
-        idt.set_overflow(                     overflow);
-        idt.set_bound_range_exceeded(         bound_range_exceeded);
-        idt.set_invalid_opcode(               invalid_opcode);
-        idt.set_device_not_available(         device_not_available);
-        idt.set_double_fault(                 double_fault);
-        idt.set_invalid_tss(                  invalid_tss);
-        idt.set_segment_not_present(          segment_not_present);
-        idt.set_stack_segment_fault(          stack_segment_fault);
-        idt.set_general_protection_fault(     general_protection_fault);
-        idt.set_page_fault(                   page_fault);
-        idt.set_x87_floating_point_exception( x87_floating_point_exception);
-        idt.set_alignment_check(              alignment_check);
-        idt.set_machine_check(                machine_check);
-        idt.set_simd_floating_point_exception(simd_floating_point_exception);
-        idt.set_virtualisation_exception(     virtualisation_exception);
-        idt.set_security_exception(           security_exception);
-        for i in 32..255 {
-            unsafe {
-                idt.set_handler(i, dummy);
-            }
-        }
-        idt
-    };
-}
+static IDT: Mutex<idt::Idt> = Mutex::new(idt::Idt::new());
 
 pub fn init() {
-    IDT.load();
+    let mut idt = IDT.lock();
+    //Initialise exception handler routines
+    idt.set_divide_by_zero(               divide_by_zero);
+    idt.set_debug(                        debug);
+    idt.set_non_maskable_interrupt(       non_maskable_interrupt);
+    idt.set_breakpoint(                   breakpoint);
+    idt.set_overflow(                     overflow);
+    idt.set_bound_range_exceeded(         bound_range_exceeded);
+    idt.set_invalid_opcode(               invalid_opcode);
+    idt.set_device_not_available(         device_not_available);
+    idt.set_double_fault(                 double_fault);
+    idt.set_invalid_tss(                  invalid_tss);
+    idt.set_segment_not_present(          segment_not_present);
+    idt.set_stack_segment_fault(          stack_segment_fault);
+    idt.set_general_protection_fault(     general_protection_fault);
+    idt.set_page_fault(                   page_fault);
+    idt.set_x87_floating_point_exception( x87_floating_point_exception);
+    idt.set_alignment_check(              alignment_check);
+    idt.set_machine_check(                machine_check);
+    idt.set_simd_floating_point_exception(simd_floating_point_exception);
+    idt.set_virtualisation_exception(     virtualisation_exception);
+    idt.set_security_exception(           security_exception);
+    for i in 32..256 {
+        unsafe {
+            idt.set_handler(i, dummy);
+        }
+    }
+    idt.load();
 
     println!("[ OK ] IDT Initialised");
+}
+
+pub fn set_handler(num: usize, f: idt::HandlerFn) {
+    assert!(num <= 255);
+    unsafe {
+        IDT.lock().set_handler(num, f);
+    }
 }
 
 
@@ -77,7 +81,7 @@ extern "x86-interrupt" fn bound_range_exceeded(_frame: &mut idt::ExceptionStackF
 }
 
 extern "x86-interrupt" fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) {
-    println!("Invalid Opcode error!");
+    println!("Invalid Opcode error! {:?}", _frame);
     loop {}
 }
 

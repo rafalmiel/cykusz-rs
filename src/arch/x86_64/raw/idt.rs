@@ -108,7 +108,7 @@ impl Idt {
         self.entries[idx].set_handler_fn_err(f, cs(), dsc::Flags::SYS_RING0_INTERRUPT_GATE);
     }
 
-    pub fn load(&'static self) {
+    pub fn load(&self) {
         let mut idtr = dsc::DescriptorTablePointer::<IdtEntry>::empty();
         idtr.init(&self.entries[..]);
         unsafe {

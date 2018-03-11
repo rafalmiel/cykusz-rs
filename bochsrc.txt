@@ -5,7 +5,7 @@ vgaromimage:     file=/usr/share/bochs/VGABIOS-lgpl-latest
 ata0-master:     type=cdrom, path=build/os-x86_64.iso, status=inserted
 boot:            cdrom
 log:             bochslog.txt
-clock:           sync=realtime, time0=local
-cpu:             count=4, ips=10000000, reset_on_triple_fault=0
+clock:           sync=realtime, rtc_sync=1, time0=local
+cpu:             count=4, ips=1000000, reset_on_triple_fault=0
 cpuid:           1g_pages=0
-debug:           action=report
+debug:           CMOS=report

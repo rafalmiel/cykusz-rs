@@ -1,5 +1,7 @@
 use arch::raw::cpuio::{Port, UnsafePort};
 
+use arch::int::InterruptController;
+
 // Cmd sent to begin PIC initialization
 const CMD_INIT: u8 = 0x11;
 
@@ -8,6 +10,8 @@ const CMD_END_OF_INTERRUPT: u8 = 0x20;
 
 // The mode in which we want to run PIC
 const MODE_8086: u8 = 0x01;
+
+const CMD_READ_ISR: u8 = 0x0B;
 
 struct Pic {
     offset: u8,
@@ -82,7 +86,7 @@ impl ChainedPics {
         self.pics[1].data.write(MODE_8086);
         wait();
 
-        self.pics[0].data.write(saved_mask1);//disable timer?
+        self.pics[0].data.write(saved_mask1 | 0b00000001);//disable timer?
         self.pics[1].data.write(saved_mask2);
     }
 
@@ -100,6 +104,26 @@ impl ChainedPics {
     pub fn init(&mut self) {
         unsafe {
             self.configure();
+            //self.disable();
+        }
+    }
+
+    pub fn mask_int(&mut self, irq: u8, masked: bool) {
+        let (irqline, port) =
+            if irq < 8 { (irq, 0) } else { (irq - 8, 1) };
+
+        let val = if masked {
+            unsafe {
+                self.pics[port].data.read() | (1 << irqline)
+            }
+        } else {
+            unsafe {
+                self.pics[port].data.read() & !(1 << irqline)
+            }
+        };
+
+        unsafe {
+            self.pics[port].data.write(val);
         }
     }
 
@@ -107,14 +131,58 @@ impl ChainedPics {
         self.pics.iter().any(|p| p.handles_interrupt(interrupt_id))
     }
 
-    pub unsafe fn notify_end_of_interrupt(&mut self, int_id: u8) {
-        if self.handles_interrupt(int_id) {
-            if self.pics[1].handles_interrupt(int_id) {
-            }
+    unsafe fn get_irq_reg(&mut self, cmd: u8) -> u16 {
+        self.pics[1].command.write(cmd);
+        self.pics[0].command.write(cmd);
 
-            self.pics[1].end_of_interrupt();
-            self.pics[0].end_of_interrupt();
+        return ((self.pics[1].command.read() as u16) << 8) | (self.pics[0].command.read() as u16);
+    }
+
+    pub fn get_isr(&mut self) -> u16 {
+        unsafe {
+            self.get_irq_reg(CMD_READ_ISR)
         }
     }
 
+    fn is_pic0_pic1_active(&mut self) -> (bool, bool) {
+        let isr = self.get_isr();
+
+        ((isr & 0xFF) > 0, (isr >> 8) > 0)
+    }
+
+    pub fn notify_end_of_interrupt(&mut self) {
+        let (p0, p1) = self.is_pic0_pic1_active();
+        unsafe {
+            if p0 || p1 {
+                if p1 {
+                    self.pics[1].end_of_interrupt();
+                }
+
+                self.pics[0].end_of_interrupt();
+            }
+        }
+    }
+
+}
+
+impl InterruptController for ChainedPics {
+    fn init(&mut self) {
+        self.init();
+    }
+
+    fn end_of_int(&mut self) {
+        self.notify_end_of_interrupt();
+    }
+
+    fn irq_remap(&self, irq: u32) -> u32 {
+        irq
+    }
+
+    fn mask_int(&mut self, int: u8, masked: bool) {
+        self.mask_int(int, masked);
+    }
+
+    fn disable(&mut self) {
+        self.disable();
+    }
 }

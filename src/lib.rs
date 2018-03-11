@@ -12,6 +12,7 @@
 #![feature(alloc, allocator_api)]
 #![feature(conservative_impl_trait)]
 #![feature(pointer_methods)]
+#![feature(dyn_trait)]
 
 extern crate rlibc;
 #[macro_use]
@@ -34,5 +35,5 @@ pub mod lang_items;
 
 #[no_mangle]
 pub extern "C" fn rust_main() {
-    kernel::mm::init();
+    ::kernel::mm::init();
 }

@@ -10,6 +10,7 @@ pub mod mm;
 //pub mod acpi3;
 pub mod acpi;
 pub mod int;
+pub mod dev;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
@@ -23,8 +24,7 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
 
     int::init();
 
-
-    //int::sti();
+    dev::rtc::init();
 
     ::rust_main();
 }

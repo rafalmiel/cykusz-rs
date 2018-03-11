@@ -2,23 +2,30 @@ mod rsdp;
 mod util;
 mod rsdt;
 mod apic;
+pub mod hpet;
 
 use self::rsdp::Address;
 use kernel::mm::{PhysAddr,MappedAddr,VirtAddr};
 use self::rsdt::Rsdt;
+use arch::dev::lapic::LApic;
+use arch::dev::ioapic::IOApic;
+use arch::dev::hpet::Hpet;
+use self::hpet::HpetHeader;
 
 pub struct Acpi {
     rsdt: Option<&'static Rsdt>,
-    lapic: apic::lapic::LApic,
-    ioapic: apic::ioapic::IOApic
+    lapic: LApic,
+    ioapic: IOApic,
+    hpet: Option<Hpet>,
 }
 
 impl Acpi {
     pub const fn new() -> Acpi {
         Acpi {
             rsdt: None,
-            lapic: apic::lapic::LApic::new(),
-            ioapic: apic::ioapic::IOApic::new(),
+            lapic: LApic::new(),
+            ioapic: IOApic::new(),
+            hpet: None
         }
     }
 
@@ -51,10 +58,22 @@ impl Acpi {
         for io in apic.ioapic_entries() {
             self.ioapic.init(io.ioapic_address())
         }
+
+        if let Some(h) = self.rsdt.expect("RSDT").find_hpet_entry() {
+            //println!("HPET 0x{:x} 0x{:x} 0x{:x}", h.address, h.minimum_tick, h.pci_vendor_id);
+
+            self.hpet = Some(Hpet::new(h));
+        } else {
+            println!("HPET not found, switching back to PIT");
+        }
+        if let Some(ref ht) = self.hpet {
+            println!("HPET Tick Period: {}", ht.counter_clk_period());
+        }
+
     }
 
-    pub fn mask_int(&mut self, idx: u32, masked: bool) {
-        self.ioapic.mask_int(idx, masked);
+    pub fn mask_int(&mut self, idx: u8, masked: bool) {
+        self.ioapic.mask_int(idx as u32, masked);
     }
 
     pub fn set_int_dest(&mut self, idx: u32, dest: u32) {
@@ -68,5 +87,9 @@ impl Acpi {
 
     pub fn end_of_int(&mut self) {
         self.lapic.end_of_int();
+    }
+
+    pub fn has_hpet(&self) -> bool {
+        self.hpet.is_some()
     }
 }

@@ -1,12 +1,20 @@
-mod pic;
 
 use spin::Mutex;
+use alloc::boxed::Box;
 
 use arch::acpi::Acpi;
-use self::pic::ChainedPics;
+use arch::dev::pic::ChainedPics;
 
 static ACPI: Mutex<Acpi> = Mutex::new(Acpi::new());
-static PIC: Mutex<ChainedPics> = Mutex::new( unsafe { ChainedPics::new(0x20, 0x28) } );
+static PIC: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(0x20, 0x28) });
+
+pub trait InterruptController : Send + Sync {
+    fn init(&mut self);
+    fn end_of_int(&mut self);
+    fn irq_remap(&self, irq: u32) -> u32;
+    fn mask_int(&mut self, int: u8, masked: bool);
+    fn disable(&mut self);
+}
 
 pub fn sti() {
     unsafe {
@@ -20,27 +28,29 @@ pub fn cli() {
     }
 }
 
-fn remap_irq(irq: u32) -> u32 {
+pub fn remap_irq(irq: u32) -> u32 {
     ACPI.lock().find_irq_remap(irq)
 }
 
 pub fn end_of_int() {
-    //ACPI.lock().end_of_int();
-    unsafe {
-        PIC.lock().notify_end_of_interrupt(32);
-    }
+    ACPI.lock().end_of_int()
+}
+
+pub fn mask_int(int: u8, masked: bool) {
+    ACPI.lock().mask_int(int, masked);
+}
+
+pub fn set_irq_dest(src: u8, dst: u8) {
+    ACPI.lock().set_int_dest(src as u32, dst as u32);
 }
 
 pub fn init() {
-    let cp = &mut *PIC.lock();
-    cp.init();
-    //cp.disable();
-    let acpi = &mut *ACPI.lock();
-    acpi.init();
-    //let acpi3 = &mut *ACPI.lock();
-    //acpi3.init();
+    let mut pic = PIC.lock();
 
-    let remap = acpi.find_irq_remap(0);
-    acpi.set_int_dest(remap, 32);
-        //cp.init_timer(50);
+    pic.init();
+    pic.disable();
+
+    let mut apic = ACPI.lock();
+
+    apic.init();
 }

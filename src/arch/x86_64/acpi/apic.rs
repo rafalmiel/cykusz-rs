@@ -1,6 +1,3 @@
-pub mod lapic;
-pub mod ioapic;
-
 use core::iter::FilterMap;
 use arch::acpi::rsdt::AcpiStdHeader;
 
@@ -15,7 +12,7 @@ bitflags! {
 }
 
 #[repr(packed, C)]
-pub struct Matd {
+pub struct MatdHeader {
     hdr: AcpiStdHeader,
     pub local_controller_address: u32,
     flags: u32
@@ -28,7 +25,7 @@ pub struct MatdEntry {
 }
 
 pub struct MatdIter {
-    matd: &'static Matd,
+    matd: &'static MatdHeader,
     current: *const u8,
     limit: *const u8
 }
@@ -76,13 +73,13 @@ impl MatdEntryIOApic {
     }
 }
 
-impl Matd {
+impl MatdHeader {
     pub fn entries(&'static self) -> MatdIter {
         MatdIter {
             matd: self,
             current: unsafe {
                 (self as *const _ as *const u8)
-                    .offset(::core::mem::size_of::<Matd>() as isize)
+                    .offset(::core::mem::size_of::<MatdHeader>() as isize)
             },
             limit: unsafe {
                 (self as *const _ as *const u8)

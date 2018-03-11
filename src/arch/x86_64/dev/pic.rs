@@ -2,6 +2,10 @@ use arch::raw::cpuio::{Port, UnsafePort};
 
 use arch::int::InterruptController;
 
+use spin::Mutex;
+
+pub static PIC: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(0x20, 0x28) });
+
 // Cmd sent to begin PIC initialization
 const CMD_INIT: u8 = 0x11;
 
@@ -185,4 +189,12 @@ impl InterruptController for ChainedPics {
     fn disable(&mut self) {
         self.disable();
     }
+}
+
+pub fn init() {
+    PIC.lock().init();
+}
+
+pub fn disable() {
+    PIC.lock().disable();
 }

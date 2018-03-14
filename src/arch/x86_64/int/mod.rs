@@ -14,6 +14,14 @@ pub trait InterruptController : Send + Sync {
     fn disable(&mut self);
 }
 
+pub fn is_int_enabled() -> bool {
+    unsafe {
+        let r: usize;
+        asm!("pushfq; popq $0" : "=r"(r) :: "memory");
+        return (r & (1usize << 9)) > 0;
+    }
+}
+
 pub fn sti() {
     unsafe {
         asm!("sti");
@@ -26,8 +34,8 @@ pub fn cli() {
     }
 }
 
-pub fn remap_irq(irq: u32) -> u32 {
-    ::arch::acpi::ACPI.lock().find_irq_remap(irq)
+pub fn get_irq_mapping(irq: u32) -> u32 {
+    ::arch::acpi::ACPI.lock().get_irq_mapping(irq)
 }
 
 pub fn end_of_int() {
@@ -41,4 +49,3 @@ pub fn mask_int(int: u8, masked: bool) {
 pub fn set_irq_dest(src: u8, dst: u8) {
     ::arch::dev::ioapic::IOAPIC.lock().set_int(src as u32, dst as u32);
 }
-

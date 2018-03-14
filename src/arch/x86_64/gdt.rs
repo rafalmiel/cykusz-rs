@@ -2,13 +2,15 @@ use arch::raw::descriptor as dsc;
 use arch::raw::gdt;
 use arch::raw::segmentation as sgm;
 
+use kernel::mm::PhysAddr;
+
 static INIT_GDT: [gdt::GdtEntry; 3] = [
     // Null
     gdt::GdtEntry::MISSING,
     // Kernel code
     gdt::GdtEntry::new(dsc::Flags::SEG_RING0_CODE, gdt::GdtFlags::LONG_MODE),
     // Kernel data
-    gdt::GdtEntry::new(dsc::Flags::SEG_RING0_DATA, gdt::GdtFlags::MISSING),
+    gdt::GdtEntry::new(dsc::Flags::SEG_RING0_DATA, gdt::GdtFlags::LONG_MODE),
 ];
 
 pub const fn ring0_cs() -> sgm::SegmentSelector {
@@ -34,4 +36,5 @@ pub fn init() {
     }
 
     println!("[ OK ] GDT Initialised");
+
 }

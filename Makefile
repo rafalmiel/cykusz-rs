@@ -44,7 +44,7 @@ $(iso): $(kernel) $(grub_cfg)
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
-	ld -n --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
+	ld -n --gc-sections  -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 build:
 	./update_core_nightly.sh ../rust

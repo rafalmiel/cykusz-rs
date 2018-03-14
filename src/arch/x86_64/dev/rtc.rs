@@ -4,10 +4,11 @@ use arch::int;
 use arch::raw::cpuio;
 
 pub fn init() {
-    int::set_irq_dest(int::remap_irq(8) as u8, 40);
+    let remap: u8 = int::get_irq_mapping(8) as u8;
+    int::set_irq_dest(remap as u8, 40);
     idt::set_handler(40, rtc_handler);
 
-    int::mask_int(8, false);
+    int::mask_int(remap, false);
 
     int::cli();
 

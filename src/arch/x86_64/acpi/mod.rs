@@ -42,7 +42,7 @@ impl Acpi {
         self.rsdt
     }
 
-    pub fn find_irq_remap(&mut self, irq: u32) -> u32 {
+    pub fn get_irq_mapping(&mut self, irq: u32) -> u32 {
         let apic = self.rsdt.expect("RSDT not initialized").find_apic_entry().expect("APIC Entry Not Found!");
         apic.find_irq_remap(irq)
     }
@@ -57,5 +57,5 @@ pub fn init() {
     let acpi = &mut *ACPI.lock();
     acpi.init();
 
-    println!("[ ACPI ] Found...? {}", if acpi.get_rsdt().is_some() { "YES" } else { "NO" });
+    println!("[ OK ] ACPI found...? {}", if acpi.get_rsdt().is_some() { "YES" } else { "NO" });
 }

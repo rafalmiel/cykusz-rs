@@ -10,6 +10,9 @@ pub mod mm;
 pub mod acpi;
 pub mod int;
 pub mod dev;
+pub mod sync;
+
+use kernel::mm::PhysAddr;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
@@ -20,8 +23,14 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
     let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
 
     mm::init(&mboot);
+
     acpi::init();
+
     dev::init();
+
+    int::sti();
+
+    println!("[ OK ] Interrupts enabled");
 
     ::rust_main();
 }

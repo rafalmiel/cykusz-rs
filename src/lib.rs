@@ -35,4 +35,9 @@ pub mod lang_items;
 #[no_mangle]
 pub extern "C" fn rust_main() {
     ::kernel::mm::init();
+
+    loop {
+        print!(".");
+        arch::dev::pit::early_sleep(100);
+    }
 }

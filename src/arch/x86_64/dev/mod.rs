@@ -24,7 +24,11 @@ pub fn init()
             println!("[ OK ] LAPIC Initialized");
         }
     }
-    rtc::init();
 
-    println!("[ OK ] RTC Initialized");
+    // initialise and disable pit. its used to implement busy sleep
+    // sleep function mask and unmask interrupts when needed
+    pit::init();
+    pit::disable();
+
+    println!("[ OK ] PIT Initialised")
 }

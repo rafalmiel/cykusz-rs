@@ -54,8 +54,8 @@ SECTIONS {
         {
                 build/arch/x86_64/asm/long_mode_init.o(.stack)
                 *(.bss .bss.*)
-                . = ALIGN(4K);
         }
 
+        . = ALIGN(4K) - 0xFFFFFF0000000000;
         __kernel_bss_end = .;
 }

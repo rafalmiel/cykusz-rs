@@ -1,4 +1,5 @@
 ENTRY(start)
+OUTPUT_FORMAT(elf64-x86-64)
 
 SECTIONS {
 
@@ -8,6 +9,7 @@ SECTIONS {
         .boot :
         {
                 KEEP(*(.multiboot_header))
+                KEEP(*(.apinit_trampoline))
                 KEEP(*(.apinit))
                 build/arch/x86_64/asm/boot.o(.text* .rodata* .data* .bss*)
                 build/arch/x86_64/asm/paging.o(.text* .rodata* .data* .bss*)
@@ -46,7 +48,6 @@ SECTIONS {
         .data(0xFFFFFF0000000000 + __kernel_data_start) : AT(__kernel_data_start)
         {
                 *(.data .data.*)
-                *(.stack .stack.*)
         }
 
         . = ALIGN(4K) - 0xFFFFFF0000000000;
@@ -54,7 +55,7 @@ SECTIONS {
 
         .bss(0xFFFFFF0000000000 + __kernel_bss_start) : AT(__kernel_bss_start)
         {
-                build/arch/x86_64/asm/long_mode_init.o(.stack)
+                build/arch/x86_64/asm/higher_half.o(.stack)
                 *(.bss .bss.*)
         }
 

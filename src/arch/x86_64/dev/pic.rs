@@ -36,8 +36,6 @@ impl Pic {
 
 pub struct ChainedPics {
     pics: [Pic; 2],
-    pitCh0: UnsafePort<u8>,
-    pitMC: UnsafePort<u8>
 }
 
 impl ChainedPics {
@@ -53,8 +51,6 @@ impl ChainedPics {
                        command: UnsafePort::new(0xA0),
                        data: UnsafePort::new(0xA1),
                    }],
-            pitCh0: UnsafePort::new(0x40),
-            pitMC : UnsafePort::new(0x43)
         }
     }
 

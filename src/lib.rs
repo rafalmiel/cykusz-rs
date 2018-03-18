@@ -37,8 +37,11 @@ pub mod lang_items;
 pub extern "C" fn rust_main() {
     ::kernel::mm::init();
 
+    ::arch::smp::init();
+
     loop {
-        print!(".");
-        arch::dev::pit::early_sleep(1000);
+        unsafe {
+            asm!("pause"::::"volatile");
+        }
     }
 }

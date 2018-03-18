@@ -1,22 +1,105 @@
 global start
 global gdt64_code_offset
 global error
+global trampoline
 global apinit_start
 global apinit_end
 
 extern long_mode_start
+extern long_mode_start_ap
 extern test_multiboot
 extern test_cpuid
 extern test_long_mode
 extern setup_page_tables
 extern enable_paging
+extern __p4_table
+extern setup_SSE
+extern higher_half_start_ap
+
+section .apinit_trampoline
+trampoline:
+    .ready: dq 0
+    .cpu_num: db 0
+    .stack_ptr: dq 0
+    .page_table: dq 0
+
+tmp_gdt:
+	; null descriptor 0x00
+	dq 0
+
+	; 64-bit kernel code descriptor 0x08
+	dw 0xFFFF
+	dw 0
+	db 0
+	db 10011010b
+	db 10101111b
+	db 0
+
+	; 64-bit kernel data descriptor 0x10
+	dw 0xFFFF
+	dw 0
+	db 0
+	db 10010010b
+	db 10101111b
+	db 0
+.pointer:
+    dw $ - tmp_gdt - 1
+    dq 0xE00 + (tmp_gdt - trampoline)
+tmp_gdt_end:
+
+    times 512 - ($ - tmp_gdt_end) db 0
+
 
 section .apinit
-align 4096
 bits 16
 apinit_start:
-hlt
-jmp apinit_start
+    cli
+
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+
+    ; Ap boot stack
+    mov sp, 0x4000
+
+    lgdt [0xE00 + tmp_gdt.pointer - trampoline]
+
+    mov eax, 0x630
+    mov cr4, eax
+
+    ;mov eax, cr0
+    ;and eax, 0xFFFFFFFB
+    ;or eax, 2
+    ;mov cr0, eax
+
+    ; go to long mode
+    mov eax, __p4_table
+    mov cr3, eax
+
+    mov ecx, 0xC0000080
+    rdmsr
+    or eax, 0x100
+    wrmsr
+
+    ; enable paging in the cr0 register
+    mov eax, cr0
+    or eax, 1 << 31
+    or eax, 1 << 16
+    or eax, 1
+    mov cr0, eax
+
+    jmp 0x08:0x1000 + (lmsap - apinit_start)
+
+lmsap:
+bits 64
+    ;call setup_SSE
+    mov rax, higher_half_start_ap
+    jmp rax
+
+.apinit_hlt:
+    hlt
+    jmp .apinit_hlt
 apinit_end:
 
 section .text

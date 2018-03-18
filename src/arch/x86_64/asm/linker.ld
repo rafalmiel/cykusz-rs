@@ -1,12 +1,14 @@
 ENTRY(start)
 
 SECTIONS {
+
         . = 1M;
 
         __kernel_boot_start = .;
         .boot :
         {
                 KEEP(*(.multiboot_header))
+                KEEP(*(.apinit))
                 build/arch/x86_64/asm/boot.o(.text* .rodata* .data* .bss*)
                 build/arch/x86_64/asm/paging.o(.text* .rodata* .data* .bss*)
                 build/arch/x86_64/asm/sse.o(.text* .rodata* .data* .bss*)

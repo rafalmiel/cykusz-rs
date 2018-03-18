@@ -26,7 +26,27 @@ impl Pit {
     }
 
     pub fn init(&mut self) {
-        self.init_timer(10);
+        //self.init_timer(10);
+    }
+
+    pub fn init_sleep(&mut self) {
+        unsafe {
+            //Interrupt on terminal count mode for counter 0
+            self.pit_mc.write(0x30);
+
+            //Set count value
+            self.pit_ch0.write(0xA9);
+            self.pit_ch0.write(0x4);
+        }
+    }
+
+    pub fn is_sleep_finished(&mut self) -> bool {
+        unsafe {
+            self.pit_mc.write(0xE2);
+            let status = self.pit_ch0.read();
+
+            return (status & 0b1000_0000) != 0;
+        }
     }
 
     // Supports from 1 to 50ms
@@ -74,23 +94,16 @@ pub extern "x86-interrupt" fn pit_handler(_frame: &mut ridt::ExceptionStackFrame
     int::end_of_int();
 }
 
-// Should be used only at early stage
-// After enabling multiple cpus or even threads, this function is not thread safe
-pub fn early_sleep(ms10: u64) {
-    enable();
-    let cur = PIT.lock_irq().ticks;
-    let dst = cur + ms10;
+pub fn early_sleep(mut ms: u64) {
+    let mut pit = PIT.lock_irq();
+    while (ms > 0) {
+        pit.init_sleep();
 
-    loop {
-        let pit = PIT.lock_irq();
-
-        if pit.ticks >= dst {
-            break;
+        while !pit.is_sleep_finished() {
+            unsafe {
+                asm!("pause"::::"volatile");
+            }
         }
-        unsafe {
-            //TODO: Move somewhere else
-            asm!("pause")
-        }
+        ms -= 1;
     }
-    disable();
 }

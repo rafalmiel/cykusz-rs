@@ -1,6 +1,8 @@
 global start
 global gdt64_code_offset
 global error
+global apinit_start
+global apinit_end
 
 extern long_mode_start
 extern test_multiboot
@@ -8,6 +10,14 @@ extern test_cpuid
 extern test_long_mode
 extern setup_page_tables
 extern enable_paging
+
+section .apinit
+align 4096
+bits 16
+apinit_start:
+hlt
+jmp apinit_start
+apinit_end:
 
 section .text
 bits 32

@@ -34,15 +34,15 @@ impl PhysMemIterator {
 
         PhysMemIterator {
             current:        PhysAddr(ent.base_addr as usize),
-            mm_iter:        mm_iter,
+            mm_iter,
             mm_start:       PhysAddr(ent.base_addr as usize),
             mm_end:         PhysAddr(ent.base_addr as usize) + ent.length as usize,
-            kern_start:     kern_start,
-            kern_end:       kern_end,
-            mboot_start:    mboot_start,
-            mboot_end:      mboot_end,
-            modules_start:  modules_start,
-            modules_end:    modules_end
+            kern_start,
+            kern_end,
+            mboot_start,
+            mboot_end,
+            modules_start,
+            modules_end
         }
     }
 

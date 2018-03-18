@@ -4,8 +4,9 @@ use core::ptr::read_volatile;
 use arch::acpi::apic::MatdHeader;
 
 use arch::mm::MappedAddr;
+use arch::raw::msr;
 
-use spin::Mutex;
+use arch::sync::Mutex;
 
 pub static LAPIC: Mutex<LApic> = Mutex::new(LApic::new());
 
@@ -15,6 +16,8 @@ const REG_DFR: u32 = 0xE0;
 const REG_SIVR: u32 = 0xF0;
 const REG_EOI: u32 = 0xB0;
 
+const REG_CMD: u32 = 0x300;
+const REG_CMD_ID: u32 = 0x310;
 const REG_TIM: u32 = 0x320;
 const REG_TIMDIV: u32 = 0x3E0;
 const REG_TIMINIT: u32 = 0x380;
@@ -22,12 +25,14 @@ const REG_TIMCUR: u32 = 0x390;
 
 pub struct LApic {
     lapic_base: Option<MappedAddr>,
+    x2: bool
 }
 
 impl LApic {
     pub const fn new() -> LApic {
         LApic {
-            lapic_base: None
+            lapic_base: None,
+            x2: false
         }
     }
 
@@ -52,30 +57,80 @@ impl LApic {
     }
 
     pub fn init(&mut self, hdr: &'static MatdHeader) {
-        self.lapic_base = Some(hdr.lapic_address());
+        self.x2 = ::arch::dev::cpu::has_x2apic();
 
-        // Clear task priority to enable all interrupts
-        self.reg_write(REG_TRP, 0);
+        if !self.x2 {
+            self.lapic_base = Some(hdr.lapic_address());
 
-        // Logical Destination Mode
-    	self.reg_write(REG_DFR, 0xffffffff);	// Flat mode
-    	self.reg_write(REG_LCR, 0x01000000);	// All cpus use logical id 1
+            // Clear task priority to enable all interrupts
+            self.reg_write(REG_TRP, 0);
 
-    	// Configure Spurious Interrupt Vector Register
-    	self.reg_write(REG_SIVR, 0x100 | 0xff);
+            // Logical Destination Mode
+            self.reg_write(REG_DFR, 0xffffffff);	// Flat mode
+            self.reg_write(REG_LCR, 0x01000000);	// All cpus use logical id 1
+
+            // Configure Spurious Interrupt Vector Register
+            self.reg_write(REG_SIVR, 0x100 | 0xff);
+        } else {
+            unsafe {
+                //Enable X2APIC: (bit 10)
+                msr::wrmsr(msr::IA32_APIC_BASE, msr::rdmsr(msr::IA32_APIC_BASE) | 1 << 10);
+
+                // Clear task priority to enable all interrupts
+                msr::wrmsr(msr::IA32_X2APIC_TPR, 0);
+
+                // Configure Spurious Interrupt Vector Register
+                msr::wrmsr(msr::IA32_X2APIC_SIVR, 0x100 | 0xff);
+            }
+        }
     }
 
-    pub fn fire_timer(&mut self) {
-        self.reg_write(REG_TIMDIV, 0b1010);
-        self.reg_write(REG_TIM, 32 | 0x20000);
-        self.reg_write(REG_TIMINIT, 0x100000);
+    pub fn init_ap(&mut self, ap_id: u8) {
+        if !self.x2 {
+            self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
+            self.reg_write(REG_CMD, 0x4500);
+
+            ::arch::dev::pit::early_sleep(10);
+
+            self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
+            self.reg_write(REG_CMD, 0x4601);
+
+            ::arch::dev::pit::early_sleep(10);
+        } else {
+            unsafe {
+                // INIT
+                msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4500u64 | ((ap_id as u64) << 32));
+                ::arch::dev::pit::early_sleep(10);
+
+                // START: AP Trampoline begins at physical address 0x1000
+                msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4601u64 | ((ap_id as u64) << 32));
+                ::arch::dev::pit::early_sleep(10);
+            }
+        }
     }
 
     pub fn end_of_int(&self) {
-        self.reg_write(REG_EOI, 0);
+        if !self.x2 {
+            self.reg_write(REG_EOI, 0);
+        } else {
+            unsafe {
+                msr::wrmsr(msr::IA32_X2APIC_EOI, 0);
+            }
+        }
     }
 }
 
 pub fn init(hdr: &'static MatdHeader) {
     LAPIC.lock().init(hdr);
+}
+
+pub fn init_ap() {
+    let mut lapic = LAPIC.lock_irq();
+
+    for cpu in ::arch::acpi::ACPI.lock().get_rsdt().unwrap().find_apic_entry().unwrap().lapic_entries() {
+        if cpu.proc_id > 0 {
+            lapic.init_ap(cpu.proc_id);
+            println!("[ OK ] Initialized AP CPU: {}", cpu.proc_id);
+        }
+    }
 }

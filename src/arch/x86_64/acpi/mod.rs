@@ -26,6 +26,7 @@ impl Acpi {
     pub fn init(&mut self) {
         let rsdt = rsdp::find_rsdt_address().expect("RSDT Addr Not Found!");
 
+
         let rsdt_addr = match rsdt {
             Address::Rsdp(addr) => {
                 addr

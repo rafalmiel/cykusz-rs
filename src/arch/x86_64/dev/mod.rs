@@ -4,6 +4,7 @@ pub mod pit;
 pub mod ioapic;
 pub mod lapic;
 pub mod hpet;
+pub mod cpu;
 
 pub fn init()
 {
@@ -21,7 +22,7 @@ pub fn init()
 
             lapic::init(apic);
 
-            println!("[ OK ] LAPIC Initialized");
+            println!("[ OK ] LAPIC Initialized (x2apic: {})", cpu::has_x2apic());
         }
     }
 
@@ -30,5 +31,5 @@ pub fn init()
     pit::init();
     pit::disable();
 
-    println!("[ OK ] PIT Initialised")
+    println!("[ OK ] PIT Initialised");
 }

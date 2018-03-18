@@ -13,6 +13,8 @@ static INIT_GDT: [gdt::GdtEntry; 3] = [
     gdt::GdtEntry::new(dsc::Flags::SEG_RING0_DATA, gdt::GdtFlags::LONG_MODE),
 ];
 
+static mut INIT_GDTR : dsc::DescriptorTablePointer<gdt::GdtEntry> =  dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
+
 pub const fn ring0_cs() -> sgm::SegmentSelector {
     sgm::SegmentSelector::new(1, sgm::SegmentSelector::RPL_0)
 }
@@ -22,10 +24,9 @@ pub const fn ring0_ds() -> sgm::SegmentSelector {
 }
 
 pub fn init() {
-    let mut gdtr= dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
-    gdtr.init(&INIT_GDT[..]);
     unsafe {
-        dsc::lgdt(&gdtr);
+        INIT_GDTR.init(&INIT_GDT[..]);
+        dsc::lgdt(&INIT_GDTR);
 
         sgm::set_cs(ring0_cs());
         sgm::load_ds(ring0_ds());

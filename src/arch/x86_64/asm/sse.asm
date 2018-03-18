@@ -1,5 +1,6 @@
 global setup_SSE
 
+section .text
 ; Check for SSE and enable it. If it's not supported throw error "a".
 setup_SSE:
     ; check for SSE

@@ -148,6 +148,10 @@ macro_rules! enable_unsigned_ops {
                 return *(self.0 as *mut T);
             }
 
+            pub unsafe fn read_volatile<T: Copy>(&self) -> T {
+                return ::core::ptr::read_volatile(self.0 as *const T);
+            }
+
             pub unsafe fn read_ref<'a, T>(&self) -> &'a T {
                 return &*(self.0 as *mut T);
             }

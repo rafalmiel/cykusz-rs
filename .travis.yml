@@ -22,4 +22,5 @@ addons:
       - nasm
 
 script:
+  - make clean
   - make

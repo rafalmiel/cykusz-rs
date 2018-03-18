@@ -1,9 +1,10 @@
+use alloc::allocator::Alloc;
 use core::ptr::write_volatile;
 use core::ptr::read_volatile;
 
 use arch::acpi::apic::MatdHeader;
 
-use arch::mm::MappedAddr;
+use arch::mm::{MappedAddr,PhysAddr};
 use arch::raw::msr;
 
 use arch::sync::Mutex;
@@ -86,6 +87,7 @@ impl LApic {
     }
 
     pub fn init_ap(&mut self, ap_id: u8) {
+        use arch::smp::{AP_INIT};
         if !self.x2 {
             self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
             self.reg_write(REG_CMD, 0x4500);
@@ -93,7 +95,7 @@ impl LApic {
             ::arch::dev::pit::early_sleep(10);
 
             self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
-            self.reg_write(REG_CMD, 0x4601);
+            self.reg_write(REG_CMD, 0x4600u32 | ((AP_INIT.0 as u32) >> 12));
 
             ::arch::dev::pit::early_sleep(10);
         } else {
@@ -102,8 +104,8 @@ impl LApic {
                 msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4500u64 | ((ap_id as u64) << 32));
                 ::arch::dev::pit::early_sleep(10);
 
-                // START: AP Trampoline begins at physical address 0x1000
-                msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4601u64 | ((ap_id as u64) << 32));
+                // START: AP INIT routine begins at physical address 0x1000
+                msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4600u64 | ((AP_INIT.0 as u64) >> 12) | ((ap_id as u64) << 32));
                 ::arch::dev::pit::early_sleep(10);
             }
         }
@@ -125,11 +127,28 @@ pub fn init(hdr: &'static MatdHeader) {
 }
 
 pub fn init_ap() {
+    use arch::smp::{TRAMPOLINE};
+
     let mut lapic = LAPIC.lock_irq();
 
     for cpu in ::arch::acpi::ACPI.lock().get_rsdt().unwrap().find_apic_entry().unwrap().lapic_entries() {
         if cpu.proc_id > 0 {
+            let rdy = TRAMPOLINE.to_mapped();
+            unsafe {
+                rdy.store::<u8>(0);
+                (rdy + 1).store::<u8>(cpu.proc_id as u8);
+                let sp = ::HEAP.alloc(::alloc::heap::Layout::from_size_align_unchecked(4096*16, 4096)).unwrap().offset(4096*16);
+                (rdy + 2).store::<usize>(sp as usize);
+                (rdy + 10).store::<usize>(::arch::raw::ctrlregs::cr3() as usize);
+            }
             lapic.init_ap(cpu.proc_id);
+
+            unsafe {
+                while rdy.read_volatile::<u8>() == 0 {
+                    asm!("pause"::::"volatile");
+                }
+            }
+
             println!("[ OK ] Initialized AP CPU: {}", cpu.proc_id);
         }
     }

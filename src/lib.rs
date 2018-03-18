@@ -22,6 +22,7 @@ extern crate lazy_static;
 extern crate spin;
 extern crate alloc;
 extern crate linked_list_allocator;
+extern crate raw_cpuid;
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -38,6 +39,6 @@ pub extern "C" fn rust_main() {
 
     loop {
         print!(".");
-        arch::dev::pit::early_sleep(100);
+        arch::dev::pit::early_sleep(1000);
     }
 }

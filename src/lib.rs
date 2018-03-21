@@ -33,8 +33,7 @@ mod drivers;
 pub mod kernel;
 pub mod lang_items;
 
-#[no_mangle]
-pub extern "C" fn rust_main() {
+pub fn rust_main() {
     ::kernel::mm::init();
 
     ::arch::smp::init();

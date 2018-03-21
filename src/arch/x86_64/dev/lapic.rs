@@ -86,7 +86,24 @@ impl LApic {
         }
     }
 
-    pub fn init_ap(&mut self, ap_id: u8) {
+    pub fn init_ap(&mut self, hdr: &'static MatdHeader) {
+        self.x2 = ::arch::dev::cpu::has_x2apic();
+
+        if !self.x2 {
+            self.reg_write(REG_SIVR, 0x100 | 0xff);
+        } else {
+            unsafe {
+                //Enable X2APIC: (bit 10)
+                msr::wrmsr(msr::IA32_APIC_BASE, msr::rdmsr(msr::IA32_APIC_BASE) | 1 << 10);
+
+                // Configure Spurious Interrupt Vector Register
+                msr::wrmsr(msr::IA32_X2APIC_SIVR, 0x100 | 0xff);
+
+            }
+        }
+    }
+
+    pub fn start_ap(&mut self, ap_id: u8) {
         use arch::smp::{AP_INIT};
         if !self.x2 {
             self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
@@ -126,28 +143,50 @@ pub fn init(hdr: &'static MatdHeader) {
     LAPIC.lock().init(hdr);
 }
 
-pub fn init_ap() {
-    use arch::smp::{TRAMPOLINE};
+pub fn init_ap(hdr: &'static MatdHeader) {
+    LAPIC.lock().init_ap(hdr);
+}
 
-    let mut lapic = LAPIC.lock_irq();
+pub fn start_ap() {
+    use arch::smp::{Trampoline};
 
-    for cpu in ::arch::acpi::ACPI.lock().get_rsdt().unwrap().find_apic_entry().unwrap().lapic_entries() {
+    let iter = {
+        ::arch::acpi::ACPI.lock().get_rsdt().unwrap().find_apic_entry().unwrap().lapic_entries()
+    };
+
+
+    for cpu in iter {
+
+        // Don't boot bootstrap processor
         if cpu.proc_id > 0 {
-            let rdy = TRAMPOLINE.to_mapped();
-            unsafe {
-                rdy.store::<u8>(0);
-                (rdy + 1).store::<u8>(cpu.proc_id as u8);
-                let sp = ::HEAP.alloc(::alloc::heap::Layout::from_size_align_unchecked(4096*16, 4096)).unwrap().offset(4096*16);
-                (rdy + 2).store::<usize>(sp as usize);
-                (rdy + 10).store::<usize>(::arch::raw::ctrlregs::cr3() as usize);
-            }
-            lapic.init_ap(cpu.proc_id);
+
+            let trampoline = Trampoline::get();
+            trampoline.reset();
+
+            // Pass CPU ID to the new CPU
+            trampoline.cpu_num = cpu.proc_id as u8;
+
+            // Allocate stack for the new CPU
+            trampoline.stack_ptr = unsafe {
+                ::HEAP.alloc(
+                    ::alloc::heap::Layout::from_size_align_unchecked(4096 * 16, 4096)
+                ).unwrap().offset(4096 * 16)
+            } as u64;
 
             unsafe {
-                while rdy.read_volatile::<u8>() == 0 {
-                    asm!("pause"::::"volatile");
-                }
+                // Pass page table pointer to the new CPU
+                trampoline.page_table_ptr = ::arch::raw::ctrlregs::cr3();
             }
+
+            {
+                let mut lapic = LAPIC.lock_irq();
+
+                //Initialize new CPU
+                lapic.start_ap(cpu.proc_id);
+            }
+
+            // Wait for the CPU to set the ready flag
+            trampoline.wait_ready();
 
             println!("[ OK ] Initialized AP CPU: {}", cpu.proc_id);
         }

@@ -33,3 +33,12 @@ pub fn init()
 
     println!("[ OK ] PIT Initialised");
 }
+
+pub fn init_ap()
+{
+    if let Some(ref rsdt) = ::arch::acpi::ACPI.lock().get_rsdt() {
+        if let Some(ref apic) = rsdt.find_apic_entry() {
+            lapic::init(apic);
+        }
+    }
+}

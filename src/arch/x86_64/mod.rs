@@ -42,14 +42,13 @@ pub extern "C" fn x86_64_rust_main_ap() {
 
     gdt::init();
     idt::init();
+    dev::init_ap();
     int::sti();
 
-    let cpu = unsafe {
-        PhysAddr(0xE01).to_mapped().read::<u8>()
-    };
-    unsafe {
-        PhysAddr(0xE00).to_mapped().store::<u8>(1);
-    }
+    let trampoline = smp::Trampoline::get();
+
+    let cpu = trampoline.cpu_num;
+    trampoline.notify_ready();
 
     println!("[ OK ] Hello from cpu {}", cpu);
 

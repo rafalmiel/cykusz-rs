@@ -6,7 +6,6 @@ global apinit_start
 global apinit_end
 
 extern long_mode_start
-extern long_mode_start_ap
 extern test_multiboot
 extern test_cpuid
 extern test_long_mode
@@ -24,31 +23,23 @@ trampoline:
     .page_table: dq 0
 
 tmp_gdt:
-	; null descriptor 0x00
-	dq 0
+    ; null descriptor 0x00
+    dq 0
 
-	; 64-bit kernel code descriptor 0x08
-	dw 0xFFFF
-	dw 0
-	db 0
-	db 10011010b
-	db 10101111b
-	db 0
+.code:
+    ; 64-bit kernel code descriptor 0x08
+    dw 0xFFFF
+    dw 0
+    db 0
+    db 10011010b
+    db 10101111b
+    db 0
 
-	; 64-bit kernel data descriptor 0x10
-	dw 0xFFFF
-	dw 0
-	db 0
-	db 10010010b
-	db 10101111b
-	db 0
 .pointer:
     dw $ - tmp_gdt - 1
     dq 0xE00 + (tmp_gdt - trampoline)
 tmp_gdt_end:
-
     times 512 - ($ - tmp_gdt_end) db 0
-
 
 section .apinit
 bits 16
@@ -60,38 +51,40 @@ apinit_start:
     mov es, ax
     mov ss, ax
 
-    ; Ap boot stack
+    ; Ap boot stack - temporary - used by one cpu at a time
     mov sp, 0x4000
 
     lgdt [0xE00 + tmp_gdt.pointer - trampoline]
 
-    mov eax, 0x630
+    ; Enable:
+    ; bit 4 - Page Size Extension
+    ; bit 5 - Physical Address Extension
+    mov eax, 0x30
     mov cr4, eax
-
-    ;mov eax, cr0
-    ;and eax, 0xFFFFFFFB
-    ;or eax, 2
-    ;mov cr0, eax
 
     ; go to long mode
     mov eax, __p4_table
     mov cr3, eax
 
+    ; Enable long mode in EFER register
     mov ecx, 0xC0000080
     rdmsr
     or eax, 0x100
     wrmsr
 
     ; enable paging in the cr0 register
+    ; bit 0 - Protected Mode Enable
+    ; bit 16 - Write Protect
+    ; bit 31 - Paging
     mov eax, cr0
     or eax, 1 << 31
     or eax, 1 << 16
     or eax, 1
     mov cr0, eax
 
-    jmp 0x08:0x1000 + (lmsap - apinit_start)
+    jmp 0x08:0x1000 + (long_mode_start_ap - apinit_start)
 
-lmsap:
+long_mode_start_ap:
 bits 64
     ;call setup_SSE
     mov rax, higher_half_start_ap

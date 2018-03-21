@@ -5,6 +5,47 @@ use kernel::mm::{PhysAddr,MappedAddr};
 pub const TRAMPOLINE : PhysAddr = PhysAddr(0xE00);
 pub const AP_INIT : PhysAddr = PhysAddr(0x1000);
 
+#[repr(C, packed)]
+pub struct Trampoline {
+    pub ready: u8,
+    pub cpu_num: u8,
+    pub stack_ptr: u64,
+    pub page_table_ptr: u64
+}
+
+impl Trampoline {
+    pub fn get() -> &'static mut Trampoline {
+        unsafe {
+            TRAMPOLINE.to_mapped().read_mut::<Trampoline>()
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.ready = 0;
+        self.cpu_num = 0;
+        self.stack_ptr = 0;
+        self.page_table_ptr = 0;
+    }
+
+    pub fn notify_ready(&mut self) {
+        let rdy = &mut self.ready as *mut u8;
+
+        unsafe {
+            rdy.write_volatile(1);
+        }
+    }
+
+    pub fn wait_ready(&self) {
+        let rdy = &self.ready as *const u8;
+
+        unsafe {
+            while rdy.read_volatile() == 0 {
+                asm!("pause"::::"volatile");
+            }
+        }
+    }
+}
+
 pub fn init() {
     extern {
         static apinit_start: u8;
@@ -28,5 +69,5 @@ pub fn init() {
         pt.copy_to(TRAMPOLINE.to_mapped().0 as *mut u8, 0x100);
     }
 
-    ::arch::dev::lapic::init_ap();
+    ::arch::dev::lapic::start_ap();
 }

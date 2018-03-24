@@ -12,6 +12,7 @@ pub mod int;
 pub mod dev;
 pub mod sync;
 pub mod smp;
+pub mod tls;
 
 use kernel::mm::PhysAddr;
 
@@ -19,7 +20,10 @@ use kernel::mm::PhysAddr;
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
     output::clear();
     gdt::init();
+    println!("[ OK ] GDT Initialised");
+
     idt::init();
+    println!("[ OK ] IDT Initialised");
 
     let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
 
@@ -28,10 +32,6 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
     acpi::init();
 
     dev::init();
-
-    int::sti();
-
-    println!("[ OK ] Interrupts enabled");
 
     ::rust_main();
 }
@@ -43,20 +43,6 @@ pub extern "C" fn x86_64_rust_main_ap() {
     gdt::init();
     idt::init();
     dev::init_ap();
-    int::sti();
 
-    dev::lapic::start_timer();
-
-    let trampoline = smp::Trampoline::get();
-
-    let cpu = trampoline.cpu_num;
-    trampoline.notify_ready();
-
-    println!("[ OK ] Hello from cpu {}", cpu);
-
-    loop {
-        unsafe {
-            asm!("pause"::::"volatile");
-        }
-    }
+    ::rust_main_ap();
 }

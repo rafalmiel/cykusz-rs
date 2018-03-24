@@ -196,7 +196,7 @@ impl LApic {
 
         self.ticks_in_1_ms = ticks;
 
-        println!("Ticks in {}ms: {}", ms, ticks);
+        println!("[ INFO ] Ticks in {}ms: {}", ms, ticks);
     }
 }
 
@@ -219,7 +219,9 @@ pub fn start_timer() {
 }
 
 pub extern "x86-interrupt" fn lapic_timer_handler(_frame: &mut ridt::ExceptionStackFrame) {
-    print!(".");
+    unsafe {
+        print!("{}", ::CPU_ID);
+    }
     int::end_of_int();
 }
 
@@ -264,8 +266,6 @@ pub fn start_ap() {
 
             // Wait for the CPU to set the ready flag
             trampoline.wait_ready();
-
-            println!("[ OK ] Initialized AP CPU: {}", cpu.proc_id);
         }
     }
 }

@@ -9,8 +9,6 @@ SECTIONS {
         .boot :
         {
                 KEEP(*(.multiboot_header))
-                KEEP(*(.apinit_trampoline))
-                KEEP(*(.apinit))
                 build/arch/x86_64/asm/boot.o(.text* .rodata* .data* .bss*)
                 build/arch/x86_64/asm/paging.o(.text* .rodata* .data* .bss*)
                 build/arch/x86_64/asm/sse.o(.text* .rodata* .data* .bss*)
@@ -24,6 +22,15 @@ SECTIONS {
         .text(0xFFFFFF0000000000 + __kernel_text_start) : AT(__kernel_text_start)
         {
                 *(.text .text.*)
+        }
+
+        . = ALIGN(4K) - 0xFFFFFF0000000000;
+        __kernel_apinit_start = .;
+
+        .apinit(0xFFFFFF0000000000 + __kernel_apinit_start) : AT(__kernel_apinit_start)
+        {
+                KEEP(*(.apinit_trampoline))
+                KEEP(*(.apinit))
         }
 
         . = ALIGN(4K) - 0xFFFFFF0000000000;
@@ -60,5 +67,13 @@ SECTIONS {
         }
 
         . = ALIGN(4K) - 0xFFFFFF0000000000;
-        __kernel_bss_end = .;
+        __kernel_tdata_start = .;
+
+        .tdata(0xFFFFFF0000000000 + __kernel_tdata_start) : AT(__kernel_tdata_start)
+        {
+                __tdata_start = .;
+                KEEP(*(.tdata*))
+                KEEP(*(.tbss*))
+                __tdata_end = ALIGN(8);
+        }
 }

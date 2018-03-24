@@ -1,5 +1,6 @@
 pub mod phys;
 pub mod virt;
+pub mod heap;
 
 pub use arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
 

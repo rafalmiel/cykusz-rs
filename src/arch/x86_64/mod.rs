@@ -45,6 +45,8 @@ pub extern "C" fn x86_64_rust_main_ap() {
     dev::init_ap();
     int::sti();
 
+    dev::lapic::start_timer();
+
     let trampoline = smp::Trampoline::get();
 
     let cpu = trampoline.cpu_num;

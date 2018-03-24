@@ -13,6 +13,7 @@
 #![feature(conservative_impl_trait)]
 #![feature(pointer_methods)]
 #![feature(dyn_trait)]
+#![feature(thread_local)]
 
 extern crate rlibc;
 #[macro_use]
@@ -33,12 +34,53 @@ mod drivers;
 pub mod kernel;
 pub mod lang_items;
 
+#[thread_local]
+static mut CPU_ID: u8 = 0;
+
 pub fn rust_main() {
-    ::kernel::mm::init();
+    kernel::mm::init();
 
-    ::arch::smp::init();
+    kernel::tls::init();
 
-    ::arch::dev::lapic::start_timer();
+    println!("[ OK ] Per-CPU Storage Initialised");
+
+    unsafe {
+        CPU_ID = 0;
+    }
+
+    kernel::smp::init();
+
+    println!("[ OK ] SMP Initialized");
+
+    kernel::timer::start_timer();
+
+    println!("[ OK ] Local Timer Started");
+
+    kernel::int::enable_ints();
+
+    loop {
+        unsafe {
+            asm!("pause"::::"volatile");
+        }
+    }
+}
+
+pub fn rust_main_ap() {
+    kernel::tls::init();
+    let trampoline = ::arch::smp::Trampoline::get();
+
+    unsafe {
+        CPU_ID = trampoline.cpu_num;
+    }
+    trampoline.notify_ready();
+
+    unsafe {
+        println!("[ OK ] CPU {} Ready!", CPU_ID);
+    }
+
+    kernel::timer::start_timer();
+
+    kernel::int::enable_ints();
 
     loop {
         unsafe {

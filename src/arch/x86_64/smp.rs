@@ -1,6 +1,6 @@
 use core::ptr;
 
-use kernel::mm::{PhysAddr,MappedAddr};
+use kernel::mm::{PhysAddr,MappedAddr,VirtAddr};
 
 pub const TRAMPOLINE : PhysAddr = PhysAddr(0xE00);
 pub const AP_INIT : PhysAddr = PhysAddr(0x1000);
@@ -10,7 +10,7 @@ pub struct Trampoline {
     pub ready: u8,
     pub cpu_num: u8,
     pub stack_ptr: u64,
-    pub page_table_ptr: u64
+    pub page_table_ptr: u64,
 }
 
 impl Trampoline {

@@ -34,10 +34,11 @@ pub fn clear() {
 }
 
 pub fn write_fmt(args: ::core::fmt::Arguments) -> ::core::fmt::Result {
+
     let mut w = &mut *WRITER.lock_irq();
     let r = ::core::fmt::write(&mut w, args);
     update_cursor(w.buffer_pos());
-    r
+    return r;
 }
 
 #[macro_export]

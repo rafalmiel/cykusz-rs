@@ -31,7 +31,7 @@ pub fn init()
     pit::init();
     pit::disable();
 
-    println!("[ OK ] PIT Initialised");
+    println!("[ OK ] PIT Disabled");
 }
 
 pub fn init_ap()

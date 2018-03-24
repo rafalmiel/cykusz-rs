@@ -34,7 +34,6 @@ pub fn init() {
     }
     idt.load();
 
-    println!("[ OK ] IDT Initialised");
 }
 
 pub fn set_handler(num: usize, f: idt::HandlerFn) {

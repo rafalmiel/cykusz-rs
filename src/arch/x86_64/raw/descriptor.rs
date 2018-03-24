@@ -76,13 +76,7 @@ pub struct DescriptorTablePointer<T> {
 impl<T> DescriptorTablePointer<T> {
     pub fn init(&mut self, e_slice: &[T]) {
         self.limit = (e_slice.len() * mem::size_of::<T>() - 1) as u16;
-        unsafe {
-            asm!("xchg %bx, %bx")
-        }
         self.base = e_slice.as_ptr();
-        unsafe {
-            asm!("xchg %bx, %bx")
-        }
     }
 
     pub const fn empty() -> Self {

@@ -8,6 +8,9 @@ use arch::mm::{MappedAddr,PhysAddr};
 use arch::raw::msr;
 
 use arch::sync::Mutex;
+use arch::int;
+use arch::idt;
+use arch::raw::idt as ridt;
 
 pub static LAPIC: Mutex<LApic> = Mutex::new(LApic::new());
 
@@ -26,14 +29,16 @@ const REG_TIMCUR: u32 = 0x390;
 
 pub struct LApic {
     lapic_base: Option<MappedAddr>,
-    x2: bool
+    x2: bool,
+    ticks_in_1_ms: u32
 }
 
 impl LApic {
     pub const fn new() -> LApic {
         LApic {
             lapic_base: None,
-            x2: false
+            x2: false,
+            ticks_in_1_ms: 0
         }
     }
 
@@ -84,21 +89,28 @@ impl LApic {
                 msr::wrmsr(msr::IA32_X2APIC_SIVR, 0x100 | 0xff);
             }
         }
+        self.ticks_in_ms(1);
+        self.ticks_in_ms(1);
+        self.ticks_in_ms(1);
+        self.ticks_in_ms(1);
     }
 
     pub fn init_ap(&mut self, hdr: &'static MatdHeader) {
-        self.x2 = ::arch::dev::cpu::has_x2apic();
-
         if !self.x2 {
+            // Clear task priority to enable all interrupts
+            self.reg_write(REG_TRP, 0);
+
             self.reg_write(REG_SIVR, 0x100 | 0xff);
         } else {
             unsafe {
                 //Enable X2APIC: (bit 10)
                 msr::wrmsr(msr::IA32_APIC_BASE, msr::rdmsr(msr::IA32_APIC_BASE) | 1 << 10);
 
+                // Clear task priority to enable all interrupts
+                msr::wrmsr(msr::IA32_X2APIC_TPR, 0);
+
                 // Configure Spurious Interrupt Vector Register
                 msr::wrmsr(msr::IA32_X2APIC_SIVR, 0x100 | 0xff);
-
             }
         }
     }
@@ -137,6 +149,55 @@ impl LApic {
             }
         }
     }
+
+    pub fn start_timer(&mut self) {
+        if !self.x2 {
+            self.reg_write(REG_TIMDIV, 0b11);
+            self.reg_write(REG_TIM, 32 | (1<<17));
+            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 1000);
+        } else {
+            unsafe {
+                msr::wrmsr(msr::IA32_X2APIC_DIV_CONF, 0b11);
+                msr::wrmsr(msr::IA32_X2APIC_LVT_TIMER, 32 | (1<<17));
+                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 1000);
+            }
+        }
+    }
+
+    pub fn ticks_in_ms(&mut self, ms: u64) {
+        if !self.x2 {
+            self.reg_write(REG_TIMDIV, 0b11);
+            self.reg_write(REG_TIMINIT, 0xFFFFFFFF);
+        } else {
+            unsafe {
+                msr::wrmsr(msr::IA32_X2APIC_DIV_CONF, 0x11);
+                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, 0xFFFFFFFF);
+            }
+        }
+
+        ::arch::dev::pit::early_sleep(ms);
+
+        if !self.x2 {
+            self.reg_write(REG_TIM, 1<<16);
+        } else {
+            unsafe {
+                msr::wrmsr(msr::IA32_X2APIC_LVT_TIMER, 1<<16);
+            }
+        }
+
+        let ticks = 0xFFFFFFFFu32 -
+            if !self.x2 {
+                self.reg_read(REG_TIMCUR)
+            } else {
+                unsafe {
+                    msr::rdmsr(msr::IA32_X2APIC_CUR_COUNT) as u32
+                }
+            };
+
+        self.ticks_in_1_ms = ticks;
+
+        println!("Ticks in {}ms: {}", ms, ticks);
+    }
 }
 
 pub fn init(hdr: &'static MatdHeader) {
@@ -145,6 +206,21 @@ pub fn init(hdr: &'static MatdHeader) {
 
 pub fn init_ap(hdr: &'static MatdHeader) {
     LAPIC.lock().init_ap(hdr);
+}
+
+pub fn start_timer() {
+    let remap: u8 = int::get_irq_mapping(0) as u8;
+    int::set_irq_dest(remap as u8, 32);
+    idt::set_handler(32, lapic_timer_handler);
+
+    int::mask_int(remap, false);
+
+    LAPIC.lock().start_timer();
+}
+
+pub extern "x86-interrupt" fn lapic_timer_handler(_frame: &mut ridt::ExceptionStackFrame) {
+    print!(".");
+    int::end_of_int();
 }
 
 pub fn start_ap() {
@@ -173,15 +249,16 @@ pub fn start_ap() {
                 ).unwrap().offset(4096 * 16)
             } as u64;
 
-            unsafe {
-                // Pass page table pointer to the new CPU
-                trampoline.page_table_ptr = ::arch::raw::ctrlregs::cr3();
-            }
+            // Pass page table pointer to the new CPU
+            trampoline.page_table_ptr = unsafe {
+                ::arch::raw::ctrlregs::cr3()
+            };
 
             {
+                // Start AP and release the lock
                 let mut lapic = LAPIC.lock_irq();
 
-                //Initialize new CPU
+                // Initialize new CPU
                 lapic.start_ap(cpu.proc_id);
             }
 

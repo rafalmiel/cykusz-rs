@@ -38,6 +38,8 @@ pub fn rust_main() {
 
     ::arch::smp::init();
 
+    ::arch::dev::lapic::start_timer();
+
     loop {
         unsafe {
             asm!("pause"::::"volatile");

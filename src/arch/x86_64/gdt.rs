@@ -2,8 +2,6 @@ use arch::raw::descriptor as dsc;
 use arch::raw::gdt;
 use arch::raw::segmentation as sgm;
 
-use kernel::mm::PhysAddr;
-
 static INIT_GDT: [gdt::GdtEntry; 3] = [
     // Null
     gdt::GdtEntry::MISSING,

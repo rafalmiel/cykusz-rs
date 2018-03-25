@@ -148,8 +148,3 @@ extern "x86-interrupt" fn security_exception(_frame: &mut idt::ExceptionStackFra
     println!("Security Exception! 0x{:x}", err);
     loop {}
 }
-
-extern "x86-interrupt" fn int80_handler(frame: &mut idt::ExceptionStackFrame) {
-    println!("INT 80!!!");
-    println!("{:?}", frame);
-}

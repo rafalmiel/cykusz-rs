@@ -1,4 +1,4 @@
-use kernel::mm::{PhysAddr,MappedAddr,VirtAddr};
+use kernel::mm::{PhysAddr,MappedAddr};
 
 use arch::mm::PAGE_SIZE;
 

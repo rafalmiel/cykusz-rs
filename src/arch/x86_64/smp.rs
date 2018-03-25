@@ -1,6 +1,4 @@
-use core::ptr;
-
-use kernel::mm::{PhysAddr,MappedAddr,VirtAddr};
+use kernel::mm::{PhysAddr};
 
 pub const TRAMPOLINE : PhysAddr = PhysAddr(0xE00);
 pub const AP_INIT : PhysAddr = PhysAddr(0x1000);

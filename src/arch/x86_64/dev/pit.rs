@@ -1,4 +1,4 @@
-use arch::raw::cpuio::{Port, UnsafePort};
+use arch::raw::cpuio::{UnsafePort};
 
 use arch::int;
 use arch::idt;
@@ -50,6 +50,7 @@ impl Pit {
     }
 
     // Supports from 1 to 50ms
+    #[allow(unused)]
     fn init_timer(&mut self, ms: u16) {
         let hz: u16 = 1000u16 / ms;
         let divisor: u16 = ( 1193182u32 / hz as u32 ) as u16;
@@ -96,7 +97,7 @@ pub extern "x86-interrupt" fn pit_handler(_frame: &mut ridt::ExceptionStackFrame
 
 pub fn early_sleep(mut ms: u64) {
     let mut pit = PIT.lock_irq();
-    while (ms > 0) {
+    while ms > 0 {
         pit.init_sleep();
 
         while !pit.is_sleep_finished() {

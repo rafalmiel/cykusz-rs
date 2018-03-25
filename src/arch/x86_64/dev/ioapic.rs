@@ -42,6 +42,7 @@ impl RegVer {
 }
 
 impl RegRedTblL {
+    #[allow(unused)]
     pub const fn masked(&self) -> bool {
         self.0 & (1 << 16) != 0
     }
@@ -58,6 +59,7 @@ impl RegRedTblL {
         self.0 = (self.0 & !(0xFFu32)) | (idx & 0xFF);
     }
 
+    #[allow(unused)]
     pub const fn vector(&self) -> u32 {
         self.0 & 0xFF
     }
@@ -68,6 +70,7 @@ impl RegRedTblH {
         self.0 = (self.0 & !(0xFFu32 << 24)) | (dest & 0xFF);
     }
 
+    #[allow(unused)]
     pub const fn destination(&mut self) -> u32 {
         self.0 >> 24
     }

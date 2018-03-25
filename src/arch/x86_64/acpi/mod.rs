@@ -5,7 +5,6 @@ pub mod apic;
 pub mod hpet;
 
 use self::rsdp::Address;
-use kernel::mm::{PhysAddr,MappedAddr,VirtAddr};
 use self::rsdt::Rsdt;
 
 use spin::Mutex;
@@ -41,10 +40,6 @@ impl Acpi {
                 println!("[ OK ] ACPI Found Xsdp Header");
                 self.hdr = Header::XSDT(Some(Rsdt::<u64>::new(addr)))
             },
-            _ => {
-                println!("[ ERR ] ACPI Init failed");
-                return false;
-            }
         };
         return true;
     }

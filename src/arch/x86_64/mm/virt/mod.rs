@@ -6,7 +6,7 @@ use arch::raw::mm;
 use arch::raw::ctrlregs;
 use kernel::mm::virt;
 use kernel::mm::allocate;
-use kernel::mm::{PhysAddr,VirtAddr,MappedAddr};
+use kernel::mm::{PhysAddr,VirtAddr};
 use kernel::mm::PAGE_SIZE;
 use kernel::mm::Frame;
 use self::table::*;

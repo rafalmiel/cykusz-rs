@@ -1,4 +1,4 @@
-use kernel::mm::{MappedAddr, PhysAddr, VirtAddr};
+use kernel::mm::{PhysAddr, VirtAddr};
 use drivers::multiboot2::tags::Tag;
 
 #[repr(packed)]
@@ -30,6 +30,7 @@ pub struct ElfSectionIter {
     entry_size:                 u32
 }
 
+#[allow(unused)]
 #[repr(u32)]
 pub enum ElfSectionType {
     Unused =                    0,

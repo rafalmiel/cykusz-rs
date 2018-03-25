@@ -12,6 +12,7 @@ impl Page {
         }
     }
 
+    #[allow(unused)]
     pub fn address(&self) -> VirtAddr {
         VirtAddr(self.number) * PAGE_SIZE
     }

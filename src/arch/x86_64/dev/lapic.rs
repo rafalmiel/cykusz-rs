@@ -4,7 +4,7 @@ use core::ptr::read_volatile;
 
 use arch::acpi::apic::MatdHeader;
 
-use arch::mm::{MappedAddr,PhysAddr};
+use arch::mm::{MappedAddr};
 use arch::raw::msr;
 
 use arch::sync::Mutex;
@@ -95,7 +95,7 @@ impl LApic {
         self.ticks_in_ms(1);
     }
 
-    pub fn init_ap(&mut self, hdr: &'static MatdHeader) {
+    pub fn init_ap(&mut self) {
         if !self.x2 {
             // Clear task priority to enable all interrupts
             self.reg_write(REG_TRP, 0);
@@ -204,8 +204,8 @@ pub fn init(hdr: &'static MatdHeader) {
     LAPIC.lock().init(hdr);
 }
 
-pub fn init_ap(hdr: &'static MatdHeader) {
-    LAPIC.lock().init_ap(hdr);
+pub fn init_ap() {
+    LAPIC.lock().init_ap();
 }
 
 pub fn start_timer() {

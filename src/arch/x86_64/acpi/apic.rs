@@ -5,9 +5,9 @@ use kernel::mm::{PhysAddr,MappedAddr};
 
 bitflags! {
     pub struct MatdEntryType : u8{
-        const ProcLocalApic = 0x0;
-        const ProcIOApic = 0x1;
-        const IntSrcOverride = 0x2;
+        const PROC_LOCAL_APIC = 0x0;
+        const PROC_IO_APIC = 0x1;
+        const INT_SRC_OVERRIDE = 0x2;
     }
 }
 
@@ -25,7 +25,6 @@ pub struct MatdEntry {
 }
 
 pub struct MatdIter {
-    matd: &'static MatdHeader,
     current: *const u8,
     limit: *const u8
 }
@@ -76,7 +75,6 @@ impl MatdEntryIOApic {
 impl MatdHeader {
     pub fn entries(&'static self) -> MatdIter {
         MatdIter {
-            matd: self,
             current: unsafe {
                 (self as *const _ as *const u8)
                     .offset(::core::mem::size_of::<MatdHeader>() as isize)
@@ -96,7 +94,7 @@ impl MatdHeader {
         -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryLocalApic>> {
 
         self.entries().filter_map(|e| {
-            if e.typ == MatdEntryType::ProcLocalApic {
+            if e.typ == MatdEntryType::PROC_LOCAL_APIC {
                 unsafe {
                     Some(&*(e as *const _ as *const MatdEntryLocalApic))
                 }
@@ -110,7 +108,7 @@ impl MatdHeader {
         -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryIOApic>> {
 
         self.entries().filter_map(|e| {
-            if e.typ == MatdEntryType::ProcIOApic {
+            if e.typ == MatdEntryType::PROC_IO_APIC {
                 unsafe {
                     Some(&*(e as *const _ as *const MatdEntryIOApic))
                 }
@@ -124,7 +122,7 @@ impl MatdHeader {
         -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryIntSrc>> {
 
         self.entries().filter_map(|e| {
-            if e.typ == MatdEntryType::IntSrcOverride {
+            if e.typ == MatdEntryType::INT_SRC_OVERRIDE {
                 unsafe {
                     Some(&*(e as *const _ as *const MatdEntryIntSrc))
                 }

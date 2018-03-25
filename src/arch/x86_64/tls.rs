@@ -1,9 +1,8 @@
 use arch::raw::msr;
-use kernel::mm::map;
 use HEAP;
 use alloc::allocator::Alloc;
 
-use kernel::mm::{VirtAddr, MappedAddr, PhysAddr};
+use kernel::mm::{VirtAddr};
 
 #[repr(C)]
 struct ThreadPtr {

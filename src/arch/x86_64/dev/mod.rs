@@ -34,7 +34,5 @@ pub fn init()
 
 pub fn init_ap()
 {
-    if let Some(ref apic) = ::arch::acpi::ACPI.lock().get_apic_entry() {
-        lapic::init_ap(apic);
-    }
+    lapic::init_ap();
 }

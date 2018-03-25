@@ -127,7 +127,7 @@ impl ChainedPics {
         }
     }
 
-    fn handles_interrupt(&self, interrupt_id: u8) -> bool {
+    pub fn handles_interrupt(&self, interrupt_id: u8) -> bool {
         self.pics.iter().any(|p| p.handles_interrupt(interrupt_id))
     }
 

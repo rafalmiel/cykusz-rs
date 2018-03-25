@@ -12,39 +12,59 @@ use spin::Mutex;
 
 pub static ACPI: Mutex<Acpi> = Mutex::new(Acpi::new());
 
+enum Header {
+    RSDT(Option<&'static Rsdt<u32>>),
+    XSDT(Option<&'static Rsdt<u64>>),
+    None
+}
+
 pub struct Acpi {
-    rsdt: Option<&'static Rsdt>,
+    hdr: Header,
 }
 
 impl Acpi {
     pub const fn new() -> Acpi {
         Acpi {
-            rsdt: None,
+            hdr: Header::None
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn init(&mut self) -> bool {
         let rsdt = rsdp::find_rsdt_address().expect("RSDT Addr Not Found!");
 
-
-        let rsdt_addr = match rsdt {
+        match rsdt {
             Address::Rsdp(addr) => {
-                addr
+                println!("[ OK ] ACPI Found Rsdp Header");
+                self.hdr = Header::RSDT(Some(Rsdt::<u32>::new(addr)))
             },
             Address::Xsdp(addr) => {
-                panic!("Xsdp address is not yet supported!")
+                println!("[ OK ] ACPI Found Xsdp Header");
+                self.hdr = Header::XSDT(Some(Rsdt::<u64>::new(addr)))
+            },
+            _ => {
+                println!("[ ERR ] ACPI Init failed");
+                return false;
             }
         };
-
-        self.rsdt = Some(Rsdt::new(rsdt_addr));
+        return true;
     }
 
-    pub fn get_rsdt(&self) -> Option<&'static Rsdt> {
-        self.rsdt
+    pub fn get_apic_entry(&self) -> Option<&'static apic::MatdHeader> {
+        match self.hdr {
+            Header::RSDT(ref r) => {
+                r.unwrap().find_apic_entry()
+            },
+            Header::XSDT(ref r) => {
+                r.unwrap().find_apic_entry()
+            },
+            _ => {
+                panic!("ACPI Not Initialised");
+            }
+        }
     }
 
     pub fn get_irq_mapping(&mut self, irq: u32) -> u32 {
-        let apic = self.rsdt.expect("RSDT not initialized").find_apic_entry().expect("APIC Entry Not Found!");
+        let apic = self.get_apic_entry().expect("APIC Entry not found");
         apic.find_irq_remap(irq)
     }
 
@@ -56,7 +76,7 @@ impl Acpi {
 
 pub fn init() {
     let acpi = &mut *ACPI.lock();
-    acpi.init();
+    let res = acpi.init();
 
-    println!("[ OK ] ACPI found...? {}", if acpi.get_rsdt().is_some() { "YES" } else { "NO" });
+    println!("[ OK ] ACPI found...? {}", if res { "YES" } else { "NO" });
 }

@@ -229,7 +229,7 @@ pub fn start_ap() {
     use arch::smp::{Trampoline};
 
     let iter = {
-        ::arch::acpi::ACPI.lock().get_rsdt().unwrap().find_apic_entry().unwrap().lapic_entries()
+        ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries()
     };
 
 

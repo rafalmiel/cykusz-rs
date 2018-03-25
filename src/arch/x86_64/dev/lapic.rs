@@ -170,7 +170,7 @@ impl LApic {
             self.reg_write(REG_TIMINIT, 0xFFFFFFFF);
         } else {
             unsafe {
-                msr::wrmsr(msr::IA32_X2APIC_DIV_CONF, 0x11);
+                msr::wrmsr(msr::IA32_X2APIC_DIV_CONF, 0b11);
                 msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, 0xFFFFFFFF);
             }
         }

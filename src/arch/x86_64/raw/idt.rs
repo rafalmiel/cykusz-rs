@@ -35,6 +35,7 @@ impl ::core::fmt::Debug for ExceptionStackFrame {
     }
 }
 
+#[allow(unused)]
 macro_rules! int {
     ( $x:expr) => {
         {

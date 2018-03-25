@@ -1,7 +1,4 @@
-use core::ptr::write_volatile;
-use core::ptr::read_volatile;
-
-use kernel::mm::{PhysAddr, MappedAddr};
+use kernel::mm::{PhysAddr};
 
 use arch::acpi::hpet::HpetHeader;
 
@@ -9,6 +6,7 @@ pub struct Hpet {
     hpet_hdr: &'static HpetHeader
 }
 
+#[allow(unused)]
 const CAPABILITIES_OFFSET: u64 = 0;
 
 struct RegCapabilities(u64);

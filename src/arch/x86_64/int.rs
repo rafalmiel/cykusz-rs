@@ -1,11 +1,3 @@
-
-use spin::Mutex;
-use alloc::boxed::Box;
-
-use arch::acpi::Acpi;
-use arch::dev::pic::ChainedPics;
-
-
 pub trait InterruptController : Send + Sync {
     fn init(&mut self);
     fn end_of_int(&mut self);

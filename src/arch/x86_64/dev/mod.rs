@@ -9,21 +9,19 @@ pub mod cpu;
 pub fn init()
 {
     pic::init();
-    if let Some(ref rsdt) = ::arch::acpi::ACPI.lock().get_rsdt() {
-        if let Some(ref apic) = rsdt.find_apic_entry() {
-            //We have local apic, so disable PIC
-            pic::disable();
+    if let Some(ref apic) = ::arch::acpi::ACPI.lock().get_apic_entry() {
+        //We have local apic, so disable PIC
+        pic::disable();
 
-            println!("[ OK ] PIC Disabled");
+        println!("[ OK ] PIC Disabled");
 
-            ioapic::init(apic);
+        ioapic::init(apic);
 
-            println!("[ OK ] IOAPIC Initialized");
+        println!("[ OK ] IOAPIC Initialized");
 
-            lapic::init(apic);
+        lapic::init(apic);
 
-            println!("[ OK ] LAPIC Initialized (x2apic: {})", cpu::has_x2apic());
-        }
+        println!("[ OK ] LAPIC Initialized (x2apic: {})", cpu::has_x2apic());
     }
 
     // initialise and disable pit. its used to implement busy sleep
@@ -36,9 +34,7 @@ pub fn init()
 
 pub fn init_ap()
 {
-    if let Some(ref rsdt) = ::arch::acpi::ACPI.lock().get_rsdt() {
-        if let Some(ref apic) = rsdt.find_apic_entry() {
-            lapic::init_ap(apic);
-        }
+    if let Some(ref apic) = ::arch::acpi::ACPI.lock().get_apic_entry() {
+        lapic::init_ap(apic);
     }
 }

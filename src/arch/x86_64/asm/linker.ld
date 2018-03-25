@@ -54,6 +54,7 @@ SECTIONS {
 
         .data(0xFFFFFF0000000000 + __kernel_data_start) : AT(__kernel_data_start)
         {
+                build/arch/x86_64/asm/higher_half.o(.stack)
                 *(.data .data.*)
         }
 
@@ -62,7 +63,6 @@ SECTIONS {
 
         .bss(0xFFFFFF0000000000 + __kernel_bss_start) : AT(__kernel_bss_start)
         {
-                build/arch/x86_64/asm/higher_half.o(.stack)
                 *(.bss .bss.*)
         }
 

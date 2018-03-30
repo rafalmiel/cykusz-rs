@@ -36,7 +36,7 @@ pub fn init() {
 
 }
 
-pub fn set_handler(num: usize, f: idt::HandlerFn) {
+pub fn set_handler(num: usize, f: idt::ExceptionHandlerFn) {
     assert!(num <= 255);
     unsafe {
         IDT.lock().set_handler(num, f);

@@ -1,5 +1,5 @@
 use core::ops::{Deref, DerefMut};
-use arch::int;
+use kernel::int;
 use spin::{Mutex as M, MutexGuard as MG};
 use core::cell::UnsafeCell;
 
@@ -41,7 +41,7 @@ impl<T> Mutex<T> {
 
     pub fn lock_irq(&self) -> MutexGuard<T> {
         let ints = int::is_int_enabled();
-        int::cli();
+        int::disable_ints();
         MutexGuard {
             g: Some(self.l.lock()),
             //reenable ints if they were enabled before
@@ -56,10 +56,12 @@ impl<T> IrqLock<T> {
             l: UnsafeCell::new(user_data)
         }
     }
+}
 
+impl<T:?Sized> IrqLock<T> {
     pub fn lock(&self) -> IrqLockGuard<T> {
         let ints = int::is_int_enabled();
-        int::cli();
+        int::disable_ints();
         IrqLockGuard {
             data: unsafe { &mut *self.l.get() },
             irq: ints
@@ -83,13 +85,13 @@ impl<'a, T: ?Sized> DerefMut for MutexGuard<'a, T> {
 impl<'a, T: ?Sized> Deref for IrqLockGuard<'a, T> {
     type Target = T;
     fn deref<'b>(&'b self) -> &'b T {
-        &*self.data
+        self.data
     }
 }
 
 impl<'a, T: ?Sized> DerefMut for IrqLockGuard<'a, T> {
     fn deref_mut<'b>(&'b mut self) -> &'b mut T {
-        &mut *self.data
+        self.data
     }
 }
 
@@ -97,7 +99,7 @@ impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
         if self.irq {
-            int::sti();
+            int::enable_ints();
         }
     }
 }
@@ -105,7 +107,7 @@ impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
 impl<'a, T: ?Sized> Drop for IrqLockGuard<'a, T> {
     fn drop(&mut self) {
         if self.irq {
-            int::sti();
+            int::enable_ints();
         }
     }
 }

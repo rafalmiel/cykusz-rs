@@ -7,10 +7,9 @@ use arch::acpi::apic::MatdHeader;
 use arch::mm::{MappedAddr};
 use arch::raw::msr;
 
-use arch::sync::IrqLock;
+use kernel::sync::IrqLock;
 use arch::int;
 use arch::idt;
-use arch::raw::idt as ridt;
 
 pub static LAPIC: IrqLock<LApic> = IrqLock::new(LApic::new());
 
@@ -219,22 +218,16 @@ pub fn init_ap() {
     LAPIC.lock().init_ap();
 }
 
-pub fn start_timer() {
+pub fn start_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
     let remap: u8 = int::get_irq_mapping(0) as u8;
     int::set_irq_dest(remap as u8, 32);
-    idt::set_handler(32, lapic_timer_handler);
+    idt::set_handler(32, f);
 
     int::mask_int(remap, false);
 
     LAPIC.lock().start_timer();
 }
 
-pub extern "x86-interrupt" fn lapic_timer_handler(_frame: &mut ridt::ExceptionStackFrame) {
-    unsafe {
-        print!("{}", ::CPU_ID);
-    }
-    int::end_of_int();
-}
 
 pub fn start_ap() {
     use arch::smp::{Trampoline};

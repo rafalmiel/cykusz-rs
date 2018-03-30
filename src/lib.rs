@@ -52,7 +52,7 @@ pub fn rust_main() {
 
     println!("[ OK ] SMP Initialized");
 
-    kernel::timer::start_timer();
+    kernel::timer::setup_timer();
 
     println!("[ OK ] Local Timer Started");
 
@@ -74,11 +74,11 @@ pub fn rust_main_ap() {
         CPU_ID = trampoline.cpu_num;
     }
 
-    trampoline.notify_ready();
-
     unsafe {
         println!("[ OK ] CPU {} Ready!", CPU_ID);
     }
+
+    trampoline.notify_ready();
 
     kernel::timer::start_timer();
 

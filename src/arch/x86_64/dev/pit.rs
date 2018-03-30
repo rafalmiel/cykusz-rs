@@ -4,7 +4,7 @@ use arch::int;
 use arch::idt;
 use arch::raw::idt as ridt;
 
-use arch::sync::Mutex;
+use kernel::sync::Mutex;
 
 static PIT: Mutex<Pit> = Mutex::new(Pit::new());
 

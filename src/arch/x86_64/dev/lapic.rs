@@ -7,13 +7,14 @@ use arch::acpi::apic::MatdHeader;
 use arch::mm::{MappedAddr};
 use arch::raw::msr;
 
-use arch::sync::Mutex;
+use arch::sync::IrqLock;
 use arch::int;
 use arch::idt;
 use arch::raw::idt as ridt;
 
-pub static LAPIC: Mutex<LApic> = Mutex::new(LApic::new());
+pub static LAPIC: IrqLock<LApic> = IrqLock::new(LApic::new());
 
+const REG_ID: u32 = 0x20;
 const REG_TRP: u32 = 0x80;
 const REG_LCR: u32 = 0xD0;
 const REG_DFR: u32 = 0xE0;
@@ -59,6 +60,16 @@ impl LApic {
             }
         } else {
             panic!("Failed read!");
+        }
+    }
+
+    pub fn id(&self) -> u64 {
+        if self.x2 {
+            unsafe {
+                msr::rdmsr(msr::IA32_X2APIC_APICID)
+            }
+        } else {
+            (self.reg_read(REG_ID) >> 24) as u64
         }
     }
 
@@ -232,13 +243,14 @@ pub fn start_ap() {
         ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries()
     };
 
+    let bsp_id = LAPIC.lock().id();
 
     for cpu in iter {
 
         // Don't boot bootstrap processor
-        if cpu.proc_id > 0 {
-
+        if cpu.proc_id as u64 != bsp_id {
             let trampoline = Trampoline::get();
+
             trampoline.reset();
 
             // Pass CPU ID to the new CPU
@@ -258,7 +270,7 @@ pub fn start_ap() {
 
             {
                 // Start AP and release the lock
-                let mut lapic = LAPIC.lock_irq();
+                let mut lapic = LAPIC.lock();
 
                 // Initialize new CPU
                 lapic.start_ap(cpu.proc_id);

@@ -1,14 +1,27 @@
 use core::ops::{Deref, DerefMut};
 use arch::int;
 use spin::{Mutex as M, MutexGuard as MG};
+use core::cell::UnsafeCell;
 
 pub struct Mutex<T> {
     l: M<T>,
 }
 
+pub struct IrqLock<T: ?Sized> {
+    l: UnsafeCell<T>,
+}
+
+unsafe impl<T: ?Sized + Send> Sync for IrqLock<T> {}
+unsafe impl<T: ?Sized + Send> Send for IrqLock<T> {}
+
 pub struct MutexGuard<'a, T: ?Sized + 'a> {
     g: Option<MG<'a, T>>,
     irq: bool,
+}
+
+pub struct IrqLockGuard<'a, T: ?Sized + 'a> {
+    data: &'a mut T,
+    irq: bool
 }
 
 impl<T> Mutex<T> {
@@ -37,6 +50,23 @@ impl<T> Mutex<T> {
     }
 }
 
+impl<T> IrqLock<T> {
+    pub const fn new(user_data: T) -> IrqLock<T> {
+        IrqLock {
+            l: UnsafeCell::new(user_data)
+        }
+    }
+
+    pub fn lock(&self) -> IrqLockGuard<T> {
+        let ints = int::is_int_enabled();
+        int::cli();
+        IrqLockGuard {
+            data: unsafe { &mut *self.l.get() },
+            irq: ints
+        }
+    }
+}
+
 impl<'a, T: ?Sized> Deref for MutexGuard<'a, T> {
     type Target = T;
     fn deref<'b>(&'b self) -> &'b T {
@@ -50,9 +80,30 @@ impl<'a, T: ?Sized> DerefMut for MutexGuard<'a, T> {
     }
 }
 
+impl<'a, T: ?Sized> Deref for IrqLockGuard<'a, T> {
+    type Target = T;
+    fn deref<'b>(&'b self) -> &'b T {
+        &*self.data
+    }
+}
+
+impl<'a, T: ?Sized> DerefMut for IrqLockGuard<'a, T> {
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T {
+        &mut *self.data
+    }
+}
+
 impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
+        if self.irq {
+            int::sti();
+        }
+    }
+}
+
+impl<'a, T: ?Sized> Drop for IrqLockGuard<'a, T> {
+    fn drop(&mut self) {
         if self.irq {
             int::sti();
         }

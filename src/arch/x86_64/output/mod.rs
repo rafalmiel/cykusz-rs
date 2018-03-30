@@ -1,7 +1,7 @@
 use drivers::video::vga::{Color, Writer};
 use arch::raw::cpuio::Port;
 use kernel::mm::MappedAddr;
-use arch::sync::Mutex;
+use kernel::sync::Mutex;
 
 const VGA_BUFFER: MappedAddr = MappedAddr(0xffff8000000b8000);
 

@@ -1,5 +1,6 @@
-use alloc::allocator::{Alloc, Layout, AllocErr};
+use core::alloc::{Opaque, Alloc, Layout, AllocErr, GlobalAlloc};
 use core::ops::Deref;
+use core::ptr::NonNull;
 
 use linked_list_allocator::{Heap, align_up};
 
@@ -36,12 +37,10 @@ impl LockedHeap {
         LockedHeap(Mutex::new(Heap::empty()))
     }
 
-    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<*mut u8, AllocErr> {
-        use self::AllocErr::{Exhausted, Unsupported};
-
+    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<Opaque>, AllocErr> {
         heap.alloc(layout.clone()).or_else(|e| {
             match e {
-                Exhausted{ .. } => {
+                AllocErr{ .. } => {
                     let top = heap.top();
                     let req = align_up(layout.size(), 0x1000);
 
@@ -55,9 +54,6 @@ impl LockedHeap {
 
                     heap.alloc(layout)
                 },
-                Unsupported{ details: s} => {
-                    panic!("Out of mem! {}", s);
-                }
             }
         })
     }
@@ -71,22 +67,18 @@ impl Deref for LockedHeap {
     }
 }
 
-unsafe impl Alloc for LockedHeap {
-    unsafe fn alloc(&mut self, layout: Layout) -> Result<*mut u8, AllocErr> {
-        self.allocate(&mut self.0.lock(), layout)
+unsafe impl GlobalAlloc for LockedHeap {
+    unsafe fn alloc(&self, layout: Layout) -> *mut Opaque {
+        self.allocate(&mut self.0.lock(), layout).ok().map_or(0 as *mut Opaque, |alloc| alloc.as_ptr())
     }
 
-    unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
-        self.0.lock().dealloc(ptr, layout)
+    unsafe fn dealloc(&self, ptr: *mut Opaque, layout: Layout) {
+        self.0.lock().dealloc(NonNull::new_unchecked(ptr), layout)
     }
 }
 
-unsafe impl<'a> Alloc for &'a LockedHeap {
-    unsafe fn alloc(&mut self, layout: Layout) -> Result<*mut u8, AllocErr> {
-        self.allocate(&mut self.0.lock(), layout)
-    }
-
-    unsafe fn dealloc(&mut self, ptr: *mut u8, layout: Layout) {
-        self.0.lock().dealloc(ptr, layout)
+pub fn allocate(layout: Layout) -> Option<*mut u8> {
+    unsafe {
+        Some(::HEAP.alloc(layout) as *mut u8)
     }
 }

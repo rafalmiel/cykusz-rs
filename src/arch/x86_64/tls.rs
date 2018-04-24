@@ -1,7 +1,4 @@
 use arch::raw::msr;
-use HEAP;
-use alloc::allocator::Alloc;
-
 use kernel::mm::{VirtAddr};
 
 #[repr(C)]
@@ -33,7 +30,7 @@ pub fn init() {
         let size = &__tdata_end as *const u8 as usize - &__tdata_start as *const u8 as usize;
         let mapped = VirtAddr(&__tdata_start as *const _ as usize);
 
-        let tls = HEAP.alloc(
+        let tls = ::kernel::mm::heap::allocate(
             ::alloc::heap::Layout::from_size_align_unchecked(size + 8, 8)
         ).expect("Out of memory!");
 

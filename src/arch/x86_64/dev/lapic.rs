@@ -1,4 +1,3 @@
-use alloc::allocator::Alloc;
 use core::ptr::write_volatile;
 use core::ptr::read_volatile;
 
@@ -239,9 +238,10 @@ pub fn start_ap() {
     let bsp_id = LAPIC.lock().id();
 
     for cpu in iter {
+        println!("proc_id: {} apic_id: {} bsp_id: {}", cpu.proc_id, cpu.apic_id, bsp_id);
 
         // Don't boot bootstrap processor
-        if cpu.proc_id as u64 != bsp_id {
+        if cpu.apic_id as u64 != bsp_id {
             let trampoline = Trampoline::get();
 
             trampoline.reset();
@@ -251,8 +251,8 @@ pub fn start_ap() {
 
             // Allocate stack for the new CPU
             trampoline.stack_ptr = unsafe {
-                ::HEAP.alloc(
-                    ::alloc::heap::Layout::from_size_align_unchecked(4096 * 16, 4096)
+                ::kernel::mm::heap::allocate(
+                    ::core::alloc::Layout::from_size_align_unchecked(4096 * 16, 4096)
                 ).unwrap().offset(4096 * 16)
             } as u64;
 

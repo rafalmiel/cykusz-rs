@@ -239,7 +239,7 @@ pub fn start_ap() {
 
     for cpu in iter {
         // Don't boot bootstrap processor
-        if cpu.apic_id as u64 != bsp_id {
+        if cpu.proc_is_enabled() && cpu.apic_id as u64 != bsp_id {
             let trampoline = Trampoline::get();
 
             trampoline.reset();

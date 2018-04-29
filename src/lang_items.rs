@@ -20,3 +20,9 @@ pub extern "C" fn panic_fmt(fmt: ::core::fmt::Arguments, file: &str, line: u32) 
 pub extern "C" fn _Unwind_Resume() -> ! {
     loop {}
 }
+
+#[lang = "oom"]
+fn oom() -> ! {
+    println!("Out of memory!");
+    loop {}
+}

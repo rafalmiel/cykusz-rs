@@ -238,8 +238,6 @@ pub fn start_ap() {
     let bsp_id = LAPIC.lock().id();
 
     for cpu in iter {
-        println!("proc_id: {} apic_id: {} bsp_id: {}", cpu.proc_id, cpu.apic_id, bsp_id);
-
         // Don't boot bootstrap processor
         if cpu.apic_id as u64 != bsp_id {
             let trampoline = Trampoline::get();
@@ -247,7 +245,7 @@ pub fn start_ap() {
             trampoline.reset();
 
             // Pass CPU ID to the new CPU
-            trampoline.cpu_num = cpu.proc_id as u8;
+            trampoline.cpu_num = cpu.apic_id as u8;
 
             // Allocate stack for the new CPU
             trampoline.stack_ptr = unsafe {
@@ -266,7 +264,7 @@ pub fn start_ap() {
                 let mut lapic = LAPIC.lock();
 
                 // Initialize new CPU
-                lapic.start_ap(cpu.proc_id);
+                lapic.start_ap(cpu.apic_id);
             }
 
             // Wait for the CPU to set the ready flag

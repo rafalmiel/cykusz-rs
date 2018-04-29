@@ -11,7 +11,6 @@
 #![feature(global_allocator)]
 #![feature(alloc, allocator_api)]
 #![feature(pointer_methods)]
-#![feature(dyn_trait)]
 #![feature(thread_local)]
 
 extern crate rlibc;

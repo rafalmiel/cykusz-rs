@@ -53,7 +53,7 @@ pub struct MatdEntryLocalApic {
     matd: MatdEntry,
     pub proc_id: u8,
     pub apic_id: u8,
-    flags: u32
+    flags:   u32
 }
 
 
@@ -69,6 +69,12 @@ pub struct MatdEntryIOApic {
 impl MatdEntryIOApic {
     pub fn ioapic_address(&'static self) -> MappedAddr {
         PhysAddr(self.ioapic_address as usize).to_mapped()
+    }
+}
+
+impl MatdEntryLocalApic {
+    pub fn proc_is_enabled(&self) -> bool {
+        self.flags == 1
     }
 }
 

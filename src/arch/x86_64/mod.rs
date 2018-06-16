@@ -13,6 +13,7 @@ pub mod dev;
 pub mod smp;
 pub mod tls;
 pub mod timer;
+pub mod task;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {

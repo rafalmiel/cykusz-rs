@@ -31,7 +31,7 @@ pub fn init() {
         let mapped = VirtAddr(&__tdata_start as *const _ as usize);
 
         let tls = ::kernel::mm::heap::allocate(
-            ::alloc::heap::Layout::from_size_align_unchecked(size + 8, 8)
+            ::core::alloc::Layout::from_size_align_unchecked(size + 8, 8)
         ).expect("Out of memory!");
 
         let ptr = mapped.0 as *const u8;

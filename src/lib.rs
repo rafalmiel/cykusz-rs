@@ -8,7 +8,6 @@
 #![feature(concat_idents)]
 #![feature(step_trait)]
 #![feature(iterator_step_by)]
-#![feature(global_allocator)]
 #![feature(alloc, allocator_api)]
 #![feature(pointer_methods)]
 #![feature(thread_local)]
@@ -19,7 +18,6 @@ extern crate bitflags;
 #[macro_use]
 extern crate lazy_static;
 extern crate spin;
-extern crate alloc;
 extern crate linked_list_allocator;
 extern crate raw_cpuid;
 
@@ -34,6 +32,29 @@ pub mod lang_items;
 
 #[thread_local]
 static mut CPU_ID: u8 = 0;
+
+static mut TASK1: arch::task::Task = arch::task::Task::empty();
+static mut TASK2: arch::task::Task = arch::task::Task::empty();
+
+pub fn task_1() {
+    loop {
+        print!("1");
+
+        unsafe {
+            arch::task::switch(&mut TASK1, &TASK2);
+        }
+    }
+}
+
+pub fn task_2() {
+    loop {
+        print!("2");
+
+        unsafe {
+            arch::task::switch(&mut TASK2, &TASK1);
+        }
+    }
+}
 
 pub fn rust_main() {
     kernel::mm::init();
@@ -54,7 +75,19 @@ pub fn rust_main() {
 
     println!("[ OK ] Local Timer Started");
 
-    kernel::int::enable_ints();
+    //kernel::int::enable_ints();
+
+    unsafe {
+        TASK1 = arch::task::Task::new_kern(task_1);
+        TASK2 = arch::task::Task::new_kern(task_2);
+    }
+
+    let mut t0 = arch::task::Task::empty();
+
+    unsafe {
+        arch::task::switch(&mut t0, &TASK1);
+    }
+
 
     loop {
         unsafe {
@@ -80,7 +113,7 @@ pub fn rust_main_ap() {
 
     kernel::timer::start_timer();
 
-    kernel::int::enable_ints();
+    //kernel::int::enable_ints();
 
     loop {
         unsafe {

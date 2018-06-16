@@ -210,11 +210,11 @@ impl LApic {
 }
 
 pub fn init(hdr: &'static MatdHeader) {
-    LAPIC.lock().init(hdr);
+    LAPIC.irq().init(hdr);
 }
 
 pub fn init_ap() {
-    LAPIC.lock().init_ap();
+    LAPIC.irq().init_ap();
 }
 
 pub fn start_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
@@ -224,7 +224,7 @@ pub fn start_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
 
     int::mask_int(remap, false);
 
-    LAPIC.lock().start_timer();
+    LAPIC.irq().start_timer();
 }
 
 
@@ -235,7 +235,9 @@ pub fn start_ap() {
         ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries()
     };
 
-    let bsp_id = LAPIC.lock().id();
+    let bsp_id = LAPIC.irq().id();
+
+    let mut cpu_id = 0;
 
     for cpu in iter {
         // Don't boot bootstrap processor
@@ -244,8 +246,10 @@ pub fn start_ap() {
 
             trampoline.reset();
 
+            cpu_id += 1;
+
             // Pass CPU ID to the new CPU
-            trampoline.cpu_num = cpu.apic_id as u8;
+            trampoline.cpu_num = cpu_id;
 
             // Allocate stack for the new CPU
             trampoline.stack_ptr = unsafe {
@@ -261,7 +265,7 @@ pub fn start_ap() {
 
             {
                 // Start AP and release the lock
-                let mut lapic = LAPIC.lock();
+                let mut lapic = LAPIC.irq();
 
                 // Initialize new CPU
                 lapic.start_ap(cpu.apic_id);

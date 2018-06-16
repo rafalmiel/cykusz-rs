@@ -1,4 +1,4 @@
-use core::alloc::{Opaque, Alloc, Layout, AllocErr, GlobalAlloc};
+use core::alloc::{Alloc, Layout, AllocErr, GlobalAlloc};
 use core::ops::Deref;
 use core::ptr::NonNull;
 
@@ -37,7 +37,7 @@ impl LockedHeap {
         LockedHeap(Mutex::new(Heap::empty()))
     }
 
-    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<Opaque>, AllocErr> {
+    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, AllocErr> {
         heap.alloc(layout.clone()).or_else(|e| {
             match e {
                 AllocErr{ .. } => {
@@ -68,11 +68,11 @@ impl Deref for LockedHeap {
 }
 
 unsafe impl GlobalAlloc for LockedHeap {
-    unsafe fn alloc(&self, layout: Layout) -> *mut Opaque {
-        self.allocate(&mut self.0.lock(), layout).ok().map_or(0 as *mut Opaque, |alloc| alloc.as_ptr())
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        self.allocate(&mut self.0.lock(), layout).ok().map_or(0 as *mut u8, |alloc| alloc.as_ptr())
     }
 
-    unsafe fn dealloc(&self, ptr: *mut Opaque, layout: Layout) {
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         self.0.lock().dealloc(NonNull::new_unchecked(ptr), layout)
     }
 }

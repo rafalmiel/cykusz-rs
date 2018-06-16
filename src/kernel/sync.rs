@@ -59,7 +59,7 @@ impl<T> IrqLock<T> {
 }
 
 impl<T:?Sized> IrqLock<T> {
-    pub fn lock(&self) -> IrqLockGuard<T> {
+    pub fn irq(&self) -> IrqLockGuard<T> {
         let ints = int::is_int_enabled();
         int::disable_ints();
         IrqLockGuard {

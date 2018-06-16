@@ -31,7 +31,7 @@ pub fn get_irq_mapping(irq: u32) -> u32 {
 }
 
 pub fn end_of_int() {
-    ::arch::dev::lapic::LAPIC.lock().end_of_int()
+    ::arch::dev::lapic::LAPIC.irq().end_of_int()
 }
 
 pub fn mask_int(int: u8, masked: bool) {

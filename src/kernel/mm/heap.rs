@@ -82,3 +82,9 @@ pub fn allocate(layout: Layout) -> Option<*mut u8> {
         Some(::HEAP.alloc(layout) as *mut u8)
     }
 }
+
+pub fn deallocate(ptr: *mut u8, layout: Layout) {
+    unsafe {
+        ::HEAP.dealloc(ptr, layout)
+    }
+}

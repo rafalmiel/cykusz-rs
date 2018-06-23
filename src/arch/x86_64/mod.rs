@@ -4,6 +4,8 @@ use drivers::multiboot2;
 pub mod output;
 #[macro_use]
 pub mod raw;
+#[macro_use]
+pub mod task;
 pub mod gdt;
 pub mod idt;
 pub mod mm;
@@ -13,7 +15,6 @@ pub mod dev;
 pub mod smp;
 pub mod tls;
 pub mod timer;
-pub mod task;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {

@@ -1,7 +1,8 @@
-section .text
-bits 64
 global switch_to
 global isr_return
+
+section .text
+bits 64
 ; fn switch_to(old: *mut *mut Context, new: *mut Context)
 ; old = rsp
 ; new = rsi

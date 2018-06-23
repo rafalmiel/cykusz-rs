@@ -1,4 +1,6 @@
 use arch::raw::segmentation::SegmentSelector;
+use arch::gdt;
+use kernel::mm::heap::allocate as heap_allocate;
 
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -24,13 +26,14 @@ pub struct Context {
 #[derive(Copy, Clone, Debug)]
 pub struct ContextMutPtr(pub *mut Context);
 
-unsafe impl Send for ContextMutPtr {}
+//unsafe impl Send for ContextMutPtr {}
 
 #[derive(Copy, Clone, Debug)]
 pub struct Task {
     pub ctx: ContextMutPtr,
     //top of the stack, used to deallocate
     pub stack_top: usize,
+    pub stack_size: usize
 }
 
 impl Context {
@@ -52,69 +55,80 @@ impl Context {
 
 fn task_finished()
 {
+    println!("Task Finished");
+}
 
+#[repr(C, packed)]
+struct IretqFrame {
+    pub ip: usize,
+    pub cs: usize,
+    pub rlfags: usize,
+    pub sp: usize,
+    pub ds: usize,
+    pub task_finished_fun: usize,
 }
 
 impl Task {
+    pub const fn empty() -> Task {
+        Task {
+            ctx: ContextMutPtr(::core::ptr::null_mut()),
+            stack_top: 0,
+            stack_size: 0
+        }
+    }
+
     fn new_sp(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, stack: usize, stack_size: usize) -> Task {
         unsafe {
             let sp = (stack as *mut u8).offset(stack_size as isize);
-            *(sp.offset(-8) as *mut usize) = task_finished as usize;//task finished function
-            *(sp.offset(-16) as *mut usize) = ds.bits() as usize;//task finished function
-            *(sp.offset(-24) as *mut usize) = sp.offset(-8) as usize;                           //sp
-            *(sp.offset(-32) as *mut usize) = if int_enabled { 0x200 } else { 0x0 };                                            //rflags enable interrupts
-            *(sp.offset(-40) as *mut usize) = cs.bits() as usize;//cs
-            *(sp.offset(-48) as *mut usize) = fun as usize;                                     //rip
-            let ctx = sp.offset(-(::core::mem::size_of::<Context>() as isize + 48)) as *mut Context;
+            let frame: &mut IretqFrame =
+                &mut *(sp.offset(
+                    -(::core::mem::size_of::<IretqFrame>() as isize)
+                ) as *mut IretqFrame);
+
+            frame.task_finished_fun = task_finished as usize;
+            frame.ds = ds.bits() as usize;
+            frame.sp = sp.offset(-8) as usize;
+            frame.rlfags = if int_enabled { 0x200 } else { 0x0 };
+            frame.cs = cs.bits() as usize;
+            frame.ip = fun as usize;
+
+            let ctx = sp.offset(
+                -(::core::mem::size_of::<Context>() as isize + ::core::mem::size_of::<IretqFrame>() as isize)) as *mut Context;
             (*ctx).rip = isr_return as usize;
+
             Task {
                 ctx: ContextMutPtr(ctx),
                 stack_top: sp as usize - stack_size,
+                stack_size
             }
         }
 
     }
 
-    pub fn new(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool) -> Task {
+    fn new(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool) -> Task {
         let sp = unsafe {
-            ::kernel::mm::heap::allocate(::core::alloc::Layout::from_size_align_unchecked(4096*4, 4096)).unwrap()
+            heap_allocate(::core::alloc::Layout::from_size_align_unchecked(4096*4, 4096)).unwrap()
         };
 
         Task::new_sp(fun, cs, ds, int_enabled, sp as usize, 4096*4)
     }
 
-    pub fn new_sched(fun: fn ()) -> Task {
-        Task::new(fun, SegmentSelector::new(1, SegmentSelector::RPL_0), SegmentSelector::new(0, SegmentSelector::RPL_0), false)
-    }
-
-    pub fn new_kern(fun: fn ()) -> Task {
-        Task::new(fun, SegmentSelector::new(1, SegmentSelector::RPL_0), SegmentSelector::new(0, SegmentSelector::RPL_0), true)
-    }
-
-    pub fn new_user(fun: fn(), stack: usize, stack_size: usize) -> Task {
-        Task::new_sp(
-            fun,
-            SegmentSelector::new(3, SegmentSelector::RPL_3),
-            SegmentSelector::new(4, SegmentSelector::RPL_3),
-            true,
-            stack, stack_size)
-    }
-
-    pub const fn empty() -> Task {
-        Task {
-            ctx: ContextMutPtr(::core::ptr::null_mut()),
-            stack_top: 0,
-        }
+    pub fn create_kernel_task(fun: fn ()) -> Task {
+        Task::new(fun, gdt::ring0_cs(), gdt::ring0_ds(), true)
     }
 
     pub fn deallocate(&mut self) {
         self.ctx = ContextMutPtr(::core::ptr::null_mut());
-        //unsafe {
-        //    HEAP.dealloc(self.stack_top as *mut u8, ::core::alloc::Layout::from_size_align_unchecked(4096*4, 4096));
-        //}
+        unsafe {
+            ::kernel::mm::heap::deallocate(
+                self.stack_top as *mut u8,
+                ::core::alloc::Layout::from_size_align_unchecked(self.stack_size, 4096)
+            );
+        }
         self.stack_top = 0;
     }
 }
+
 
 extern "C" {
     pub fn switch_to(old_ctx: *mut *mut Context, new_ctx: *const Context);
@@ -125,4 +139,12 @@ pub fn switch(from: &mut Task, to: &Task) {
     unsafe {
         switch_to((&mut from.ctx.0) as *mut *mut Context, to.ctx.0);
     }
+}
+
+//TODO: Move somewhere else
+#[macro_export]
+macro_rules! switch {
+    ($ctx1:expr, $ctx2:expr) => (
+        $crate::arch::task::switch(&mut $ctx1, &$ctx2);
+    )
 }

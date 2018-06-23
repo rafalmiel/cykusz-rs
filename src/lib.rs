@@ -29,32 +29,10 @@ pub mod arch;
 mod drivers;
 pub mod kernel;
 pub mod lang_items;
+pub mod task_test;
 
 #[thread_local]
 static mut CPU_ID: u8 = 0;
-
-static mut TASK1: arch::task::Task = arch::task::Task::empty();
-static mut TASK2: arch::task::Task = arch::task::Task::empty();
-
-pub fn task_1() {
-    loop {
-        print!("1");
-
-        unsafe {
-            arch::task::switch(&mut TASK1, &TASK2);
-        }
-    }
-}
-
-pub fn task_2() {
-    loop {
-        print!("2");
-
-        unsafe {
-            arch::task::switch(&mut TASK2, &TASK1);
-        }
-    }
-}
 
 pub fn rust_main() {
     kernel::mm::init();
@@ -75,20 +53,9 @@ pub fn rust_main() {
 
     println!("[ OK ] Local Timer Started");
 
-    //kernel::int::enable_ints();
+    task_test::start();
 
-    unsafe {
-        TASK1 = arch::task::Task::new_kern(task_1);
-        TASK2 = arch::task::Task::new_kern(task_2);
-    }
-
-    let mut t0 = arch::task::Task::empty();
-
-    unsafe {
-        arch::task::switch(&mut t0, &TASK1);
-    }
-
-
+    kernel::int::enable_ints();
     loop {
         unsafe {
             asm!("hlt"::::"volatile");

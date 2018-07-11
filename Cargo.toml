@@ -1,4 +1,7 @@
+cargo-features = ["edition"]
+
 [package]
+edition = '2018'
 name = "cykusz_rs"
 version = "0.1.0"
 authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]

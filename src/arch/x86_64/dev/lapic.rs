@@ -1,14 +1,14 @@
 use core::ptr::write_volatile;
 use core::ptr::read_volatile;
 
-use arch::acpi::apic::MatdHeader;
+use crate::arch::acpi::apic::MatdHeader;
 
-use arch::mm::{MappedAddr};
-use arch::raw::msr;
+use crate::arch::mm::{MappedAddr};
+use crate::arch::raw::msr;
 
-use kernel::sync::IrqLock;
-use arch::int;
-use arch::idt;
+use crate::kernel::sync::IrqLock;
+use crate::arch::int;
+use crate::arch::idt;
 
 pub static LAPIC: IrqLock<LApic> = IrqLock::new(LApic::new());
 
@@ -72,7 +72,7 @@ impl LApic {
     }
 
     pub fn init(&mut self, hdr: &'static MatdHeader) {
-        self.x2 = ::arch::dev::cpu::has_x2apic();
+        self.x2 = crate::arch::dev::cpu::has_x2apic();
 
         if !self.x2 {
             self.lapic_base = Some(hdr.lapic_address());
@@ -125,26 +125,26 @@ impl LApic {
     }
 
     pub fn start_ap(&mut self, ap_id: u8) {
-        use arch::smp::{AP_INIT};
+        use crate::arch::smp::{AP_INIT};
         if !self.x2 {
             self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
             self.reg_write(REG_CMD, 0x4500);
 
-            ::arch::dev::pit::early_sleep(10);
+            crate::arch::dev::pit::early_sleep(10);
 
             self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
             self.reg_write(REG_CMD, 0x4600u32 | ((AP_INIT.0 as u32) >> 12));
 
-            ::arch::dev::pit::early_sleep(10);
+            crate::arch::dev::pit::early_sleep(10);
         } else {
             unsafe {
                 // INIT
                 msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4500u64 | ((ap_id as u64) << 32));
-                ::arch::dev::pit::early_sleep(10);
+                crate::arch::dev::pit::early_sleep(10);
 
                 // START: AP INIT routine begins at physical address 0x1000
                 msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4600u64 | ((AP_INIT.0 as u64) >> 12) | ((ap_id as u64) << 32));
-                ::arch::dev::pit::early_sleep(10);
+                crate::arch::dev::pit::early_sleep(10);
             }
         }
     }
@@ -184,7 +184,7 @@ impl LApic {
             }
         }
 
-        ::arch::dev::pit::early_sleep(ms);
+        crate::arch::dev::pit::early_sleep(ms);
 
         if !self.x2 {
             self.reg_write(REG_TIM, 1<<16);
@@ -217,7 +217,7 @@ pub fn init_ap() {
     LAPIC.irq().init_ap();
 }
 
-pub fn start_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
+pub fn start_timer(f: crate::arch::raw::idt::ExceptionHandlerFn) {
     let remap: u8 = int::get_irq_mapping(0) as u8;
     int::set_irq_dest(remap as u8, 32);
     idt::set_handler(32, f);
@@ -229,10 +229,10 @@ pub fn start_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
 
 
 pub fn start_ap() {
-    use arch::smp::{Trampoline};
+    use crate::arch::smp::{Trampoline};
 
     let iter = {
-        ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries()
+        crate::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries()
     };
 
     let bsp_id = LAPIC.irq().id();
@@ -253,14 +253,14 @@ pub fn start_ap() {
 
             // Allocate stack for the new CPU
             trampoline.stack_ptr = unsafe {
-                ::kernel::mm::heap::allocate(
+                crate::kernel::mm::heap::allocate(
                     ::core::alloc::Layout::from_size_align_unchecked(4096 * 16, 4096)
                 ).unwrap().offset(4096 * 16)
             } as u64;
 
             // Pass page table pointer to the new CPU
             trampoline.page_table_ptr = unsafe {
-                ::arch::raw::ctrlregs::cr3()
+                crate::arch::raw::ctrlregs::cr3()
             };
 
             {

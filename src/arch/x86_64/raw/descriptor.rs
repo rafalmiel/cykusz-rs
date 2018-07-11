@@ -1,5 +1,5 @@
-use arch::raw::gdt;
-use arch::raw::idt;
+use crate::arch::raw::gdt;
+use crate::arch::raw::idt;
 use core::mem;
 
 bitflags! {

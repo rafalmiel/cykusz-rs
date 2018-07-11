@@ -1,5 +1,5 @@
 use core::ops::{Deref, DerefMut};
-use kernel::int;
+use crate::kernel::int;
 use spin::{Mutex as M, MutexGuard as MG};
 use core::cell::UnsafeCell;
 

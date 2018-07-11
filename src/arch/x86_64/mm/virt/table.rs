@@ -1,11 +1,11 @@
 use core::marker::PhantomData;
 
-use kernel::mm::virt;
-use kernel::mm::*;
+use crate::kernel::mm::virt;
+use crate::kernel::mm::*;
 
-use arch::mm::virt::entry::Entry;
-use arch::mm::virt::entry;
-use kernel::mm::Frame;
+use crate::arch::mm::virt::entry::Entry;
+use crate::arch::mm::virt::entry;
+use crate::kernel::mm::Frame;
 
 use super::page;
 
@@ -93,7 +93,7 @@ where
         let entry = &mut self.entries[idx];
 
         if !entry.contains(entry::Entry::PRESENT) {
-            let frame = ::arch::mm::phys::allocate().expect("Out of memory!");
+            let frame = crate::arch::mm::phys::allocate().expect("Out of memory!");
 
             Table::<L::NextLevel>::new_at_frame_mut(&frame).clear();
 
@@ -127,7 +127,7 @@ where
         let entry = &mut self.entries[idx];
 
         if !entry.contains(entry::Entry::PRESENT) {
-            let frame = ::arch::mm::phys::allocate().expect("Out of memory!");
+            let frame = crate::arch::mm::phys::allocate().expect("Out of memory!");
 
             Table::<L>::new_at_frame_mut(&frame).clear();
 
@@ -147,7 +147,7 @@ where
         let entry = &mut self.entries[idx];
 
         if !entry.contains(entry::Entry::PRESENT) {
-            let frame = ::arch::mm::phys::allocate().expect("Out of memory!");
+            let frame = crate::arch::mm::phys::allocate().expect("Out of memory!");
 
             Table::<L>::new_at_frame_mut(&frame).clear();
 
@@ -172,7 +172,7 @@ where
         if entry.contains(entry::Entry::PRESENT) {
             let frame = Frame::new(entry.address());
 
-            ::arch::mm::phys::deallocate(&frame);
+            crate::arch::mm::phys::deallocate(&frame);
 
             entry.clear();
         }

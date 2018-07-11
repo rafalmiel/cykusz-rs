@@ -1,5 +1,5 @@
-use kernel::mm::PAGE_SIZE;
-use kernel::mm::VirtAddr;
+use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::VirtAddr;
 
 pub struct Page {
     number: usize,

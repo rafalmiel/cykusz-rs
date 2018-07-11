@@ -1,4 +1,4 @@
-use drivers::multiboot2;
+use crate::drivers::multiboot2;
 
 #[macro_use]
 pub mod output;
@@ -33,16 +33,16 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
 
     dev::init();
 
-    ::rust_main();
+    crate::rust_main();
 }
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main_ap() {
-    ::arch::raw::mm::enable_nxe_bit();
+    crate::arch::raw::mm::enable_nxe_bit();
 
     gdt::init();
     idt::init();
     dev::init_ap();
 
-    ::rust_main_ap();
+    crate::rust_main_ap();
 }

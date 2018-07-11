@@ -1,5 +1,7 @@
 #![no_std]
 
+#![feature(rust_2018_preview)]
+
 #![feature(lang_items)]
 #![feature(const_fn)]
 #![feature(ptr_internals)]
@@ -67,7 +69,7 @@ pub fn rust_main() {
 pub fn rust_main_ap() {
     kernel::tls::init();
 
-    let trampoline = ::arch::smp::Trampoline::get();
+    let trampoline = crate::arch::smp::Trampoline::get();
 
     unsafe {
         CPU_ID = trampoline.cpu_num;

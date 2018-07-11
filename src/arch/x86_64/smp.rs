@@ -1,4 +1,4 @@
-use kernel::mm::{PhysAddr};
+use crate::kernel::mm::{PhysAddr};
 
 pub const TRAMPOLINE : PhysAddr = PhysAddr(0xE00);
 pub const AP_INIT : PhysAddr = PhysAddr(0x1000);
@@ -67,5 +67,5 @@ pub fn init() {
         pt.copy_to(TRAMPOLINE.to_mapped().0 as *mut u8, 0x100);
     }
 
-    ::arch::dev::lapic::start_ap();
+    crate::arch::dev::lapic::start_ap();
 }

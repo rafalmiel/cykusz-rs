@@ -1,3 +1,3 @@
 pub fn init() {
-    ::arch::smp::init();
+    crate::arch::smp::init();
 }

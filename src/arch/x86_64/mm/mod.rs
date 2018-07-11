@@ -2,9 +2,9 @@ pub mod phys;
 pub mod virt;
 pub mod heap;
 
-pub use arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
+pub use crate::arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
 
-use drivers::multiboot2;
+use crate::drivers::multiboot2;
 
 const VIRT: VirtAddr = VirtAddr(0xFFFFFF0000000000);
 const PHYSMAP: MappedAddr = MappedAddr(0xFFFF800000000000);

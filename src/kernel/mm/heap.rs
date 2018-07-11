@@ -4,16 +4,16 @@ use core::ptr::NonNull;
 
 use linked_list_allocator::{Heap, align_up};
 
-use kernel::mm::*;
-use kernel::mm::PAGE_SIZE;
-use kernel::mm::map;
+use crate::kernel::mm::*;
+use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::map;
 use spin::Mutex;
 
-use arch::mm::heap::{HEAP_START, HEAP_END, HEAP_SIZE};
+use crate::arch::mm::heap::{HEAP_START, HEAP_END, HEAP_SIZE};
 
 pub fn init()
 {
-    use HEAP;
+    use crate::HEAP;
 
     for addr in (HEAP_START..(HEAP_START + HEAP_SIZE)).step_by(PAGE_SIZE) {
         map(addr);
@@ -79,12 +79,12 @@ unsafe impl GlobalAlloc for LockedHeap {
 
 pub fn allocate(layout: Layout) -> Option<*mut u8> {
     unsafe {
-        Some(::HEAP.alloc(layout) as *mut u8)
+        Some(crate::HEAP.alloc(layout) as *mut u8)
     }
 }
 
 pub fn deallocate(ptr: *mut u8, layout: Layout) {
     unsafe {
-        ::HEAP.dealloc(ptr, layout)
+        crate::HEAP.dealloc(ptr, layout)
     }
 }

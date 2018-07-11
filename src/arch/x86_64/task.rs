@@ -1,6 +1,6 @@
-use arch::raw::segmentation::SegmentSelector;
-use arch::gdt;
-use kernel::mm::heap::allocate as heap_allocate;
+use crate::arch::raw::segmentation::SegmentSelector;
+use crate::arch::gdt;
+use crate::kernel::mm::heap::allocate as heap_allocate;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -120,7 +120,7 @@ impl Task {
     pub fn deallocate(&mut self) {
         self.ctx = ContextMutPtr(::core::ptr::null_mut());
         unsafe {
-            ::kernel::mm::heap::deallocate(
+            crate::kernel::mm::heap::deallocate(
                 self.stack_top as *mut u8,
                 ::core::alloc::Layout::from_size_align_unchecked(self.stack_size, 4096)
             );

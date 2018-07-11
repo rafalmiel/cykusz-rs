@@ -1,8 +1,8 @@
 use core::ptr::write_volatile;
 use core::ptr::read_volatile;
 
-use arch::acpi::apic::MatdHeader;
-use kernel::mm::*;
+use crate::arch::acpi::apic::MatdHeader;
+use crate::kernel::mm::*;
 
 use spin::Mutex;
 

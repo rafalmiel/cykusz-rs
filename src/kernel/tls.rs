@@ -1,4 +1,4 @@
 
 pub fn init() {
-    ::arch::tls::init();
+    crate::arch::tls::init();
 }

@@ -1,6 +1,6 @@
-use arch::raw::descriptor as dsc;
-use arch::raw::segmentation::cs;
-use arch::raw::segmentation::SegmentSelector;
+use crate::arch::raw::descriptor as dsc;
+use crate::arch::raw::segmentation::cs;
+use crate::arch::raw::segmentation::SegmentSelector;
 use core::fmt;
 
 #[derive(Copy, Clone, Debug)]

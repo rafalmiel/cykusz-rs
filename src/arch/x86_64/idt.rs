@@ -1,4 +1,4 @@
-use arch::raw::idt;
+use crate::arch::raw::idt;
 
 use spin::Mutex;
 
@@ -46,7 +46,7 @@ pub fn set_handler(num: usize, f: idt::ExceptionHandlerFn) {
 
 extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {
     println!("Dummy int");
-    ::arch::int::end_of_int();
+    crate::arch::int::end_of_int();
 }
 
 extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {

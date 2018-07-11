@@ -1,7 +1,7 @@
-use arch::raw::idt as ridt;
-use arch::idt;
-use arch::int;
-use arch::raw::cpuio;
+use crate::arch::raw::idt as ridt;
+use crate::arch::idt;
+use crate::arch::int;
+use crate::arch::raw::cpuio;
 
 pub fn init() {
     let remap: u8 = int::get_irq_mapping(8) as u8;

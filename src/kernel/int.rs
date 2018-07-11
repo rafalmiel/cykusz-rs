@@ -1,9 +1,9 @@
-pub use arch::int::is_int_enabled;
+pub use crate::arch::int::is_int_enabled;
 
 pub fn disable() {
-    ::arch::int::cli();
+    crate::arch::int::cli();
 }
 
 pub fn enable() {
-    ::arch::int::sti();
+    crate::arch::int::sti();
 }

@@ -1,4 +1,4 @@
-use kernel::mm::MappedAddr;
+use crate::kernel::mm::MappedAddr;
 use core::ptr::Unique;
 
 #[allow(unused)]

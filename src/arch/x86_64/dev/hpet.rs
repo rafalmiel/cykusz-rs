@@ -1,6 +1,6 @@
-use kernel::mm::{PhysAddr};
+use crate::kernel::mm::{PhysAddr};
 
-use arch::acpi::hpet::HpetHeader;
+use crate::arch::acpi::hpet::HpetHeader;
 
 pub struct Hpet {
     hpet_hdr: &'static HpetHeader

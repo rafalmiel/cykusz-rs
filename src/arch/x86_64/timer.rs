@@ -1,7 +1,7 @@
-use arch::raw::idt as ridt;
-use arch::int;
-use arch::dev::lapic;
-use kernel::sync::Mutex;
+use crate::arch::raw::idt as ridt;
+use crate::arch::int;
+use crate::arch::dev::lapic;
+use crate::kernel::sync::Mutex;
 
 struct Timer {
     pub handler: Option<fn () -> ()>,

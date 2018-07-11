@@ -1,4 +1,4 @@
-use arch::raw::io;
+use crate::arch::raw::io;
 use core::marker::PhantomData;
 
 pub trait InOut {

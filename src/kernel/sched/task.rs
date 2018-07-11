@@ -1,4 +1,4 @@
-use arch::task::Task as ArchTask;
+use crate::arch::task::Task as ArchTask;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {

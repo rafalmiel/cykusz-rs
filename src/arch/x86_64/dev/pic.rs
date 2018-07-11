@@ -1,6 +1,6 @@
-use arch::raw::cpuio::{Port, UnsafePort};
+use crate::arch::raw::cpuio::{Port, UnsafePort};
 
-use arch::int::InterruptController;
+use crate::arch::int::InterruptController;
 
 use spin::Mutex;
 

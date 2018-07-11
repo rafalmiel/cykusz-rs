@@ -27,17 +27,17 @@ pub fn cli() {
 }
 
 pub fn get_irq_mapping(irq: u32) -> u32 {
-    ::arch::acpi::ACPI.lock().get_irq_mapping(irq)
+    crate::arch::acpi::ACPI.lock().get_irq_mapping(irq)
 }
 
 pub fn end_of_int() {
-    ::arch::dev::lapic::LAPIC.irq().end_of_int()
+    crate::arch::dev::lapic::LAPIC.irq().end_of_int()
 }
 
 pub fn mask_int(int: u8, masked: bool) {
-    ::arch::dev::ioapic::IOAPIC.lock().mask_int(int as u32, masked);
+    crate::arch::dev::ioapic::IOAPIC.lock().mask_int(int as u32, masked);
 }
 
 pub fn set_irq_dest(src: u8, dst: u8) {
-    ::arch::dev::ioapic::IOAPIC.lock().set_int(src as u32, dst as u32);
+    crate::arch::dev::ioapic::IOAPIC.lock().set_int(src as u32, dst as u32);
 }

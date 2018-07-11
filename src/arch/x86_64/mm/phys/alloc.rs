@@ -1,10 +1,10 @@
 use super::iter;
 
 use spin::Mutex;
-use kernel::mm::{PhysAddr, MappedAddr};
-use kernel::mm::Frame;
-use drivers::multiboot2;
-use drivers::multiboot2::memory::MemoryIter;
+use crate::kernel::mm::{PhysAddr, MappedAddr};
+use crate::kernel::mm::Frame;
+use crate::drivers::multiboot2;
+use crate::drivers::multiboot2::memory::MemoryIter;
 use self::iter::PhysMemIterator;
 
 const LIST_ADDR_INVALID: PhysAddr = PhysAddr(0xFFFF_FFFF_FFFF_FFFF);

@@ -1,4 +1,4 @@
-use arch::task::Task;
+use crate::arch::task::Task;
 
 static mut TASK1: Task = Task::empty();
 static mut TASK2: Task = Task::empty();

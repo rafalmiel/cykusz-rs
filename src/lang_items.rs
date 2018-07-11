@@ -1,4 +1,5 @@
 use core::panic::PanicInfo;
+use core::alloc::Layout;
 
 #[cfg(not(test))]
 #[lang = "eh_personality"]
@@ -19,7 +20,7 @@ pub extern "C" fn _Unwind_Resume() -> ! {
 }
 
 #[lang = "oom"]
-fn oom() -> ! {
-    println!("Out of memory!");
+fn oom(layout: Layout) -> ! {
+    println!("Out of memory! {:?}", layout);
     loop {}
 }

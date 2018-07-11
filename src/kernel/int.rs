@@ -1,9 +1,9 @@
 pub use arch::int::is_int_enabled;
 
-pub fn disable_ints() {
+pub fn disable() {
     ::arch::int::cli();
 }
 
-pub fn enable_ints() {
+pub fn enable() {
     ::arch::int::sti();
 }

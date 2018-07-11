@@ -41,7 +41,7 @@ impl LApic {
         }
     }
 
-    pub fn reg_write(&self, reg: u32, value: u32) {
+    fn reg_write(&self, reg: u32, value: u32) {
         if let Some(base) = self.lapic_base {
             unsafe {
                 write_volatile::<u32>((base + reg as usize).0 as *mut u32, value);
@@ -51,7 +51,7 @@ impl LApic {
         }
     }
 
-    pub fn reg_read(&self, reg: u32) -> u32 {
+    fn reg_read(&self, reg: u32) -> u32 {
         if let Some(base) = self.lapic_base {
             unsafe {
                 read_volatile::<u32>((base + reg as usize).0 as *const u32)

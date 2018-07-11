@@ -1,8 +1,8 @@
-pub fn setup_timer() {
+pub fn setup() {
     ::arch::timer::setup_timer(timer_handler);
 }
 
-pub fn start_timer() {
+pub fn start() {
     ::arch::timer::start_timer();
 }
 

@@ -41,7 +41,7 @@ impl LApic {
         }
     }
 
-    pub fn reg_write(&self, reg: u32, value: u32) {
+    fn reg_write(&self, reg: u32, value: u32) {
         if let Some(base) = self.lapic_base {
             unsafe {
                 write_volatile::<u32>((base + reg as usize).0 as *mut u32, value);
@@ -51,7 +51,7 @@ impl LApic {
         }
     }
 
-    pub fn reg_read(&self, reg: u32) -> u32 {
+    fn reg_read(&self, reg: u32) -> u32 {
         if let Some(base) = self.lapic_base {
             unsafe {
                 read_volatile::<u32>((base + reg as usize).0 as *const u32)
@@ -130,21 +130,21 @@ impl LApic {
             self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
             self.reg_write(REG_CMD, 0x4500);
 
-            ::arch::dev::pit::early_sleep(10);
+            ::kernel::timer::early_sleep(10);
 
             self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
             self.reg_write(REG_CMD, 0x4600u32 | ((AP_INIT.0 as u32) >> 12));
 
-            ::arch::dev::pit::early_sleep(10);
+            ::kernel::timer::early_sleep(10);
         } else {
             unsafe {
                 // INIT
                 msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4500u64 | ((ap_id as u64) << 32));
-                ::arch::dev::pit::early_sleep(10);
+                ::kernel::timer::early_sleep(10);
 
                 // START: AP INIT routine begins at physical address 0x1000
                 msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4600u64 | ((AP_INIT.0 as u64) >> 12) | ((ap_id as u64) << 32));
-                ::arch::dev::pit::early_sleep(10);
+                ::kernel::timer::early_sleep(10);
             }
         }
     }
@@ -184,7 +184,7 @@ impl LApic {
             }
         }
 
-        ::arch::dev::pit::early_sleep(ms);
+        ::kernel::timer::early_sleep(ms);
 
         if !self.x2 {
             self.reg_write(REG_TIM, 1<<16);

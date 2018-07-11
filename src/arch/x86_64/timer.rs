@@ -9,7 +9,7 @@ struct Timer {
 
 static TIMER: Mutex<Timer> = Mutex::new(Timer { handler: None });
 
-pub fn setup_timer(fun: fn()) {
+pub fn setup(fun: fn()) {
     let mut tmr = TIMER.lock();
 
     tmr.handler = Some(fun);
@@ -17,7 +17,7 @@ pub fn setup_timer(fun: fn()) {
     lapic::start_timer(timer_handler);
 }
 
-pub fn start_timer() {
+pub fn start() {
     lapic::start_timer(timer_handler);
 }
 
@@ -30,4 +30,8 @@ pub extern "x86-interrupt" fn timer_handler(_frame: &mut ridt::ExceptionStackFra
         }
     }
     int::end_of_int();
+}
+
+pub fn early_sleep(ms: u64) {
+    ::arch::dev::pit::early_sleep(ms);
 }

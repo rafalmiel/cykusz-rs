@@ -41,7 +41,7 @@ impl<T> Mutex<T> {
 
     pub fn lock_irq(&self) -> MutexGuard<T> {
         let ints = int::is_int_enabled();
-        int::disable_ints();
+        int::disable();
         MutexGuard {
             g: Some(self.l.lock()),
             //reenable ints if they were enabled before
@@ -61,7 +61,7 @@ impl<T> IrqLock<T> {
 impl<T:?Sized> IrqLock<T> {
     pub fn irq(&self) -> IrqLockGuard<T> {
         let ints = int::is_int_enabled();
-        int::disable_ints();
+        int::disable();
         IrqLockGuard {
             data: unsafe { &mut *self.l.get() },
             irq: ints
@@ -99,7 +99,7 @@ impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
         if self.irq {
-            int::enable_ints();
+            int::enable();
         }
     }
 }
@@ -107,7 +107,7 @@ impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
 impl<'a, T: ?Sized> Drop for IrqLockGuard<'a, T> {
     fn drop(&mut self) {
         if self.irq {
-            int::enable_ints();
+            int::enable();
         }
     }
 }

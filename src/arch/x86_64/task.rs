@@ -2,8 +2,8 @@ use arch::raw::segmentation::SegmentSelector;
 use arch::gdt;
 use kernel::mm::heap::allocate as heap_allocate;
 
-#[derive(Clone, Debug)]
-#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
 pub struct Context {
     /// RFLAGS register
     pub rflags: usize,
@@ -43,11 +43,11 @@ impl Context {
         Context {
             rflags: 0,
             rbp: 0,
+            rbx: 0,
             r12: 0,
             r13: 0,
             r14: 0,
             r15: 0,
-            rbx: 0,
             rip: 0
         }
     }

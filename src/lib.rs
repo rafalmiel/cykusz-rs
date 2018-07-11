@@ -49,13 +49,14 @@ pub fn rust_main() {
 
     println!("[ OK ] SMP Initialized");
 
-    kernel::timer::setup_timer();
+    kernel::timer::setup();
 
     println!("[ OK ] Local Timer Started");
 
     task_test::start();
 
-    kernel::int::enable_ints();
+    kernel::int::enable();
+
     loop {
         unsafe {
             asm!("hlt"::::"volatile");
@@ -78,9 +79,9 @@ pub fn rust_main_ap() {
 
     trampoline.notify_ready();
 
-    kernel::timer::start_timer();
+    kernel::timer::start();
 
-    //kernel::int::enable_ints();
+    kernel::int::enable();
 
     loop {
         unsafe {

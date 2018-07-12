@@ -1,9 +1,9 @@
-pub use arch::int::is_int_enabled;
+pub use arch::int::is_enabled;
 
 pub fn disable() {
-    ::arch::int::cli();
+    ::arch::int::disable();
 }
 
 pub fn enable() {
-    ::arch::int::sti();
+    ::arch::int::enable();
 }

@@ -76,3 +76,5 @@ impl<T: InOut> UnsafePort<T> {
         T::port_out(self.port, value)
     }
 }
+
+impl<T> !Sync for UnsafePort<T> {}

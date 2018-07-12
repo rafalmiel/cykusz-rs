@@ -21,6 +21,10 @@ pub fn start() {
     lapic::start_timer(timer_handler);
 }
 
+pub fn early_sleep(ms: u64) {
+    ::arch::dev::pit::early_sleep(ms);
+}
+
 pub extern "x86-interrupt" fn timer_handler(_frame: &mut ridt::ExceptionStackFrame) {
     {
         let tmr = TIMER.lock_irq();
@@ -30,8 +34,4 @@ pub extern "x86-interrupt" fn timer_handler(_frame: &mut ridt::ExceptionStackFra
         }
     }
     int::end_of_int();
-}
-
-pub fn early_sleep(ms: u64) {
-    ::arch::dev::pit::early_sleep(ms);
 }

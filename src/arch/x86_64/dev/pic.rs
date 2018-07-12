@@ -1,7 +1,5 @@
 use arch::raw::cpuio::{Port, UnsafePort};
 
-use arch::int::InterruptController;
-
 use spin::Mutex;
 
 pub static PIC: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(0x20, 0x28) });
@@ -104,7 +102,6 @@ impl ChainedPics {
     pub fn init(&mut self) {
         unsafe {
             self.configure();
-            //self.disable();
         }
     }
 
@@ -163,28 +160,6 @@ impl ChainedPics {
         }
     }
 
-}
-
-impl InterruptController for ChainedPics {
-    fn init(&mut self) {
-        self.init();
-    }
-
-    fn end_of_int(&mut self) {
-        self.notify_end_of_interrupt();
-    }
-
-    fn irq_remap(&self, irq: u32) -> u32 {
-        irq
-    }
-
-    fn mask_int(&mut self, int: u8, masked: bool) {
-        self.mask_int(int, masked);
-    }
-
-    fn disable(&mut self) {
-        self.disable();
-    }
 }
 
 pub fn init() {

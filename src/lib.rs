@@ -11,6 +11,7 @@
 #![feature(alloc, allocator_api)]
 #![feature(pointer_methods)]
 #![feature(thread_local)]
+#![feature(optin_builtin_traits)]
 
 extern crate rlibc;
 #[macro_use]

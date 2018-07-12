@@ -4,13 +4,12 @@ use arch::int;
 use arch::raw::cpuio;
 
 pub fn init() {
-    let remap: u8 = int::get_irq_mapping(8) as u8;
-    int::set_irq_dest(remap as u8, 40);
+    int::set_irq_dest(8, 40);
     idt::set_handler(40, rtc_handler);
 
-    int::mask_int(remap, false);
+    int::mask_int(8, false);
 
-    int::cli();
+    int::disable();
 
     unsafe {
         let mut sel=  cpuio::UnsafePort::<u8>::new(0x70);
@@ -29,7 +28,7 @@ pub fn init() {
         cmd.write((prev & 0xF0) | 0xF);
     }
 
-    int::sti();
+    int::enable();
 }
 
 fn eoi() {

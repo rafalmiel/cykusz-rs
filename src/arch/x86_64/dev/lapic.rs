@@ -218,11 +218,10 @@ pub fn init_ap() {
 }
 
 pub fn start_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
-    let remap: u8 = int::get_irq_mapping(0) as u8;
-    int::set_irq_dest(remap as u8, 32);
+    int::set_irq_dest(0, 32);
     idt::set_handler(32, f);
 
-    int::mask_int(remap, false);
+    int::mask_int(0, false);
 
     LAPIC.irq().start_timer();
 }

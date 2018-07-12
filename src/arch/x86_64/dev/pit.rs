@@ -70,23 +70,20 @@ impl Pit {
 }
 
 pub fn init() {
-    let remap: u8 = int::get_irq_mapping(0) as u8;
-    int::set_irq_dest(remap as u8, 32);
+    int::set_irq_dest(0, 32);
     idt::set_handler(32, pit_handler);
 
-    int::mask_int(remap, false);
+    int::mask_int(0, false);
 
     PIT.lock_irq().init();
 }
 
 pub fn disable() {
-    let remap: u8 = int::get_irq_mapping(0) as u8;
-    int::mask_int(remap, true);
+    int::mask_int(0, true);
 }
 
 pub fn enable() {
-    let remap: u8 = int::get_irq_mapping(0) as u8;
-    int::mask_int(remap, false);
+    int::mask_int(0, false);
 }
 
 pub extern "x86-interrupt" fn pit_handler(_frame: &mut ridt::ExceptionStackFrame) {

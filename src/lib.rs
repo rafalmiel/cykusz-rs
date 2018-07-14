@@ -22,18 +22,29 @@ extern crate spin;
 extern crate linked_list_allocator;
 extern crate raw_cpuid;
 
+use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
+
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
 
 #[macro_use]
 pub mod arch;
 mod drivers;
+#[macro_use]
 pub mod kernel;
 pub mod lang_items;
 pub mod task_test;
 
 #[thread_local]
 static mut CPU_ID: u8 = 0;
+
+static SMP_INITIALISED: AtomicBool = ATOMIC_BOOL_INIT;
+
+pub fn bochs() {
+    unsafe {
+        asm!("xchg %bx, %bx");
+    }
+}
 
 pub fn rust_main() {
     kernel::mm::init();
@@ -48,12 +59,19 @@ pub fn rust_main() {
 
     kernel::smp::init();
 
-    println!("[ OK ] SMP Initialized");
+    println!("[ OK ] SMP Initialized (CPU count: {})", kernel::smp::cpu_count());
+
+    SMP_INITIALISED.store(true, Ordering::SeqCst);
+
+    kernel::sched::init();
+
+    println!("[ OK ] Scheduler Initialised");
 
     kernel::timer::setup();
 
     println!("[ OK ] Local Timer Started");
 
+    // Start test tasks on this cpu
     task_test::start();
 
     kernel::int::enable();
@@ -74,13 +92,21 @@ pub fn rust_main_ap() {
         CPU_ID = trampoline.cpu_num;
     }
 
-    unsafe {
-        println!("[ OK ] CPU {} Ready!", CPU_ID);
-    }
-
     trampoline.notify_ready();
 
-    kernel::timer::start();
+    // Waiting for all CPUs to be ready
+    while SMP_INITIALISED.load(Ordering::SeqCst) == false {
+        unsafe {
+            asm!("pause"::::"volatile");
+        }
+    }
+
+    kernel::sched::init();
+
+    kernel::timer::setup();
+
+    // Start test tasks on this cpu
+    task_test::start();
 
     kernel::int::enable();
 

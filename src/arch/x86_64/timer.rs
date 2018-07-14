@@ -1,23 +1,20 @@
 use arch::raw::idt as ridt;
 use arch::int;
 use arch::dev::lapic;
-use kernel::sync::Mutex;
+use kernel::sync::IrqLock;
 
 struct Timer {
     pub handler: Option<fn () -> ()>,
 }
 
-static TIMER: Mutex<Timer> = Mutex::new(Timer { handler: None });
+#[thread_local]
+static TIMER: IrqLock<Timer> = IrqLock::new(Timer { handler: None });
 
 pub fn setup(fun: fn()) {
-    let mut tmr = TIMER.lock();
-
+    let timer = &TIMER;
+    let mut tmr = timer.irq();
     tmr.handler = Some(fun);
 
-    lapic::start_timer(timer_handler);
-}
-
-pub fn start() {
     lapic::start_timer(timer_handler);
 }
 
@@ -26,12 +23,9 @@ pub fn early_sleep(ms: u64) {
 }
 
 pub extern "x86-interrupt" fn timer_handler(_frame: &mut ridt::ExceptionStackFrame) {
-    {
-        let tmr = TIMER.lock_irq();
-
-        if let Some(ref f) = tmr.handler {
-            (f)();
-        }
+    let timer = &TIMER;
+    if let Some(ref f) = timer.irq().handler {
+        (f)();
     }
     int::end_of_int();
 }

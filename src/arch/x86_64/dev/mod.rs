@@ -22,6 +22,8 @@ pub fn init()
         lapic::init(apic);
 
         println!("[ OK ] LAPIC Initialized (x2apic: {})", cpu::has_x2apic());
+    } else {
+        panic!("No APIC found!");
     }
 
     // initialise and disable pit. its used to implement busy sleep

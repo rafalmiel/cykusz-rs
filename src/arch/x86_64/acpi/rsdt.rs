@@ -22,9 +22,6 @@ pub trait RsdtPtrType {
     fn as_usize(self) -> usize;
 }
 
-pub trait U32Marker {}
-pub trait U64Marker {}
-
 impl RsdtPtrType for u32 {
     fn as_usize(self) -> usize {
         self as usize
@@ -35,9 +32,6 @@ impl RsdtPtrType for u64 {
         self as usize
     }
 }
-
-impl U32Marker for u32 {}
-impl U64Marker for u64 {}
 
 #[repr(packed, C)]
 pub struct Rsdt<T: RsdtPtrType + ::core::marker::Sized> {

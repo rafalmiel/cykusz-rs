@@ -163,12 +163,12 @@ impl LApic {
         if !self.x2 {
             self.reg_write(REG_TIMDIV, 0b11);
             self.reg_write(REG_TIM, 32 | (1<<17));
-            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 1000);
+            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 1);
         } else {
             unsafe {
                 msr::wrmsr(msr::IA32_X2APIC_DIV_CONF, 0b11);
                 msr::wrmsr(msr::IA32_X2APIC_LVT_TIMER, 32 | (1<<17));
-                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 1000);
+                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 1);
             }
         }
     }
@@ -205,7 +205,7 @@ impl LApic {
 
         self.ticks_in_1_ms = ticks;
 
-        println!("[ INFO ] Ticks in {}ms: {}", ms, ticks);
+        //println!("[ INFO ] Ticks in {}ms: {}", ms, ticks);
     }
 }
 
@@ -225,7 +225,6 @@ pub fn start_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
 
     LAPIC.irq().start_timer();
 }
-
 
 pub fn start_ap() {
     use arch::smp::{Trampoline};

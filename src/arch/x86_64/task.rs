@@ -32,8 +32,6 @@ impl ContextMutPtr {
     }
 }
 
-//unsafe impl Send for ContextMutPtr {}
-
 #[derive(Copy, Clone, Debug)]
 pub struct Task {
     pub ctx: ContextMutPtr,
@@ -113,7 +111,7 @@ impl Task {
 
     fn new(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool) -> Task {
         let sp = unsafe {
-            heap_allocate(::core::alloc::Layout::from_size_align_unchecked(4096*8, 4096)).unwrap()
+            heap_allocate(::core::alloc::Layout::from_size_align_unchecked(4096*4, 4096)).unwrap()
         };
 
         Task::new_sp(fun, cs, ds, int_enabled, sp as usize, 4096*4)

@@ -42,6 +42,17 @@ SECTIONS {
         }
 
         . = ALIGN(4K) - 0xFFFFFF0000000000;
+        __kernel_tdata_start = .;
+
+        .tdata(0xFFFFFF0000000000 + __kernel_tdata_start) : AT(__kernel_tdata_start)
+        {
+                __tdata_start = .;
+                KEEP(*(.tdata*))
+                KEEP(*(.tbss*))
+                __tdata_end = ALIGN(8);
+        }
+
+        . = ALIGN(4K) - 0xFFFFFF0000000000;
         __kernel_gccexc_start = .;
 
         .gcc_except_table(0xFFFFFF0000000000 + __kernel_gccexc_start) : AT(__kernel_gccexc_start)
@@ -64,16 +75,5 @@ SECTIONS {
         .bss(0xFFFFFF0000000000 + __kernel_bss_start) : AT(__kernel_bss_start)
         {
                 *(.bss .bss.*)
-        }
-
-        . = ALIGN(4K) - 0xFFFFFF0000000000;
-        __kernel_tdata_start = .;
-
-        .tdata(0xFFFFFF0000000000 + __kernel_tdata_start) : AT(__kernel_tdata_start)
-        {
-                __tdata_start = .;
-                KEEP(*(.tdata*))
-                KEEP(*(.tbss*))
-                __tdata_end = ALIGN(8);
         }
 }

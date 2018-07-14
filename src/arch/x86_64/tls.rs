@@ -31,6 +31,7 @@ pub fn init() {
         let mapped = VirtAddr(&__tdata_start as *const _ as usize);
 
         //println!("TLS 0x{:x} - 0x{:x}", &__tdata_start as *const u8 as usize, &__tdata_end as *const u8 as usize);
+        //::bochs();
 
         let tls = ::kernel::mm::heap::allocate(
             ::core::alloc::Layout::from_size_align_unchecked(size + 8, 8)

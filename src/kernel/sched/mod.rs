@@ -30,8 +30,6 @@ impl Scheduler {
     fn init(&mut self) {
         self.sched_task = task::Task::new_sched(scheduler_main);
 
-        //TODO: For some reason tasks array was not initialised to 0's, need to look into it
-        self.tasks = [task::Task::empty(); 32];
         self.tasks[0].state = task::TaskState::Running;
         self.current = 0;
         self.initialisd = true;
@@ -98,9 +96,6 @@ impl Scheduler {
 
     fn enter_critical_section(&mut self) {
         if self.initialisd {
-            unsafe {
-                asm!("xchg %bx, %bx");
-            }
 
             self.tasks[self.current].locks += 1;
         }
@@ -108,9 +103,6 @@ impl Scheduler {
 
     fn leave_critical_section(&mut self) {
         if self.initialisd {
-            unsafe {
-                asm!("xchg %bx, %bx");
-            }
             let t = &mut self.tasks[self.current];
 
             t.locks -= 1;

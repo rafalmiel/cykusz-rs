@@ -101,6 +101,8 @@ pub fn rust_main_ap() {
         }
     }
 
+    println!("[ OK ] CPU {} Initialised", unsafe {::CPU_ID});
+
     kernel::sched::init();
 
     kernel::timer::setup();

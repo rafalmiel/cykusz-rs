@@ -81,6 +81,18 @@ impl Task {
         }
     }
 
+    pub fn assure_empty(&self) {
+        if self.stack_top != 0 {
+            panic!("[ ERROR ] ArchTask corrupted on init");
+        }
+        if self.stack_size != 0 {
+            panic!("[ ERROR ] ArchTask corrupted on init");
+        }
+        if self.ctx.0 != ::core::ptr::null_mut() {
+            panic!("[ ERROR ] ArchTask corrupted on init");
+        }
+    }
+
     fn new_sp(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, stack: usize, stack_size: usize) -> Task {
         unsafe {
             let sp = (stack as *mut u8).offset(stack_size as isize);
@@ -111,7 +123,7 @@ impl Task {
 
     fn new(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool) -> Task {
         let sp = unsafe {
-            heap_allocate(::core::alloc::Layout::from_size_align_unchecked(4096*4, 4096)).unwrap()
+            heap_allocate(::core::alloc::Layout::from_size_align_unchecked(4096*8, 4096)).unwrap()
         };
 
         Task::new_sp(fun, cs, ds, int_enabled, sp as usize, 4096*4)

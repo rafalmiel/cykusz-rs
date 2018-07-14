@@ -17,7 +17,6 @@ unsafe impl<T: ?Sized + Send> Send for IrqLock<T> {}
 pub struct MutexGuard<'a, T: ?Sized + 'a> {
     g: Option<MG<'a, T>>,
     irq: bool,
-    crit: bool,
 }
 
 pub struct IrqLockGuard<'a, T: ?Sized + 'a> {
@@ -34,23 +33,21 @@ impl<T> Mutex<T> {
     }
 
     pub fn lock(&self) -> MutexGuard<T> {
-        let c = ::kernel::sched::enter_critical_section();
+        ::kernel::sched::enter_critical_section();
         MutexGuard {
             g: Some(self.l.lock()),
             irq: false,
-            crit: c
         }
     }
 
     pub fn lock_irq(&self) -> MutexGuard<T> {
         let ints = int::is_enabled();
-        let c = ::kernel::sched::enter_critical_section();
+        ::kernel::sched::enter_critical_section();
         int::disable();
         MutexGuard {
             g: Some(self.l.lock()),
             //reenable ints if they were enabled before
             irq: ints,
-            crit: c,
         }
     }
 }
@@ -103,9 +100,7 @@ impl<'a, T: ?Sized> DerefMut for IrqLockGuard<'a, T> {
 impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
-        if self.crit {
-            ::kernel::sched::leave_critical_section();
-        }
+        ::kernel::sched::leave_critical_section();
         if self.irq {
             int::enable();
         }

@@ -105,9 +105,9 @@ pub fn init(mboot_info: &::drivers::multiboot2::Info) {
     enable_nxe_bit();
     enable_write_protect_bit();
 
-    println!("[ OK ] Enabled nxe and write protect");
+    println!("[ OK ] NXE and Write Protect Enabled");
 
     remap(&mboot_info);
 
-    println!("[ OK ] Remapped kernel code");
+    println!("[ OK ] Kernel Code Remapped");
 }

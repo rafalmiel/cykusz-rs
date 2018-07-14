@@ -73,5 +73,5 @@ pub fn init() {
     let acpi = &mut *ACPI.lock();
     let res = acpi.init();
 
-    println!("[ OK ] ACPI found...? {}", if res { "YES" } else { "NO" });
+    println!("[ OK ] ACPI Found...? {}", if res { "YES" } else { "NO" });
 }

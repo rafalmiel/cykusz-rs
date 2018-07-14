@@ -1,44 +1,55 @@
-use arch::task::Task;
+fn task_1() {
+//    let a = &3 as *const i32;
 
-static mut TASK1: Task = Task::empty();
-static mut TASK2: Task = Task::empty();
+    let mut cnt = 0;
 
-pub fn task_1() {
-    unsafe {
-        switch!(TASK1, TASK2);
-        switch!(TASK1, TASK2);
-        switch!(TASK1, TASK2);
-        switch!(TASK1, TASK2);
-        switch!(TASK1, TASK2);
+    let id = unsafe {::CPU_ID * 2 };
+    loop {
+        print!("{},", id);
+
+        // Dummy work
+//        for i in 1..10000 {
+//            unsafe {
+//                let _ = a.read_volatile();
+//            }
+//        }
+
+        cnt += 1;
+
+        if cnt == 10 {
+            break;
+        }
+
     }
-    println!("FINISHED 1");
-    loop{}
 }
 
-pub fn task_2() {
-    unsafe {
-        switch!(TASK2, TASK1);
-        switch!(TASK2, TASK1);
-        switch!(TASK2, TASK1);
-        switch!(TASK2, TASK1);
+fn task_2() {
+//    let a = &3 as *const i32;
+
+    let mut cnt = 0;
+
+    let id = unsafe {::CPU_ID * 2 + 1 };
+    loop {
+        print!("{},", id);
+
+
+        // Dummy work
+//        for i in 1..10000 {
+//            unsafe {
+//                let _ = a.read_volatile();
+//            }
+//        }
+
+        cnt += 1;
+
+        if cnt == 10 {
+            break;
+        }
+
     }
-    println!("FINISHED 2");
-    unsafe {
-        switch!(TASK2, TASK1);
-    }
-    loop{}
 }
 
 pub fn start() {
-    unsafe {
-        TASK1 = Task::create_kernel_task(task_1);
-        TASK2 = Task::create_kernel_task(task_2);
-    }
-
-    let mut t0 = Task::empty();
-
-    unsafe {
-        asm!("xchg %bx, %bx");
-        switch!(t0, TASK1);
-    }
+    ::kernel::sched::create_task(task_1);
+    ::kernel::sched::create_task(task_2);
 }

@@ -13,5 +13,37 @@ pub enum TaskState {
 pub struct Task {
     pub arch_task: ArchTask,
     pub state: TaskState,
-    pub locks: u32,
+    pub locks: i32,
+}
+
+impl Task {
+    pub const fn empty() -> Task {
+        Task {
+            arch_task: ArchTask::empty(),
+            state: TaskState::Unused,
+            locks: 0
+        }
+    }
+
+    pub fn new_sched(fun: fn()) -> Task {
+        Task {
+            arch_task: ArchTask::new_sched(fun),
+            state: TaskState::Runnable,
+            locks: 0,
+        }
+    }
+
+    pub fn new_kern(fun: fn()) -> Task {
+        Task {
+            arch_task: ArchTask::new_kern(fun),
+            state: TaskState::Runnable,
+            locks: 0,
+        }
+    }
+
+    pub fn deallocate(&mut self) {
+        self.arch_task.deallocate();
+        self.state = TaskState::Unused;
+        self.locks = 0;
+    }
 }

@@ -44,6 +44,12 @@ impl Trampoline {
     }
 }
 
+pub fn cpu_count() -> usize {
+    ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries().filter(|e| {
+        e.proc_is_enabled()
+    }).count()
+}
+
 pub fn init() {
     extern {
         static apinit_start: u8;

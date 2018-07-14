@@ -28,11 +28,18 @@ impl Scheduler {
     }
 
     fn init(&mut self) {
+
+        // Validate against any corruptions in TLS
+        for t in self.tasks.iter() {
+            t.assure_empty();
+        }
+
         self.sched_task = task::Task::new_sched(scheduler_main);
 
         self.tasks[0].state = task::TaskState::Running;
         self.current = 0;
         self.initialisd = true;
+
     }
 
     fn schedule_next(&mut self) {

@@ -25,6 +25,16 @@ impl Task {
         }
     }
 
+    pub fn assure_empty(&self) {
+        self.arch_task.assure_empty();
+        if self.state != TaskState::Unused {
+            panic!("[ ERROR ] Task corrupted on init")
+        }
+        if self.locks != 0 {
+            panic!("[ ERROR ] Task corrupted on init")
+        }
+    }
+
     pub fn new_sched(fun: fn()) -> Task {
         Task {
             arch_task: ArchTask::new_sched(fun),
@@ -42,6 +52,9 @@ impl Task {
     }
 
     pub fn deallocate(&mut self) {
+        if self.locks != 0 {
+            panic!("PANIC: Task finished while holding a lock?");
+        }
         self.arch_task.deallocate();
         self.state = TaskState::Unused;
         self.locks = 0;

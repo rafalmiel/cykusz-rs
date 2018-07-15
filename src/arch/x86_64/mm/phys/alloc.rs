@@ -1,6 +1,6 @@
 use super::iter;
 
-use spin::Mutex;
+use kernel::sync::Mutex;
 use kernel::mm::{PhysAddr, MappedAddr};
 use kernel::mm::Frame;
 use drivers::multiboot2;

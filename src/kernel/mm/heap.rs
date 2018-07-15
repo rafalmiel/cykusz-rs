@@ -7,7 +7,7 @@ use linked_list_allocator::{Heap, align_up};
 use kernel::mm::*;
 use kernel::mm::PAGE_SIZE;
 use kernel::mm::map;
-use spin::Mutex;
+use kernel::sync::Mutex;
 
 use arch::mm::heap::{HEAP_START, HEAP_END, HEAP_SIZE};
 

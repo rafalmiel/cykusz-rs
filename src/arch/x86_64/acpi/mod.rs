@@ -7,7 +7,7 @@ pub mod hpet;
 use self::rsdp::Address;
 use self::rsdt::Rsdt;
 
-use spin::Mutex;
+use kernel::sync::Mutex;
 
 pub static ACPI: Mutex<Acpi> = Mutex::new(Acpi::new());
 

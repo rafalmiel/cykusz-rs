@@ -4,7 +4,7 @@ use core::ptr::read_volatile;
 use arch::acpi::apic::MatdHeader;
 use kernel::mm::*;
 
-use spin::Mutex;
+use kernel::sync::Mutex;
 
 pub static IOAPIC: Mutex<IOApic> = Mutex::new(IOApic::new());
 

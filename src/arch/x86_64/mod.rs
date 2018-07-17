@@ -1,4 +1,5 @@
 use drivers::multiboot2;
+use kernel::mm::VirtAddr;
 
 #[macro_use]
 pub mod output;
@@ -15,11 +16,14 @@ pub mod dev;
 pub mod smp;
 pub mod tls;
 pub mod timer;
+pub mod user;
 
 #[no_mangle]
-pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
+pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr) {
     output::clear();
-    gdt::init();
+
+    gdt::early_init();
+
     println!("[ OK ] GDT Initialised");
 
     idt::init();
@@ -33,15 +37,18 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr) {
 
     dev::init();
 
-    ::rust_main();
+    user::init(&mboot);
+
+    ::rust_main(stack_top);
 }
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main_ap() {
     ::arch::raw::mm::enable_nxe_bit();
 
-    gdt::init();
+    gdt::early_init();
     idt::init();
+
     dev::init_ap();
 
     ::rust_main_ap();

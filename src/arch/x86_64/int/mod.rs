@@ -21,14 +21,35 @@ lazy_static! {
 }
 
 pub fn enable() {
-    unsafe {
-        asm!("sti");
-    }
+    enable_and_nop();
 }
 
 pub fn disable() {
     unsafe {
         asm!("cli");
+    }
+}
+/// Set interrupts and halt
+/// This will atomically wait for the next interrupt
+/// Performing enable followed by halt is not guaranteed to be atomic, use this instead!
+#[inline(always)]
+pub fn enable_and_halt() {
+    unsafe {
+        asm!("sti
+        hlt"
+        : : : : "intel", "volatile");
+    }
+}
+
+/// Set interrupts and nop
+/// This will enable interrupts and allow the IF flag to be processed
+/// Simply enabling interrupts does not gurantee that they will trigger, use this instead!
+#[inline(always)]
+pub fn enable_and_nop() {
+    unsafe {
+        asm!("sti
+        nop"
+        : : : : "intel", "volatile");
     }
 }
 

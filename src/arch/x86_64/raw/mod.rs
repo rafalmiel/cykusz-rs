@@ -11,3 +11,4 @@ pub mod descriptor;
 pub mod mm;
 pub mod ctrlregs;
 pub mod msr;
+pub mod task;

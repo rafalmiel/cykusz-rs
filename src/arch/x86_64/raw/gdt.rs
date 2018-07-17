@@ -40,4 +40,21 @@ impl GdtEntry {
             offseth: 0
         }
     }
+
+    pub fn set_offset(&mut self, offset: u32) {
+        self.offsetl = offset as u16;
+        self.offsetm = (offset >> 16) as u8;
+        self.offseth = (offset >> 24) as u8;
+    }
+
+    pub fn set_limit(&mut self, limit: u32) {
+        self.limitl = limit as u16;
+        self.flags_limith = self.flags_limith & 0xF0 | ((limit >> 16) as u8) & 0x0F;
+    }
+
+    pub fn set_raw(&mut self, val: u64) {
+        unsafe {
+            *(self as *mut _ as *mut u64) = val;
+        }
+    }
 }

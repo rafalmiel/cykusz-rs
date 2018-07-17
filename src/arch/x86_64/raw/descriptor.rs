@@ -17,10 +17,7 @@ bitflags! {
 
         const SYSTEM = 0 << 4;
         const SEGMENT = 1 << 4;
-
-        const SYS_TYPE_32_TASK_GATE = 0b0101;
-        const SYS_TYPE_16_INTERRUPT_GATE = 0b0110;
-        const SYS_TYPE_16_TRAP_GATE = 0b0111;
+        const SYS_TYPE_32_TSS_AVAILABLE = 0b1001;
         const SYS_TYPE_32_INTERRUPT_GATE = 0b1110;
         const SYS_TYPE_32_TRAP_GATE = 0b1111;
 
@@ -56,6 +53,18 @@ bitflags! {
                                Self::PRIV_RING0.bits |
                                Self::SEGMENT.bits |
                                Self::SEG_D_WRITABLE.bits;
+        const SEG_RING3_CODE = Self::PRESENT.bits |
+                               Self::PRIV_RING3.bits |
+                               Self::SEGMENT.bits |
+                               Self::SEG_C_EXECUTABLE.bits |
+                               Self::SEG_C_READABLE.bits;
+        const SEG_RING3_DATA = Self::PRESENT.bits |
+                               Self::PRIV_RING3.bits |
+                               Self::SEGMENT.bits |
+                               Self::SEG_D_WRITABLE.bits;
+        const SEG_RING3_TASK = Self::PRESENT.bits |
+                               Self::SYS_TYPE_32_TSS_AVAILABLE.bits |
+                               Self::PRIV_RING3.bits;
     }
 }
 
@@ -93,4 +102,8 @@ pub unsafe fn lidt(idt: &DescriptorTablePointer<idt::IdtEntry>) {
 
 pub unsafe fn lgdt(gdt: &DescriptorTablePointer<gdt::GdtEntry>) {
     asm!("lgdt ($0)" :: "r"(gdt) : "memory");
+}
+
+pub unsafe fn load_tr(tr: &::arch::raw::segmentation::SegmentSelector) {
+    asm!("ltr $0" :: "r"(tr.bits()));
 }

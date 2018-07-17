@@ -20,7 +20,7 @@ impl ThreadPtr {
     }
 }
 
-pub fn init() {
+pub fn init(stack_top: VirtAddr) {
     extern {
         static __tdata_start: u8;
         static __tdata_end: u8;
@@ -43,4 +43,5 @@ pub fn init() {
         thread.setup();
     }
 
+    ::arch::gdt::init(stack_top);
 }

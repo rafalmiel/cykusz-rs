@@ -14,6 +14,7 @@ struct Scheduler {
     sched_task: task::Task,
     tasks: [task::Task; TASK_COUNT],
     current: usize,
+    previous: usize,
     pub initialisd: bool
 }
 
@@ -23,6 +24,7 @@ impl Scheduler {
             sched_task: task::Task::empty(),
             tasks: [task::Task::empty(); TASK_COUNT],
             current: 0,
+            previous: 0,
             initialisd: false,
         }
     }
@@ -36,42 +38,49 @@ impl Scheduler {
 
         self.sched_task = task::Task::new_sched(scheduler_main);
 
-        self.tasks[0].state = task::TaskState::Running;
+        self.tasks[0].set_state(task::TaskState::Running);
         self.current = 0;
         self.initialisd = true;
 
     }
 
     fn schedule_next(&mut self) {
-        if self.tasks[self.current].state == task::TaskState::ToDelete {
+        //::bochs();
+        if self.tasks[self.current].state() == task::TaskState::ToDelete {
 
             self.tasks[self.current].deallocate();
             return;
         } else if self.tasks[self.current].locks > 0 {
 
-            self.tasks[self.current].state = task::TaskState::ToReschedule;
+            self.tasks[self.current].set_state(task::TaskState::ToReschedule);
             switch!(self.sched_task, self.tasks[self.current]);
             return;
         }
 
         let mut c = (self.current % (TASK_COUNT - 1)) + 1;
+        let mut loops = 0;
 
         if let Some(found) = loop {
-            if self.tasks[c].state == task::TaskState::Runnable {
+            if self.tasks[c].state() == task::TaskState::Runnable {
 
                 break Some(c);
-            } else if c == self.current {
+            } else if c == self.current && self.tasks[self.current].state() == task::TaskState::Running {
 
-                break Some(0);
+                break Some(self.current);
+            } else if loops == TASK_COUNT - 1 {
+
+                break Some(0)
             }
 
             c = (c % (TASK_COUNT - 1)) + 1;
+            loops += 1;
         } {
-            if self.tasks[self.current].state == task::TaskState::Running {
-                self.tasks[self.current].state = task::TaskState::Runnable;
+            if self.tasks[self.current].state() == task::TaskState::Running {
+                self.tasks[self.current].set_state(task::TaskState::Runnable);
             }
 
-            self.tasks[found].state = task::TaskState::Running;
+            self.tasks[found].set_state(task::TaskState::Running);
+            self.previous = self.current;
             self.current = found;
 
             ::kernel::int::finish();
@@ -81,19 +90,33 @@ impl Scheduler {
         }
     }
 
-    fn reschedule(&mut self) {
+    fn reschedule(&mut self) -> bool {
         switch!(self.tasks[self.current], self.sched_task);
+        return self.previous != self.current
     }
 
     fn current_task_finished(&mut self) {
-        self.tasks[self.current].state = task::TaskState::ToDelete;
-        self.reschedule();
+        self.tasks[self.current].set_state(task::TaskState::ToDelete);
+        if !self.reschedule() {
+            panic!("task_finished but still running?");
+        }
     }
 
     fn add_task(&mut self, fun: fn()) {
         for i in 1..32 {
-            if self.tasks[i].state == task::TaskState::Unused {
+            if self.tasks[i].state() == task::TaskState::Unused {
                 self.tasks[i] = task::Task::new_kern(fun);
+                return;
+            }
+        }
+
+        panic!("Sched: Too many tasks!");
+    }
+
+    fn add_user_task(&mut self, fun: fn(), stack: usize, stack_size: usize) {
+        for i in 1..32 {
+            if self.tasks[i].state() == task::TaskState::Unused {
+                self.tasks[i] = task::Task::new_user(fun, stack, stack_size);
                 return;
             }
         }
@@ -114,8 +137,8 @@ impl Scheduler {
 
             t.locks -= 1;
 
-            if t.state == task::TaskState::ToReschedule && t.locks == 0 {
-                t.state = task::TaskState::Running;
+            if t.state() == task::TaskState::ToReschedule && t.locks == 0 {
+                t.set_state(task::TaskState::Running);
                 reschedule();
             }
         }
@@ -125,16 +148,17 @@ impl Scheduler {
 #[thread_local]
 static SCHEDULER: IrqLock<Scheduler> = IrqLock::new(Scheduler::empty());
 
-pub fn scheduler_main() {
+fn scheduler_main() {
     loop {
         let scheduler = &SCHEDULER;
         scheduler.irq().schedule_next();
     }
 }
 
-pub fn reschedule() {
+pub fn reschedule() -> bool {
     let scheduler = &SCHEDULER;
-    scheduler.irq().reschedule();
+    let a = scheduler.irq().reschedule();
+    a
 }
 
 pub fn task_finished() {
@@ -146,6 +170,11 @@ pub fn task_finished() {
 pub fn create_task(fun: fn()) {
     let scheduler = &SCHEDULER;
     scheduler.irq().add_task(fun);
+}
+
+pub fn create_user_task(fun: fn(), stack: usize, stack_size: usize) {
+    let scheduler = &SCHEDULER;
+    scheduler.irq().add_user_task(fun, stack, stack_size);
 }
 
 pub fn enter_critical_section() -> bool {

@@ -22,6 +22,8 @@ extern crate spin;
 extern crate linked_list_allocator;
 extern crate raw_cpuid;
 
+use kernel::mm::VirtAddr;
+
 use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
 
 #[global_allocator]
@@ -46,10 +48,10 @@ pub fn bochs() {
     }
 }
 
-pub fn rust_main() {
+pub fn rust_main(stack_top: VirtAddr) {
     kernel::mm::init();
 
-    kernel::tls::init();
+    kernel::tls::init(stack_top);
 
     println!("[ OK ] Per-CPU Storage Initialised");
 
@@ -84,9 +86,9 @@ pub fn rust_main() {
 }
 
 pub fn rust_main_ap() {
-    kernel::tls::init();
-
     let trampoline = ::arch::smp::Trampoline::get();
+
+    kernel::tls::init(VirtAddr(trampoline.stack_ptr as usize));
 
     unsafe {
         CPU_ID = trampoline.cpu_num;
@@ -108,7 +110,7 @@ pub fn rust_main_ap() {
     kernel::timer::setup();
 
     // Start test tasks on this cpu
-    task_test::start();
+    //task_test::start();
 
     kernel::int::enable();
 

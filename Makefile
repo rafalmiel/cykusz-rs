@@ -15,6 +15,9 @@ rust_os := target/$(target)/release/libcykusz_rs.a
 
 all: $(kernel)
 
+userspace/program: userspace/program.asm
+	nasm -f bin $< -o $@
+
 clean:
 	cargo clean
 	find build -name *.o | xargs rm | true
@@ -24,7 +27,7 @@ purge: clean
 	rm -rf target
 
 run: $(iso)
-	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -m 128 -smp cpus=4
+	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -m 128 -smp cpus=1
 debug: $(iso)
 	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -s -S
 gdb:
@@ -37,10 +40,11 @@ bochs: $(iso)
 
 iso: $(iso)
 
-$(iso): $(kernel) $(grub_cfg)
+$(iso): $(kernel) $(grub_cfg) userspace/program
 	mkdir -p build/isofiles/boot/grub
 	cp $(kernel) build/isofiles/boot/kernel.bin
 	cp $(grub_cfg) build/isofiles/boot/grub
+	cp userspace/program build/isofiles/boot/program
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)

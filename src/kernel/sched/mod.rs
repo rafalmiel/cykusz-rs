@@ -43,6 +43,7 @@ impl Scheduler {
     }
 
     fn schedule_next(&mut self) {
+        ::bochs();
         if self.tasks[self.current].state == task::TaskState::ToDelete {
 
             self.tasks[self.current].deallocate();
@@ -75,6 +76,7 @@ impl Scheduler {
             self.current = found;
 
             ::kernel::int::finish();
+            ::bochs();
             switch!(self.sched_task, self.tasks[found]);
         } else {
             panic!("SCHED BUG");
@@ -94,6 +96,17 @@ impl Scheduler {
         for i in 1..32 {
             if self.tasks[i].state == task::TaskState::Unused {
                 self.tasks[i] = task::Task::new_kern(fun);
+                return;
+            }
+        }
+
+        panic!("Sched: Too many tasks!");
+    }
+
+    fn add_user_task(&mut self, fun: fn(), stack: usize, stack_size: usize) {
+        for i in 1..32 {
+            if self.tasks[i].state == task::TaskState::Unused {
+                self.tasks[i] = task::Task::new_user(fun, stack, stack_size);
                 return;
             }
         }
@@ -146,6 +159,11 @@ pub fn task_finished() {
 pub fn create_task(fun: fn()) {
     let scheduler = &SCHEDULER;
     scheduler.irq().add_task(fun);
+}
+
+pub fn create_user_task(fun: fn(), stack: usize, stack_size: usize) {
+    let scheduler = &SCHEDULER;
+    scheduler.irq().add_user_task(fun, stack, stack_size);
 }
 
 pub fn enter_critical_section() -> bool {

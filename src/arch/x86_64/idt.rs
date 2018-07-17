@@ -32,6 +32,11 @@ pub fn init() {
             idt.set_handler(i, dummy);
         }
     }
+
+    unsafe {
+        idt.set_user_handler(80, syscall_handler);
+    }
+
     idt.load();
 
 }
@@ -43,6 +48,14 @@ pub fn set_handler(num: usize, f: idt::ExceptionHandlerFn) {
     }
 }
 
+static mut CNT: usize = 0;
+
+extern "x86-interrupt" fn syscall_handler(_frame: &mut idt::ExceptionStackFrame) {
+    unsafe {
+        CNT += 1;
+    }
+    println!("Syscall {}", unsafe {CNT});
+}
 
 extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {
     println!("Dummy int");
@@ -115,7 +128,7 @@ extern "x86-interrupt" fn general_protection_fault(_frame: &mut idt::ExceptionSt
 }
 
 extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
-    println!("PAGE FAULT! 0x{:x}", err);
+    println!("PAGE FAULT! 0b{:x} CPU: {}", err, unsafe {::CPU_ID});
     loop {}
 }
 

@@ -97,12 +97,16 @@ pub struct Idt {
 impl Idt {
     pub const fn new() -> Idt {
         Idt {
-            entries: [IdtEntry::MISSING; 256]
+            entries: [IdtEntry::MISSING; 256],
         }
     }
 
     pub unsafe fn set_handler(&mut self, idx: usize, f: ExceptionHandlerFn) {
         self.entries[idx].set_handler_fn(f, cs(), dsc::Flags::SYS_RING0_INTERRUPT_GATE);
+    }
+
+    pub unsafe fn set_user_handler(&mut self, idx: usize, f: ExceptionHandlerFn) {
+        self.entries[idx].set_handler_fn(f, ::arch::gdt::ring0_cs(), dsc::Flags::SYS_RING3_INTERRUPT_GATE);
     }
 
     unsafe fn set_handler_err(&mut self, idx: usize, f: ExceptionHandlerFnErrCode) {

@@ -1,55 +1,43 @@
+
+const WORK_COUNT: usize = 10000;
+const ITERS: usize = 1;
+
+fn dummy_work() {
+    let a = &3 as *const i32;
+
+    // Dummy work
+    for _ in 1..WORK_COUNT {
+        unsafe {
+            let _ = a.read_volatile();
+        }
+    }
+
+}
+
 fn task_1() {
-//    let a = &3 as *const i32;
-
-    let mut cnt = 0;
-
     let id = unsafe {::CPU_ID * 2 };
-    loop {
+    for _ in 0..ITERS {
         print!("{},", id);
 
-        // Dummy work
-//        for i in 1..10000 {
-//            unsafe {
-//                let _ = a.read_volatile();
-//            }
-//        }
-
-        cnt += 1;
-
-        if cnt == 10 {
-            break;
-        }
-
+        dummy_work();
     }
 }
 
 fn task_2() {
-//    let a = &3 as *const i32;
-
-    let mut cnt = 0;
-
     let id = unsafe {::CPU_ID * 2 + 1 };
-    loop {
+    for _ in 0..ITERS {
         print!("{},", id);
 
-
-        // Dummy work
-//        for i in 1..10000 {
-//            unsafe {
-//                let _ = a.read_volatile();
-//            }
-//        }
-
-        cnt += 1;
-
-        if cnt == 10 {
-            break;
-        }
-
+        dummy_work();
     }
 }
 
 pub fn start() {
-    ::kernel::sched::create_task(task_1);
-    ::kernel::sched::create_task(task_2);
+    //::kernel::sched::create_task(task_1);
+    //::kernel::sched::create_task(task_2);
+    //::bochs();
+    ::kernel::sched::create_user_task(
+        unsafe {::core::mem::transmute::<usize, fn() -> ()>(0x40000) },
+        0x60000, 4096
+    );
 }

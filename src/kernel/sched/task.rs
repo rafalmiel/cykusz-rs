@@ -51,6 +51,14 @@ impl Task {
         }
     }
 
+    pub fn new_user(fun: fn(), stack: usize, stack_size: usize) -> Task {
+        Task {
+            arch_task: ArchTask::new_user(fun, stack, stack_size),
+            state: TaskState::Runnable,
+            locks: 0,
+        }
+    }
+
     pub fn deallocate(&mut self) {
         if self.locks != 0 {
             panic!("PANIC: Task finished while holding a lock?");

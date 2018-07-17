@@ -12,7 +12,7 @@ pub enum TaskState {
 #[derive(Copy, Clone, Debug)]
 pub struct Task {
     pub arch_task: ArchTask,
-    pub state: TaskState,
+    state: TaskState,
     pub locks: i32,
 }
 
@@ -49,6 +49,22 @@ impl Task {
             state: TaskState::Runnable,
             locks: 0,
         }
+    }
+
+    pub fn new_user(fun: fn(), stack: usize, stack_size: usize) -> Task {
+        Task {
+            arch_task: ArchTask::new_user(fun, stack, stack_size),
+            state: TaskState::Runnable,
+            locks: 0,
+        }
+    }
+
+    pub fn state(&self) -> TaskState {
+        self.state
+    }
+
+    pub fn set_state(&mut self, state: TaskState) {
+        self.state = state;
     }
 
     pub fn deallocate(&mut self) {

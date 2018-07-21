@@ -16,8 +16,8 @@ fn dummy_work() {
 
 fn task() {
     let id = unsafe {::CPU_ID };
-    for _ in 0..ITERS {
-        println!("{},", id);
+    for i in 0..ITERS {
+        print!("K({} {:4}),", id, i);
 
         dummy_work();
     }

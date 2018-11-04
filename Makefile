@@ -27,7 +27,7 @@ purge: clean
 	rm -rf target
 
 run: $(iso)
-	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -m 128 -smp cpus=1
+	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -m 128 -smp cpus=4
 debug: $(iso)
 	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -s -S
 gdb:

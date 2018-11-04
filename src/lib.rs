@@ -7,9 +7,7 @@
 #![feature(abi_x86_interrupt)]
 #![feature(concat_idents)]
 #![feature(step_trait)]
-#![feature(iterator_step_by)]
 #![feature(alloc, allocator_api)]
-#![feature(pointer_methods)]
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
 

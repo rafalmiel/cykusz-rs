@@ -38,7 +38,7 @@ pub struct Task {
     //top of the stack, used to deallocate
     pub stack_top: usize,
     pub stack_size: usize,
-    pub cleanup_stack: bool,
+    pub is_user: bool,
 }
 
 impl Context {
@@ -79,7 +79,7 @@ impl Task {
             ctx: ContextMutPtr(::core::ptr::null_mut()),
             stack_top: 0,
             stack_size: 0,
-            cleanup_stack: false
+            is_user: false,
         }
     }
 
@@ -95,7 +95,7 @@ impl Task {
         }
     }
 
-    fn new_sp(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, stack: usize, stack_size: usize, cleanup_stack: bool) -> Task {
+    fn new_sp(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, stack: usize, stack_size: usize, user_stack: Option<usize>) -> Task {
         unsafe {
             let sp = (stack as *mut u8).offset(stack_size as isize);
             let frame: &mut IretqFrame =
@@ -105,7 +105,7 @@ impl Task {
 
             frame.task_finished_fun = task_finished as usize;
             frame.ds                = ds.bits() as usize;
-            frame.sp                = sp.offset(-8) as usize;
+            frame.sp                = user_stack.unwrap_or(sp.offset(-8) as usize);
             frame.rlfags            = if int_enabled { 0x200 } else { 0x0 };
             frame.cs                = cs.bits() as usize;
             frame.ip                = fun as usize;
@@ -118,41 +118,39 @@ impl Task {
                 ctx: ContextMutPtr(ctx),
                 stack_top: sp as usize - stack_size,
                 stack_size,
-                cleanup_stack
+                is_user: user_stack.is_some(),
             }
         }
 
     }
 
-    fn new(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, cleanup_stack: bool) -> Task {
+    fn new(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, user_stack: Option<usize>) -> Task {
         let sp = unsafe {
             heap_allocate(::core::alloc::Layout::from_size_align_unchecked(4096*16, 4096)).unwrap()
         };
 
-        Task::new_sp(fun, cs, ds, int_enabled, sp as usize, 4096*4, cleanup_stack)
+        Task::new_sp(fun, cs, ds, int_enabled, sp as usize, 4096*16, user_stack)
     }
 
     pub fn new_kern(fun: fn ()) -> Task {
-        Task::new(fun, gdt::ring0_cs(), gdt::ring0_ds(), true, true)
+        Task::new(fun, gdt::ring0_cs(), gdt::ring0_ds(), true, None)
     }
 
     pub fn new_sched(fun: fn ()) -> Task {
-        Task::new(fun, gdt::ring0_cs(), gdt::ring0_ds(), false, true)
+        Task::new(fun, gdt::ring0_cs(), gdt::ring0_ds(), false, None)
     }
 
-    pub fn new_user(fun: fn(), stack: usize, stack_size: usize) -> Task {
-        Task::new_sp(fun, gdt::ring3_cs(), gdt::ring3_ds(), true, stack, stack_size, false)
+    pub fn new_user(fun: fn(), stack: usize) -> Task {
+        Task::new(fun, gdt::ring3_cs(), gdt::ring3_ds(), true, Some(stack))
     }
 
     pub fn deallocate(&mut self) {
         self.ctx = ContextMutPtr::null();
         unsafe {
-            if self.cleanup_stack {
-                ::kernel::mm::heap::deallocate(
-                    self.stack_top as *mut u8,
-                    ::core::alloc::Layout::from_size_align_unchecked(self.stack_size, 4096)
-                );
-            }
+            ::kernel::mm::heap::deallocate(
+                self.stack_top as *mut u8,
+                ::core::alloc::Layout::from_size_align_unchecked(self.stack_size, 4096)
+            );
         }
         self.stack_top = 0;
     }
@@ -166,6 +164,9 @@ extern "C" {
 
 pub fn switch(from: &mut Task, to: &Task) {
     unsafe {
+        if to.is_user {
+            ::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
+        }
         switch_to((&mut from.ctx.0) as *mut *mut Context, to.ctx.0);
     }
 }

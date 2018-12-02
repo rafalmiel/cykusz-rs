@@ -51,9 +51,9 @@ impl Task {
         }
     }
 
-    pub fn new_user(fun: fn(), stack: usize, stack_size: usize) -> Task {
+    pub fn new_user(fun: fn(), stack: usize) -> Task {
         Task {
-            arch_task: ArchTask::new_user(fun, stack, stack_size),
+            arch_task: ArchTask::new_user(fun, stack),
             state: TaskState::Runnable,
             locks: 0,
         }

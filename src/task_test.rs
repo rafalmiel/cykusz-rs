@@ -27,6 +27,6 @@ pub fn start() {
     ::kernel::sched::create_task(task);
     ::kernel::sched::create_user_task(
         unsafe {::core::mem::transmute::<usize, fn() -> ()>(0x40000) },
-        0x60000, 4096
+        0x60000 + 0x1000
     );
 }

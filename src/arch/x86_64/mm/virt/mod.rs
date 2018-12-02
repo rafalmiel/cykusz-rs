@@ -1,6 +1,6 @@
 pub mod entry;
 mod page;
-mod table;
+pub mod table;
 
 use arch::raw::mm;
 use arch::raw::ctrlregs;
@@ -11,10 +11,13 @@ use kernel::mm::PAGE_SIZE;
 use kernel::mm::Frame;
 use self::table::*;
 
-fn p4_table_addr() -> PhysAddr {
+pub fn p4_table_addr() -> PhysAddr {
     unsafe {
         PhysAddr(ctrlregs::cr3() as usize)
     }
+}
+pub fn current_p4_table() -> &'static mut P4Table {
+    P4Table::new_mut(&Frame::new(p4_table_addr()))
 }
 
 pub fn flush(virt: VirtAddr) {
@@ -92,7 +95,7 @@ fn remap(mboot_info: &::drivers::multiboot2::Info) {
     }
 
     // Set physmap from previous mapping
-    let orig = P4Table::new_mut(&Frame::new(p4_table_addr()));
+    let orig = current_p4_table();
     table.set_entry(256, orig.entry_at(256));
 
     unsafe {

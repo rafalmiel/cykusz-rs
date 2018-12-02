@@ -15,8 +15,14 @@ switch_to:
     push r14
     push r15
 
+    mov rax, cr3    ; Save CR3
+    push rax
+
     mov [rdi], rsp	; update old ctx ptr with current stack ptr
     mov rsp, rsi	; switch to new stack
+
+    pop rax         ; Restore CR3
+    mov cr3, rax
 
     pop r15
     pop r14

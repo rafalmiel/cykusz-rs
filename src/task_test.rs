@@ -1,3 +1,4 @@
+use kernel::mm::*;
 
 const WORK_COUNT: usize = 0x1000000;
 const ITERS: usize = <usize>::max_value();
@@ -17,16 +18,17 @@ fn dummy_work() {
 fn task() {
     let id = unsafe {::CPU_ID };
     for i in 0..ITERS {
+        //println!("K {}: 0x{:x}", unsafe {::CPU_ID}, unsafe {::arch::raw::ctrlregs::cr3()});
         print!("K({} {:10}),", id, i);
 
         dummy_work();
     }
 }
 
-pub fn start() {
+pub fn start(user_program: MappedAddr, user_program_size: usize) {
     ::kernel::sched::create_task(task);
     ::kernel::sched::create_user_task(
-        unsafe {::core::mem::transmute::<usize, fn() -> ()>(0x40000) },
-        0x60000 + 0x1000
+        user_program, user_program_size,
+        0x60000
     );
 }

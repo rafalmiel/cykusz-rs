@@ -23,3 +23,11 @@ pub fn init(mboot_info: &multiboot2::Info) {
     }
 
 }
+
+pub fn find_user_program(mboot_info: &multiboot2::Info) -> Option<(MappedAddr, usize)> {
+    if let Some(mtag) = mboot_info.modules_tags().next() {
+        Some((PhysAddr(mtag.mod_start as usize).to_mapped(), (mtag.mod_end - mtag.mod_start) as usize))
+    } else {
+        None
+    }
+}

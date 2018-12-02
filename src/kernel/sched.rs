@@ -1,5 +1,6 @@
 use kernel::sync::IrqLock;
-pub mod task;
+use kernel::task;
+use kernel::mm::MappedAddr;
 
 #[macro_export]
 macro_rules! switch {
@@ -15,7 +16,7 @@ struct Scheduler {
     tasks: [task::Task; TASK_COUNT],
     current: usize,
     previous: usize,
-    pub initialisd: bool
+    pub initialised: bool
 }
 
 impl Scheduler {
@@ -25,7 +26,7 @@ impl Scheduler {
             tasks: [task::Task::empty(); TASK_COUNT],
             current: 0,
             previous: 0,
-            initialisd: false,
+            initialised: false,
         }
     }
 
@@ -40,7 +41,7 @@ impl Scheduler {
 
         self.tasks[0].set_state(task::TaskState::Running);
         self.current = 0;
-        self.initialisd = true;
+        self.initialised = true;
 
     }
 
@@ -60,7 +61,7 @@ impl Scheduler {
         let mut c = (self.current % (TASK_COUNT - 1)) + 1;
         let mut loops = 0;
 
-        if let Some(found) = loop {
+        let found = loop {
             if self.tasks[c].state() == task::TaskState::Runnable {
 
                 break Some(c);
@@ -74,20 +75,18 @@ impl Scheduler {
 
             c = (c % (TASK_COUNT - 1)) + 1;
             loops += 1;
-        } {
-            if self.tasks[self.current].state() == task::TaskState::Running {
-                self.tasks[self.current].set_state(task::TaskState::Runnable);
-            }
+        }.expect("SCHEDULER BUG");
 
-            self.tasks[found].set_state(task::TaskState::Running);
-            self.previous = self.current;
-            self.current = found;
-
-            ::kernel::int::finish();
-            switch!(self.sched_task, self.tasks[found]);
-        } else {
-            panic!("SCHED BUG");
+        if self.tasks[self.current].state() == task::TaskState::Running {
+            self.tasks[self.current].set_state(task::TaskState::Runnable);
         }
+
+        self.tasks[found].set_state(task::TaskState::Running);
+        self.previous = self.current;
+        self.current = found;
+
+        ::kernel::int::finish();
+        switch!(self.sched_task, self.tasks[found]);
     }
 
     fn reschedule(&mut self) -> bool {
@@ -113,10 +112,10 @@ impl Scheduler {
         panic!("Sched: Too many tasks!");
     }
 
-    fn add_user_task(&mut self, fun: fn(), stack: usize) {
+    fn add_user_task(&mut self, fun: MappedAddr, code_size: usize, stack: usize) {
         for i in 1..32 {
             if self.tasks[i].state() == task::TaskState::Unused {
-                self.tasks[i] = task::Task::new_user(fun, stack);
+                self.tasks[i] = task::Task::new_user(fun, code_size, stack);
                 return;
             }
         }
@@ -125,14 +124,14 @@ impl Scheduler {
     }
 
     fn enter_critical_section(&mut self) {
-        if self.initialisd {
+        if self.initialised {
 
             self.tasks[self.current].locks += 1;
         }
     }
 
     fn leave_critical_section(&mut self) {
-        if self.initialisd {
+        if self.initialised {
             let t = &mut self.tasks[self.current];
 
             t.locks -= 1;
@@ -172,9 +171,9 @@ pub fn create_task(fun: fn()) {
     scheduler.irq().add_task(fun);
 }
 
-pub fn create_user_task(fun: fn(), stack: usize) {
+pub fn create_user_task(fun: MappedAddr, code_size: usize, stack: usize) {
     let scheduler = &SCHEDULER;
-    scheduler.irq().add_user_task(fun, stack);
+    scheduler.irq().add_user_task(fun, code_size, stack);
 }
 
 pub fn enter_critical_section() -> bool {

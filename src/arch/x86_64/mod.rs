@@ -37,9 +37,9 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
 
     dev::init();
 
-    user::init(&mboot);
+    //user::init(&mboot);
 
-    ::rust_main(stack_top);
+    ::rust_main(stack_top, user::find_user_program(mboot));
 }
 
 #[no_mangle]

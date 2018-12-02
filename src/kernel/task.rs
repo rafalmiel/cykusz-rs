@@ -1,4 +1,5 @@
 use arch::task::Task as ArchTask;
+use kernel::mm::MappedAddr;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
@@ -51,9 +52,9 @@ impl Task {
         }
     }
 
-    pub fn new_user(fun: fn(), stack: usize) -> Task {
+    pub fn new_user(fun: MappedAddr, code_size: usize, stack: usize) -> Task {
         Task {
-            arch_task: ArchTask::new_user(fun, stack),
+            arch_task: ArchTask::new_user(fun, code_size, stack),
             state: TaskState::Runnable,
             locks: 0,
         }

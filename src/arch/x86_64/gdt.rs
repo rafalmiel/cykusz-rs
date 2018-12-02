@@ -77,7 +77,6 @@ pub fn update_tss_rps0(new_rsp: usize) {
 
 fn init_tss(stack_top: VirtAddr) {
     unsafe {
-        println!("TSS ADDR {:x}", &TSS as *const _ as usize);
         TSS.rsp[0] = stack_top.0 as u64;
 
         {

@@ -10,6 +10,7 @@
 #![feature(alloc, allocator_api)]
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
+#![feature(integer_atomics)]
 
 extern crate rlibc;
 #[macro_use]
@@ -20,9 +21,9 @@ extern crate spin;
 extern crate linked_list_allocator;
 extern crate raw_cpuid;
 
-use kernel::mm::VirtAddr;
+use kernel::mm::{VirtAddr, MappedAddr};
 
-use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, ATOMIC_BOOL_INIT, ATOMIC_U64_INIT, Ordering};
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -39,6 +40,8 @@ pub mod task_test;
 static mut CPU_ID: u8 = 0;
 
 static SMP_INITIALISED: AtomicBool = ATOMIC_BOOL_INIT;
+static USER_PROGRAM: AtomicU64 = ATOMIC_U64_INIT;
+static USER_PROGRAM_SIZE: AtomicU64 = ATOMIC_U64_INIT;
 
 pub fn bochs() {
     unsafe {
@@ -46,7 +49,12 @@ pub fn bochs() {
     }
 }
 
-pub fn rust_main(stack_top: VirtAddr) {
+pub fn rust_main(stack_top: VirtAddr, user_program: Option<(MappedAddr, usize)>) {
+    if let Some(addr) = user_program {
+        USER_PROGRAM.store((addr.0).0 as u64, Ordering::SeqCst);
+        USER_PROGRAM_SIZE.store(addr.1 as u64, Ordering::SeqCst);
+    }
+
     kernel::mm::init();
 
     kernel::tls::init(stack_top);
@@ -72,7 +80,9 @@ pub fn rust_main(stack_top: VirtAddr) {
     println!("[ OK ] Local Timer Started");
 
     // Start test tasks on this cpu
-    task_test::start();
+    if let Some(addr) = user_program {
+        task_test::start(addr.0, addr.1);
+    }
 
     loop {
         ::kernel::int::disable();
@@ -108,8 +118,13 @@ pub fn rust_main_ap() {
 
     kernel::timer::setup();
 
-    // Start test tasks on this cpu
-    task_test::start();
+    let user_program = USER_PROGRAM.load(Ordering::SeqCst);
+    let user_program_size = USER_PROGRAM_SIZE.load(Ordering::SeqCst);
+
+    if user_program != 0 {
+        // Start test tasks on this cpu
+        task_test::start(MappedAddr(user_program as usize), user_program_size as usize);
+    }
 
     loop {
         ::kernel::int::disable();

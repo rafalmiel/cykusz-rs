@@ -55,6 +55,7 @@ extern "x86-interrupt" fn syscall_handler(_frame: &mut idt::ExceptionStackFrame)
     unsafe {
         CNT += 1;
     }
+    //println!("U {}: 0x{:x}", unsafe {::CPU_ID}, unsafe {::arch::raw::ctrlregs::cr3()});
     print!("S({} {:10}),", unsafe {::CPU_ID}, unsafe {CNT});
 }
 

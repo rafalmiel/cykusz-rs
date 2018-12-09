@@ -1,5 +1,3 @@
-use kernel::mm::*;
-
 const WORK_COUNT: usize = 0x1000000;
 const ITERS: usize = <usize>::max_value();
 
@@ -25,10 +23,10 @@ fn task() {
     }
 }
 
-pub fn start(user_program: MappedAddr, user_program_size: usize) {
+pub fn start() {
     ::kernel::sched::create_task(task);
     ::kernel::sched::create_user_task(
-        user_program, user_program_size,
+        ::kernel::user::get_user_program(), ::kernel::user::get_user_program_size(),
         0x60000
     );
 }

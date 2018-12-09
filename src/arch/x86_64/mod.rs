@@ -38,9 +38,9 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
 
     dev::init();
 
-    //user::init(&mboot);
+    user::init(mboot);
 
-    ::rust_main(stack_top, user::find_user_program(mboot));
+    ::rust_main(stack_top);
 }
 
 #[no_mangle]
@@ -48,9 +48,11 @@ pub extern "C" fn x86_64_rust_main_ap() {
     ::arch::raw::mm::enable_nxe_bit();
 
     gdt::early_init();
+
     idt::init();
 
     dev::init_ap();
 
-    ::rust_main_ap();
+    let trampoline = ::arch::smp::Trampoline::get();
+    ::rust_main_ap(trampoline.stack_ptr, trampoline.cpu_num);
 }

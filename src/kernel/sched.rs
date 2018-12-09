@@ -173,9 +173,9 @@ pub fn create_task(fun: fn()) {
     scheduler.irq().add_task(fun);
 }
 
-pub fn create_user_task(fun: MappedAddr, code_size: usize, stack: usize) {
+pub fn create_user_task(fun: MappedAddr, code_size: u64, stack: usize) {
     let scheduler = &SCHEDULER;
-    scheduler.irq().add_user_task(fun, code_size, stack);
+    scheduler.irq().add_user_task(fun, code_size as usize, stack);
 }
 
 pub fn enter_critical_section() -> bool {

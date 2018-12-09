@@ -75,3 +75,9 @@ pub fn init() {
 
     ::arch::dev::lapic::start_ap();
 }
+
+pub fn notify_ap_ready() {
+    let trampoline = ::arch::smp::Trampoline::get();
+
+    trampoline.notify_ready();
+}

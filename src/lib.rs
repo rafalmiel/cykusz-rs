@@ -21,9 +21,7 @@ extern crate spin;
 extern crate linked_list_allocator;
 extern crate raw_cpuid;
 
-use kernel::mm::{VirtAddr, MappedAddr};
-
-use core::sync::atomic::{AtomicBool, AtomicU64, ATOMIC_BOOL_INIT, ATOMIC_U64_INIT, Ordering};
+use kernel::mm::{VirtAddr};
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -39,21 +37,13 @@ pub mod task_test;
 #[thread_local]
 static mut CPU_ID: u8 = 0;
 
-static SMP_INITIALISED: AtomicBool = ATOMIC_BOOL_INIT;
-static USER_PROGRAM: AtomicU64 = ATOMIC_U64_INIT;
-static USER_PROGRAM_SIZE: AtomicU64 = ATOMIC_U64_INIT;
-
 pub fn bochs() {
     unsafe {
         asm!("xchg %bx, %bx");
     }
 }
 
-pub fn rust_main(stack_top: VirtAddr, user_program: Option<(MappedAddr, usize)>) {
-    if let Some(addr) = user_program {
-        USER_PROGRAM.store((addr.0).0 as u64, Ordering::SeqCst);
-        USER_PROGRAM_SIZE.store(addr.1 as u64, Ordering::SeqCst);
-    }
+pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::mm::init();
 
@@ -68,8 +58,6 @@ pub fn rust_main(stack_top: VirtAddr, user_program: Option<(MappedAddr, usize)>)
     kernel::smp::init();
 
     println!("[ OK ] SMP Initialized (CPU count: {})", kernel::smp::cpu_count());
-
-    SMP_INITIALISED.store(true, Ordering::SeqCst);
 
     kernel::syscall::init();
 
@@ -86,39 +74,22 @@ pub fn rust_main(stack_top: VirtAddr, user_program: Option<(MappedAddr, usize)>)
     println!("[ OK ] Local Timer Started");
 
     // Start test tasks on this cpu
-    if let Some(addr) = user_program {
-        task_test::start(addr.0, addr.1);
-    }
+    task_test::start();
 
-    loop {
-        ::kernel::int::disable();
-        if ::kernel::sched::reschedule() {
-            ::kernel::int::enable();
-        } else {
-            ::kernel::int::enable_and_halt();
-        }
-    }
+    idle();
 }
 
-pub fn rust_main_ap() {
-    let trampoline = ::arch::smp::Trampoline::get();
+pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
-    kernel::tls::init(VirtAddr(trampoline.stack_ptr as usize));
+    kernel::tls::init(VirtAddr(stack_ptr as usize));
 
     unsafe {
-        CPU_ID = trampoline.cpu_num;
+        CPU_ID = cpu_num;
     }
 
     println!("[ OK ] CPU {} Initialised", unsafe {::CPU_ID});
 
-    trampoline.notify_ready();
-
-    // Waiting for all CPUs to be ready
-    while SMP_INITIALISED.load(Ordering::SeqCst) == false {
-        unsafe {
-            asm!("pause"::::"volatile");
-        }
-    }
+    kernel::smp::notify_ap_ready();
 
     kernel::sched::init();
 
@@ -126,14 +97,13 @@ pub fn rust_main_ap() {
 
     kernel::timer::start();
 
-    let user_program = USER_PROGRAM.load(Ordering::SeqCst);
-    let user_program_size = USER_PROGRAM_SIZE.load(Ordering::SeqCst);
+    // Start test tasks on this cpu
+    task_test::start();
 
-    if user_program != 0 {
-        // Start test tasks on this cpu
-        task_test::start(MappedAddr(user_program as usize), user_program_size as usize);
-    }
+    idle();
+}
 
+fn idle() {
     loop {
         ::kernel::int::disable();
         if ::kernel::sched::reschedule() {

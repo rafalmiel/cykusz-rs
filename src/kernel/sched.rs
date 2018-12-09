@@ -86,6 +86,8 @@ impl Scheduler {
         self.current = found;
 
         ::kernel::int::finish();
+
+        ::kernel::timer::reset_counter();
         switch!(self.sched_task, self.tasks[found]);
     }
 

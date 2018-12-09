@@ -77,6 +77,8 @@ pub fn rust_main(stack_top: VirtAddr, user_program: Option<(MappedAddr, usize)>)
 
     kernel::timer::setup();
 
+    kernel::timer::start();
+
     println!("[ OK ] Local Timer Started");
 
     // Start test tasks on this cpu
@@ -117,6 +119,8 @@ pub fn rust_main_ap() {
     kernel::sched::init();
 
     kernel::timer::setup();
+
+    kernel::timer::start();
 
     let user_program = USER_PROGRAM.load(Ordering::SeqCst);
     let user_program_size = USER_PROGRAM_SIZE.load(Ordering::SeqCst);

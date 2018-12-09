@@ -159,15 +159,25 @@ impl LApic {
         }
     }
 
-    pub fn start_timer(&mut self) {
+    pub fn start_timer(&mut self, one_shot: bool) {
         if !self.x2 {
             self.reg_write(REG_TIMDIV, 0b11);
-            self.reg_write(REG_TIM, 32 | (1<<17));
+            self.reg_write(REG_TIM, 32 | (if one_shot {0} else {1} << 17));
             self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 1);
         } else {
             unsafe {
                 msr::wrmsr(msr::IA32_X2APIC_DIV_CONF, 0b11);
-                msr::wrmsr(msr::IA32_X2APIC_LVT_TIMER, 32 | (1<<17));
+                msr::wrmsr(msr::IA32_X2APIC_LVT_TIMER, 32 | (if one_shot {0} else {1} << 17));
+                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 1);
+            }
+        }
+    }
+
+    pub fn reset_timer_counter(&mut self) {
+        if !self.x2 {
+            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 1);
+        } else {
+            unsafe {
                 msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 1);
             }
         }
@@ -217,13 +227,19 @@ pub fn init_ap() {
     LAPIC.irq().init_ap();
 }
 
-pub fn start_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
+pub fn setup_timer(f: ::arch::raw::idt::ExceptionHandlerFn) {
     int::set_irq_dest(0, 32);
     idt::set_handler(32, f);
 
     int::mask_int(0, false);
+}
 
-    LAPIC.irq().start_timer();
+pub fn start_timer(one_shot: bool) {
+    LAPIC.irq().start_timer(one_shot);
+}
+
+pub fn reset_timer_counter() {
+    LAPIC.irq().reset_timer_counter();
 }
 
 pub fn start_ap() {

@@ -15,7 +15,15 @@ pub fn setup(fun: fn()) {
     let mut tmr = timer.irq();
     tmr.handler = Some(fun);
 
-    lapic::start_timer(timer_handler);
+    lapic::setup_timer(timer_handler);
+}
+
+pub fn start() {
+    lapic::start_timer(true);
+}
+
+pub fn reset_counter() {
+    lapic::reset_timer_counter();
 }
 
 pub fn early_sleep(ms: u64) {

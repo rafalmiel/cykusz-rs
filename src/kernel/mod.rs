@@ -5,6 +5,7 @@ pub mod tls;
 pub mod smp;
 pub mod sync;
 pub mod task;
+pub mod syscall;
 
 #[macro_use]
 pub mod sched;

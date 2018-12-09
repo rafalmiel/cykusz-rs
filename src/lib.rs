@@ -71,6 +71,10 @@ pub fn rust_main(stack_top: VirtAddr, user_program: Option<(MappedAddr, usize)>)
 
     SMP_INITIALISED.store(true, Ordering::SeqCst);
 
+    kernel::syscall::init();
+
+    println!("[ OK ] Syscall Initialized");
+
     kernel::sched::init();
 
     println!("[ OK ] Scheduler Initialised");
@@ -105,6 +109,8 @@ pub fn rust_main_ap() {
         CPU_ID = trampoline.cpu_num;
     }
 
+    println!("[ OK ] CPU {} Initialised", unsafe {::CPU_ID});
+
     trampoline.notify_ready();
 
     // Waiting for all CPUs to be ready
@@ -113,8 +119,6 @@ pub fn rust_main_ap() {
             asm!("pause"::::"volatile");
         }
     }
-
-    println!("[ OK ] CPU {} Initialised", unsafe {::CPU_ID});
 
     kernel::sched::init();
 

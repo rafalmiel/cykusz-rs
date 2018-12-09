@@ -16,6 +16,7 @@ pub mod dev;
 pub mod smp;
 pub mod tls;
 pub mod timer;
+pub mod syscall;
 pub mod user;
 
 #[no_mangle]

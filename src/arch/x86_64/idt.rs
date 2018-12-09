@@ -33,30 +33,23 @@ pub fn init() {
         }
     }
 
-    unsafe {
-        idt.set_user_handler(80, syscall_handler);
-    }
-
     idt.load();
-
 }
 
 pub fn set_handler(num: usize, f: idt::ExceptionHandlerFn) {
     assert!(num <= 255);
     unsafe {
-        IDT.lock().set_handler(num, f);
+        let mut idt = IDT.lock();
+        idt.set_handler(num, f);
     }
 }
 
-#[thread_local]
-static mut CNT: usize = 0;
-
-extern "x86-interrupt" fn syscall_handler(_frame: &mut idt::ExceptionStackFrame) {
+pub fn set_user_handler(num: usize, f: idt::ExceptionHandlerFn) {
+    assert!(num <= 255);
     unsafe {
-        CNT += 1;
+        let mut idt = IDT.lock();
+        idt.set_user_handler(num, f);
     }
-    //println!("U {}: 0x{:x}", unsafe {::CPU_ID}, unsafe {::arch::raw::ctrlregs::cr3()});
-    print!("S({} {:10}),", unsafe {::CPU_ID}, unsafe {CNT});
 }
 
 extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {

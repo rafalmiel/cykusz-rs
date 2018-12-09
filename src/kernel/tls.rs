@@ -5,5 +5,5 @@ pub fn init(stack_top: VirtAddr) {
 }
 
 pub fn is_ready() -> bool {
-    ::SMP_INITIALISED.load(::core::sync::atomic::Ordering::SeqCst)
+    ::kernel::smp::is_smp_initialised()
 }

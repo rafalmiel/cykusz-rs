@@ -44,10 +44,12 @@ impl Trampoline {
     }
 }
 
+static mut CPU_COUNT: usize = 0;
+
 pub fn cpu_count() -> usize {
-    ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries().filter(|e| {
-        e.proc_is_enabled()
-    }).count()
+    unsafe {
+        CPU_COUNT
+    }
 }
 
 pub fn init() {
@@ -55,6 +57,12 @@ pub fn init() {
         static apinit_start: u8;
         static apinit_end: u8;
         static trampoline: u8;
+    }
+
+    unsafe {
+        CPU_COUNT = ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries().filter(|e| {
+            e.proc_is_enabled()
+        }).count();
     }
 
     // Copy over trampoline and apinit code to 0xE00 and 0x1000

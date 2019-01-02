@@ -30,17 +30,8 @@ pub struct Context {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct ContextMutPtr(pub *mut Context);
-
-impl ContextMutPtr {
-    pub const fn null() -> ContextMutPtr {
-       ContextMutPtr(::core::ptr::null_mut())
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
 pub struct Task {
-    pub ctx: ContextMutPtr,
+    pub ctx: *mut Context,
     //top of the stack, used to deallocate
     pub stack_top: usize,
     pub stack_size: usize,
@@ -95,7 +86,8 @@ fn allocate_page_table(fun: MappedAddr, code_size: usize) -> PhysAddr {
     }
 
     new_p4.map_to_flags(VirtAddr(0x40000), code.address(), virt::PageFlags::USER);
-    new_p4.map_flags(VirtAddr(0x60000), virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE);
+    new_p4.map_flags(VirtAddr(0x60000),
+                     virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE);
     new_p4.phys_addr()
 }
 
@@ -113,7 +105,7 @@ struct IretqFrame {
 impl Task {
     pub const fn empty() -> Task {
         Task {
-            ctx: ContextMutPtr(::core::ptr::null_mut()),
+            ctx: ::core::ptr::null_mut(),
             stack_top: 0,
             stack_size: 0,
             is_user: false,
@@ -127,7 +119,7 @@ impl Task {
         if self.stack_size != 0 {
             panic!("[ ERROR ] ArchTask corrupted on init");
         }
-        if self.ctx.0 != ::core::ptr::null_mut() {
+        if self.ctx != ::core::ptr::null_mut() {
             panic!("[ ERROR ] ArchTask corrupted on init");
         }
     }
@@ -153,7 +145,7 @@ impl Task {
             (*ctx).cr3 = cr3.0;
 
             Task {
-                ctx: ContextMutPtr(ctx),
+                ctx,
                 stack_top: sp as usize - stack_size,
                 stack_size,
                 is_user: user_stack.is_some(),
@@ -188,7 +180,7 @@ impl Task {
     }
 
     pub fn deallocate(&mut self) {
-        self.ctx = ContextMutPtr::null();
+        self.ctx = ::core::ptr::null_mut();
         unsafe {
             ::kernel::mm::heap::deallocate(
                 self.stack_top as *mut u8,
@@ -210,7 +202,7 @@ pub fn switch(from: &mut Task, to: &Task) {
         if to.is_user {
             ::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
-        switch_to((&mut from.ctx.0) as *mut *mut Context, to.ctx.0);
+        switch_to((&mut from.ctx) as *mut *mut Context, to.ctx);
     }
 }
 

@@ -8,7 +8,6 @@ use kernel::mm::virt;
 use kernel::mm::allocate;
 use kernel::mm::{PhysAddr,VirtAddr};
 use kernel::mm::PAGE_SIZE;
-use kernel::mm::Frame;
 use self::table::*;
 
 pub fn p4_table_addr() -> PhysAddr {
@@ -17,7 +16,7 @@ pub fn p4_table_addr() -> PhysAddr {
     }
 }
 pub fn current_p4_table() -> &'static mut P4Table {
-    P4Table::new_mut(&Frame::new(p4_table_addr()))
+    P4Table::new_mut_at_phys(p4_table_addr())
 }
 
 pub fn flush(virt: VirtAddr) {
@@ -33,9 +32,7 @@ pub fn flush_all() {
 }
 
 pub fn map_flags(virt: VirtAddr, flags: virt::PageFlags) {
-    P4Table::new_mut(
-        &Frame::new(p4_table_addr())
-    ).map_flags(virt, flags);
+    current_p4_table().map_flags(virt, flags);
 
     flush(virt);
 }
@@ -45,16 +42,14 @@ pub fn map(virt: VirtAddr) {
 }
 
 pub fn unmap(virt: VirtAddr) {
-    P4Table::new_mut(
-        &Frame::new(p4_table_addr())
-    ).unmap(virt);
+    current_p4_table().unmap(virt);
 
     flush(virt);
 }
 
 #[allow(unused)]
 pub fn map_to(virt: VirtAddr, phys: PhysAddr) {
-    P4Table::new_mut(&Frame::new(p4_table_addr())).map_to(virt, phys);
+    current_p4_table().map_to(virt, phys);
 
     flush(virt);
 }

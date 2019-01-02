@@ -181,7 +181,7 @@ where
 
 impl<L> Table<L>
 where
-    L :TopLevel + NotLastLevel
+    L : NotLastLevel
 {
     pub fn new_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
         Table::<L>::new_at_frame_mut(frame)
@@ -189,6 +189,14 @@ where
 
     pub fn new<'a>(frame: &Frame) -> &'a Table<L> {
         Table::<L>::new_at_frame(frame)
+    }
+
+    pub fn new_mut_at_phys<'a>(addr: PhysAddr) -> &'a mut Table<L> {
+        Table::<L>::new_mut(&Frame::new(addr))
+    }
+
+    pub fn new_at_phys<'a>(addr: PhysAddr) -> &'a Table<L> {
+        Table::<L>::new(&Frame::new(addr))
     }
 
     pub fn entry_at(&self, idx: usize) -> &Entry {

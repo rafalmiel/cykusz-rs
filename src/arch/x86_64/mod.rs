@@ -30,6 +30,7 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
     idt::init();
     println!("[ OK ] IDT Initialised");
 
+
     let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
 
     mm::init(&mboot);

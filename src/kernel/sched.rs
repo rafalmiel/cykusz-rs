@@ -1,5 +1,6 @@
 use kernel::sync::IrqLock;
 use kernel::task;
+use kernel::mm::heap::allocate as heap_allocate;
 use kernel::mm::MappedAddr;
 
 #[macro_export]
@@ -11,38 +12,31 @@ macro_rules! switch {
 
 const TASK_COUNT: usize = 32;
 
-struct Scheduler {
+struct CpuTasks {
     sched_task: task::Task,
     tasks: [task::Task; TASK_COUNT],
     current: usize,
     previous: usize,
-    pub initialised: bool
 }
 
-impl Scheduler {
-    const fn empty() -> Scheduler {
-        Scheduler {
-            sched_task: task::Task::empty(),
-            tasks: [task::Task::empty(); TASK_COUNT],
-            current: 0,
-            previous: 0,
-            initialised: false,
-        }
-    }
+struct CpuTasksPtr(*mut CpuTasks);
 
+unsafe impl Send for CpuTasksPtr{}
+
+impl CpuTasks {
     fn init(&mut self) {
+        self.sched_task = task::Task::empty();
 
-        // Validate against any corruptions in TLS
-        for t in self.tasks.iter() {
-            t.assure_empty();
+        for i in 0..TASK_COUNT {
+            self.tasks[i] = task::Task::empty();
         }
+
+        self.tasks[0].set_state(task::TaskState::Running);
 
         self.sched_task = task::Task::new_sched(scheduler_main);
 
-        self.tasks[0].set_state(task::TaskState::Running);
         self.current = 0;
-        self.initialised = true;
-
+        self.previous = 0;
     }
 
     fn schedule_next(&mut self) {
@@ -126,62 +120,152 @@ impl Scheduler {
     }
 
     fn enter_critical_section(&mut self) {
-        if self.initialised {
+        self.tasks[self.current].locks += 1;
+    }
 
-            self.tasks[self.current].locks += 1;
+    fn leave_critical_section(&mut self) {
+        let t = &mut self.tasks[self.current];
+
+        t.locks -= 1;
+
+        if t.state() == task::TaskState::ToReschedule && t.locks == 0 {
+            t.set_state(task::TaskState::Running);
+            reschedule();
+        }
+    }
+
+    fn current(&mut self) -> &'static mut task::Task {
+        unsafe {
+            &mut *(&mut self.tasks[self.current] as *mut _)
+        }
+    }
+}
+
+struct Tasks {
+    tasks: CpuTasksPtr,
+}
+
+impl Tasks {
+    const fn empty() -> Tasks {
+        Tasks {
+            tasks: CpuTasksPtr(::core::ptr::null_mut()),
+        }
+    }
+
+    fn init(&mut self) {
+        use ::kernel::smp::cpu_count;
+        use ::core::mem::size_of;
+
+        self.tasks = CpuTasksPtr(heap_allocate(size_of::<CpuTasks>() * cpu_count()).expect("Out of mem") as *mut CpuTasks);
+
+        for i in 0..cpu_count() {
+            self.at_cpu(i as isize).init();
+        }
+    }
+
+    fn at_cpu(&mut self, cpu: isize) -> &mut CpuTasks {
+        unsafe {
+            &mut *self.tasks.0.offset(cpu)
+        }
+    }
+
+    fn at_this_cpu(&mut self) -> &'static mut CpuTasks {
+        unsafe {
+            &mut *self.tasks.0.offset(::CPU_ID as isize)
+        }
+    }
+}
+
+struct Scheduler {
+    tasks: Tasks,
+    pub initialised: bool
+}
+
+impl Scheduler {
+    const fn empty() -> Scheduler {
+        Scheduler {
+            tasks: Tasks::empty(),
+            initialised: false,
+        }
+    }
+
+    fn init(&mut self) {
+        self.tasks.init();
+
+        self.initialised = true;
+    }
+
+    fn this_cpu_tasks(&mut self) -> &mut CpuTasks {
+        self.tasks.at_this_cpu()
+    }
+
+    fn schedule_next(&mut self) {
+        self.this_cpu_tasks().schedule_next();
+    }
+
+    fn reschedule(&mut self) -> bool {
+        self.this_cpu_tasks().reschedule()
+    }
+
+    fn current_task_finished(&mut self) {
+        self.this_cpu_tasks().current_task_finished()
+    }
+
+    fn add_task(&mut self, fun: fn()) {
+        self.this_cpu_tasks().add_task(fun);
+    }
+
+    fn add_user_task(&mut self, fun: MappedAddr, code_size: usize, stack: usize) {
+        self.this_cpu_tasks().add_user_task(fun, code_size, stack)
+    }
+
+    fn enter_critical_section(&mut self) {
+        if self.initialised {
+            self.this_cpu_tasks().enter_critical_section()
         }
     }
 
     fn leave_critical_section(&mut self) {
         if self.initialised {
-            let t = &mut self.tasks[self.current];
-
-            t.locks -= 1;
-
-            if t.state() == task::TaskState::ToReschedule && t.locks == 0 {
-                t.set_state(task::TaskState::Running);
-                reschedule();
-            }
+            self.this_cpu_tasks().leave_critical_section()
         }
     }
+
+    fn current(&mut self) -> &'static mut task::Task {
+        self.this_cpu_tasks().current()
+    }
+
 }
 
-#[thread_local]
 static SCHEDULER: IrqLock<Scheduler> = IrqLock::new(Scheduler::empty());
 
 fn scheduler_main() {
     loop {
-        let scheduler = &SCHEDULER;
-        scheduler.irq().schedule_next();
+        SCHEDULER.irq().schedule_next();
     }
 }
 
 pub fn reschedule() -> bool {
-    let scheduler = &SCHEDULER;
-    let a = scheduler.irq().reschedule();
+    let a = SCHEDULER.irq().reschedule();
     a
 }
 
 pub fn task_finished() {
     print!("f,");
-    let scheduler = &SCHEDULER;
-    scheduler.irq().current_task_finished();
+    SCHEDULER.irq().current_task_finished();
 }
 
 pub fn create_task(fun: fn()) {
-    let scheduler = &SCHEDULER;
-    scheduler.irq().add_task(fun);
+    SCHEDULER.irq().add_task(fun);
 }
 
 pub fn create_user_task(fun: MappedAddr, code_size: u64, stack: usize) {
-    let scheduler = &SCHEDULER;
-    scheduler.irq().add_user_task(fun, code_size as usize, stack);
+    SCHEDULER.irq().add_user_task(fun, code_size as usize, stack);
 }
 
 pub fn enter_critical_section() -> bool {
     if ::kernel::tls::is_ready() {
-        let scheduler = &SCHEDULER;
-        scheduler.irq().enter_critical_section();
+        SCHEDULER.irq().enter_critical_section();
         return true;
     }
 
@@ -190,13 +274,15 @@ pub fn enter_critical_section() -> bool {
 
 pub fn leave_critical_section() {
     if ::kernel::tls::is_ready() {
-        let scheduler = &SCHEDULER;
-        scheduler.irq().leave_critical_section();
+        SCHEDULER.irq().leave_critical_section();
     }
 }
 
+pub fn current() -> &'static mut task::Task {
+    SCHEDULER.irq().current()
+}
+
 pub fn init() {
-    let scheduler = &SCHEDULER;
-    scheduler.irq().init();
+    SCHEDULER.irq().init();
 }
 

@@ -4,6 +4,10 @@ static SMP_INITIALISED: AtomicBool = AtomicBool::new(false);
 
 pub fn init() {
     ::arch::smp::init();
+}
+
+pub fn start() {
+    ::arch::smp::start();
 
     mark_smp_initialized();
 }

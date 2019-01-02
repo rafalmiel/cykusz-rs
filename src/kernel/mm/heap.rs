@@ -77,14 +77,38 @@ unsafe impl GlobalAlloc for LockedHeap {
     }
 }
 
-pub fn allocate(layout: Layout) -> Option<*mut u8> {
+pub fn allocate_layout(layout: Layout) -> Option<*mut u8> {
     unsafe {
         Some(::HEAP.alloc(layout) as *mut u8)
     }
 }
 
-pub fn deallocate(ptr: *mut u8, layout: Layout) {
+pub fn deallocate_layout(ptr: *mut u8, layout: Layout) {
     unsafe {
         ::HEAP.dealloc(ptr, layout)
+    }
+}
+
+pub fn allocate(size: usize) -> Option<*mut u8> {
+    unsafe {
+        Some(::HEAP.alloc(::core::alloc::Layout::from_size_align_unchecked(size, 8)) as *mut u8)
+    }
+}
+
+pub fn deallocate(ptr: *mut u8, size: usize) {
+    unsafe {
+        ::HEAP.dealloc(ptr, ::core::alloc::Layout::from_size_align_unchecked(size, 8))
+    }
+}
+
+pub fn allocate_align(size: usize, align: usize) -> Option<*mut u8> {
+    unsafe {
+        Some(::HEAP.alloc(::core::alloc::Layout::from_size_align_unchecked(size, align)) as *mut u8)
+    }
+}
+
+pub fn deallocate_align(ptr: *mut u8, size: usize, align: usize) {
+    unsafe {
+        ::HEAP.dealloc(ptr, ::core::alloc::Layout::from_size_align_unchecked(size, align))
     }
 }

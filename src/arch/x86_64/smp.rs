@@ -53,16 +53,18 @@ pub fn cpu_count() -> usize {
 }
 
 pub fn init() {
-    extern {
-        static apinit_start: u8;
-        static apinit_end: u8;
-        static trampoline: u8;
-    }
-
     unsafe {
         CPU_COUNT = ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries().filter(|e| {
             e.proc_is_enabled()
         }).count();
+    }
+}
+
+pub fn start() {
+    extern {
+        static apinit_start: u8;
+        static apinit_end: u8;
+        static trampoline: u8;
     }
 
     // Copy over trampoline and apinit code to 0xE00 and 0x1000

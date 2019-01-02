@@ -47,6 +47,8 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::mm::init();
 
+    kernel::smp::init();
+
     kernel::tls::init(stack_top);
 
     println!("[ OK ] Per-CPU Storage Initialised");
@@ -55,7 +57,11 @@ pub fn rust_main(stack_top: VirtAddr) {
         CPU_ID = 0;
     }
 
-    kernel::smp::init();
+    kernel::sched::init();
+
+    println!("[ OK ] Scheduler Initialised");
+
+    kernel::smp::start();
 
     println!("[ OK ] SMP Initialized (CPU count: {})", kernel::smp::cpu_count());
 
@@ -63,13 +69,11 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Syscall Initialized");
 
-    kernel::sched::init();
-
-    println!("[ OK ] Scheduler Initialised");
-
     kernel::timer::setup();
 
     kernel::timer::start();
+
+    let task = ::kernel::sched::current();
 
     println!("[ OK ] Local Timer Started");
 
@@ -90,8 +94,6 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     println!("[ OK ] CPU {} Initialised", unsafe {::CPU_ID});
 
     kernel::smp::notify_ap_ready();
-
-    kernel::sched::init();
 
     kernel::timer::setup();
 

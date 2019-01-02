@@ -1,7 +1,8 @@
 use arch::raw::segmentation::SegmentSelector;
 use arch::gdt;
 use arch::mm::virt::p4_table_addr;
-use kernel::mm::heap::allocate as heap_allocate;
+use kernel::mm::heap::allocate_align as heap_allocate_align;
+use kernel::mm::heap::deallocate_align as heap_deallocate_align;
 use kernel::mm::MappedAddr;
 use kernel::mm::PhysAddr;
 use kernel::mm::VirtAddr;
@@ -155,9 +156,7 @@ impl Task {
     }
 
     fn new(fun: fn (), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, cr3: PhysAddr, user_stack: Option<usize>) -> Task {
-        let sp = unsafe {
-            heap_allocate(::core::alloc::Layout::from_size_align_unchecked(4096*16, 4096)).unwrap()
-        };
+        let sp = heap_allocate_align(4096*16, 4096).unwrap();
 
         Task::new_sp(fun, cs, ds, int_enabled, sp as usize, 4096*16, cr3, user_stack)
     }
@@ -181,12 +180,10 @@ impl Task {
 
     pub fn deallocate(&mut self) {
         self.ctx = ::core::ptr::null_mut();
-        unsafe {
-            ::kernel::mm::heap::deallocate(
-                self.stack_top as *mut u8,
-                ::core::alloc::Layout::from_size_align_unchecked(self.stack_size, 4096)
-            );
-        }
+        heap_deallocate_align(
+            self.stack_top as *mut u8,
+            self.stack_size, 4096
+        );
         self.stack_top = 0;
     }
 }

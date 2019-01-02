@@ -267,8 +267,8 @@ pub fn start_ap() {
 
             // Allocate stack for the new CPU
             trampoline.stack_ptr = unsafe {
-                ::kernel::mm::heap::allocate(
-                    ::core::alloc::Layout::from_size_align_unchecked(4096 * 16, 4096)
+                ::kernel::mm::heap::allocate_align(
+                    4096 * 16, 4096
                 ).unwrap().offset(4096 * 16)
             } as u64;
 

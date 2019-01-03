@@ -1,5 +1,5 @@
-use arch::raw::idt as ridt;
 use arch::idt;
+use arch::raw::idt as ridt;
 
 pub fn init() {
     idt::set_user_handler(80, syscall_handler);

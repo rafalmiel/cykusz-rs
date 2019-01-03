@@ -1,7 +1,9 @@
-use core::ops::{Deref, DerefMut};
-use kernel::int;
-use spin::{Mutex as M, MutexGuard as MG};
 use core::cell::UnsafeCell;
+use core::ops::{Deref, DerefMut};
+
+use spin::{Mutex as M, MutexGuard as MG};
+
+use kernel::int;
 
 pub struct Mutex<T> {
     l: M<T>,

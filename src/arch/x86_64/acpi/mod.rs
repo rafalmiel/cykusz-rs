@@ -1,13 +1,13 @@
+use kernel::sync::Mutex;
+
+use self::rsdp::Address;
+use self::rsdt::Rsdt;
+
 mod rsdp;
 mod util;
 mod rsdt;
 pub mod apic;
 pub mod hpet;
-
-use self::rsdp::Address;
-use self::rsdt::Rsdt;
-
-use kernel::sync::Mutex;
 
 pub static ACPI: Mutex<Acpi> = Mutex::new(Acpi::new());
 

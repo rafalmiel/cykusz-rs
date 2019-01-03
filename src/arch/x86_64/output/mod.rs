@@ -1,5 +1,5 @@
-use drivers::video::vga::{Color, Writer};
 use arch::raw::cpuio::Port;
+use drivers::video::vga::{Color, Writer};
 use kernel::mm::MappedAddr;
 use kernel::sync::Mutex;
 

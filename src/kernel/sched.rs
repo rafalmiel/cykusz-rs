@@ -1,7 +1,7 @@
-use kernel::sync::IrqLock;
-use kernel::task;
 use kernel::mm::heap::allocate as heap_allocate;
 use kernel::mm::MappedAddr;
+use kernel::sync::IrqLock;
+use kernel::task;
 
 #[macro_export]
 macro_rules! switch {

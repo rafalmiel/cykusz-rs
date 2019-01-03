@@ -1,5 +1,5 @@
-use ::arch::int::InterruptController;
 use ::arch::dev::pic::PIC;
+use ::arch::int::InterruptController;
 
 pub struct Controller {}
 

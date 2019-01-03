@@ -1,6 +1,6 @@
-use arch::raw::segmentation::SegmentSelector;
 use arch::gdt;
 use arch::mm::virt::p4_table_addr;
+use arch::raw::segmentation::SegmentSelector;
 use kernel::mm::heap::allocate_align as heap_allocate_align;
 use kernel::mm::heap::deallocate_align as heap_deallocate_align;
 use kernel::mm::MappedAddr;

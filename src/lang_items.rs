@@ -1,5 +1,5 @@
-use core::panic::PanicInfo;
 use core::alloc::Layout;
+use core::panic::PanicInfo;
 
 #[cfg(not(test))]
 #[lang = "eh_personality"]

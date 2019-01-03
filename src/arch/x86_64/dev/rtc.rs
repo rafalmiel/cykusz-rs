@@ -1,7 +1,7 @@
-use arch::raw::idt as ridt;
 use arch::idt;
 use arch::int;
 use arch::raw::cpuio;
+use arch::raw::idt as ridt;
 
 pub fn init() {
     int::set_irq_dest(8, 40);

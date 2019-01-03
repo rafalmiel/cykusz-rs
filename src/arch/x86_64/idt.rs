@@ -1,5 +1,4 @@
 use arch::raw::idt;
-
 use kernel::sync::Mutex;
 
 static IDT: Mutex<idt::Idt> = Mutex::new(idt::Idt::new());

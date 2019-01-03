@@ -1,10 +1,11 @@
-use super::iter;
-
-use kernel::sync::Mutex;
-use kernel::mm::{PhysAddr, MappedAddr};
-use kernel::mm::Frame;
 use drivers::multiboot2;
 use drivers::multiboot2::memory::MemoryIter;
+use kernel::mm::{MappedAddr, PhysAddr};
+use kernel::mm::Frame;
+use kernel::sync::Mutex;
+
+use super::iter;
+
 use self::iter::PhysMemIterator;
 
 const LIST_ADDR_INVALID: PhysAddr = PhysAddr(0xFFFF_FFFF_FFFF_FFFF);

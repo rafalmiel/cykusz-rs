@@ -1,9 +1,7 @@
-use arch::raw::cpuio::{UnsafePort};
-
-use arch::int;
 use arch::idt;
+use arch::int;
+use arch::raw::cpuio::UnsafePort;
 use arch::raw::idt as ridt;
-
 use kernel::sync::Mutex;
 
 static PIT: Mutex<Pit> = Mutex::new(Pit::new());

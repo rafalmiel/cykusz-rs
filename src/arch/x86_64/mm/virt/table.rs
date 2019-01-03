@@ -1,11 +1,10 @@
 use core::marker::PhantomData;
 
-use kernel::mm::virt;
-use kernel::mm::*;
-
-use arch::mm::virt::entry::Entry;
 use arch::mm::virt::entry;
+use arch::mm::virt::entry::Entry;
+use kernel::mm::*;
 use kernel::mm::Frame;
+use kernel::mm::virt;
 
 use super::page;
 

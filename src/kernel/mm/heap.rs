@@ -1,15 +1,14 @@
-use core::alloc::{Alloc, Layout, AllocErr, GlobalAlloc};
+use core::alloc::{Alloc, AllocErr, GlobalAlloc, Layout};
 use core::ops::Deref;
 use core::ptr::NonNull;
 
-use linked_list_allocator::{Heap, align_up};
+use linked_list_allocator::{align_up, Heap};
 
+use arch::mm::heap::{HEAP_END, HEAP_SIZE, HEAP_START};
 use kernel::mm::*;
-use kernel::mm::PAGE_SIZE;
 use kernel::mm::map;
+use kernel::mm::PAGE_SIZE;
 use kernel::sync::Mutex;
-
-use arch::mm::heap::{HEAP_START, HEAP_END, HEAP_SIZE};
 
 pub fn init()
 {

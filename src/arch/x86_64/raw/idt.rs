@@ -1,7 +1,8 @@
+use core::fmt;
+
 use arch::raw::descriptor as dsc;
 use arch::raw::segmentation::cs;
 use arch::raw::segmentation::SegmentSelector;
-use core::fmt;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]

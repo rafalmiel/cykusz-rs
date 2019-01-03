@@ -1,5 +1,5 @@
 use arch::raw::msr;
-use kernel::mm::{VirtAddr};
+use kernel::mm::VirtAddr;
 
 #[repr(C)]
 struct ThreadPtr {

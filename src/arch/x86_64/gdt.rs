@@ -2,7 +2,6 @@ use arch::raw::descriptor as dsc;
 use arch::raw::gdt;
 use arch::raw::segmentation as sgm;
 use arch::raw::task::TaskStateSegment;
-
 use kernel::mm::VirtAddr;
 
 static mut INIT_GDT: [gdt::GdtEntry; 3] = [

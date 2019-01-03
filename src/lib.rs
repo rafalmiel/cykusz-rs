@@ -11,16 +11,16 @@
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
 
-extern crate rlibc;
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
 extern crate lazy_static;
-extern crate spin;
 extern crate linked_list_allocator;
 extern crate raw_cpuid;
+extern crate rlibc;
+extern crate spin;
 
-use kernel::mm::{VirtAddr};
+use kernel::mm::VirtAddr;
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -71,8 +71,6 @@ pub fn rust_main(stack_top: VirtAddr) {
     kernel::timer::setup();
 
     kernel::timer::start();
-
-    let task = ::kernel::sched::current();
 
     println!("[ OK ] Local Timer Started");
 

@@ -1,7 +1,7 @@
-use ::arch::int::InterruptController;
+use ::arch::acpi::ACPI;
 use ::arch::dev::ioapic::IOAPIC;
 use ::arch::dev::lapic::LAPIC;
-use ::arch::acpi::ACPI;
+use ::arch::int::InterruptController;
 
 pub struct Controller {}
 

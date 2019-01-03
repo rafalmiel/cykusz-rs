@@ -1,5 +1,4 @@
 use arch::raw::cpuio::{Port, UnsafePort};
-
 use kernel::sync::Mutex;
 
 pub static PIC: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(0x20, 0x28) });

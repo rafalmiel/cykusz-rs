@@ -1,14 +1,15 @@
+use arch::raw::ctrlregs;
+use arch::raw::mm;
+use kernel::mm::{PhysAddr, VirtAddr};
+use kernel::mm::allocate;
+use kernel::mm::PAGE_SIZE;
+use kernel::mm::virt;
+
+use self::table::*;
+
 pub mod entry;
 mod page;
 pub mod table;
-
-use arch::raw::mm;
-use arch::raw::ctrlregs;
-use kernel::mm::virt;
-use kernel::mm::allocate;
-use kernel::mm::{PhysAddr,VirtAddr};
-use kernel::mm::PAGE_SIZE;
-use self::table::*;
 
 pub fn p4_table_addr() -> PhysAddr {
     unsafe {

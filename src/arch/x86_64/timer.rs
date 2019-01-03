@@ -1,6 +1,6 @@
-use arch::raw::idt as ridt;
-use arch::int;
 use arch::dev::lapic;
+use arch::int;
+use arch::raw::idt as ridt;
 use kernel::sync::IrqLock;
 
 struct Timer {

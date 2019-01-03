@@ -1,6 +1,5 @@
-use kernel::mm::{PhysAddr};
-
 use arch::acpi::hpet::HpetHeader;
+use kernel::mm::PhysAddr;
 
 pub struct Hpet {
     hpet_hdr: &'static HpetHeader

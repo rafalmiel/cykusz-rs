@@ -1,6 +1,6 @@
 use drivers::multiboot2::memory::MemoryIter;
-use kernel::mm::PhysAddr;
 use kernel::mm::PAGE_SIZE;
+use kernel::mm::PhysAddr;
 
 pub struct PhysMemIterator {
     current:        PhysAddr,

@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
+use core::sync::atomic::{ATOMIC_BOOL_INIT, AtomicBool, Ordering};
 
 static SMP_INITIALISED: AtomicBool = ATOMIC_BOOL_INIT;
 

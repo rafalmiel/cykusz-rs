@@ -1,7 +1,7 @@
 use core::mem::size_of;
-use arch::mm::*;
 
 use arch::acpi;
+use arch::mm::*;
 
 pub enum Address {
     Rsdp(MappedAddr),

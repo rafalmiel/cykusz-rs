@@ -1,14 +1,12 @@
-use core::ptr::write_volatile;
 use core::ptr::read_volatile;
+use core::ptr::write_volatile;
 
 use arch::acpi::apic::MatdHeader;
-
-use arch::mm::{MappedAddr};
-use arch::raw::msr;
-
-use kernel::sync::IrqLock;
-use arch::int;
 use arch::idt;
+use arch::int;
+use arch::mm::MappedAddr;
+use arch::raw::msr;
+use kernel::sync::IrqLock;
 
 pub static LAPIC: IrqLock<LApic> = IrqLock::new(LApic::new());
 

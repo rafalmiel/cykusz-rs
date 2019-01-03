@@ -1,7 +1,7 @@
-use kernel::mm::heap::allocate as heap_allocate;
 use kernel::mm::MappedAddr;
 use kernel::sync::IrqLock;
 use kernel::task;
+use kernel::utils::PerCpu;
 
 #[macro_export]
 macro_rules! switch {
@@ -18,10 +18,6 @@ struct CpuTasks {
     current: usize,
     previous: usize,
 }
-
-struct CpuTasksPtr(*mut CpuTasks);
-
-unsafe impl Send for CpuTasksPtr{}
 
 impl CpuTasks {
     fn init(&mut self) {
@@ -142,37 +138,31 @@ impl CpuTasks {
 }
 
 struct Tasks {
-    tasks: CpuTasksPtr,
+    tasks: PerCpu<CpuTasks>,
 }
 
 impl Tasks {
     const fn empty() -> Tasks {
         Tasks {
-            tasks: CpuTasksPtr(::core::ptr::null_mut()),
+            tasks: PerCpu::empty()
         }
     }
 
     fn init(&mut self) {
-        use ::kernel::smp::cpu_count;
-        use ::core::mem::size_of;
+        self.tasks.init();
 
-        self.tasks = CpuTasksPtr(heap_allocate(size_of::<CpuTasks>() * cpu_count()).expect("Out of mem") as *mut CpuTasks);
-
-        for i in 0..cpu_count() {
-            self.at_cpu(i as isize).init();
+        for i in 0..::kernel::smp::cpu_count() {
+            self.tasks.cpu_mut(i as isize).init();
         }
     }
 
+    #[allow(unused)]
     fn at_cpu(&mut self, cpu: isize) -> &mut CpuTasks {
-        unsafe {
-            &mut *self.tasks.0.offset(cpu)
-        }
+        self.tasks.cpu_mut(cpu)
     }
 
-    fn at_this_cpu(&mut self) -> &'static mut CpuTasks {
-        unsafe {
-            &mut *self.tasks.0.offset(::CPU_ID as isize)
-        }
+    fn at_this_cpu(&mut self) -> &mut CpuTasks {
+        self.tasks.this_cpu_mut()
     }
 }
 

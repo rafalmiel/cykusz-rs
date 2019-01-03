@@ -7,6 +7,7 @@ pub mod sync;
 pub mod task;
 pub mod syscall;
 pub mod user;
+pub mod utils;
 
 #[macro_use]
 pub mod sched;

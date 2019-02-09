@@ -1,15 +1,13 @@
-struct SendWrapper<T>(*mut T);
-
-unsafe impl<T> Send for SendWrapper<T>{}
+use core::ptr::Unique;
 
 pub struct PerCpu<T> {
-    data: SendWrapper<T>,
+    data: Unique<T>,
 }
 
 impl<T> PerCpu<T> {
     pub const fn empty() -> PerCpu<T> {
         PerCpu::<T> {
-            data: SendWrapper::<T>(::core::ptr::null_mut()),
+            data: ::core::ptr::Unique::empty(),
         }
     }
 
@@ -23,20 +21,20 @@ impl<T> PerCpu<T> {
 
         unsafe {
             raw.write_bytes(0, size);
+            self.data = ::core::ptr::Unique::new_unchecked(raw as *mut T);
         }
 
-        self.data.0 = raw as *mut T;
     }
 
     pub fn cpu(&self, cpu: isize) -> &T {
         unsafe {
-            &*self.data.0.offset(cpu)
+            &*self.data.as_ptr().offset(cpu)
         }
     }
 
     pub fn cpu_mut(&self, cpu: isize) -> &mut T {
         unsafe {
-            &mut *self.data.0.offset(cpu)
+            &mut *self.data.as_ptr().offset(cpu)
         }
 
     }

@@ -11,14 +11,10 @@ pub enum TaskState {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct MM {}
-
-#[derive(Copy, Clone, Debug)]
 pub struct Task {
     pub arch_task: ArchTask,
     state: TaskState,
     pub locks: i32,
-    pub mm: MM,
 }
 
 impl Task {
@@ -27,7 +23,6 @@ impl Task {
             arch_task: ArchTask::empty(),
             state: TaskState::Unused,
             locks: 0,
-            mm: MM{}
         }
     }
 
@@ -46,7 +41,6 @@ impl Task {
             arch_task: ArchTask::new_sched(fun),
             state: TaskState::Runnable,
             locks: 0,
-            mm: MM{},
         }
     }
 
@@ -55,7 +49,6 @@ impl Task {
             arch_task: ArchTask::new_kern(fun),
             state: TaskState::Runnable,
             locks: 0,
-            mm: MM{},
         }
     }
 
@@ -64,7 +57,6 @@ impl Task {
             arch_task: ArchTask::new_user(fun, code_size, stack),
             state: TaskState::Runnable,
             locks: 0,
-            mm: MM{},
         }
     }
 

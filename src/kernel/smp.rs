@@ -1,6 +1,6 @@
-use core::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
+use core::sync::atomic::{AtomicBool, Ordering};
 
-static SMP_INITIALISED: AtomicBool = ATOMIC_BOOL_INIT;
+static SMP_INITIALISED: AtomicBool = AtomicBool::new(false);
 
 pub fn init() {
     ::arch::smp::init();

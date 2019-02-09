@@ -2,10 +2,10 @@ use kernel::mm::*;
 
 use drivers::multiboot2;
 
-use core::sync::atomic::{AtomicU64, ATOMIC_U64_INIT, Ordering};
+use core::sync::atomic::{AtomicU64, Ordering};
 
-static USER_PROGRAM: AtomicU64 = ATOMIC_U64_INIT;
-static USER_PROGRAM_SIZE: AtomicU64 = ATOMIC_U64_INIT;
+static USER_PROGRAM: AtomicU64 = AtomicU64::new(0);
+static USER_PROGRAM_SIZE: AtomicU64 = AtomicU64::new(0);
 
 pub fn init(mboot_info: &multiboot2::Info) {
     if let Some(mtag) = mboot_info.modules_tags().next() {

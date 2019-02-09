@@ -1,3 +1,5 @@
+use core::ptr::Unique;
+
 use arch::gdt;
 use arch::mm::virt::p4_table_addr;
 use arch::raw::segmentation::SegmentSelector;
@@ -32,7 +34,7 @@ pub struct Context {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Task {
-    pub ctx: *mut Context,
+    pub ctx: Unique<Context>,
     //top of the stack, used to deallocate
     pub stack_top: usize,
     pub stack_size: usize,
@@ -106,7 +108,7 @@ struct IretqFrame {
 impl Task {
     pub const fn empty() -> Task {
         Task {
-            ctx: ::core::ptr::null_mut(),
+            ctx: Unique::empty(),
             stack_top: 0,
             stack_size: 0,
             is_user: false,
@@ -120,7 +122,7 @@ impl Task {
         if self.stack_size != 0 {
             panic!("[ ERROR ] ArchTask corrupted on init");
         }
-        if self.ctx != ::core::ptr::null_mut() {
+        if self.ctx.as_ptr() != Unique::empty().as_ptr() {
             panic!("[ ERROR ] ArchTask corrupted on init");
         }
     }
@@ -140,10 +142,10 @@ impl Task {
             frame.cs                = cs.bits() as usize;
             frame.ip                = fun as usize;
 
-            let ctx = sp.offset(
-                -(::core::mem::size_of::<Context>() as isize + ::core::mem::size_of::<IretqFrame>() as isize)) as *mut Context;
-            (*ctx).rip = isr_return as usize;
-            (*ctx).cr3 = cr3.0;
+            let mut ctx = Unique::new_unchecked(sp.offset(
+                -(::core::mem::size_of::<Context>() as isize + ::core::mem::size_of::<IretqFrame>() as isize)) as *mut Context);
+            ctx.as_mut().rip = isr_return as usize;
+            ctx.as_mut().cr3 = cr3.0;
 
             Task {
                 ctx,
@@ -179,7 +181,7 @@ impl Task {
     }
 
     pub fn deallocate(&mut self) {
-        self.ctx = ::core::ptr::null_mut();
+        self.ctx = Unique::empty();
         heap_deallocate_align(
             self.stack_top as *mut u8,
             self.stack_size, 4096
@@ -190,7 +192,7 @@ impl Task {
 
 
 extern "C" {
-    pub fn switch_to(old_ctx: *mut *mut Context, new_ctx: *const Context);
+    pub fn switch_to(old_ctx: &mut Unique<Context>, new_ctx: &Context);
     fn isr_return();
 }
 
@@ -199,7 +201,10 @@ pub fn switch(from: &mut Task, to: &Task) {
         if to.is_user {
             ::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
-        switch_to((&mut from.ctx) as *mut *mut Context, to.ctx);
+        switch_to(
+            &mut from.ctx,
+            to.ctx.as_ref()
+        );
     }
 }
 

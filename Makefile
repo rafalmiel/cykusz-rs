@@ -27,9 +27,9 @@ purge: clean
 	rm -rf target
 
 run: $(iso)
-	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -m 128 -smp cpus=4
+	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -m 512 -smp cpus=4 -no-shutdown
 debug: $(iso)
-	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -s -S
+	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -s -S -smp cpus=4 -no-shutdown
 gdb:
 	#@rust-os-gdb/bin/rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"
 	@rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"

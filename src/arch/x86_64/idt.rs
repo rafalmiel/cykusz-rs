@@ -62,7 +62,9 @@ extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) 
 }
 
 extern "x86-interrupt" fn debug(_frame: &mut idt::ExceptionStackFrame) {
-    println!("INT: Debug exception!");
+    unsafe {
+        println!("INT: Debug exception! CPU: {}", ::CPU_ID);
+    }
     loop {}
 }
 
@@ -117,7 +119,9 @@ extern "x86-interrupt" fn stack_segment_fault(_frame: &mut idt::ExceptionStackFr
 }
 
 extern "x86-interrupt" fn general_protection_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
-    println!("General Protection Fault error! 0x{:x}", err);
+    unsafe {
+        println!("General Protection Fault error! 0x{:x} CPU: {}", err, ::CPU_ID);
+    }
     loop {}
 }
 

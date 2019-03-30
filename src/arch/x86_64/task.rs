@@ -144,6 +144,7 @@ impl Task {
 
             let mut ctx = Unique::new_unchecked(sp.offset(
                 -(::core::mem::size_of::<Context>() as isize + ::core::mem::size_of::<IretqFrame>() as isize)) as *mut Context);
+            ctx.as_ptr().write(Context::empty());
             ctx.as_mut().rip = isr_return as usize;
             ctx.as_mut().cr3 = cr3.0;
 
@@ -193,6 +194,7 @@ impl Task {
 
 extern "C" {
     pub fn switch_to(old_ctx: &mut Unique<Context>, new_ctx: &Context);
+    pub fn activate_to(new_ctx: &Context);
     fn isr_return();
 }
 
@@ -208,3 +210,13 @@ pub fn switch(from: &mut Task, to: &Task) {
     }
 }
 
+pub fn activate_task(to: &Task) {
+    unsafe {
+        if to.is_user {
+            ::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
+        }
+        activate_to(
+            to.ctx.as_ref()
+        );
+    }
+}

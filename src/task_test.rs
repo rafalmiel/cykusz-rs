@@ -1,7 +1,9 @@
-const WORK_COUNT: usize = 0x1000000;
-const ITERS: usize = <usize>::max_value();
+use core::sync::atomic::Ordering;
 
-fn dummy_work() {
+const WORK_COUNT: usize = 0x5000;
+const ITERS: usize = 1;//<usize>::max_value();
+
+pub fn dummy_work() {
     let a = &3 as *const i32;
 
     // Dummy work
@@ -14,13 +16,15 @@ fn dummy_work() {
 }
 
 fn task() {
-    let id = unsafe {::CPU_ID };
-    for i in 0..ITERS {
-        //println!("K {}: 0x{:x}", unsafe {::CPU_ID}, unsafe {::arch::raw::ctrlregs::cr3()});
-        print!("K({} {:10}),", id, i);
+    for _ in 0..ITERS {
+        println!("K( PID: {:<6} CPU: {:<6} MEM: {:<8}),",
+                 ::kernel::sched::current_id(),
+                 unsafe {::CPU_ID },
+                 ::kernel::mm::heap::ALLOCED_MEM.load(Ordering::SeqCst));
 
         dummy_work();
     }
+    ::kernel::sched::create_task(task);
 }
 
 pub fn start() {

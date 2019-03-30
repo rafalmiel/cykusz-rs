@@ -1,40 +1,53 @@
 use core::ptr::Unique;
+use core::cell::UnsafeCell;
 
 pub struct PerCpu<T> {
-    data: Unique<T>,
+    data: UnsafeCell<Unique<T>>,
 }
 
 impl<T> PerCpu<T> {
     pub const fn empty() -> PerCpu<T> {
         PerCpu::<T> {
-            data: ::core::ptr::Unique::empty(),
+            data: UnsafeCell::new(::core::ptr::Unique::empty()),
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn new_fn(init: fn() -> T) -> PerCpu<T> {
         use ::core::mem::size_of;
         use ::kernel::mm::heap::allocate;
         use ::kernel::smp::cpu_count;
 
-        let size = size_of::<T>() * cpu_count();
-        let raw = allocate(size).unwrap();
+        let mut this = PerCpu::<T>::empty();
+
+        let cpu_count = cpu_count();
+
+        let size = size_of::<T>() * cpu_count;
+        let raw = allocate(size).unwrap() as *mut T;
 
         unsafe {
-            raw.write_bytes(0, size);
-            self.data = ::core::ptr::Unique::new_unchecked(raw as *mut T);
+            for i in 0..cpu_count {
+                raw.offset(i as isize).write(init());
+            }
+
+            this.data = UnsafeCell::new(::core::ptr::Unique::new_unchecked(raw));
         }
 
+        this
+    }
+
+    unsafe fn ptr(&self) -> *mut T {
+        (&mut *self.data.get()).as_mut()
     }
 
     pub fn cpu(&self, cpu: isize) -> &T {
         unsafe {
-            &*self.data.as_ptr().offset(cpu)
+            &*self.ptr().offset(cpu)
         }
     }
 
     pub fn cpu_mut(&self, cpu: isize) -> &mut T {
         unsafe {
-            &mut *self.data.as_ptr().offset(cpu)
+            &mut *self.ptr().offset(cpu)
         }
 
     }

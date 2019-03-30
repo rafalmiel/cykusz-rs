@@ -9,6 +9,7 @@ use kernel::mm::*;
 use kernel::mm::map;
 use kernel::mm::PAGE_SIZE;
 use kernel::sync::Mutex;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn init()
 {
@@ -30,6 +31,8 @@ fn map_more_heap(from: *const u8, size: usize) {
 
 pub struct LockedHeap(pub Mutex<Heap>);
 
+pub static ALLOCED_MEM: AtomicUsize = AtomicUsize::new(0);
+
 impl LockedHeap {
     /// Creates an empty heap. All allocate calls will return `None`.
     pub const fn empty() -> LockedHeap {
@@ -37,6 +40,7 @@ impl LockedHeap {
     }
 
     unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, AllocErr> {
+        ALLOCED_MEM.fetch_add(layout.size(), Ordering::SeqCst);
         heap.alloc(layout.clone()).or_else(|e| {
             match e {
                 AllocErr{ .. } => {
@@ -72,6 +76,7 @@ unsafe impl GlobalAlloc for LockedHeap {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        ALLOCED_MEM.fetch_sub(layout.size(), Ordering::SeqCst);
         self.0.lock().dealloc(NonNull::new_unchecked(ptr), layout)
     }
 }

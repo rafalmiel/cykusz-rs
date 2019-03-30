@@ -2,11 +2,16 @@ use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
 
 use spin::{Mutex as M, MutexGuard as MG};
+use spin::{RwLock as RL, RwLockReadGuard as RLR, RwLockWriteGuard as RLW};
 
 use kernel::int;
 
 pub struct Mutex<T> {
     l: M<T>,
+}
+
+pub struct RwLock<T> {
+   l: RL<T>,
 }
 
 pub struct IrqLock<T: ?Sized> {
@@ -19,6 +24,19 @@ unsafe impl<T: ?Sized + Send> Send for IrqLock<T> {}
 pub struct MutexGuard<'a, T: ?Sized + 'a> {
     g: Option<MG<'a, T>>,
     irq: bool,
+    notify: bool,
+}
+
+pub struct RwLockReadGuard<'a, T: ?Sized + 'a> {
+    g: Option<RLR<'a, T>>,
+    irq: bool,
+    notify: bool,
+}
+
+pub struct RwLockWriteGuard<'a, T: ?Sized + 'a> {
+    g: Option<RLW<'a, T>>,
+    irq: bool,
+    notify: bool,
 }
 
 pub struct IrqLockGuard<'a, T: ?Sized + 'a> {
@@ -39,17 +57,35 @@ impl<T> Mutex<T> {
         MutexGuard {
             g: Some(self.l.lock()),
             irq: false,
+            notify: true,
         }
     }
 
     pub fn lock_irq(&self) -> MutexGuard<T> {
         let ints = int::is_enabled();
-        ::kernel::sched::enter_critical_section();
+        //::kernel::sched::enter_critical_section();
         int::disable();
         MutexGuard {
             g: Some(self.l.lock()),
             //reenable ints if they were enabled before
             irq: ints,
+            notify: false,
+        }
+    }
+
+    pub fn lock_no_notify(&self) -> MutexGuard<T> {
+        MutexGuard {
+            g: Some(self.l.lock()),
+            irq: false,
+            notify: false,
+        }
+    }
+}
+
+impl<T> RwLock<T> {
+    pub const fn new(user_data: T) -> RwLock<T> {
+        RwLock {
+            l: RL::new(user_data),
         }
     }
 }
@@ -102,7 +138,9 @@ impl<'a, T: ?Sized> DerefMut for IrqLockGuard<'a, T> {
 impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
-        ::kernel::sched::leave_critical_section();
+        if self.notify {
+            ::kernel::sched::leave_critical_section();
+        }
         if self.irq {
             int::enable();
         }

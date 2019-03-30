@@ -1,5 +1,6 @@
 use arch::task::Task as ArchTask;
 use kernel::mm::MappedAddr;
+use kernel::sched::new_task_id;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
@@ -10,43 +11,36 @@ pub enum TaskState {
     ToDelete = 4,
 }
 
-#[derive(Copy, Clone, Debug)]
 pub struct Task {
     pub arch_task: ArchTask,
-    state: TaskState,
+    pub id: usize,
+    pub state: TaskState,
     pub locks: i32,
 }
 
 impl Task {
-    pub const fn empty() -> Task {
+    pub fn this() -> Task {
         Task {
             arch_task: ArchTask::empty(),
-            state: TaskState::Unused,
+            id: new_task_id(),
+            state: TaskState::Running,
             locks: 0,
-        }
-    }
-
-    pub fn assure_empty(&self) {
-        self.arch_task.assure_empty();
-        if self.state != TaskState::Unused {
-            panic!("[ ERROR ] Task corrupted on init")
-        }
-        if self.locks != 0 {
-            panic!("[ ERROR ] Task corrupted on init")
         }
     }
 
     pub fn new_sched(fun: fn()) -> Task {
         Task {
             arch_task: ArchTask::new_sched(fun),
+            id: new_task_id(),
             state: TaskState::Runnable,
-            locks: 0,
+            locks: 0
         }
     }
 
     pub fn new_kern(fun: fn()) -> Task {
         Task {
             arch_task: ArchTask::new_kern(fun),
+            id: ::kernel::sched::new_task_id(),
             state: TaskState::Runnable,
             locks: 0,
         }
@@ -55,25 +49,15 @@ impl Task {
     pub fn new_user(fun: MappedAddr, code_size: usize, stack: usize) -> Task {
         Task {
             arch_task: ArchTask::new_user(fun, code_size, stack),
+            id: ::kernel::sched::new_task_id(),
             state: TaskState::Runnable,
             locks: 0,
         }
     }
 
-    pub fn state(&self) -> TaskState {
-        self.state
-    }
-
-    pub fn set_state(&mut self, state: TaskState) {
-        self.state = state;
-    }
-
     pub fn deallocate(&mut self) {
-        if self.locks != 0 {
-            panic!("PANIC: Task finished while holding a lock?");
-        }
         self.arch_task.deallocate();
-        self.state = TaskState::Unused;
-        self.locks = 0;
+        self.state = TaskState::ToDelete;
     }
+
 }

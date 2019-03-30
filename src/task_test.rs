@@ -1,5 +1,5 @@
 const WORK_COUNT: usize = 0x1000000;
-const ITERS: usize = <usize>::max_value();
+const ITERS: usize = 10;//<usize>::max_value();
 
 fn dummy_work() {
     let a = &3 as *const i32;
@@ -21,6 +21,7 @@ fn task() {
 
         dummy_work();
     }
+    ::kernel::sched::create_task(task);
 }
 
 pub fn start() {

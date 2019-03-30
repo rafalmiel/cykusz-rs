@@ -10,6 +10,8 @@
 #![feature(alloc, allocator_api)]
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
+#![feature(const_vec_new)]
+#![feature(nll)]
 
 #[macro_use]
 extern crate bitflags;
@@ -19,8 +21,10 @@ extern crate linked_list_allocator;
 extern crate raw_cpuid;
 extern crate rlibc;
 extern crate spin;
+extern crate alloc;
 
 use kernel::mm::VirtAddr;
+use alloc::sync::Arc;
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -58,6 +62,8 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::sched::init();
 
+    kernel::sched::enable_lock_protection();
+
     println!("[ OK ] Scheduler Initialised");
 
     kernel::smp::start();
@@ -77,6 +83,7 @@ pub fn rust_main(stack_top: VirtAddr) {
     // Start test tasks on this cpu
     task_test::start();
 
+
     idle();
 }
 
@@ -85,8 +92,10 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::tls::init(VirtAddr(stack_ptr as usize));
 
     unsafe {
-        CPU_ID = cpu_num;
+        ::CPU_ID = cpu_num;
     }
+
+    kernel::sched::enable_lock_protection();
 
     println!("[ OK ] CPU {} Initialised", unsafe {::CPU_ID});
 

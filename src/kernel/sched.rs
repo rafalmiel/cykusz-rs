@@ -1,261 +1,401 @@
+use alloc::collections::btree_map::BTreeMap;
+use alloc::sync::Arc;
+
+use core::sync::atomic::{AtomicUsize, AtomicBool};
+use core::sync::atomic::Ordering;
+
+use spin::Once;
+
 use kernel::mm::MappedAddr;
-use kernel::sync::IrqLock;
-use kernel::task;
+use kernel::sync::{Mutex, MutexGuard};
+use kernel::task::{Task, TaskState};
+use alloc::vec::Vec;
 use kernel::utils::PerCpu;
+use core::cell::UnsafeCell;
+use core::borrow::BorrowMut;
 
 #[macro_export]
 macro_rules! switch {
-    ($ctx1:expr, $ctx2:expr) => (
+    ($ctx1: expr, $ctx2: expr) => (
         $crate::arch::task::switch(&mut $ctx1.arch_task, &$ctx2.arch_task);
     )
 }
 
-const TASK_COUNT: usize = 32;
+static NEW_TASK_ID: AtomicUsize = AtomicUsize::new(1);
 
-struct CpuTasks {
-    sched_task: task::Task,
-    tasks: [task::Task; TASK_COUNT],
+#[thread_local]
+static LOCK_PROTECTION: AtomicBool = AtomicBool::new(false);
+
+#[thread_local]
+static LOCK_PROTECTION_ENTERED: AtomicBool = AtomicBool::new(false);
+
+#[thread_local]
+static CURRENT_TASK_ID: AtomicUsize = AtomicUsize::new(0);
+
+pub fn new_task_id() -> usize {
+    NEW_TASK_ID.fetch_add(1, Ordering::SeqCst)
+}
+
+struct CpuQueue {
+    sched_task: Arc<Task>,
+    tasks: Vec<Arc<Task>>,
     current: usize,
     previous: usize,
 }
 
-impl CpuTasks {
-    fn init(&mut self) {
-        self.sched_task = task::Task::empty();
+struct CpuQueues {
+    cpu_queues_locks: PerCpu<Mutex<()>>,
+    cpu_queues: PerCpu<UnsafeCell<CpuQueue>>,
+}
 
-        for i in 0..TASK_COUNT {
-            self.tasks[i] = task::Task::empty();
+struct TaskContainer {
+    tasks: Mutex<BTreeMap<usize, Arc<Task>>>
+}
+
+struct Scheduler {
+    tasks: TaskContainer,
+    cpu_queues: CpuQueues,
+}
+
+unsafe impl Sync for CpuQueues{}
+
+impl Default for CpuQueue {
+    fn default() -> CpuQueue {
+        let mut this = CpuQueue {
+            sched_task: Arc::new(Task::new_sched(scheduler_main)),
+            tasks: Vec::new(),
+            current: 0,
+            previous: 0,
+        };
+
+        this.tasks.push(Arc::new(Task::this()));
+
+        this
+    }
+}
+
+impl Default for CpuQueues {
+    fn default() -> CpuQueues {
+        CpuQueues {
+            cpu_queues_locks: PerCpu::new_fn(|| {
+                Mutex::<()>::new(())
+            }),
+            cpu_queues: PerCpu::new_fn(|| {
+                UnsafeCell::new(CpuQueue::default())
+            })
         }
+    }
+}
 
-        self.tasks[0].set_state(task::TaskState::Running);
+impl Default for TaskContainer {
+    fn default() -> TaskContainer {
+        TaskContainer {
+            tasks: Mutex::new(BTreeMap::new())
+        }
+    }
+}
 
-        self.sched_task = task::Task::new_sched(scheduler_main);
+impl Default for Scheduler {
+    fn default() -> Scheduler {
+        Scheduler {
+            tasks: TaskContainer::default(),
+            cpu_queues: CpuQueues::default(),
+        }
+    }
+}
 
-        self.current = 0;
-        self.previous = 0;
+impl CpuQueue {
+
+    fn switch(&self, to: Arc<Task>, lock: MutexGuard<()>) {
+        drop(lock);
+        unsafe {
+            switch!(CpuQueue::as_mut(&self.sched_task), &to);
+        }
     }
 
-    fn schedule_next(&mut self) {
-        //::bochs();
-        if self.tasks[self.current].state() == task::TaskState::ToDelete {
+    fn switch_to_sched(&self, from: Arc<Task>, lock: MutexGuard<()>) {
+        drop(lock);
+        unsafe {
+            switch!(CpuQueue::as_mut(&from), &self.sched_task);
+        }
+    }
 
-            self.tasks[self.current].deallocate();
+    unsafe fn schedule_next(&mut self, sched_lock: MutexGuard<()>) {
+
+        if self.tasks[self.current].state == TaskState::ToDelete {
+            self.remove_task(self.current);
+            if self.current != 0 {
+                self.current -= 1;
+            }
+            self.schedule_next(sched_lock);
             return;
         } else if self.tasks[self.current].locks > 0 {
-
-            self.tasks[self.current].set_state(task::TaskState::ToReschedule);
-            switch!(self.sched_task, self.tasks[self.current]);
+            self.task_mut_at(self.current).state = TaskState::ToReschedule;
+            self.switch(self.tasks[self.current].clone(), sched_lock);
             return;
         }
 
-        let mut c = (self.current % (TASK_COUNT - 1)) + 1;
+        if self.tasks.len() == 1 {
+            self.switch(self.tasks[0].clone(), sched_lock);
+            return;
+        }
+
+        let len = self.tasks.len();
+
+        let mut c = (self.current % (len - 1)) + 1;
         let mut loops = 0;
 
         let found = loop {
-            if self.tasks[c].state() == task::TaskState::Runnable {
-
+            if self.tasks[c].state == TaskState::Runnable {
                 break Some(c);
-            } else if c == self.current && self.tasks[self.current].state() == task::TaskState::Running {
-
+            } else if c == self.current && self.tasks[self.current].state == TaskState::Running {
                 break Some(self.current);
-            } else if loops == TASK_COUNT - 1 {
-
-                break Some(0)
+            } else if loops == len - 1 {
+                break Some(0);
             }
 
-            c = (c % (TASK_COUNT - 1)) + 1;
+            c = (c % (len - 1)) + 1;
             loops += 1;
         }.expect("SCHEDULER BUG");
 
-        if self.tasks[self.current].state() == task::TaskState::Running {
-            self.tasks[self.current].set_state(task::TaskState::Runnable);
+        if self.tasks[self.current].state == TaskState::Running {
+            self.task_mut_at(self.current).state = TaskState::Runnable;
         }
 
-        self.tasks[found].set_state(task::TaskState::Running);
+        self.task_mut_at(found).state = TaskState::Running;
+
         self.previous = self.current;
         self.current = found;
+        CURRENT_TASK_ID.store(found, Ordering::SeqCst);
 
         ::kernel::int::finish();
 
         ::kernel::timer::reset_counter();
-        switch!(self.sched_task, self.tasks[found]);
+
+        self.switch( self.tasks[found].clone(), sched_lock);
+
     }
 
-    fn reschedule(&mut self) -> bool {
-        switch!(self.tasks[self.current], self.sched_task);
-        return self.previous != self.current
+    unsafe fn as_mut(task: &Task) -> &mut Task {
+        &mut *(task as *const Task as *mut Task)
     }
 
-    fn current_task_finished(&mut self) {
-        self.tasks[self.current].set_state(task::TaskState::ToDelete);
-        if !self.reschedule() {
-            panic!("task_finished but still running?");
-        }
+    unsafe fn task_mut_at(&mut self, idx: usize) -> &mut Task {
+        CpuQueue::as_mut(&self.tasks[idx])
     }
 
-    fn add_task(&mut self, fun: fn()) {
-        for i in 1..32 {
-            if self.tasks[i].state() == task::TaskState::Unused {
-                self.tasks[i] = task::Task::new_kern(fun);
-                return;
-            }
-        }
+    fn reschedule(&mut self, sched_lock: MutexGuard<()>) -> bool {
+        let current = self.tasks[self.current].clone();
 
-        panic!("Sched: Too many tasks!");
-    }
+        self.switch_to_sched(current, sched_lock);
 
-    fn add_user_task(&mut self, fun: MappedAddr, code_size: usize, stack: usize) {
-        for i in 1..32 {
-            if self.tasks[i].state() == task::TaskState::Unused {
-                self.tasks[i] = task::Task::new_user(fun, code_size, stack);
-                return;
-            }
-        }
-
-        panic!("Sched: Too many tasks!");
+        return self.current != self.previous;
     }
 
     fn enter_critical_section(&mut self) {
-        self.tasks[self.current].locks += 1;
+        let c = self.current;
+
+        unsafe {
+            self.task_mut_at(c)
+        }.locks += 1;
     }
 
-    fn leave_critical_section(&mut self) {
-        let t = &mut self.tasks[self.current];
+    fn leave_critical_section(&mut self, mutex: MutexGuard<()>) {
+        let c = self.current;
+
+        let t = unsafe {
+            self.task_mut_at(c)
+        };
 
         t.locks -= 1;
 
-        if t.state() == task::TaskState::ToReschedule && t.locks == 0 {
-            t.set_state(task::TaskState::Running);
+        if t.locks == 0 && t.state == TaskState::ToReschedule {
+            t.state = TaskState::Running;
+
+            drop(mutex);
             reschedule();
         }
     }
 
-    fn current(&mut self) -> &'static mut task::Task {
+    fn current_task_finished(&mut self, lock: MutexGuard<()>) {
         unsafe {
-            &mut *(&mut self.tasks[self.current] as *mut _)
+            LOCK_PROTECTION_ENTERED.store(true, Ordering::SeqCst);
+            self.task_mut_at(self.current).deallocate();
+            LOCK_PROTECTION_ENTERED.store(false, Ordering::SeqCst);
+        }
+
+        if !self.reschedule(lock) {
+            panic!("Task finished but still running?");
+        }
+    }
+
+    fn add_task(&mut self, task: Arc<Task>) {
+        LOCK_PROTECTION_ENTERED.store(true, Ordering::SeqCst);
+        self.tasks.push(task);
+        LOCK_PROTECTION_ENTERED.store(false, Ordering::SeqCst);
+    }
+
+    fn remove_task(&mut self, idx: usize) {
+        LOCK_PROTECTION_ENTERED.store(true, Ordering::SeqCst);
+        self.tasks.remove(idx);
+        LOCK_PROTECTION_ENTERED.store(false, Ordering::SeqCst);
+    }
+}
+
+impl CpuQueues {
+
+    unsafe fn this_cpu_queue(&self) -> &mut CpuQueue {
+        (&mut *(self.cpu_queues.this_cpu_mut().get()))
+    }
+
+    fn schedule_next(&self) {
+        let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
+
+        unsafe {
+            self.this_cpu_queue().schedule_next(mutex);
+        }
+    }
+
+    fn reschedule(&self) -> bool {
+        let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
+
+        unsafe {
+            self.this_cpu_queue().reschedule(mutex)
+        }
+    }
+
+    fn enter_critical_section(&self) {
+        let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
+
+        unsafe {
+            self.this_cpu_queue().enter_critical_section();
+        }
+    }
+
+    fn leave_critical_section(&self) {
+        let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
+
+        unsafe {
+            self.this_cpu_queue().leave_critical_section(mutex);
+        }
+
+    }
+
+    fn add_task(&self, task: Arc<Task>) {
+        let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
+        unsafe {
+            self.this_cpu_queue().add_task(task);
+        }
+    }
+
+    fn current_task_finished(&self) {
+        let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
+
+        unsafe {
+            self.this_cpu_queue().current_task_finished(mutex);
         }
     }
 }
 
-struct Tasks {
-    tasks: PerCpu<CpuTasks>,
-}
+impl TaskContainer {
+    fn add_task(&self, fun: fn()) -> Arc<Task> {
+        let task = Arc::new(Task::new_kern(fun));
 
-impl Tasks {
-    const fn empty() -> Tasks {
-        Tasks {
-            tasks: PerCpu::empty()
-        }
+        self.tasks.lock().insert(task.id, task.clone());
+
+        task
     }
 
-    fn init(&mut self) {
-        self.tasks.init();
+    fn add_user_task(&self, fun: MappedAddr, code_size: usize, stack: usize) -> Arc<Task> {
+        let task = Arc::new(Task::new_user(fun, code_size, stack));
 
-        for i in 0..::kernel::smp::cpu_count() {
-            self.tasks.cpu_mut(i as isize).init();
-        }
+        self.tasks.lock().insert(task.id, task.clone());
+
+        task
     }
 
-    #[allow(unused)]
-    fn at_cpu(&mut self, cpu: isize) -> &mut CpuTasks {
-        self.tasks.cpu_mut(cpu)
+    fn remove_task(&self, id: usize) {
+        self.tasks.lock().remove(&id);
     }
-
-    fn at_this_cpu(&mut self) -> &mut CpuTasks {
-        self.tasks.this_cpu_mut()
-    }
-}
-
-struct Scheduler {
-    tasks: Tasks,
-    pub initialised: bool
 }
 
 impl Scheduler {
-    const fn empty() -> Scheduler {
-        Scheduler {
-            tasks: Tasks::empty(),
-            initialised: false,
-        }
+
+    fn add_task(&self, fun: fn()) {
+        let task = self.tasks.add_task(fun);
+
+        self.cpu_queues.add_task(task);
     }
 
-    fn init(&mut self) {
-        self.tasks.init();
+    fn add_user_task(&self, fun: MappedAddr, code_size: usize, stack: usize) {
+        let task = self.tasks.add_user_task(fun, code_size, stack);
 
-        self.initialised = true;
+        self.cpu_queues.add_task(task);
     }
 
-    fn this_cpu_tasks(&mut self) -> &mut CpuTasks {
-        self.tasks.at_this_cpu()
+    fn schedule_next(&self) {
+        self.cpu_queues.schedule_next();
     }
 
-    fn schedule_next(&mut self) {
-        self.this_cpu_tasks().schedule_next();
+    fn reschedule(&self) -> bool {
+        self.cpu_queues.reschedule()
     }
 
-    fn reschedule(&mut self) -> bool {
-        self.this_cpu_tasks().reschedule()
+    fn enter_critical_section(&self) {
+        self.cpu_queues.enter_critical_section();
     }
 
-    fn current_task_finished(&mut self) {
-        self.this_cpu_tasks().current_task_finished()
+    fn leave_critical_section(&self) {
+        self.cpu_queues.leave_critical_section();
     }
 
-    fn add_task(&mut self, fun: fn()) {
-        self.this_cpu_tasks().add_task(fun);
+    fn current_task_finished(&self) {
+        self.tasks.remove_task(CURRENT_TASK_ID.load(Ordering::SeqCst));
+        self.cpu_queues.current_task_finished();
     }
-
-    fn add_user_task(&mut self, fun: MappedAddr, code_size: usize, stack: usize) {
-        self.this_cpu_tasks().add_user_task(fun, code_size, stack)
-    }
-
-    fn enter_critical_section(&mut self) {
-        if self.initialised {
-            self.this_cpu_tasks().enter_critical_section()
-        }
-    }
-
-    fn leave_critical_section(&mut self) {
-        if self.initialised {
-            self.this_cpu_tasks().leave_critical_section()
-        }
-    }
-
-    fn current(&mut self) -> &'static mut task::Task {
-        self.this_cpu_tasks().current()
-    }
-
 }
 
-static SCHEDULER: IrqLock<Scheduler> = IrqLock::new(Scheduler::empty());
+static SCHEDULER: Once<Scheduler> = Once::new();
+
+fn scheduler() -> &'static Scheduler {
+    SCHEDULER.try().expect("Scheduler not initialized")
+}
 
 fn scheduler_main() {
     loop {
-        SCHEDULER.irq().schedule_next();
+        unsafe {
+            scheduler().schedule_next();
+        }
     }
 }
 
 pub fn reschedule() -> bool {
-    let a = SCHEDULER.irq().reschedule();
-    a
+    scheduler().reschedule()
 }
 
 pub fn task_finished() {
-    print!("f,");
-    SCHEDULER.irq().current_task_finished();
+    scheduler().current_task_finished();
 }
 
 pub fn create_task(fun: fn()) {
-    SCHEDULER.irq().add_task(fun);
+    scheduler().add_task(fun);
 }
 
 pub fn create_user_task(fun: MappedAddr, code_size: u64, stack: usize) {
-    SCHEDULER.irq().add_user_task(fun, code_size as usize, stack);
+    scheduler().add_user_task(fun, code_size as usize, stack);
+}
+
+fn lock_protection_ready() -> bool {
+    ::kernel::tls::is_ready()
+        && LOCK_PROTECTION.load(Ordering::SeqCst)
+        && !LOCK_PROTECTION_ENTERED.load(Ordering::SeqCst)
 }
 
 pub fn enter_critical_section() -> bool {
-    if ::kernel::tls::is_ready() {
-        SCHEDULER.irq().enter_critical_section();
+    if lock_protection_ready() {
+
+        scheduler().enter_critical_section();
+
         return true;
     }
 
@@ -263,16 +403,19 @@ pub fn enter_critical_section() -> bool {
 }
 
 pub fn leave_critical_section() {
-    if ::kernel::tls::is_ready() {
-        SCHEDULER.irq().leave_critical_section();
+    if lock_protection_ready() {
+
+        scheduler().leave_critical_section();
     }
 }
 
-pub fn current() -> &'static mut task::Task {
-    SCHEDULER.irq().current()
+pub fn init() {
+    SCHEDULER.call_once(|| {
+        Scheduler::default()
+    });
 }
 
-pub fn init() {
-    SCHEDULER.irq().init();
+pub fn enable_lock_protection() {
+    LOCK_PROTECTION.store(true, Ordering::SeqCst);
 }
 

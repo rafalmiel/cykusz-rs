@@ -1,14 +1,12 @@
+use core::sync::atomic::Ordering;
+
 pub fn init() {
     ::arch::syscall::init();
 }
 
-#[thread_local]
-static mut CNT: usize = 0;
-
 pub fn syscall_handler(_num: u32) {
-    unsafe {
-        CNT += 1;
-    }
-    //println!("U {}: 0x{:x}", unsafe {::CPU_ID}, unsafe {::arch::raw::ctrlregs::cr3()});
-    print!("S({} {:10}),", unsafe {::CPU_ID}, unsafe {CNT});
+    println!("S( PID: {:<6} CPU: {:<6} MEM: {:<8}),",
+             ::kernel::sched::current_id(),
+             unsafe {::CPU_ID },
+             ::kernel::mm::heap::ALLOCED_MEM.load(Ordering::SeqCst));
 }

@@ -1,8 +1,8 @@
-/// Specifies which element to load into a segment from
-/// descriptor tables (i.e., is a index to LDT or GDT table
-/// with some additional flags).
-///
-/// See Intel 3a, Section 3.4.2 "Segment Selectors"
+// Specifies which element to load into a segment from
+// descriptor tables (i.e., is a index to LDT or GDT table
+// with some additional flags).
+//
+// See Intel 3a, Section 3.4.2 "Segment Selectors"
 bitflags! {
     pub struct SegmentSelector: u16 {
         /// Requestor Privilege Level

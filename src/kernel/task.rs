@@ -1,5 +1,8 @@
 use arch::task::Task as ArchTask;
 use kernel::mm::MappedAddr;
+use kernel::sched::new_task_id;
+use core::sync::atomic::{AtomicUsize, Ordering};
+use core::cell::UnsafeCell;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
@@ -10,70 +13,104 @@ pub enum TaskState {
     ToDelete = 4,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Task {
-    pub arch_task: ArchTask,
-    state: TaskState,
-    pub locks: i32,
-}
+impl From<usize> for TaskState {
+    fn from(val: usize) -> Self {
+        use self::TaskState::*;
 
-impl Task {
-    pub const fn empty() -> Task {
-        Task {
-            arch_task: ArchTask::empty(),
-            state: TaskState::Unused,
-            locks: 0,
+        match val {
+            0 => Unused,
+            1 => Running,
+            2 => Runnable,
+            3 => ToReschedule,
+            4 => ToDelete,
+            _ => unreachable!()
         }
     }
+}
 
-    pub fn assure_empty(&self) {
-        self.arch_task.assure_empty();
-        if self.state != TaskState::Unused {
-            panic!("[ ERROR ] Task corrupted on init")
-        }
-        if self.locks != 0 {
-            panic!("[ ERROR ] Task corrupted on init")
+pub struct Task {
+    pub arch_task: UnsafeCell<ArchTask>,
+    id: usize,
+    state: AtomicUsize,
+    locks: AtomicUsize,
+}
+
+unsafe impl Sync for Task{}
+
+impl Task {
+    pub fn this() -> Task {
+        Task {
+            arch_task: UnsafeCell::new(ArchTask::empty()),
+            id: new_task_id(),
+            state: AtomicUsize::new(TaskState::Runnable as usize),
+            locks: AtomicUsize::new(0),
         }
     }
 
     pub fn new_sched(fun: fn()) -> Task {
         Task {
-            arch_task: ArchTask::new_sched(fun),
-            state: TaskState::Runnable,
-            locks: 0,
+            arch_task: UnsafeCell::new(ArchTask::new_sched(fun)),
+            id: new_task_id(),
+            state: AtomicUsize::new(TaskState::Runnable as usize),
+            locks: AtomicUsize::new(0),
         }
     }
 
     pub fn new_kern(fun: fn()) -> Task {
         Task {
-            arch_task: ArchTask::new_kern(fun),
-            state: TaskState::Runnable,
-            locks: 0,
+            arch_task: UnsafeCell::new(ArchTask::new_kern(fun)),
+            id: ::kernel::sched::new_task_id(),
+            state: AtomicUsize::new(TaskState::Runnable as usize),
+            locks: AtomicUsize::new(0),
         }
     }
 
     pub fn new_user(fun: MappedAddr, code_size: usize, stack: usize) -> Task {
         Task {
-            arch_task: ArchTask::new_user(fun, code_size, stack),
-            state: TaskState::Runnable,
-            locks: 0,
+            arch_task: UnsafeCell::new(ArchTask::new_user(fun, code_size, stack)),
+            id: ::kernel::sched::new_task_id(),
+            state: AtomicUsize::new(TaskState::Runnable as usize),
+            locks: AtomicUsize::new(0),
         }
+    }
+
+    pub fn set_state(&self, state: TaskState) {
+        self.state.store(state as usize, Ordering::SeqCst);
     }
 
     pub fn state(&self) -> TaskState {
-        self.state
+        self.state.load(Ordering::SeqCst).into()
     }
 
-    pub fn set_state(&mut self, state: TaskState) {
-        self.state = state;
+    pub fn locks_inc(&self) {
+        self.locks.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn deallocate(&mut self) {
-        if self.locks != 0 {
-            panic!("PANIC: Task finished while holding a lock?");
+    pub fn locks_dec(&self) {
+        self.locks.fetch_sub(1, Ordering::SeqCst);
+    }
+
+    pub fn locks(&self) -> usize {
+        self.locks.load(Ordering::SeqCst)
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    pub unsafe fn arch_task_mut(&self) -> &mut ArchTask {
+        &mut (*self.arch_task.get())
+    }
+
+    pub unsafe fn arch_task(&self) -> &ArchTask {
+        &(*self.arch_task.get())
+    }
+}
+
+impl Drop for Task {
+    fn drop(&mut self) {
+        unsafe {
+            self.arch_task_mut().deallocate();
         }
-        self.arch_task.deallocate();
-        self.state = TaskState::Unused;
-        self.locks = 0;
     }
 }

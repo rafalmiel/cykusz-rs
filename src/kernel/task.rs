@@ -1,8 +1,9 @@
+use core::cell::UnsafeCell;
+use core::sync::atomic::{AtomicUsize, Ordering};
+
 use arch::task::Task as ArchTask;
 use kernel::mm::MappedAddr;
 use kernel::sched::new_task_id;
-use core::sync::atomic::{AtomicUsize, Ordering};
-use core::cell::UnsafeCell;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {

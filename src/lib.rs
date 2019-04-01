@@ -13,6 +13,7 @@
 #![feature(const_vec_new)]
 #![feature(nll)]
 
+extern crate alloc;
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
@@ -21,7 +22,6 @@ extern crate linked_list_allocator;
 extern crate raw_cpuid;
 extern crate rlibc;
 extern crate spin;
-extern crate alloc;
 
 use kernel::mm::VirtAddr;
 

@@ -1,3 +1,4 @@
+pub use self::percpu::PerCpu;
+
 pub mod percpu;
 
-pub use self::percpu::PerCpu;

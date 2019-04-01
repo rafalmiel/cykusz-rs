@@ -1,7 +1,7 @@
 use core::iter::FilterMap;
 
-use arch::acpi::rsdt::AcpiStdHeader;
-use kernel::mm::{MappedAddr, PhysAddr};
+use crate::arch::acpi::rsdt::AcpiStdHeader;
+use crate::kernel::mm::{MappedAddr, PhysAddr};
 
 bitflags! {
     pub struct MatdEntryType : u8{

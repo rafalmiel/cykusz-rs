@@ -2,8 +2,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::Ordering;
 
-use kernel::sync::MutexGuard;
-use kernel::task::{Task, TaskState};
+use crate::kernel::sync::MutexGuard;
+use crate::kernel::task::{Task, TaskState};
 
 use super::CURRENT_TASK_ID;
 use super::LOCK_PROTECTION_ENTERED;
@@ -129,9 +129,9 @@ impl CpuQueue {
 
         CURRENT_TASK_ID.store(self.tasks[found].id(), Ordering::SeqCst);
 
-        ::kernel::int::finish();
+        crate::kernel::int::finish();
 
-        ::kernel::timer::reset_counter();
+        crate::kernel::timer::reset_counter();
 
         self.switch( &self.tasks[found], sched_lock);
 

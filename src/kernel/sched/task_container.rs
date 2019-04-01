@@ -1,9 +1,9 @@
 use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
 
-use kernel::mm::MappedAddr;
-use kernel::sync::Mutex;
-use kernel::task::Task;
+use crate::kernel::mm::MappedAddr;
+use crate::kernel::sync::Mutex;
+use crate::kernel::task::Task;
 
 pub struct TaskContainer {
     tasks: Mutex<BTreeMap<usize, Arc<Task>>>

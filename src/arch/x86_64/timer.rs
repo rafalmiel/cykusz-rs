@@ -1,7 +1,7 @@
-use arch::dev::lapic;
-use arch::int;
-use arch::raw::idt as ridt;
-use kernel::sync::IrqLock;
+use crate::arch::dev::lapic;
+use crate::arch::int;
+use crate::arch::raw::idt as ridt;
+use crate::kernel::sync::IrqLock;
 
 struct Timer {
     pub handler: Option<fn () -> ()>,
@@ -27,7 +27,7 @@ pub fn reset_counter() {
 }
 
 pub fn early_sleep(ms: u64) {
-    ::arch::dev::pit::early_sleep(ms);
+    crate::arch::dev::pit::early_sleep(ms);
 }
 
 pub extern "x86-interrupt" fn timer_handler(_frame: &mut ridt::ExceptionStackFrame) {

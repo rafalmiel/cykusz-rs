@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use drivers::multiboot2;
-use kernel::mm::*;
+use crate::drivers::multiboot2;
+use crate::kernel::mm::*;
 
 static USER_PROGRAM: AtomicU64 = AtomicU64::new(0);
 static USER_PROGRAM_SIZE: AtomicU64 = AtomicU64::new(0);

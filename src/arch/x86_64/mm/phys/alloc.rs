@@ -1,8 +1,8 @@
-use drivers::multiboot2;
-use drivers::multiboot2::memory::MemoryIter;
-use kernel::mm::{MappedAddr, PhysAddr};
-use kernel::mm::Frame;
-use kernel::sync::Mutex;
+use crate::drivers::multiboot2;
+use crate::drivers::multiboot2::memory::MemoryIter;
+use crate::kernel::mm::{MappedAddr, PhysAddr};
+use crate::kernel::mm::Frame;
+use crate::kernel::sync::Mutex;
 
 use super::iter;
 

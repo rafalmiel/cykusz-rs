@@ -1,6 +1,6 @@
 use core::mem::size_of;
 
-use kernel::mm::{MappedAddr, PhysAddr};
+use crate::kernel::mm::{MappedAddr, PhysAddr};
 
 use super::apic::MatdHeader;
 use super::hpet::HpetHeader;

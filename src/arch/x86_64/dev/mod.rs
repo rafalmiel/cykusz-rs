@@ -9,7 +9,7 @@ pub mod cpu;
 pub fn init()
 {
     pic::init();
-    if let Some(ref apic) = ::arch::acpi::ACPI.lock().get_apic_entry() {
+    if let Some(ref apic) = crate::arch::acpi::ACPI.lock().get_apic_entry() {
         //We have local apic, so disable PIC
         pic::disable();
 

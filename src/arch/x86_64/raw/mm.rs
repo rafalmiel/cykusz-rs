@@ -21,12 +21,12 @@ pub unsafe fn flush(addr: usize) {
 /// This function is unsafe as it causes a general protection fault (GP) if the current privilege
 /// level is not 0.
 pub unsafe fn flush_all() {
-    use arch::raw::ctrlregs::{cr3, cr3_write};
+    use crate::arch::raw::ctrlregs::{cr3, cr3_write};
     cr3_write(cr3())
 }
 
 pub fn enable_nxe_bit() {
-    use arch::raw::msr::{IA32_EFER, rdmsr, wrmsr};
+    use crate::arch::raw::msr::{IA32_EFER, rdmsr, wrmsr};
 
     let nxe_bit = 1 << 11;
     unsafe {
@@ -36,7 +36,7 @@ pub fn enable_nxe_bit() {
 }
 
 pub fn enable_write_protect_bit() {
-    use arch::raw::ctrlregs::{cr0, cr0_write, Cr0};
+    use crate::arch::raw::ctrlregs::{cr0, cr0_write, Cr0};
 
     unsafe { cr0_write(cr0() | Cr0::CR0_WRITE_PROTECT) };
 }

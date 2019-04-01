@@ -1,5 +1,5 @@
-use arch::raw::idt;
-use kernel::sync::Mutex;
+use crate::arch::raw::idt;
+use crate::kernel::sync::Mutex;
 
 static IDT: Mutex<idt::Idt> = Mutex::new(idt::Idt::new());
 
@@ -53,7 +53,7 @@ pub fn set_user_handler(num: usize, f: idt::ExceptionHandlerFn) {
 
 extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {
     println!("Dummy int");
-    ::arch::int::end_of_int();
+    crate::arch::int::end_of_int();
 }
 
 extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {
@@ -63,7 +63,7 @@ extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) 
 
 extern "x86-interrupt" fn debug(_frame: &mut idt::ExceptionStackFrame) {
     unsafe {
-        println!("INT: Debug exception! CPU: {}", ::CPU_ID);
+        println!("INT: Debug exception! CPU: {}", crate::CPU_ID);
     }
     loop {}
 }
@@ -120,13 +120,13 @@ extern "x86-interrupt" fn stack_segment_fault(_frame: &mut idt::ExceptionStackFr
 
 extern "x86-interrupt" fn general_protection_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     unsafe {
-        println!("General Protection Fault error! 0x{:x} CPU: {}", err, ::CPU_ID);
+        println!("General Protection Fault error! 0x{:x} CPU: {}", err, crate::CPU_ID);
     }
     loop {}
 }
 
 extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
-    println!("PAGE FAULT! 0b{:x} CPU: {}", err, unsafe {::CPU_ID});
+    println!("PAGE FAULT! 0b{:x} CPU: {}", err, unsafe {crate::CPU_ID});
     loop {}
 }
 

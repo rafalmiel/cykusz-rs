@@ -1,4 +1,4 @@
-use kernel::mm::PhysAddr;
+use crate::kernel::mm::PhysAddr;
 
 pub mod memory;
 pub mod address;

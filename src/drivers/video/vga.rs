@@ -1,6 +1,6 @@
 use core::ptr::Unique;
 
-use kernel::mm::MappedAddr;
+use crate::kernel::mm::MappedAddr;
 
 #[allow(unused)]
 #[repr(u8)]

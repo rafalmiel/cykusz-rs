@@ -1,8 +1,8 @@
-use arch::raw::descriptor as dsc;
-use arch::raw::gdt;
-use arch::raw::segmentation as sgm;
-use arch::raw::task::TaskStateSegment;
-use kernel::mm::VirtAddr;
+use crate::arch::raw::descriptor as dsc;
+use crate::arch::raw::gdt;
+use crate::arch::raw::segmentation as sgm;
+use crate::arch::raw::task::TaskStateSegment;
+use crate::kernel::mm::VirtAddr;
 
 static mut INIT_GDT: [gdt::GdtEntry; 3] = [
     // Null

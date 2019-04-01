@@ -1,9 +1,9 @@
-use kernel::mm::*;
+use crate::kernel::mm::*;
 
 pub fn get_user_program() -> MappedAddr {
-    ::arch::user::get_user_program()
+    crate::arch::user::get_user_program()
 }
 
 pub fn get_user_program_size() -> u64 {
-    ::arch::user::get_user_program_size()
+    crate::arch::user::get_user_program_size()
 }

@@ -1,4 +1,4 @@
-use arch::acpi::rsdt::AcpiStdHeader;
+use crate::arch::acpi::rsdt::AcpiStdHeader;
 
 #[repr(packed, C)]
 pub struct HpetHeader {

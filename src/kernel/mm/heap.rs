@@ -5,15 +5,15 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use linked_list_allocator::{align_up, Heap};
 
-use arch::mm::heap::{HEAP_END, HEAP_SIZE, HEAP_START};
-use kernel::mm::*;
-use kernel::mm::map;
-use kernel::mm::PAGE_SIZE;
-use kernel::sync::Mutex;
+use crate::arch::mm::heap::{HEAP_END, HEAP_SIZE, HEAP_START};
+use crate::kernel::mm::*;
+use crate::kernel::mm::map;
+use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::sync::Mutex;
 
 pub fn init()
 {
-    use HEAP;
+    use crate::HEAP;
 
     for addr in (HEAP_START..(HEAP_START + HEAP_SIZE)).step_by(PAGE_SIZE) {
         map(addr);
@@ -83,36 +83,36 @@ unsafe impl GlobalAlloc for LockedHeap {
 
 pub fn allocate_layout(layout: Layout) -> Option<*mut u8> {
     unsafe {
-        Some(::HEAP.alloc(layout) as *mut u8)
+        Some(crate::HEAP.alloc(layout) as *mut u8)
     }
 }
 
 pub fn deallocate_layout(ptr: *mut u8, layout: Layout) {
     unsafe {
-        ::HEAP.dealloc(ptr, layout)
+        crate::HEAP.dealloc(ptr, layout)
     }
 }
 
 pub fn allocate(size: usize) -> Option<*mut u8> {
     unsafe {
-        Some(::HEAP.alloc(::core::alloc::Layout::from_size_align_unchecked(size, 8)) as *mut u8)
+        Some(crate::HEAP.alloc(::core::alloc::Layout::from_size_align_unchecked(size, 8)) as *mut u8)
     }
 }
 
 pub fn deallocate(ptr: *mut u8, size: usize) {
     unsafe {
-        ::HEAP.dealloc(ptr, ::core::alloc::Layout::from_size_align_unchecked(size, 8))
+        crate::HEAP.dealloc(ptr, ::core::alloc::Layout::from_size_align_unchecked(size, 8))
     }
 }
 
 pub fn allocate_align(size: usize, align: usize) -> Option<*mut u8> {
     unsafe {
-        Some(::HEAP.alloc(::core::alloc::Layout::from_size_align_unchecked(size, align)) as *mut u8)
+        Some(crate::HEAP.alloc(::core::alloc::Layout::from_size_align_unchecked(size, align)) as *mut u8)
     }
 }
 
 pub fn deallocate_align(ptr: *mut u8, size: usize, align: usize) {
     unsafe {
-        ::HEAP.dealloc(ptr, ::core::alloc::Layout::from_size_align_unchecked(size, align))
+        crate::HEAP.dealloc(ptr, ::core::alloc::Layout::from_size_align_unchecked(size, align))
     }
 }

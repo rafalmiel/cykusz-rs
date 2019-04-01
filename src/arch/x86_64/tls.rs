@@ -1,5 +1,5 @@
-use arch::raw::msr;
-use kernel::mm::VirtAddr;
+use crate::arch::raw::msr;
+use crate::kernel::mm::VirtAddr;
 
 #[repr(C)]
 struct ThreadPtr {
@@ -30,7 +30,7 @@ pub fn init(stack_top: VirtAddr) {
         let size = &__tdata_end as *const u8 as usize - &__tdata_start as *const u8 as usize;
         let mapped = VirtAddr(&__tdata_start as *const _ as usize);
 
-        let tls = ::kernel::mm::heap::allocate_align(
+        let tls = crate::kernel::mm::heap::allocate_align(
             size + 8, 8
         ).expect("Out of memory!");
 
@@ -43,5 +43,5 @@ pub fn init(stack_top: VirtAddr) {
         thread.setup();
     }
 
-    ::arch::gdt::init(stack_top);
+    crate::arch::gdt::init(stack_top);
 }

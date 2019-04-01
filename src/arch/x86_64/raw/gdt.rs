@@ -1,4 +1,4 @@
-use arch::raw::descriptor as dsc;
+use crate::arch::raw::descriptor as dsc;
 
 bitflags! {
     pub struct GdtFlags: u8 {

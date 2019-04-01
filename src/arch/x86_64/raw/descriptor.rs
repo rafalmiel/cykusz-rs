@@ -1,7 +1,7 @@
 use core::mem;
 
-use arch::raw::gdt;
-use arch::raw::idt;
+use crate::arch::raw::gdt;
+use crate::arch::raw::idt;
 
 bitflags! {
     pub struct Flags: u8 {
@@ -105,6 +105,6 @@ pub unsafe fn lgdt(gdt: &DescriptorTablePointer<gdt::GdtEntry>) {
     asm!("lgdt ($0)" :: "r"(gdt) : "memory");
 }
 
-pub unsafe fn load_tr(tr: &::arch::raw::segmentation::SegmentSelector) {
+pub unsafe fn load_tr(tr: &crate::arch::raw::segmentation::SegmentSelector) {
     asm!("ltr $0" :: "r"(tr.bits()));
 }

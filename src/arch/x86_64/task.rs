@@ -1,13 +1,13 @@
 use core::ptr::Unique;
 
-use arch::gdt;
-use arch::mm::virt::p4_table_addr;
-use arch::raw::segmentation::SegmentSelector;
-use kernel::mm::heap::allocate_align as heap_allocate_align;
-use kernel::mm::heap::deallocate_align as heap_deallocate_align;
-use kernel::mm::MappedAddr;
-use kernel::mm::PhysAddr;
-use kernel::mm::VirtAddr;
+use crate::arch::gdt;
+use crate::arch::mm::virt::p4_table_addr;
+use crate::arch::raw::segmentation::SegmentSelector;
+use crate::kernel::mm::heap::allocate_align as heap_allocate_align;
+use crate::kernel::mm::heap::deallocate_align as heap_deallocate_align;
+use crate::kernel::mm::MappedAddr;
+use crate::kernel::mm::PhysAddr;
+use crate::kernel::mm::VirtAddr;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -61,13 +61,13 @@ impl Context {
 
 fn task_finished()
 {
-    ::kernel::sched::task_finished();
+    crate::kernel::sched::task_finished();
 }
 
 fn allocate_page_table(fun: MappedAddr, code_size: usize) -> PhysAddr {
-    use ::arch::mm::virt::{current_p4_table, table::P4Table};
-    use ::arch::mm::phys::allocate;
-    use ::kernel::mm::virt;
+    use crate::arch::mm::virt::{current_p4_table, table::P4Table};
+    use crate::arch::mm::phys::allocate;
+    use crate::kernel::mm::virt;
 
     let current_p4 = current_p4_table();
     let frame = allocate().expect("Out of mem!");
@@ -201,7 +201,7 @@ extern "C" {
 pub fn switch(from: &mut Task, to: &Task) {
     unsafe {
         if to.is_user {
-            ::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
+            crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
         switch_to(
             &mut from.ctx,
@@ -213,7 +213,7 @@ pub fn switch(from: &mut Task, to: &Task) {
 pub fn activate_task(to: &Task) {
     unsafe {
         if to.is_user {
-            ::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
+            crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
         activate_to(
             to.ctx.as_ref()

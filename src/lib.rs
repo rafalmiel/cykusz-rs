@@ -23,7 +23,7 @@ extern crate raw_cpuid;
 extern crate rlibc;
 extern crate spin;
 
-use kernel::mm::VirtAddr;
+use crate::kernel::mm::VirtAddr;
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -91,12 +91,12 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::tls::init(VirtAddr(stack_ptr as usize));
 
     unsafe {
-        ::CPU_ID = cpu_num;
+        crate::CPU_ID = cpu_num;
     }
 
     kernel::sched::enable_lock_protection();
 
-    println!("[ OK ] CPU {} Initialised", unsafe {::CPU_ID});
+    println!("[ OK ] CPU {} Initialised", unsafe {crate::CPU_ID});
 
     kernel::smp::notify_ap_ready();
 
@@ -112,11 +112,11 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
 fn idle() {
     loop {
-        ::kernel::int::disable();
-        if ::kernel::sched::reschedule() {
-            ::kernel::int::enable();
+        crate::kernel::int::disable();
+        if crate::kernel::sched::reschedule() {
+            crate::kernel::int::enable();
         } else {
-            ::kernel::int::enable_and_halt();
+            crate::kernel::int::enable_and_halt();
         }
     }
 }

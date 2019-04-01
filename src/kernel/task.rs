@@ -1,9 +1,9 @@
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use arch::task::Task as ArchTask;
-use kernel::mm::MappedAddr;
-use kernel::sched::new_task_id;
+use crate::arch::task::Task as ArchTask;
+use crate::kernel::mm::MappedAddr;
+use crate::kernel::sched::new_task_id;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
@@ -60,7 +60,7 @@ impl Task {
     pub fn new_kern(fun: fn()) -> Task {
         Task {
             arch_task: UnsafeCell::new(ArchTask::new_kern(fun)),
-            id: ::kernel::sched::new_task_id(),
+            id: crate::kernel::sched::new_task_id(),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
         }
@@ -69,7 +69,7 @@ impl Task {
     pub fn new_user(fun: MappedAddr, code_size: usize, stack: usize) -> Task {
         Task {
             arch_task: UnsafeCell::new(ArchTask::new_user(fun, code_size, stack)),
-            id: ::kernel::sched::new_task_id(),
+            id: crate::kernel::sched::new_task_id(),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
         }

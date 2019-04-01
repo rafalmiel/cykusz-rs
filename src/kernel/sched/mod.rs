@@ -3,8 +3,8 @@ use core::sync::atomic::Ordering;
 
 use spin::Once;
 
-use kernel::mm::MappedAddr;
-use kernel::sync::IrqGuard;
+use crate::kernel::mm::MappedAddr;
+use crate::kernel::sync::IrqGuard;
 
 use self::cpu_queue::CpuQueue;
 use self::cpu_queues::CpuQueues;
@@ -103,7 +103,7 @@ impl Scheduler {
 static SCHEDULER: Once<Scheduler> = Once::new();
 
 fn scheduler() -> &'static Scheduler {
-    SCHEDULER.try().expect("Scheduler not initialized")
+    SCHEDULER.r#try().expect("Scheduler not initialized")
 }
 
 fn scheduler_main() {
@@ -129,7 +129,7 @@ pub fn create_user_task(fun: MappedAddr, code_size: u64, stack: usize) {
 }
 
 fn lock_protection_ready() -> bool {
-    ::kernel::tls::is_ready()
+    crate::kernel::tls::is_ready()
         && LOCK_PROTECTION.load(Ordering::SeqCst)
         && !LOCK_PROTECTION_ENTERED.load(Ordering::SeqCst)
 }

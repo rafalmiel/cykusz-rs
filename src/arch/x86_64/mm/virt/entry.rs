@@ -1,7 +1,7 @@
-use kernel::mm::Frame;
-use kernel::mm::MappedAddr;
-use kernel::mm::PhysAddr;
-use kernel::mm::virt;
+use crate::kernel::mm::Frame;
+use crate::kernel::mm::MappedAddr;
+use crate::kernel::mm::PhysAddr;
+use crate::kernel::mm::virt;
 
 bitflags! {
     pub struct Entry: usize {
@@ -64,7 +64,7 @@ impl Entry {
     }
 
     pub fn address(&self) -> PhysAddr {
-        PhysAddr(self.bits).align_down(::kernel::mm::PAGE_SIZE)
+        PhysAddr(self.bits).align_down(crate::kernel::mm::PAGE_SIZE)
     }
 
     pub fn frame(&self) -> Option<Frame> {

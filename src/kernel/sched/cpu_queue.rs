@@ -1,9 +1,9 @@
-use alloc::vec::Vec;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::sync::atomic::Ordering;
 
-use kernel::task::{Task, TaskState};
 use kernel::sync::MutexGuard;
+use kernel::task::{Task, TaskState};
 
 use super::CURRENT_TASK_ID;
 use super::LOCK_PROTECTION_ENTERED;

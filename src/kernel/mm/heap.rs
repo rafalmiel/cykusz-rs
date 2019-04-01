@@ -1,6 +1,7 @@
 use core::alloc::{Alloc, AllocErr, GlobalAlloc, Layout};
 use core::ops::Deref;
 use core::ptr::NonNull;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 use linked_list_allocator::{align_up, Heap};
 
@@ -9,7 +10,6 @@ use kernel::mm::*;
 use kernel::mm::map;
 use kernel::mm::PAGE_SIZE;
 use kernel::sync::Mutex;
-use core::sync::atomic::{AtomicUsize, Ordering};
 
 pub fn init()
 {

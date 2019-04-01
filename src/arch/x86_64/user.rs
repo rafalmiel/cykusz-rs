@@ -1,6 +1,6 @@
-use drivers::multiboot2;
 use core::sync::atomic::{AtomicU64, Ordering};
 
+use drivers::multiboot2;
 use kernel::mm::*;
 
 static USER_PROGRAM: AtomicU64 = AtomicU64::new(0);

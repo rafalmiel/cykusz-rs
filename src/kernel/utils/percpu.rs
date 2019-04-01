@@ -1,5 +1,5 @@
-use core::ptr::Unique;
 use core::cell::UnsafeCell;
+use core::ptr::Unique;
 
 pub struct PerCpu<T> {
     data: UnsafeCell<Unique<T>>,

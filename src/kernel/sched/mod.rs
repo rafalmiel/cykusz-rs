@@ -1,3 +1,15 @@
+use core::sync::atomic::{AtomicBool, AtomicUsize};
+use core::sync::atomic::Ordering;
+
+use spin::Once;
+
+use kernel::mm::MappedAddr;
+use kernel::sync::IrqGuard;
+
+use self::cpu_queue::CpuQueue;
+use self::cpu_queues::CpuQueues;
+use self::task_container::TaskContainer;
+
 #[macro_export]
 macro_rules! switch {
     ($ctx1: expr, $ctx2: expr) => (
@@ -13,18 +25,6 @@ macro_rules! activate_task {
 mod task_container;
 mod cpu_queues;
 mod cpu_queue;
-
-use spin::Once;
-
-use core::sync::atomic::{AtomicUsize, AtomicBool};
-use core::sync::atomic::Ordering;
-
-use kernel::mm::MappedAddr;
-use kernel::sync::IrqGuard;
-
-use self::task_container::TaskContainer;
-use self::cpu_queues::CpuQueues;
-use self::cpu_queue::CpuQueue;
 
 static NEW_TASK_ID: AtomicUsize = AtomicUsize::new(1);
 

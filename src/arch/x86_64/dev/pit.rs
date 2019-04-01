@@ -1,8 +1,8 @@
-use arch::idt;
-use arch::int;
-use arch::raw::cpuio::UnsafePort;
-use arch::raw::idt as ridt;
-use kernel::sync::Mutex;
+use crate::arch::idt;
+use crate::arch::int;
+use crate::arch::raw::cpuio::UnsafePort;
+use crate::arch::raw::idt as ridt;
+use crate::kernel::sync::Mutex;
 
 static PIT: Mutex<Pit> = Mutex::new(Pit::new());
 

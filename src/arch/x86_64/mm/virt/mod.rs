@@ -1,9 +1,9 @@
-use arch::raw::ctrlregs;
-use arch::raw::mm;
-use kernel::mm::{PhysAddr, VirtAddr};
-use kernel::mm::allocate;
-use kernel::mm::PAGE_SIZE;
-use kernel::mm::virt;
+use crate::arch::raw::ctrlregs;
+use crate::arch::raw::mm;
+use crate::kernel::mm::{PhysAddr, VirtAddr};
+use crate::kernel::mm::allocate;
+use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::virt;
 
 use self::table::*;
 
@@ -59,7 +59,7 @@ pub unsafe fn activate_table(table: &P4Table) {
     ctrlregs::cr3_write(table.phys_addr().0 as u64);
 }
 
-fn remap(mboot_info: &::drivers::multiboot2::Info) {
+fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
     let frame = allocate().expect("Out of mem!");
     let table = P4Table::new_mut(&frame);
 
@@ -72,7 +72,7 @@ fn remap(mboot_info: &::drivers::multiboot2::Info) {
 
         let mut flags = virt::PageFlags::empty();
 
-        use ::drivers::multiboot2::elf::ElfSectionFlags;
+        use crate::drivers::multiboot2::elf::ElfSectionFlags;
 
         if (elf.flags as usize & ElfSectionFlags::Allocated as usize) == 0 as usize {
             continue;
@@ -99,8 +99,8 @@ fn remap(mboot_info: &::drivers::multiboot2::Info) {
     }
 }
 
-pub fn init(mboot_info: &::drivers::multiboot2::Info) {
-    use arch::raw::mm::{enable_nxe_bit,enable_write_protect_bit};
+pub fn init(mboot_info: &crate::drivers::multiboot2::Info) {
+    use crate::arch::raw::mm::{enable_nxe_bit,enable_write_protect_bit};
     enable_nxe_bit();
     enable_write_protect_bit();
 

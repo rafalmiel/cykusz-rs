@@ -1,4 +1,4 @@
-use kernel::mm::PhysAddr;
+use crate::kernel::mm::PhysAddr;
 
 pub const TRAMPOLINE : PhysAddr = PhysAddr(0xE00);
 pub const AP_INIT : PhysAddr = PhysAddr(0x1000);
@@ -54,7 +54,7 @@ pub fn cpu_count() -> usize {
 
 pub fn init() {
     unsafe {
-        CPU_COUNT = ::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries().filter(|e| {
+        CPU_COUNT = crate::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries().filter(|e| {
             e.proc_is_enabled()
         }).count();
     }
@@ -83,11 +83,11 @@ pub fn start() {
         pt.copy_to(TRAMPOLINE.to_mapped().0 as *mut u8, 0x100);
     }
 
-    ::arch::dev::lapic::start_ap();
+    crate::arch::dev::lapic::start_ap();
 }
 
 pub fn notify_ap_ready() {
-    let trampoline = ::arch::smp::Trampoline::get();
+    let trampoline = crate::arch::smp::Trampoline::get();
 
     trampoline.notify_ready();
 }

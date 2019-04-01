@@ -1,4 +1,4 @@
-use kernel::mm::{MappedAddr, PhysAddr, VirtAddr};
+use crate::kernel::mm::{MappedAddr, PhysAddr, VirtAddr};
 
 pub use self::tags::*;
 

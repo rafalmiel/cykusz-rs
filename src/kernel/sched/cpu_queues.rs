@@ -1,9 +1,9 @@
 use alloc::sync::Arc;
 use core::cell::UnsafeCell;
 
-use kernel::sync::Mutex;
-use kernel::task::Task;
-use kernel::utils::PerCpu;
+use crate::kernel::sync::Mutex;
+use crate::kernel::task::Task;
+use crate::kernel::utils::PerCpu;
 
 use super::CpuQueue;
 

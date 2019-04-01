@@ -1,4 +1,4 @@
-use drivers::multiboot2::tags::Tag;
+use crate::drivers::multiboot2::tags::Tag;
 
 #[repr(packed)]
 pub struct Modules {

@@ -1,8 +1,8 @@
 use core::fmt;
 
-use arch::raw::descriptor as dsc;
-use arch::raw::segmentation::cs;
-use arch::raw::segmentation::SegmentSelector;
+use crate::arch::raw::descriptor as dsc;
+use crate::arch::raw::segmentation::cs;
+use crate::arch::raw::segmentation::SegmentSelector;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -107,7 +107,7 @@ impl Idt {
     }
 
     pub unsafe fn set_user_handler(&mut self, idx: usize, f: ExceptionHandlerFn) {
-        self.entries[idx].set_handler_fn(f, ::arch::gdt::ring0_cs(), dsc::Flags::SYS_RING3_INTERRUPT_GATE);
+        self.entries[idx].set_handler_fn(f, crate::arch::gdt::ring0_cs(), dsc::Flags::SYS_RING3_INTERRUPT_GATE);
     }
 
     unsafe fn set_handler_err(&mut self, idx: usize, f: ExceptionHandlerFnErrCode) {

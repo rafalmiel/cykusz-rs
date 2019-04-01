@@ -1,5 +1,5 @@
-use arch::mm::PAGE_SIZE;
-use kernel::mm::{MappedAddr, PhysAddr};
+use crate::arch::mm::PAGE_SIZE;
+use crate::kernel::mm::{MappedAddr, PhysAddr};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {

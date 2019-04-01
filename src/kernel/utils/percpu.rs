@@ -14,8 +14,8 @@ impl<T> PerCpu<T> {
 
     pub fn new_fn(init: fn() -> T) -> PerCpu<T> {
         use ::core::mem::size_of;
-        use ::kernel::mm::heap::allocate;
-        use ::kernel::smp::cpu_count;
+        use crate::kernel::mm::heap::allocate;
+        use crate::kernel::smp::cpu_count;
 
         let mut this = PerCpu::<T>::empty();
 
@@ -53,10 +53,10 @@ impl<T> PerCpu<T> {
     }
 
     pub fn this_cpu(&self) -> &T {
-        self.cpu(unsafe {::CPU_ID} as isize)
+        self.cpu(unsafe {crate::CPU_ID} as isize)
     }
 
     pub fn this_cpu_mut(&self) -> &mut T {
-        self.cpu_mut(unsafe {::CPU_ID} as isize)
+        self.cpu_mut(unsafe {crate::CPU_ID} as isize)
     }
 }

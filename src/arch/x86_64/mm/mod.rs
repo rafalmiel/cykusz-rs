@@ -1,5 +1,5 @@
-pub use arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
-use drivers::multiboot2;
+pub use crate::arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
+use crate::drivers::multiboot2;
 
 pub mod phys;
 pub mod virt;

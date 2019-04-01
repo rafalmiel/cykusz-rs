@@ -1,4 +1,4 @@
-use kernel::sync::Mutex;
+use crate::kernel::sync::Mutex;
 
 use self::rsdp::Address;
 use self::rsdt::Rsdt;

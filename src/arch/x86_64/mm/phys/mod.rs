@@ -1,4 +1,4 @@
-use drivers::multiboot2;
+use crate::drivers::multiboot2;
 
 pub use self::alloc::allocate;
 pub use self::alloc::deallocate;

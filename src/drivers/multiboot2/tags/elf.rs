@@ -1,5 +1,5 @@
-use drivers::multiboot2::tags::Tag;
-use kernel::mm::{PhysAddr, VirtAddr};
+use crate::drivers::multiboot2::tags::Tag;
+use crate::kernel::mm::{PhysAddr, VirtAddr};
 
 #[repr(packed)]
 pub struct Elf {

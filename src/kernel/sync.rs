@@ -3,7 +3,7 @@ use core::ops::{Deref, DerefMut};
 
 use spin::{Mutex as M, MutexGuard as MG};
 
-use kernel::int;
+use crate::kernel::int;
 
 pub struct Mutex<T> {
     l: M<T>,
@@ -34,10 +34,10 @@ pub struct IrqLockGuard<'a, T: ?Sized + 'a> {
 impl IrqGuard {
     pub fn new() -> IrqGuard {
         let g = IrqGuard {
-            had_int: ::kernel::int::is_enabled(),
+            had_int: crate::kernel::int::is_enabled(),
         };
 
-        ::kernel::int::disable();
+        crate::kernel::int::disable();
 
         g
     }
@@ -46,7 +46,7 @@ impl IrqGuard {
 impl Drop for IrqGuard {
     fn drop(&mut self) {
         if self.had_int {
-            ::kernel::int::enable();
+            crate::kernel::int::enable();
         }
     }
 }
@@ -60,7 +60,7 @@ impl<T> Mutex<T> {
     }
 
     pub fn lock(&self) -> MutexGuard<T> {
-        ::kernel::sched::enter_critical_section();
+        crate::kernel::sched::enter_critical_section();
         MutexGuard {
             g: Some(self.l.lock()),
             irq: false,
@@ -138,7 +138,7 @@ impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
         if self.notify {
-            ::kernel::sched::leave_critical_section();
+            crate::kernel::sched::leave_critical_section();
         }
         if self.irq {
             int::enable();

@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
 [dependencies]
 rlibc = "*"
 spin = "*"
-bitflags = "1.0"
+bitflags = "*"
 linked_list_allocator = "*"
 raw-cpuid = "*"
 

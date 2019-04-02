@@ -17,10 +17,11 @@ pub fn dummy_work() {
 
 fn task() {
     for _ in 0..ITERS {
-        println!("K( PID: {:<6} CPU: {:<6} MEM: {:<8}),",
+        println!("K( PID: {:<6} CPU: {:<6} MEM: {:<8} LEN: {:<6}),",
                  crate::kernel::sched::current_id(),
                  unsafe {crate::CPU_ID },
-                 crate::kernel::mm::heap::ALLOCED_MEM.load(Ordering::SeqCst));
+                 crate::kernel::mm::heap::ALLOCED_MEM.load(Ordering::SeqCst),
+                 crate::kernel::sched::queue_len());
 
         dummy_work();
     }
@@ -28,6 +29,8 @@ fn task() {
 }
 
 pub fn start() {
+    crate::kernel::sched::create_task(task);
+    crate::kernel::sched::create_task(task);
     crate::kernel::sched::create_task(task);
     crate::kernel::sched::create_user_task(
         crate::kernel::user::get_user_program(), crate::kernel::user::get_user_program_size(),

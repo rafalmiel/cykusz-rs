@@ -37,12 +37,19 @@ static LOCK_PROTECTION_ENTERED: AtomicBool = AtomicBool::new(false);
 #[thread_local]
 static CURRENT_TASK_ID: AtomicUsize = AtomicUsize::new(0);
 
+#[thread_local]
+static QUEUE_LEN: AtomicUsize = AtomicUsize::new(0);
+
 pub fn new_task_id() -> usize {
     NEW_TASK_ID.fetch_add(1, Ordering::SeqCst)
 }
 
 pub fn current_id() -> usize {
     CURRENT_TASK_ID.load(Ordering::SeqCst)
+}
+
+pub fn queue_len() -> usize {
+    QUEUE_LEN.load(Ordering::SeqCst)
 }
 
 #[derive(Default)]

@@ -7,6 +7,7 @@ use crate::kernel::task::{Task, TaskState};
 
 use super::CURRENT_TASK_ID;
 use super::LOCK_PROTECTION_ENTERED;
+use super::QUEUE_LEN;
 
 struct RecursiveLockProtection{}
 
@@ -128,6 +129,8 @@ impl CpuQueue {
         self.current = found;
 
         CURRENT_TASK_ID.store(self.tasks[found].id(), Ordering::SeqCst);
+
+        QUEUE_LEN.store(self.tasks.len(), Ordering::SeqCst);
 
         crate::kernel::int::finish();
 

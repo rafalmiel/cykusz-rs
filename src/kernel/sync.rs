@@ -14,7 +14,7 @@ pub struct IrqLock<T: ?Sized> {
 }
 
 pub struct IrqGuard {
-    had_int: bool
+    had_int: bool,
 }
 
 unsafe impl<T: ?Sized + Send> Sync for IrqLock<T> {}
@@ -52,7 +52,6 @@ impl Drop for IrqGuard {
 }
 
 impl<T> Mutex<T> {
-
     pub const fn new(user_data: T) -> Mutex<T> {
         Mutex {
             l: M::new(user_data),
@@ -92,12 +91,12 @@ impl<T> Mutex<T> {
 impl<T> IrqLock<T> {
     pub const fn new(user_data: T) -> IrqLock<T> {
         IrqLock {
-            l: UnsafeCell::new(user_data)
+            l: UnsafeCell::new(user_data),
         }
     }
 }
 
-impl<T:?Sized> IrqLock<T> {
+impl<T: ?Sized> IrqLock<T> {
     pub fn irq(&self) -> IrqLockGuard<T> {
         let ints = int::is_enabled();
         int::disable();

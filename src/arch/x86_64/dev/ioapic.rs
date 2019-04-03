@@ -7,16 +7,16 @@ use crate::kernel::sync::Mutex;
 
 pub static IOAPIC: Mutex<IOApic> = Mutex::new(IOApic::new());
 
-const REG_ID: u32 =	    0x00;
-const REG_VER: u32 =    0x01;
-const REG_ARB: u32 =    0x02;
+const REG_ID: u32 = 0x00;
+const REG_VER: u32 = 0x01;
+const REG_ARB: u32 = 0x02;
 
 const fn reg_redtbl_low(num: u32) -> u32 {
-    0x10 + (2*num)
+    0x10 + (2 * num)
 }
 
 const fn reg_redtbl_high(num: u32) -> u32 {
-    0x11 + (2*num)
+    0x11 + (2 * num)
 }
 
 struct RegId(u32);
@@ -83,14 +83,9 @@ impl IOApic {
     fn read(&self, reg: u32) -> u32 {
         if let Some(base) = self.ioapic_base {
             unsafe {
-                write_volatile::<u32>(
-                    base.0 as *mut u32,
-                    reg
-                );
+                write_volatile::<u32>(base.0 as *mut u32, reg);
 
-                return read_volatile::<u32>(
-                    (base.0 + 0x10) as *const u32
-                );
+                return read_volatile::<u32>((base.0 + 0x10) as *const u32);
             }
         } else {
             panic!("IOApic module not initialised");
@@ -100,15 +95,9 @@ impl IOApic {
     fn write(&self, reg: u32, value: u32) {
         if let Some(base) = self.ioapic_base {
             unsafe {
-                write_volatile::<u32>(
-                    base.0 as *mut u32,
-                    reg
-                );
+                write_volatile::<u32>(base.0 as *mut u32, reg);
 
-                write_volatile::<u32>(
-                    (base.0 + 0x10) as *mut u32,
-                    value
-                );
+                write_volatile::<u32>((base.0 + 0x10) as *mut u32, value);
             }
         } else {
             panic!("IOApic module not initialised");
@@ -154,9 +143,7 @@ impl IOApic {
     }
 
     pub const fn new() -> IOApic {
-        IOApic {
-            ioapic_base: None
-        }
+        IOApic { ioapic_base: None }
     }
     pub fn init(&mut self, hdr: &'static MatdHeader) {
         if let Some(ref io) = hdr.ioapic_entries().nth(0) {

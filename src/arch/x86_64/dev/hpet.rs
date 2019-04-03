@@ -2,7 +2,7 @@ use crate::arch::acpi::hpet::HpetHeader;
 use crate::kernel::mm::PhysAddr;
 
 pub struct Hpet {
-    hpet_hdr: &'static HpetHeader
+    hpet_hdr: &'static HpetHeader,
 }
 
 #[allow(unused)]
@@ -18,9 +18,7 @@ impl RegCapabilities {
 
 impl Hpet {
     pub const fn new(hdr: &'static HpetHeader) -> Hpet {
-        Hpet {
-            hpet_hdr: hdr
-        }
+        Hpet { hpet_hdr: hdr }
     }
 
     pub fn counter_clk_period(&self) -> u32 {

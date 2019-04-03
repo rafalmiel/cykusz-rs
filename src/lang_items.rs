@@ -5,13 +5,12 @@ use core::panic::PanicInfo;
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
 
-
 #[cfg(not(test))]
 #[no_mangle]
 #[lang = "panic_impl"]
 pub fn panic_impl(pi: &PanicInfo) -> ! {
     println!("PANIC: {:?}", pi);
-    loop{}
+    loop {}
 }
 
 #[allow(non_snake_case)]

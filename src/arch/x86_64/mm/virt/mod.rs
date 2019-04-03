@@ -1,9 +1,9 @@
 use crate::arch::raw::ctrlregs;
 use crate::arch::raw::mm;
-use crate::kernel::mm::{PhysAddr, VirtAddr};
 use crate::kernel::mm::allocate;
-use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::mm::virt;
+use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::{PhysAddr, VirtAddr};
 
 use self::table::*;
 
@@ -12,9 +12,7 @@ mod page;
 pub mod table;
 
 pub fn p4_table_addr() -> PhysAddr {
-    unsafe {
-        PhysAddr(ctrlregs::cr3() as usize)
-    }
+    unsafe { PhysAddr(ctrlregs::cr3() as usize) }
 }
 pub fn current_p4_table() -> &'static mut P4Table {
     P4Table::new_mut_at_phys(p4_table_addr())
@@ -66,7 +64,6 @@ fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
     table.clear();
 
     for elf in mboot_info.elf_tag().unwrap().sections() {
-
         let s = elf.address().align_down(PAGE_SIZE);
         let e = elf.end_address().align_up(PAGE_SIZE);
 
@@ -78,7 +75,9 @@ fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
             continue;
         }
 
-        if (elf.flags as usize & ElfSectionFlags::Writable as usize) == ElfSectionFlags::Writable as usize {
+        if (elf.flags as usize & ElfSectionFlags::Writable as usize)
+            == ElfSectionFlags::Writable as usize
+        {
             flags.insert(virt::PageFlags::WRITABLE);
         }
         if (elf.flags as usize & ElfSectionFlags::Executable as usize) == 0 {
@@ -100,7 +99,7 @@ fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
 }
 
 pub fn init(mboot_info: &crate::drivers::multiboot2::Info) {
-    use crate::arch::raw::mm::{enable_nxe_bit,enable_write_protect_bit};
+    use crate::arch::raw::mm::{enable_nxe_bit, enable_write_protect_bit};
     enable_nxe_bit();
     enable_write_protect_bit();
 

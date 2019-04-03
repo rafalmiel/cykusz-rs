@@ -15,18 +15,18 @@ bitflags! {
 pub struct MatdHeader {
     hdr: AcpiStdHeader,
     pub local_controller_address: u32,
-    flags: u32
+    flags: u32,
 }
 
 #[repr(packed, C)]
 pub struct MatdEntry {
     typ: MatdEntryType,
-    length: u8
+    length: u8,
 }
 
 pub struct MatdIter {
     current: *const u8,
-    limit: *const u8
+    limit: *const u8,
 }
 
 #[repr(packed, C)]
@@ -35,7 +35,7 @@ pub struct MatdEntryIntSrc {
     bus_src: u8,
     irq_src: u8,
     global_sys_int: u32,
-    flags: u16
+    flags: u16,
 }
 
 impl MatdEntryIntSrc {
@@ -53,9 +53,8 @@ pub struct MatdEntryLocalApic {
     matd: MatdEntry,
     pub proc_id: u8,
     pub apic_id: u8,
-    flags:   u32
+    flags: u32,
 }
-
 
 #[repr(packed, C)]
 pub struct MatdEntryIOApic {
@@ -63,7 +62,7 @@ pub struct MatdEntryIOApic {
     pub ioapic_id: u8,
     reserved: u8,
     pub ioapic_address: u32,
-    pub global_int_base: u32
+    pub global_int_base: u32,
 }
 
 impl MatdEntryIOApic {
@@ -85,10 +84,7 @@ impl MatdHeader {
                 (self as *const _ as *const u8)
                     .offset(::core::mem::size_of::<MatdHeader>() as isize)
             },
-            limit: unsafe {
-                (self as *const _ as *const u8)
-                    .offset(self.hdr.length as isize)
-            }
+            limit: unsafe { (self as *const _ as *const u8).offset(self.hdr.length as isize) },
         }
     }
 
@@ -96,42 +92,36 @@ impl MatdHeader {
         PhysAddr(self.local_controller_address as usize).to_mapped()
     }
 
-    pub fn lapic_entries(&'static self)
-        -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryLocalApic>> {
-
+    pub fn lapic_entries(
+        &'static self,
+    ) -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryLocalApic>> {
         self.entries().filter_map(|e| {
             if e.typ == MatdEntryType::PROC_LOCAL_APIC {
-                unsafe {
-                    Some(&*(e as *const _ as *const MatdEntryLocalApic))
-                }
+                unsafe { Some(&*(e as *const _ as *const MatdEntryLocalApic)) }
             } else {
                 None
             }
         })
     }
 
-    pub fn ioapic_entries(&'static self)
-        -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryIOApic>> {
-
+    pub fn ioapic_entries(
+        &'static self,
+    ) -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryIOApic>> {
         self.entries().filter_map(|e| {
             if e.typ == MatdEntryType::PROC_IO_APIC {
-                unsafe {
-                    Some(&*(e as *const _ as *const MatdEntryIOApic))
-                }
+                unsafe { Some(&*(e as *const _ as *const MatdEntryIOApic)) }
             } else {
                 None
             }
         })
     }
 
-    pub fn intsrc_entries(&'static self)
-        -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryIntSrc>> {
-
+    pub fn intsrc_entries(
+        &'static self,
+    ) -> FilterMap<MatdIter, fn(&MatdEntry) -> Option<&'static MatdEntryIntSrc>> {
         self.entries().filter_map(|e| {
             if e.typ == MatdEntryType::INT_SRC_OVERRIDE {
-                unsafe {
-                    Some(&*(e as *const _ as *const MatdEntryIntSrc))
-                }
+                unsafe { Some(&*(e as *const _ as *const MatdEntryIntSrc)) }
             } else {
                 None
             }
@@ -139,11 +129,9 @@ impl MatdHeader {
     }
 
     pub fn find_irq_remap(&'static self, int: u32) -> u32 {
-        self.intsrc_entries().find(|i| {
-            i.irq_src() as u32 == int
-        }).map_or(int, |e| {
-            e.global_sys_int()
-        })
+        self.intsrc_entries()
+            .find(|i| i.irq_src() as u32 == int)
+            .map_or(int, |e| e.global_sys_int())
     }
 }
 
@@ -152,9 +140,7 @@ impl Iterator for MatdIter {
 
     fn next(&mut self) -> Option<&'static MatdEntry> {
         if self.current < self.limit {
-            let r = unsafe {
-                &*(self.current as *const MatdEntry)
-            };
+            let r = unsafe { &*(self.current as *const MatdEntry) };
 
             unsafe {
                 self.current = self.current.offset(r.length as isize);

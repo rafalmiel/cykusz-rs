@@ -7,16 +7,16 @@ pub mod output;
 pub mod raw;
 #[macro_use]
 pub mod task;
+pub mod acpi;
+pub mod dev;
 pub mod gdt;
 pub mod idt;
-pub mod mm;
-pub mod acpi;
 pub mod int;
-pub mod dev;
+pub mod mm;
 pub mod smp;
-pub mod tls;
-pub mod timer;
 pub mod syscall;
+pub mod timer;
+pub mod tls;
 pub mod user;
 
 #[no_mangle]
@@ -29,7 +29,6 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
 
     idt::init();
     println!("[ OK ] IDT Initialised");
-
 
     let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
 

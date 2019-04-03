@@ -21,6 +21,8 @@ impl InterruptController for Controller {
     }
 
     fn set_irq_dest(&self, src: u8, dst: u8) {
-        IOAPIC.lock().set_int(self.irq_remap(src as u32), dst as u32);
+        IOAPIC
+            .lock()
+            .set_int(self.irq_remap(src as u32), dst as u32);
     }
 }

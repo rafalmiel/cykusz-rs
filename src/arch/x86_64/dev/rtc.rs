@@ -12,8 +12,8 @@ pub fn init() {
     int::disable();
 
     unsafe {
-        let mut sel=  cpuio::UnsafePort::<u8>::new(0x70);
-        let mut cmd=  cpuio::UnsafePort::<u8>::new(0x71);
+        let mut sel = cpuio::UnsafePort::<u8>::new(0x70);
+        let mut cmd = cpuio::UnsafePort::<u8>::new(0x71);
 
         sel.write(0x8B);
         let prev = cmd.read();
@@ -33,8 +33,8 @@ pub fn init() {
 
 fn eoi() {
     unsafe {
-        let mut sel=  cpuio::UnsafePort::<u8>::new(0x70);
-        let mut cmd=  cpuio::UnsafePort::<u8>::new(0x71);
+        let mut sel = cpuio::UnsafePort::<u8>::new(0x70);
+        let mut cmd = cpuio::UnsafePort::<u8>::new(0x71);
 
         sel.write(0x0C);
         cmd.read();

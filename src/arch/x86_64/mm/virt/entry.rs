@@ -1,7 +1,7 @@
+use crate::kernel::mm::virt;
 use crate::kernel::mm::Frame;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
-use crate::kernel::mm::virt;
 
 bitflags! {
     pub struct Entry: usize {
@@ -20,9 +20,7 @@ bitflags! {
 
 impl Entry {
     pub fn new_empty() -> Entry {
-        Entry {
-            bits: 0
-        }
+        Entry { bits: 0 }
     }
 
     pub fn from_kernel_flags(flags: virt::PageFlags) -> Entry {
@@ -81,7 +79,6 @@ impl Entry {
     }
 
     pub fn set_frame(&mut self, frame: &Frame) {
-
         self.bits = frame.address().0;
     }
 

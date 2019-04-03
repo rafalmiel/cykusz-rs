@@ -9,12 +9,12 @@ use super::CURRENT_TASK_ID;
 use super::LOCK_PROTECTION_ENTERED;
 use super::QUEUE_LEN;
 
-struct RecursiveLockProtection{}
+struct RecursiveLockProtection {}
 
 impl RecursiveLockProtection {
     fn new() -> RecursiveLockProtection {
         LOCK_PROTECTION_ENTERED.store(true, Ordering::SeqCst);
-        RecursiveLockProtection{}
+        RecursiveLockProtection {}
     }
 }
 
@@ -47,7 +47,6 @@ impl Default for CpuQueue {
 }
 
 impl CpuQueue {
-
     fn switch(&self, to: &Task, lock: MutexGuard<()>) {
         drop(lock);
 
@@ -74,7 +73,6 @@ impl CpuQueue {
 
     pub unsafe fn schedule_next(&mut self, sched_lock: MutexGuard<()>) {
         if self.tasks[self.current].state() == TaskState::ToDelete {
-
             self.remove_task(self.current);
 
             if self.current != 0 {
@@ -84,7 +82,6 @@ impl CpuQueue {
             self.schedule_next(sched_lock);
             return;
         } else if self.tasks[self.current].locks() > 0 {
-
             self.tasks[self.current].set_state(TaskState::ToReschedule);
             self.switch(&self.tasks[self.current], sched_lock);
 
@@ -92,7 +89,6 @@ impl CpuQueue {
         }
 
         if self.tasks.len() == 1 {
-
             self.switch(&self.tasks[0], sched_lock);
             return;
         }
@@ -104,20 +100,17 @@ impl CpuQueue {
 
         let found = loop {
             if self.tasks[c].state() == TaskState::Runnable {
-
                 break Some(c);
             } else if c == self.current && self.tasks[self.current].state() == TaskState::Running {
-
                 break Some(self.current);
             } else if loops == len - 1 {
-
                 break Some(0);
             }
 
             c = (c % (len - 1)) + 1;
             loops += 1;
-
-        }.expect("SCHEDULER BUG");
+        }
+        .expect("SCHEDULER BUG");
 
         if self.tasks[self.current].state() == TaskState::Running {
             self.tasks[self.current].set_state(TaskState::Runnable);
@@ -136,8 +129,7 @@ impl CpuQueue {
 
         crate::kernel::timer::reset_counter();
 
-        self.switch( &self.tasks[found], sched_lock);
-
+        self.switch(&self.tasks[found], sched_lock);
     }
 
     pub fn reschedule(&mut self, sched_lock: MutexGuard<()>) -> bool {
@@ -180,4 +172,3 @@ impl CpuQueue {
         self.tasks.shrink_to_fit();
     }
 }
-

@@ -6,17 +6,16 @@ use crate::kernel::sync::Mutex;
 use crate::kernel::task::Task;
 
 pub struct TaskContainer {
-    tasks: Mutex<BTreeMap<usize, Arc<Task>>>
+    tasks: Mutex<BTreeMap<usize, Arc<Task>>>,
 }
 
 impl Default for TaskContainer {
     fn default() -> TaskContainer {
         TaskContainer {
-            tasks: Mutex::new(BTreeMap::new())
+            tasks: Mutex::new(BTreeMap::new()),
         }
     }
 }
-
 
 impl TaskContainer {
     pub fn add_task(&self, fun: fn()) -> Arc<Task> {

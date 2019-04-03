@@ -18,8 +18,8 @@ impl Pit {
     pub const fn new() -> Pit {
         Pit {
             pit_ch0: unsafe { UnsafePort::new(0x40) },
-            pit_mc : unsafe { UnsafePort::new(0x43) },
-            ticks: 0
+            pit_mc: unsafe { UnsafePort::new(0x43) },
+            ticks: 0,
         }
     }
 
@@ -51,7 +51,7 @@ impl Pit {
     #[allow(unused)]
     fn init_timer(&mut self, ms: u16) {
         let hz: u16 = 1000u16 / ms;
-        let divisor: u16 = ( 1193182u32 / hz as u32 ) as u16;
+        let divisor: u16 = (1193182u32 / hz as u32) as u16;
 
         unsafe {
             self.pit_mc.write(0x36);

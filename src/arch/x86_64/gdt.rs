@@ -13,7 +13,8 @@ static mut INIT_GDT: [gdt::GdtEntry; 3] = [
     gdt::GdtEntry::new(dsc::Flags::SEG_RING0_DATA, gdt::GdtFlags::LONG_MODE),
 ];
 
-static mut INIT_GDTR : dsc::DescriptorTablePointer<gdt::GdtEntry> =  dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
+static mut INIT_GDTR: dsc::DescriptorTablePointer<gdt::GdtEntry> =
+    dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
 
 #[thread_local]
 static mut GDT: [gdt::GdtEntry; 7] = [
@@ -37,7 +38,8 @@ static mut GDT: [gdt::GdtEntry; 7] = [
 static mut TSS: TaskStateSegment = TaskStateSegment::new();
 
 #[thread_local]
-static mut GDTR : dsc::DescriptorTablePointer<gdt::GdtEntry> =  dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
+static mut GDTR: dsc::DescriptorTablePointer<gdt::GdtEntry> =
+    dsc::DescriptorTablePointer::<gdt::GdtEntry>::empty();
 
 pub const fn ring0_cs() -> sgm::SegmentSelector {
     sgm::SegmentSelector::new(1, sgm::SegmentSelector::RPL_0)

@@ -27,7 +27,7 @@ const REG_TIMCUR: u32 = 0x390;
 pub struct LApic {
     lapic_base: Option<MappedAddr>,
     x2: bool,
-    ticks_in_1_ms: u32
+    ticks_in_1_ms: u32,
 }
 
 impl LApic {
@@ -35,7 +35,7 @@ impl LApic {
         LApic {
             lapic_base: None,
             x2: false,
-            ticks_in_1_ms: 0
+            ticks_in_1_ms: 0,
         }
     }
 
@@ -51,9 +51,7 @@ impl LApic {
 
     fn reg_read(&self, reg: u32) -> u32 {
         if let Some(base) = self.lapic_base {
-            unsafe {
-                read_volatile::<u32>((base + reg as usize).0 as *const u32)
-            }
+            unsafe { read_volatile::<u32>((base + reg as usize).0 as *const u32) }
         } else {
             panic!("Failed read!");
         }
@@ -61,9 +59,7 @@ impl LApic {
 
     pub fn id(&self) -> u64 {
         if self.x2 {
-            unsafe {
-                msr::rdmsr(msr::IA32_X2APIC_APICID)
-            }
+            unsafe { msr::rdmsr(msr::IA32_X2APIC_APICID) }
         } else {
             (self.reg_read(REG_ID) >> 24) as u64
         }
@@ -79,15 +75,18 @@ impl LApic {
             self.reg_write(REG_TRP, 0);
 
             // Logical Destination Mode
-            self.reg_write(REG_DFR, 0xffffffff);	// Flat mode
-            self.reg_write(REG_LCR, 0x01000000);	// All cpus use logical id 1
+            self.reg_write(REG_DFR, 0xffffffff); // Flat mode
+            self.reg_write(REG_LCR, 0x01000000); // All cpus use logical id 1
 
             // Configure Spurious Interrupt Vector Register
             self.reg_write(REG_SIVR, 0x100 | 0xff);
         } else {
             unsafe {
                 //Enable X2APIC: (bit 10)
-                msr::wrmsr(msr::IA32_APIC_BASE, msr::rdmsr(msr::IA32_APIC_BASE) | 1 << 10);
+                msr::wrmsr(
+                    msr::IA32_APIC_BASE,
+                    msr::rdmsr(msr::IA32_APIC_BASE) | 1 << 10,
+                );
 
                 // Clear task priority to enable all interrupts
                 msr::wrmsr(msr::IA32_X2APIC_TPR, 0);
@@ -111,7 +110,10 @@ impl LApic {
         } else {
             unsafe {
                 //Enable X2APIC: (bit 10)
-                msr::wrmsr(msr::IA32_APIC_BASE, msr::rdmsr(msr::IA32_APIC_BASE) | 1 << 10);
+                msr::wrmsr(
+                    msr::IA32_APIC_BASE,
+                    msr::rdmsr(msr::IA32_APIC_BASE) | 1 << 10,
+                );
 
                 // Clear task priority to enable all interrupts
                 msr::wrmsr(msr::IA32_X2APIC_TPR, 0);
@@ -123,7 +125,7 @@ impl LApic {
     }
 
     pub fn start_ap(&mut self, ap_id: u8) {
-        use crate::arch::smp::{AP_INIT};
+        use crate::arch::smp::AP_INIT;
         if !self.x2 {
             self.reg_write(REG_CMD_ID, (ap_id as u32) << 24);
             self.reg_write(REG_CMD, 0x4500);
@@ -141,7 +143,10 @@ impl LApic {
                 crate::kernel::timer::early_sleep(10);
 
                 // START: AP INIT routine begins at physical address 0x1000
-                msr::wrmsr(msr::IA32_X2APIC_ICR, 0x4600u64 | ((AP_INIT.0 as u64) >> 12) | ((ap_id as u64) << 32));
+                msr::wrmsr(
+                    msr::IA32_X2APIC_ICR,
+                    0x4600u64 | ((AP_INIT.0 as u64) >> 12) | ((ap_id as u64) << 32),
+                );
                 crate::kernel::timer::early_sleep(10);
             }
         }
@@ -160,12 +165,15 @@ impl LApic {
     pub fn start_timer(&mut self, one_shot: bool) {
         if !self.x2 {
             self.reg_write(REG_TIMDIV, 0b11);
-            self.reg_write(REG_TIM, 32 | (if one_shot {0} else {1} << 17));
+            self.reg_write(REG_TIM, 32 | (if one_shot { 0 } else { 1 } << 17));
             self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 1);
         } else {
             unsafe {
                 msr::wrmsr(msr::IA32_X2APIC_DIV_CONF, 0b11);
-                msr::wrmsr(msr::IA32_X2APIC_LVT_TIMER, 32 | (if one_shot {0} else {1} << 17));
+                msr::wrmsr(
+                    msr::IA32_X2APIC_LVT_TIMER,
+                    32 | (if one_shot { 0 } else { 1 } << 17),
+                );
                 msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 1);
             }
         }
@@ -195,20 +203,18 @@ impl LApic {
         crate::kernel::timer::early_sleep(ms);
 
         if !self.x2 {
-            self.reg_write(REG_TIM, 1<<16);
+            self.reg_write(REG_TIM, 1 << 16);
         } else {
             unsafe {
-                msr::wrmsr(msr::IA32_X2APIC_LVT_TIMER, 1<<16);
+                msr::wrmsr(msr::IA32_X2APIC_LVT_TIMER, 1 << 16);
             }
         }
 
-        let ticks = 0xFFFFFFFFu32 -
-            if !self.x2 {
+        let ticks = 0xFFFFFFFFu32
+            - if !self.x2 {
                 self.reg_read(REG_TIMCUR)
             } else {
-                unsafe {
-                    msr::rdmsr(msr::IA32_X2APIC_CUR_COUNT) as u32
-                }
+                unsafe { msr::rdmsr(msr::IA32_X2APIC_CUR_COUNT) as u32 }
             };
 
         self.ticks_in_1_ms = ticks;
@@ -241,10 +247,14 @@ pub fn reset_timer_counter() {
 }
 
 pub fn start_ap() {
-    use crate::arch::smp::{Trampoline};
+    use crate::arch::smp::Trampoline;
 
     let iter = {
-        crate::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries()
+        crate::arch::acpi::ACPI
+            .lock()
+            .get_apic_entry()
+            .unwrap()
+            .lapic_entries()
     };
 
     let bsp_id = LAPIC.irq().id();
@@ -265,15 +275,13 @@ pub fn start_ap() {
 
             // Allocate stack for the new CPU
             trampoline.stack_ptr = unsafe {
-                crate::kernel::mm::heap::allocate_align(
-                    4096 * 16, 4096
-                ).unwrap().offset(4096 * 16)
+                crate::kernel::mm::heap::allocate_align(4096 * 16, 4096)
+                    .unwrap()
+                    .offset(4096 * 16)
             } as u64;
 
             // Pass page table pointer to the new CPU
-            trampoline.page_table_ptr = unsafe {
-                crate::arch::raw::ctrlregs::cr3()
-            };
+            trampoline.page_table_ptr = unsafe { crate::arch::raw::ctrlregs::cr3() };
 
             {
                 // Start AP and release the lock

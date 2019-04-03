@@ -25,7 +25,9 @@ impl SegmentSelector {
     ///  * `index` index in GDT or LDT array.
     ///
     pub const fn new(index: u16, rpl: SegmentSelector) -> SegmentSelector {
-        SegmentSelector { bits: index << 3 | rpl.cbits() }
+        SegmentSelector {
+            bits: index << 3 | rpl.cbits(),
+        }
     }
 
     pub const fn cbits(&self) -> u16 {
@@ -39,17 +41,13 @@ impl SegmentSelector {
 
 pub fn cs() -> SegmentSelector {
     let segment: u16;
-    unsafe {
-        asm!("mov %cs, $0" : "=r"(segment))
-    }
+    unsafe { asm!("mov %cs, $0" : "=r"(segment)) }
     SegmentSelector::from_raw(segment)
 }
 
 pub fn ds() -> SegmentSelector {
     let segment: u16;
-    unsafe {
-        asm!("mov %ds, $0" : "=r"(segment))
-    }
+    unsafe { asm!("mov %ds, $0" : "=r"(segment)) }
     SegmentSelector::from_raw(segment)
 }
 

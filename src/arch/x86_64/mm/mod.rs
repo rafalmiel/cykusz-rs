@@ -1,9 +1,9 @@
 pub use crate::arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
 use crate::drivers::multiboot2;
 
+pub mod heap;
 pub mod phys;
 pub mod virt;
-pub mod heap;
 
 const VIRT: VirtAddr = VirtAddr(0xFFFFFF0000000000);
 const PHYSMAP: MappedAddr = MappedAddr(0xFFFF800000000000);

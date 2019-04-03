@@ -12,23 +12,18 @@ pub struct CpuQueues {
     cpu_queues: PerCpu<UnsafeCell<CpuQueue>>,
 }
 
-unsafe impl Sync for CpuQueues{}
+unsafe impl Sync for CpuQueues {}
 
 impl Default for CpuQueues {
     fn default() -> CpuQueues {
         CpuQueues {
-            cpu_queues_locks: PerCpu::new_fn(|| {
-                Mutex::<()>::new(())
-            }),
-            cpu_queues: PerCpu::new_fn(|| {
-                UnsafeCell::new(CpuQueue::default())
-            })
+            cpu_queues_locks: PerCpu::new_fn(|| Mutex::<()>::new(())),
+            cpu_queues: PerCpu::new_fn(|| UnsafeCell::new(CpuQueue::default())),
         }
     }
 }
 
 impl CpuQueues {
-
     unsafe fn this_cpu_queue(&self) -> &mut CpuQueue {
         (&mut *(self.cpu_queues.this_cpu_mut().get()))
     }
@@ -44,9 +39,7 @@ impl CpuQueues {
     pub fn reschedule(&self) -> bool {
         let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
 
-        unsafe {
-            self.this_cpu_queue().reschedule(mutex)
-        }
+        unsafe { self.this_cpu_queue().reschedule(mutex) }
     }
 
     pub fn enter_critical_section(&self) {
@@ -63,7 +56,6 @@ impl CpuQueues {
         unsafe {
             self.this_cpu_queue().leave_critical_section(mutex);
         }
-
     }
 
     pub fn add_task(&self, task: Arc<Task>) {
@@ -82,4 +74,3 @@ impl CpuQueues {
         }
     }
 }
-

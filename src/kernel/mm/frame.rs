@@ -3,13 +3,13 @@ use crate::kernel::mm::{MappedAddr, PhysAddr};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {
-    number:         usize
+    number: usize,
 }
 
 impl Frame {
     pub fn new(address: PhysAddr) -> Frame {
         Frame {
-            number: (address / PhysAddr(PAGE_SIZE)).0
+            number: (address / PhysAddr(PAGE_SIZE)).0,
         }
     }
 
@@ -39,7 +39,7 @@ impl Frame {
 
     pub fn next(&self) -> Frame {
         Frame {
-            number: self.number + 1
+            number: self.number + 1,
         }
     }
 }

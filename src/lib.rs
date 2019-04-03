@@ -1,5 +1,4 @@
 #![no_std]
-
 #![feature(lang_items)]
 #![feature(const_fn)]
 #![feature(ptr_internals)]
@@ -46,7 +45,6 @@ pub fn bochs() {
 }
 
 pub fn rust_main(stack_top: VirtAddr) {
-
     kernel::mm::init();
 
     kernel::smp::init();
@@ -67,7 +65,10 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::smp::start();
 
-    println!("[ OK ] SMP Initialized (CPU count: {})", kernel::smp::cpu_count());
+    println!(
+        "[ OK ] SMP Initialized (CPU count: {})",
+        kernel::smp::cpu_count()
+    );
 
     kernel::syscall::init();
 
@@ -82,12 +83,10 @@ pub fn rust_main(stack_top: VirtAddr) {
     // Start test tasks on this cpu
     task_test::start();
 
-
     idle();
 }
 
 pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
-
     kernel::tls::init(VirtAddr(stack_ptr as usize));
 
     unsafe {
@@ -96,7 +95,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
     kernel::sched::enable_lock_protection();
 
-    println!("[ OK ] CPU {} Initialised", unsafe {crate::CPU_ID});
+    println!("[ OK ] CPU {} Initialised", unsafe { crate::CPU_ID });
 
     kernel::smp::notify_ap_ready();
 

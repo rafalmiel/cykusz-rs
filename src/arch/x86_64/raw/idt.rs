@@ -13,7 +13,7 @@ pub struct IdtEntry {
     pub type_attr: dsc::Flags,
     pub offset_2: u16,
     pub offset_3: u32,
-    pub zero: u32
+    pub zero: u32,
 }
 
 #[repr(C)]
@@ -27,12 +27,16 @@ pub struct ExceptionStackFrame {
 
 impl ::core::fmt::Debug for ExceptionStackFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, r#"ExceptionStackFrame
+        write!(
+            f,
+            r#"ExceptionStackFrame
     ip: 0x{:x}
     cs: 0x{:x}
     cf: 0x{:x}
     sp: 0x{:x}
-    ss: 0x{:x}"#, self.ip, self.cs, self.cf, self.sp, self.ss)
+    ss: 0x{:x}"#,
+            self.ip, self.cs, self.cf, self.sp, self.ss
+        )
     }
 }
 
@@ -45,8 +49,9 @@ macro_rules! int {
     };
 }
 
-pub type ExceptionHandlerFn =        extern "x86-interrupt" fn (&mut ExceptionStackFrame);
-pub type ExceptionHandlerFnErrCode = extern "x86-interrupt" fn (&mut ExceptionStackFrame, err_code: u64);
+pub type ExceptionHandlerFn = extern "x86-interrupt" fn(&mut ExceptionStackFrame);
+pub type ExceptionHandlerFnErrCode =
+    extern "x86-interrupt" fn(&mut ExceptionStackFrame, err_code: u64);
 
 impl IdtEntry {
     pub const MISSING: IdtEntry = IdtEntry {
@@ -81,11 +86,21 @@ impl IdtEntry {
         self.zero = 0;
     }
 
-    pub fn set_handler_fn(&mut self, f: ExceptionHandlerFn, selector: SegmentSelector, flags: dsc::Flags) {
+    pub fn set_handler_fn(
+        &mut self,
+        f: ExceptionHandlerFn,
+        selector: SegmentSelector,
+        flags: dsc::Flags,
+    ) {
         self.set_handler(f as u64, selector, flags);
     }
 
-    pub fn set_handler_fn_err(&mut self, f: ExceptionHandlerFnErrCode, selector: SegmentSelector, flags: dsc::Flags) {
+    pub fn set_handler_fn_err(
+        &mut self,
+        f: ExceptionHandlerFnErrCode,
+        selector: SegmentSelector,
+        flags: dsc::Flags,
+    ) {
         self.set_handler(f as u64, selector, flags);
     }
 }
@@ -107,7 +122,11 @@ impl Idt {
     }
 
     pub unsafe fn set_user_handler(&mut self, idx: usize, f: ExceptionHandlerFn) {
-        self.entries[idx].set_handler_fn(f, crate::arch::gdt::ring0_cs(), dsc::Flags::SYS_RING3_INTERRUPT_GATE);
+        self.entries[idx].set_handler_fn(
+            f,
+            crate::arch::gdt::ring0_cs(),
+            dsc::Flags::SYS_RING3_INTERRUPT_GATE,
+        );
     }
 
     unsafe fn set_handler_err(&mut self, idx: usize, f: ExceptionHandlerFnErrCode) {
@@ -126,60 +145,60 @@ impl Idt {
         unsafe { self.set_handler(0, f) };
     }
     pub fn set_debug(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(1, f) };
+        unsafe { self.set_handler(1, f) };
     }
     pub fn set_non_maskable_interrupt(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(2, f) };
+        unsafe { self.set_handler(2, f) };
     }
     pub fn set_breakpoint(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(3, f) };
+        unsafe { self.set_handler(3, f) };
     }
     pub fn set_overflow(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(4, f) };
+        unsafe { self.set_handler(4, f) };
     }
     pub fn set_bound_range_exceeded(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(5, f) };
+        unsafe { self.set_handler(5, f) };
     }
     pub fn set_invalid_opcode(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(6, f) };
+        unsafe { self.set_handler(6, f) };
     }
     pub fn set_device_not_available(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(7, f) };
+        unsafe { self.set_handler(7, f) };
     }
     pub fn set_double_fault(&mut self, f: ExceptionHandlerFnErrCode) {
-        unsafe {self.set_handler_err(8, f) };
+        unsafe { self.set_handler_err(8, f) };
     }
     pub fn set_invalid_tss(&mut self, f: ExceptionHandlerFnErrCode) {
-        unsafe {self.set_handler_err(10, f) };
+        unsafe { self.set_handler_err(10, f) };
     }
     pub fn set_segment_not_present(&mut self, f: ExceptionHandlerFnErrCode) {
-        unsafe {self.set_handler_err(11, f) };
+        unsafe { self.set_handler_err(11, f) };
     }
     pub fn set_stack_segment_fault(&mut self, f: ExceptionHandlerFnErrCode) {
-        unsafe {self.set_handler_err(12, f) };
+        unsafe { self.set_handler_err(12, f) };
     }
     pub fn set_general_protection_fault(&mut self, f: ExceptionHandlerFnErrCode) {
-        unsafe {self.set_handler_err(13, f) };
+        unsafe { self.set_handler_err(13, f) };
     }
     pub fn set_page_fault(&mut self, f: ExceptionHandlerFnErrCode) {
-        unsafe {self.set_handler_err(14, f) };
+        unsafe { self.set_handler_err(14, f) };
     }
     pub fn set_x87_floating_point_exception(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(16, f) };
+        unsafe { self.set_handler(16, f) };
     }
     pub fn set_alignment_check(&mut self, f: ExceptionHandlerFnErrCode) {
-        unsafe {self.set_handler_err(17, f) };
+        unsafe { self.set_handler_err(17, f) };
     }
     pub fn set_machine_check(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(18, f) };
+        unsafe { self.set_handler(18, f) };
     }
     pub fn set_simd_floating_point_exception(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(19, f) };
+        unsafe { self.set_handler(19, f) };
     }
     pub fn set_virtualisation_exception(&mut self, f: ExceptionHandlerFn) {
-        unsafe {self.set_handler(20, f) };
+        unsafe { self.set_handler(20, f) };
     }
     pub fn set_security_exception(&mut self, f: ExceptionHandlerFnErrCode) {
-        unsafe {self.set_handler_err(30, f) };
+        unsafe { self.set_handler_err(30, f) };
     }
 }

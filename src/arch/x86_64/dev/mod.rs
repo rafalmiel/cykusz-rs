@@ -1,13 +1,12 @@
-pub mod pic;
-pub mod rtc;
-pub mod pit;
+pub mod cpu;
+pub mod hpet;
 pub mod ioapic;
 pub mod lapic;
-pub mod hpet;
-pub mod cpu;
+pub mod pic;
+pub mod pit;
+pub mod rtc;
 
-pub fn init()
-{
+pub fn init() {
     pic::init();
     if let Some(ref apic) = crate::arch::acpi::ACPI.lock().get_apic_entry() {
         //We have local apic, so disable PIC
@@ -34,7 +33,6 @@ pub fn init()
     println!("[ OK ] PIT Disabled");
 }
 
-pub fn init_ap()
-{
+pub fn init_ap() {
     lapic::init_ap();
 }

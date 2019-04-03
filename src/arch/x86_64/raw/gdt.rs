@@ -24,7 +24,7 @@ pub struct GdtEntry {
     pub offsetm: u8,
     pub access: u8,
     pub flags_limith: u8,
-    pub offseth: u8
+    pub offseth: u8,
 }
 
 impl GdtEntry {
@@ -37,7 +37,7 @@ impl GdtEntry {
             offsetm: 0,
             access: access.cbits(),
             flags_limith: flags.cbits() & 0xF0,
-            offseth: 0
+            offseth: 0,
         }
     }
 

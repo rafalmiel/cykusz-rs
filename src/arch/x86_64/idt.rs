@@ -6,26 +6,26 @@ static IDT: Mutex<idt::Idt> = Mutex::new(idt::Idt::new());
 pub fn init() {
     let mut idt = IDT.lock();
     //Initialise exception handler routines
-    idt.set_divide_by_zero(               divide_by_zero);
-    idt.set_debug(                        debug);
-    idt.set_non_maskable_interrupt(       non_maskable_interrupt);
-    idt.set_breakpoint(                   breakpoint);
-    idt.set_overflow(                     overflow);
-    idt.set_bound_range_exceeded(         bound_range_exceeded);
-    idt.set_invalid_opcode(               invalid_opcode);
-    idt.set_device_not_available(         device_not_available);
-    idt.set_double_fault(                 double_fault);
-    idt.set_invalid_tss(                  invalid_tss);
-    idt.set_segment_not_present(          segment_not_present);
-    idt.set_stack_segment_fault(          stack_segment_fault);
-    idt.set_general_protection_fault(     general_protection_fault);
-    idt.set_page_fault(                   page_fault);
-    idt.set_x87_floating_point_exception( x87_floating_point_exception);
-    idt.set_alignment_check(              alignment_check);
-    idt.set_machine_check(                machine_check);
+    idt.set_divide_by_zero(divide_by_zero);
+    idt.set_debug(debug);
+    idt.set_non_maskable_interrupt(non_maskable_interrupt);
+    idt.set_breakpoint(breakpoint);
+    idt.set_overflow(overflow);
+    idt.set_bound_range_exceeded(bound_range_exceeded);
+    idt.set_invalid_opcode(invalid_opcode);
+    idt.set_device_not_available(device_not_available);
+    idt.set_double_fault(double_fault);
+    idt.set_invalid_tss(invalid_tss);
+    idt.set_segment_not_present(segment_not_present);
+    idt.set_stack_segment_fault(stack_segment_fault);
+    idt.set_general_protection_fault(general_protection_fault);
+    idt.set_page_fault(page_fault);
+    idt.set_x87_floating_point_exception(x87_floating_point_exception);
+    idt.set_alignment_check(alignment_check);
+    idt.set_machine_check(machine_check);
     idt.set_simd_floating_point_exception(simd_floating_point_exception);
-    idt.set_virtualisation_exception(     virtualisation_exception);
-    idt.set_security_exception(           security_exception);
+    idt.set_virtualisation_exception(virtualisation_exception);
+    idt.set_security_exception(security_exception);
     for i in 32..256 {
         unsafe {
             idt.set_handler(i, dummy);
@@ -118,15 +118,22 @@ extern "x86-interrupt" fn stack_segment_fault(_frame: &mut idt::ExceptionStackFr
     loop {}
 }
 
-extern "x86-interrupt" fn general_protection_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+extern "x86-interrupt" fn general_protection_fault(
+    _frame: &mut idt::ExceptionStackFrame,
+    err: u64,
+) {
     unsafe {
-        println!("General Protection Fault error! 0x{:x} CPU: {}", err, crate::CPU_ID);
+        println!(
+            "General Protection Fault error! 0x{:x} CPU: {}",
+            err,
+            crate::CPU_ID
+        );
     }
     loop {}
 }
 
 extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
-    println!("PAGE FAULT! 0b{:x} CPU: {}", err, unsafe {crate::CPU_ID});
+    println!("PAGE FAULT! 0b{:x} CPU: {}", err, unsafe { crate::CPU_ID });
     loop {}
 }
 

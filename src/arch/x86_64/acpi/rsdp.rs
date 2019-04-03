@@ -33,7 +33,7 @@ struct Rsdp20 {
     reserved: [u8; 3],
 }
 
-fn is_valid<T : Header>(f: &'static T) -> bool {
+fn is_valid<T: Header>(f: &'static T) -> bool {
     unsafe {
         if f.signature() as &[u8] != b"RSD PTR " {
             false
@@ -69,15 +69,12 @@ impl Header for Rsdp20 {
     }
 }
 
-fn find_hdr<T : Header>() -> Option<&'static impl Header> {
+fn find_hdr<T: Header>() -> Option<&'static impl Header> {
     let ebda_address = unsafe {
         PhysAddr((PhysAddr(0x40E as usize).to_mapped().read::<u16>()) as usize * 4).to_mapped()
     };
 
-    let ebda_iter = (
-        ebda_address
-        ..
-        (ebda_address + 1024)).step_by(0x10);
+    let ebda_iter = (ebda_address..(ebda_address + 1024)).step_by(0x10);
 
     for addr in ebda_iter {
         let ptr = unsafe { addr.read_ref::<T>() };
@@ -87,10 +84,8 @@ fn find_hdr<T : Header>() -> Option<&'static impl Header> {
         }
     }
 
-    let iter = (
-        PhysAddr(0xE0_000 as usize).to_mapped()
-        ..
-        PhysAddr(0x100_000 as usize).to_mapped()).step_by(0x10);
+    let iter = (PhysAddr(0xE0_000 as usize).to_mapped()..PhysAddr(0x100_000 as usize).to_mapped())
+        .step_by(0x10);
 
     for addr in iter {
         let ptr = unsafe { addr.read_ref::<T>() };
@@ -104,7 +99,6 @@ fn find_hdr<T : Header>() -> Option<&'static impl Header> {
 }
 
 pub fn find_rsdt_address() -> Option<Address> {
-
     // Look for Rsdp20 header, and if it does not exists, look for Rsdp
     let rsdp20 = find_hdr::<Rsdp20>();
     if let Some(x) = rsdp20 {
@@ -112,5 +106,5 @@ pub fn find_rsdt_address() -> Option<Address> {
             return Some(Address::Xsdp(x.rsdt_address()));
         }
     }
-    return Some(Address::Rsdp(find_hdr::<Rsdp>()?.rsdt_address()))
+    return Some(Address::Rsdp(find_hdr::<Rsdp>()?.rsdt_address()));
 }

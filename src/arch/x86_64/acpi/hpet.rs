@@ -13,9 +13,7 @@ pub struct HpetHeader {
     pub address: u64,
     pub hpet_number: u8,
     pub minimum_tick: u16,
-    pub page_protection: u8
+    pub page_protection: u8,
 }
 
-impl HpetHeader {
-
-}
+impl HpetHeader {}

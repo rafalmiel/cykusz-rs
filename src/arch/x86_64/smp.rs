@@ -1,7 +1,7 @@
 use crate::kernel::mm::PhysAddr;
 
-pub const TRAMPOLINE : PhysAddr = PhysAddr(0xE00);
-pub const AP_INIT : PhysAddr = PhysAddr(0x1000);
+pub const TRAMPOLINE: PhysAddr = PhysAddr(0xE00);
+pub const AP_INIT: PhysAddr = PhysAddr(0x1000);
 
 #[repr(C, packed)]
 pub struct Trampoline {
@@ -13,9 +13,7 @@ pub struct Trampoline {
 
 impl Trampoline {
     pub fn get() -> &'static mut Trampoline {
-        unsafe {
-            TRAMPOLINE.to_mapped().read_mut::<Trampoline>()
-        }
+        unsafe { TRAMPOLINE.to_mapped().read_mut::<Trampoline>() }
     }
 
     pub fn reset(&mut self) {
@@ -47,21 +45,23 @@ impl Trampoline {
 static mut CPU_COUNT: usize = 0;
 
 pub fn cpu_count() -> usize {
-    unsafe {
-        CPU_COUNT
-    }
+    unsafe { CPU_COUNT }
 }
 
 pub fn init() {
     unsafe {
-        CPU_COUNT = crate::arch::acpi::ACPI.lock().get_apic_entry().unwrap().lapic_entries().filter(|e| {
-            e.proc_is_enabled()
-        }).count();
+        CPU_COUNT = crate::arch::acpi::ACPI
+            .lock()
+            .get_apic_entry()
+            .unwrap()
+            .lapic_entries()
+            .filter(|e| e.proc_is_enabled())
+            .count();
     }
 }
 
 pub fn start() {
-    extern {
+    extern "C" {
         static apinit_start: u8;
         static apinit_end: u8;
         static trampoline: u8;

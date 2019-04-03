@@ -66,7 +66,7 @@ impl Writer {
             column: 0,
             row: 0,
             color: ColorCode::new(fg, bg),
-            buffer: unsafe {Unique::new_unchecked(buf.0 as *mut _ )},
+            buffer: unsafe { Unique::new_unchecked(buf.0 as *mut _) },
         }
     }
 
@@ -109,7 +109,6 @@ impl Writer {
                 }
 
                 for i in ((BUFFER_HEIGHT - 1) * (BUFFER_WIDTH))..(BUFFER_HEIGHT * BUFFER_WIDTH) {
-
                     buffer.chars[i] = blank;
                 }
             }
@@ -142,7 +141,7 @@ impl Writer {
     }
 
     #[allow(unused)]
-    pub fn write_str(&mut self, s: &str)  -> ::core::fmt::Result {
+    pub fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         for byte in s.bytes() {
             self.write_byte(byte)
         }

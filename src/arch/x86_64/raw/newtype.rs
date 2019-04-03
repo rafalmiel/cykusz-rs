@@ -18,13 +18,12 @@ macro_rules! simple_impl2 {
                 $type_(a.$method(&b))
             }
         }
-    }
+    };
 }
 
-macro_rules! simple_impl2_assign{
+macro_rules! simple_impl2_assign {
     (impl $trait_: ident for $type_: ident { fn $method: ident }) => {
         impl $trait_<$type_> for $type_ {
-
             fn $method(&mut self, $type_(b): $type_) {
                 (self.0).$method(b);
             }
@@ -32,7 +31,6 @@ macro_rules! simple_impl2_assign{
     };
     (impl $trait_: ident for $type_: ident { fn $method: ident } with $type2_:ident) => {
         impl $trait_<$type2_> for $type_ {
-
             fn $method(&mut self, b: $type2_) {
                 (self.0).$method(b);
             }
@@ -50,7 +48,7 @@ macro_rules! simple_impl1 {
                 $type_(a.$method())
             }
         }
-    }
+    };
 }
 
 macro_rules! simple_from {
@@ -60,7 +58,7 @@ macro_rules! simple_from {
                 $type_(v as usize)
             }
         }
-    }
+    };
 }
 
 macro_rules! enable_unsigned_ops {

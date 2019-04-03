@@ -2,9 +2,9 @@ use core::marker::PhantomData;
 
 use crate::arch::mm::virt::entry;
 use crate::arch::mm::virt::entry::Entry;
-use crate::kernel::mm::*;
-use crate::kernel::mm::Frame;
 use crate::kernel::mm::virt;
+use crate::kernel::mm::Frame;
+use crate::kernel::mm::*;
 
 use super::page;
 
@@ -21,9 +21,9 @@ pub trait NotLastLevel: TableLevel {
     type NextLevel: TableLevel;
 }
 pub trait TableLevel {}
-pub trait LastLevel : TableLevel {}
-pub trait HugePageLevel : TableLevel {}
-pub trait TopLevel : TableLevel {}
+pub trait LastLevel: TableLevel {}
+pub trait HugePageLevel: TableLevel {}
+pub trait TopLevel: TableLevel {}
 
 impl TableLevel for Level4 {}
 impl TableLevel for Level3 {}
@@ -52,18 +52,14 @@ pub type P4Table = Table<Level4>;
 
 impl<L> Table<L>
 where
-    L: TableLevel
+    L: TableLevel,
 {
     fn new_at_frame_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
-        unsafe {
-            frame.address_mapped().read_mut::<Table<L>>()
-        }
+        unsafe { frame.address_mapped().read_mut::<Table<L>>() }
     }
 
     fn new_at_frame<'a>(frame: &Frame) -> &'a Table<L> {
-        unsafe {
-            frame.address_mapped().read_ref::<Table<L>>()
-        }
+        unsafe { frame.address_mapped().read_ref::<Table<L>>() }
     }
 
     pub fn clear(&mut self) {
@@ -75,17 +71,18 @@ where
 
 impl<L> Table<L>
 where
-    L: NotLastLevel
+    L: NotLastLevel,
 {
-
     pub fn next_level_mut(&mut self, idx: usize) -> Option<&mut Table<L::NextLevel>> {
         let entry = &self.entries[idx];
 
         if !entry.contains(entry::Entry::PRESENT) {
-            return None
+            return None;
         }
 
-        Some(Table::<L::NextLevel>::new_at_frame_mut(&Frame::new(entry.address())))
+        Some(Table::<L::NextLevel>::new_at_frame_mut(&Frame::new(
+            entry.address(),
+        )))
     }
 
     pub fn alloc_next_level(&mut self, idx: usize) -> &mut Table<L::NextLevel> {
@@ -107,20 +104,23 @@ where
 
 impl<L> Table<L>
 where
-    L: HugePageLevel
+    L: HugePageLevel,
 {
     pub fn set_hugepage(&mut self, idx: usize, frame: &Frame) {
         let entry = &mut self.entries[idx];
 
         if !entry.contains(entry::Entry::PRESENT) {
-            entry.set_frame_flags(&frame, entry::Entry::PRESENT | entry::Entry::WRITABLE | entry::Entry::HUGE_PAGE);
+            entry.set_frame_flags(
+                &frame,
+                entry::Entry::PRESENT | entry::Entry::WRITABLE | entry::Entry::HUGE_PAGE,
+            );
         }
     }
 }
 
 impl<L> Table<L>
 where
-    L: LastLevel
+    L: LastLevel,
 {
     pub fn alloc(&mut self, idx: usize) {
         let entry = &mut self.entries[idx];
@@ -180,7 +180,7 @@ where
 
 impl<L> Table<L>
 where
-    L : NotLastLevel
+    L: NotLastLevel,
 {
     pub fn new_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
         Table::<L>::new_at_frame_mut(frame)
@@ -199,7 +199,7 @@ where
     }
 
     pub fn entry_at(&self, idx: usize) -> &Entry {
-        return &self.entries[idx]
+        return &self.entries[idx];
     }
 
     pub fn set_entry(&mut self, idx: usize, entry: &Entry) {
@@ -226,7 +226,11 @@ impl Table<Level4> {
         self.alloc_next_level(page.p4_index())
             .alloc_next_level(page.p3_index())
             .alloc_next_level(page.p2_index())
-            .set_flags(page.p1_index(), &Frame::new(phys), entry::Entry::from_kernel_flags(flags));
+            .set_flags(
+                page.p1_index(),
+                &Frame::new(phys),
+                entry::Entry::from_kernel_flags(flags),
+            );
     }
 
     pub fn map_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
@@ -249,11 +253,10 @@ impl Table<Level4> {
     pub fn unmap(&mut self, virt: VirtAddr) {
         let page = page::Page::new(virt);
 
-        if let Some(p1) = 
-            self.next_level_mut(page.p4_index())
-                .and_then(|t| t.next_level_mut(page.p3_index())
-                .and_then(|t| t.next_level_mut(page.p2_index()))) {
-
+        if let Some(p1) = self.next_level_mut(page.p4_index()).and_then(|t| {
+            t.next_level_mut(page.p3_index())
+                .and_then(|t| t.next_level_mut(page.p2_index()))
+        }) {
             p1.unmap(page.p1_index());
         } else {
             println!("ERROR: virt addr {} cannot be unmapped", virt);

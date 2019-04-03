@@ -19,7 +19,5 @@ impl InterruptController for Controller {
         PIC.lock().mask_int(int, masked);
     }
 
-    fn set_irq_dest(&self, _src: u8, _dst: u8) {
-    }
+    fn set_irq_dest(&self, _src: u8, _dst: u8) {}
 }
-

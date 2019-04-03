@@ -4,7 +4,7 @@ use crate::arch::raw::idt as ridt;
 use crate::kernel::sync::IrqLock;
 
 struct Timer {
-    pub handler: Option<fn () -> ()>,
+    pub handler: Option<fn() -> ()>,
 }
 
 #[thread_local]

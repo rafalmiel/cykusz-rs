@@ -6,9 +6,9 @@ pub mod tags;
 
 #[repr(C)]
 pub struct Info {
-    pub size:       u32,
-    reserved:       u32,
-    pub tag:        tags::Tag
+    pub size: u32,
+    reserved: u32,
+    pub tag: tags::Tag,
 }
 
 pub unsafe fn load(addr: MappedAddr) -> &'static Info {
@@ -17,7 +17,13 @@ pub unsafe fn load(addr: MappedAddr) -> &'static Info {
 
 impl Info {
     pub fn kernel_start_addr(&self) -> PhysAddr {
-        self.elf_tag().unwrap().sections().nth(0).unwrap().address().to_phys()
+        self.elf_tag()
+            .unwrap()
+            .sections()
+            .nth(0)
+            .unwrap()
+            .address()
+            .to_phys()
     }
 
     pub fn kernel_end_addr(&self) -> PhysAddr {
@@ -27,60 +33,50 @@ impl Info {
     }
 
     pub fn modules_start_addr(&self) -> Option<PhysAddr> {
-        self.modules_tags().nth(0).and_then(|m| Some(VirtAddr(m.mod_start as usize).to_phys()))
+        self.modules_tags()
+            .nth(0)
+            .and_then(|m| Some(VirtAddr(m.mod_start as usize).to_phys()))
     }
 
     pub fn modules_end_addr(&self) -> Option<PhysAddr> {
-        self.modules_tags().last().and_then(|m| Some(VirtAddr(m.mod_end as usize).to_phys()))
+        self.modules_tags()
+            .last()
+            .and_then(|m| Some(VirtAddr(m.mod_end as usize).to_phys()))
     }
 
     pub fn tags(&self) -> tags::TagIter {
         tags::TagIter {
-            current: &self.tag as *const _
+            current: &self.tag as *const _,
         }
     }
 
     pub fn memory_map_tag(&self) -> Option<&'static tags::memory::Memory> {
-        self.tags().find(
-            |t| t.typ == 6
-        ).map(
-            |t| unsafe {
-                &*(t as *const tags::Tag as *const tags::memory::Memory)
-            }
-        )
+        self.tags()
+            .find(|t| t.typ == 6)
+            .map(|t| unsafe { &*(t as *const tags::Tag as *const tags::memory::Memory) })
     }
 
     pub fn address_tag(&self) -> Option<&'static tags::address::Address> {
-        self.tags().find(
-            |t| t.typ == 2
-        ).map(
-            |t| unsafe {
-                &*(t as *const tags::Tag as *const tags::address::Address)
-            }
-        )
+        self.tags()
+            .find(|t| t.typ == 2)
+            .map(|t| unsafe { &*(t as *const tags::Tag as *const tags::address::Address) })
     }
 
     pub fn elf_tag(&self) -> Option<&'static tags::elf::Elf> {
-        self.tags().find(
-            |t| t.typ == 9
-        ).map(
-            |t| unsafe {
-                &*(t as *const tags::Tag as *const tags::elf::Elf)
-            }
-        )
+        self.tags()
+            .find(|t| t.typ == 9)
+            .map(|t| unsafe { &*(t as *const tags::Tag as *const tags::elf::Elf) })
     }
 
-    pub fn modules_tags(&self) ->
-        ::core::iter::FilterMap<
-            tags::TagIter,
-            fn(&tags::Tag) -> Option<&'static tags::modules::Modules>
-        > {
-
+    pub fn modules_tags(
+        &self,
+    ) -> ::core::iter::FilterMap<
+        tags::TagIter,
+        fn(&tags::Tag) -> Option<&'static tags::modules::Modules>,
+    > {
         self.tags().filter_map(|t| {
             if t.typ == 3 {
-                Some(unsafe {
-                    &*(t as *const tags::Tag as *const tags::modules::Modules)
-                })
+                Some(unsafe { &*(t as *const tags::Tag as *const tags::modules::Modules) })
             } else {
                 None
             }

@@ -38,16 +38,18 @@ pub struct ChainedPics {
 impl ChainedPics {
     pub const unsafe fn new(offset1: u8, offset2: u8) -> ChainedPics {
         ChainedPics {
-            pics: [Pic {
-                       offset: offset1,
-                       command: UnsafePort::new(0x20),
-                       data: UnsafePort::new(0x21),
-                   },
-                   Pic {
-                       offset: offset2,
-                       command: UnsafePort::new(0xA0),
-                       data: UnsafePort::new(0xA1),
-                   }],
+            pics: [
+                Pic {
+                    offset: offset1,
+                    command: UnsafePort::new(0x20),
+                    data: UnsafePort::new(0x21),
+                },
+                Pic {
+                    offset: offset2,
+                    command: UnsafePort::new(0xA0),
+                    data: UnsafePort::new(0xA1),
+                },
+            ],
         }
     }
 
@@ -83,7 +85,7 @@ impl ChainedPics {
         self.pics[1].data.write(MODE_8086);
         wait();
 
-        self.pics[0].data.write(saved_mask1 | 0b00000001);//disable timer?
+        self.pics[0].data.write(saved_mask1 | 0b00000001); //disable timer?
         self.pics[1].data.write(saved_mask2);
     }
 
@@ -105,17 +107,12 @@ impl ChainedPics {
     }
 
     pub fn mask_int(&mut self, irq: u8, masked: bool) {
-        let (irqline, port) =
-            if irq < 8 { (irq, 0) } else { (irq - 8, 1) };
+        let (irqline, port) = if irq < 8 { (irq, 0) } else { (irq - 8, 1) };
 
         let val = if masked {
-            unsafe {
-                self.pics[port].data.read() | (1 << irqline)
-            }
+            unsafe { self.pics[port].data.read() | (1 << irqline) }
         } else {
-            unsafe {
-                self.pics[port].data.read() & !(1 << irqline)
-            }
+            unsafe { self.pics[port].data.read() & !(1 << irqline) }
         };
 
         unsafe {
@@ -135,9 +132,7 @@ impl ChainedPics {
     }
 
     pub fn get_isr(&mut self) -> u16 {
-        unsafe {
-            self.get_irq_reg(CMD_READ_ISR)
-        }
+        unsafe { self.get_irq_reg(CMD_READ_ISR) }
     }
 
     fn is_pic0_pic1_active(&mut self) -> (bool, bool) {
@@ -158,7 +153,6 @@ impl ChainedPics {
             }
         }
     }
-
 }
 
 pub fn init() {

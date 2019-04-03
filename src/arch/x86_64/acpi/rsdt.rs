@@ -15,7 +15,7 @@ pub struct AcpiStdHeader {
     oem_table_id: [u8; 8],
     oem_revision: u32,
     creator_id: u32,
-    creator_revision: u32
+    creator_revision: u32,
 }
 
 pub trait RsdtPtrType {
@@ -48,32 +48,26 @@ pub struct RsdtIter<T: 'static + RsdtPtrType + ::core::marker::Sized> {
 impl AcpiStdHeader {
     pub fn is_valid(&self) -> bool {
         use super::util::checksum;
-        unsafe {
-            checksum(self as *const _ as *const u8, self.length as isize)
-        }
-
+        unsafe { checksum(self as *const _ as *const u8, self.length as isize) }
     }
 }
 
-impl<T : RsdtPtrType> Rsdt<T> {
-
+impl<T: RsdtPtrType> Rsdt<T> {
     pub fn entries_count(&'static self) -> usize {
         (self.hdr.length as usize - size_of::<Self>()) / 4
     }
 
     fn raw_entries(&'static self) -> *const T {
-        unsafe {
-            (self as *const _ as *const u8).offset(size_of::<Self>() as isize) as *const T
-        }
+        unsafe { (self as *const _ as *const u8).offset(size_of::<Self>() as isize) as *const T }
     }
 
     pub fn entry_at(&'static self, i: usize) -> &'static AcpiStdHeader {
         assert!(i < self.entries_count());
 
         unsafe {
-            PhysAddr(
-                (self.raw_entries().offset(i as isize)).read().as_usize()
-            ).to_mapped().read_ref::<AcpiStdHeader>()
+            PhysAddr((self.raw_entries().offset(i as isize)).read().as_usize())
+                .to_mapped()
+                .read_ref::<AcpiStdHeader>()
         }
     }
 
@@ -81,14 +75,12 @@ impl<T : RsdtPtrType> Rsdt<T> {
         RsdtIter::<T> {
             rsdt: self,
             current: 0,
-            total: self.entries_count()
+            total: self.entries_count(),
         }
     }
 
     fn find_entry(&'static self, val: &[u8]) -> Option<&'static AcpiStdHeader> {
-        self.entries().find(|e| {
-            &e.signature == val && e.is_valid()
-        })
+        self.entries().find(|e| &e.signature == val && e.is_valid())
     }
 
     pub fn find_apic_entry(&'static self) -> Option<&'static MatdHeader> {
@@ -98,10 +90,9 @@ impl<T : RsdtPtrType> Rsdt<T> {
     pub fn find_hpet_entry(&'static self) -> Option<&'static HpetHeader> {
         Some(self.find_entry(b"HPET")?.into_hpet())
     }
-
 }
 
-impl<T : RsdtPtrType> Iterator for RsdtIter<T> {
+impl<T: RsdtPtrType> Iterator for RsdtIter<T> {
     type Item = &'static AcpiStdHeader;
 
     fn next(&mut self) -> Option<&'static AcpiStdHeader> {
@@ -117,16 +108,13 @@ impl<T : RsdtPtrType> Iterator for RsdtIter<T> {
     }
 }
 
-
 impl AcpiStdHeader {
     unsafe fn to<T>(&'static self) -> &'static T {
         &*(self as *const _ as *const T)
     }
 
     pub fn into_rsdt(&'static self) -> &'static Rsdt<u32> {
-        if self.is_valid() &&
-            &self.signature == b"RSDT" {
-
+        if self.is_valid() && &self.signature == b"RSDT" {
             unsafe {
                 return self.to::<Rsdt<u32>>();
             }
@@ -135,9 +123,7 @@ impl AcpiStdHeader {
     }
 
     pub fn into_xsdt(&'static self) -> &'static Rsdt<u64> {
-        if self.is_valid() &&
-            &self.signature == b"XSDT" {
-
+        if self.is_valid() && &self.signature == b"XSDT" {
             unsafe {
                 return self.to::<Rsdt<u64>>();
             }
@@ -146,9 +132,7 @@ impl AcpiStdHeader {
     }
 
     pub fn into_matd(&'static self) -> &'static MatdHeader {
-        if self.is_valid() &&
-            &self.signature == b"APIC" {
-
+        if self.is_valid() && &self.signature == b"APIC" {
             unsafe {
                 return self.to::<MatdHeader>();
             }
@@ -158,9 +142,7 @@ impl AcpiStdHeader {
     }
 
     pub fn into_hpet(&'static self) -> &'static HpetHeader {
-        if self.is_valid() &&
-            &self.signature == b"HPET" {
-
+        if self.is_valid() && &self.signature == b"HPET" {
             unsafe {
                 return self.to::<HpetHeader>();
             }
@@ -172,9 +154,7 @@ impl AcpiStdHeader {
 
 impl Rsdt<u32> {
     pub fn new(addr: MappedAddr) -> &'static Rsdt<u32> {
-        let r = unsafe {
-            addr.read_ref::<Rsdt<u32>>()
-        };
+        let r = unsafe { addr.read_ref::<Rsdt<u32>>() };
 
         if !r.hdr.is_valid() || &r.hdr.signature != b"RSDT" {
             panic!("Rsdt addr is invalid: {}", addr);
@@ -186,9 +166,7 @@ impl Rsdt<u32> {
 
 impl Rsdt<u64> {
     pub fn new(addr: MappedAddr) -> &'static Rsdt<u64> {
-        let r = unsafe {
-            addr.read_ref::<Rsdt<u64>>()
-        };
+        let r = unsafe { addr.read_ref::<Rsdt<u64>>() };
 
         if !r.hdr.is_valid() || &r.hdr.signature != b"XSDT" {
             panic!("Xsdt addr is invalid: {}", addr);

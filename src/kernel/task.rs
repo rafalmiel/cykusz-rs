@@ -24,7 +24,7 @@ impl From<usize> for TaskState {
             2 => Runnable,
             3 => ToReschedule,
             4 => ToDelete,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
@@ -36,7 +36,7 @@ pub struct Task {
     locks: AtomicUsize,
 }
 
-unsafe impl Sync for Task{}
+unsafe impl Sync for Task {}
 
 impl Task {
     pub fn this() -> Task {

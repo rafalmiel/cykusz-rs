@@ -26,7 +26,7 @@ pub unsafe fn flush_all() {
 }
 
 pub fn enable_nxe_bit() {
-    use crate::arch::raw::msr::{IA32_EFER, rdmsr, wrmsr};
+    use crate::arch::raw::msr::{rdmsr, wrmsr, IA32_EFER};
 
     let nxe_bit = 1 << 11;
     unsafe {

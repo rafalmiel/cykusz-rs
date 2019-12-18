@@ -17,7 +17,7 @@ pub fn is_enabled() -> bool {
 }
 
 lazy_static! {
-    static ref CONTROLLER: &'static InterruptController = &apic::CONTROLLER;
+    static ref CONTROLLER: &'static dyn InterruptController = &apic::CONTROLLER;
 }
 
 pub fn enable() {

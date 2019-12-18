@@ -6,10 +6,9 @@
 #![feature(abi_x86_interrupt)]
 #![feature(concat_idents)]
 #![feature(step_trait)]
-#![feature(alloc, allocator_api)]
+#![feature(allocator_api)]
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
-#![feature(const_vec_new)]
 #![feature(nll)]
 
 extern crate alloc;

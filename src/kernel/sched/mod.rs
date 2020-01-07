@@ -1,5 +1,5 @@
-use core::sync::atomic::Ordering;
 use core::sync::atomic::{AtomicBool, AtomicUsize};
+use core::sync::atomic::Ordering;
 
 use spin::Once;
 
@@ -162,4 +162,6 @@ pub fn enable_lock_protection() {
 
 pub fn init() {
     SCHEDULER.call_once(|| Scheduler::default());
+
+    enable_lock_protection();
 }

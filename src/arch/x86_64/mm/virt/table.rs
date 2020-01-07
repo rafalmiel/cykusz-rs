@@ -2,9 +2,11 @@ use core::marker::PhantomData;
 
 use crate::arch::mm::virt::entry;
 use crate::arch::mm::virt::entry::Entry;
-use crate::kernel::mm::virt;
-use crate::kernel::mm::Frame;
+use crate::arch::x86_64::mm::phys::PhysPage;
 use crate::kernel::mm::*;
+use crate::kernel::mm::Frame;
+use crate::kernel::mm::virt;
+use crate::kernel::sync::MutexGuard;
 
 use super::page;
 
@@ -67,6 +69,14 @@ where
             self.entries[i].clear();
         }
     }
+
+    pub fn phys_addr(&self) -> PhysAddr {
+        MappedAddr(self as *const _ as usize).to_phys()
+    }
+
+    pub fn phys_page(&self) -> Option<&'static PhysPage> {
+        self.phys_addr().to_phys_page()
+    }
 }
 
 impl<L> Table<L>
@@ -99,6 +109,30 @@ where
         entry.set_flags(entry::Entry::PRESENT | entry::Entry::WRITABLE | entry::Entry::USER);
 
         Table::<L::NextLevel>::new_at_frame_mut(&Frame::new(entry.address()))
+    }
+
+    pub fn new_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
+        Table::<L>::new_at_frame_mut(frame)
+    }
+
+    pub fn new<'a>(frame: &Frame) -> &'a Table<L> {
+        Table::<L>::new_at_frame(frame)
+    }
+
+    pub fn new_mut_at_phys<'a>(addr: PhysAddr) -> &'a mut Table<L> {
+        Table::<L>::new_mut(&Frame::new(addr))
+    }
+
+    pub fn new_at_phys<'a>(addr: PhysAddr) -> &'a Table<L> {
+        Table::<L>::new(&Frame::new(addr))
+    }
+
+    pub fn entry_at(&self, idx: usize) -> &Entry {
+        return &self.entries[idx];
+    }
+
+    pub fn set_entry(&mut self, idx: usize, entry: &Entry) {
+        self.entries[idx].set_raw(entry.raw());
     }
 }
 
@@ -178,41 +212,18 @@ where
     }
 }
 
-impl<L> Table<L>
-where
-    L: NotLastLevel,
-{
-    pub fn new_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
-        Table::<L>::new_at_frame_mut(frame)
-    }
-
-    pub fn new<'a>(frame: &Frame) -> &'a Table<L> {
-        Table::<L>::new_at_frame(frame)
-    }
-
-    pub fn new_mut_at_phys<'a>(addr: PhysAddr) -> &'a mut Table<L> {
-        Table::<L>::new_mut(&Frame::new(addr))
-    }
-
-    pub fn new_at_phys<'a>(addr: PhysAddr) -> &'a Table<L> {
-        Table::<L>::new(&Frame::new(addr))
-    }
-
-    pub fn entry_at(&self, idx: usize) -> &Entry {
-        return &self.entries[idx];
-    }
-
-    pub fn set_entry(&mut self, idx: usize, entry: &Entry) {
-        self.entries[idx].set_raw(entry.raw());
-    }
-
-    pub fn phys_addr(&self) -> PhysAddr {
-        MappedAddr(self as *const _ as usize).to_phys()
-    }
-}
-
 impl Table<Level4> {
+    fn lock(&self) -> Option<MutexGuard<'static, ()>> {
+        if let Some(pp) = self.phys_page() {
+            Some(pp.lock_pt())
+        } else {
+            None
+        }
+    }
+
     pub fn map_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) {
+        let _g = self.lock();
+
         let page = page::Page::new(addr);
         self.alloc_next_level(page.p4_index())
             .alloc_next_level(page.p3_index())
@@ -221,6 +232,8 @@ impl Table<Level4> {
     }
 
     pub fn map_to_flags(&mut self, virt: VirtAddr, phys: PhysAddr, flags: virt::PageFlags) {
+        let _g = self.lock();
+
         let page = page::Page::new(virt);
 
         self.alloc_next_level(page.p4_index())
@@ -234,6 +247,8 @@ impl Table<Level4> {
     }
 
     pub fn map_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
+        let _g = self.lock();
+
         let page = page::Page::new(virt);
 
         self.alloc_next_level(page.p4_index())
@@ -243,6 +258,8 @@ impl Table<Level4> {
     }
 
     pub fn map_hugepage_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
+        let _g = self.lock();
+
         let page = page::Page::new(virt);
 
         self.alloc_next_level(page.p4_index())
@@ -251,6 +268,8 @@ impl Table<Level4> {
     }
 
     pub fn unmap(&mut self, virt: VirtAddr) {
+        let _g = self.lock();
+
         let page = page::Page::new(virt);
 
         if let Some(p1) = self.next_level_mut(page.p4_index()).and_then(|t| {

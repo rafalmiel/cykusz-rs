@@ -1,5 +1,8 @@
 use core::ops::*;
 
+use crate::arch::x86_64::mm::PAGE_SIZE;
+use crate::arch::x86_64::mm::phys::PhysPage;
+
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
 pub struct VirtAddr(pub usize);
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
@@ -10,6 +13,18 @@ pub struct MappedAddr(pub usize);
 enable_unsigned_ops!(VirtAddr);
 enable_unsigned_ops!(PhysAddr);
 enable_unsigned_ops!(MappedAddr);
+
+impl PhysAddr {
+    pub fn to_phys_page(&self) -> Option<&'static PhysPage> {
+        if crate::arch::mm::phys::pages().is_none() {
+            None
+        } else {
+            let idx = self.align_down(PAGE_SIZE).0 / PAGE_SIZE;
+
+            return Some(&crate::arch::mm::phys::pages().unwrap()[idx]);
+        }
+    }
+}
 
 pub unsafe fn flush(addr: usize) {
     asm!("invlpg ($0)" :: "r" (addr) : "memory");

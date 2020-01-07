@@ -20,7 +20,7 @@ pub fn notify_ap_ready() {
     crate::arch::smp::notify_ap_ready();
 
     // Waiting for all CPUs to be ready
-    while SMP_INITIALISED.load(Ordering::SeqCst) == false {
+    while !is_smp_initialised() {
         unsafe {
             asm!("pause"::::"volatile");
         }

@@ -1,6 +1,9 @@
+use core::sync::atomic::AtomicU64;
+use core::sync::atomic::Ordering;
+
 use crate::drivers::multiboot2;
 use crate::drivers::multiboot2::memory::MemoryIter;
-use crate::kernel::mm::Frame;
+use crate::kernel::mm::{Frame, PAGE_SIZE};
 use crate::kernel::mm::{MappedAddr, PhysAddr};
 use crate::kernel::sync::Mutex;
 
@@ -21,6 +24,8 @@ struct PhysAllocatorList {
 static PHYS_LIST: Mutex<PhysAllocatorList> = Mutex::new(PhysAllocatorList {
     head: LIST_ADDR_INVALID,
 });
+
+pub static NUM_PAGES: AtomicU64 = AtomicU64::new(0);
 
 pub fn allocate() -> Option<Frame> {
     let mut list = PHYS_LIST.lock();
@@ -91,6 +96,8 @@ pub fn init(mboot_info: &multiboot2::Info) {
         unsafe {
             p.to_mapped().store(LIST_ADDR_INVALID);
         }
+
+        NUM_PAGES.store((p.0 / PAGE_SIZE) as u64, Ordering::SeqCst);
     }
 
     let mut l = PHYS_LIST.lock();

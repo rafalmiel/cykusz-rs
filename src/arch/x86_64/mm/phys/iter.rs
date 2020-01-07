@@ -1,6 +1,6 @@
 use crate::drivers::multiboot2::memory::MemoryIter;
-use crate::kernel::mm::PhysAddr;
 use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::PhysAddr;
 
 pub struct PhysMemIterator {
     current: PhysAddr,
@@ -16,7 +16,7 @@ pub struct PhysMemIterator {
 }
 
 fn not_contains(saddr: PhysAddr, start: PhysAddr, end: PhysAddr) -> bool {
-    let eaddr = saddr + PAGE_SIZE;
+    let eaddr = saddr + PAGE_SIZE - 1;
 
     (saddr < start && eaddr < start) || (saddr >= end && eaddr >= end)
 }

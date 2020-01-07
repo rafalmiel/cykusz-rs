@@ -46,6 +46,12 @@ pub fn bochs() {
 pub fn rust_main(stack_top: VirtAddr) {
     kernel::mm::init();
 
+    println!("[ OK ] Heap Initialised");
+
+    arch::mm::phys::init_pages();
+
+    println!("[ OK ] Phys Page Map Initialised");
+
     kernel::smp::init();
 
     kernel::tls::init(stack_top);
@@ -57,8 +63,6 @@ pub fn rust_main(stack_top: VirtAddr) {
     }
 
     kernel::sched::init();
-
-    kernel::sched::enable_lock_protection();
 
     println!("[ OK ] Scheduler Initialised");
 
@@ -80,7 +84,7 @@ pub fn rust_main(stack_top: VirtAddr) {
     println!("[ OK ] Local Timer Started");
 
     // Start test tasks on this cpu
-    task_test::start();
+    //task_test::start();
 
     idle();
 }
@@ -103,7 +107,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::timer::start();
 
     // Start test tasks on this cpu
-    task_test::start();
+    //task_test::start();
 
     idle();
 }

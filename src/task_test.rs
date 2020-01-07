@@ -1,6 +1,6 @@
 use core::sync::atomic::Ordering;
 
-const WORK_COUNT: usize = 0x5000;
+const WORK_COUNT: usize = 0x50000;
 const ITERS: usize = 1; //<usize>::max_value();
 
 pub fn dummy_work() {

@@ -66,9 +66,9 @@ impl Task {
         }
     }
 
-    pub fn new_user(fun: MappedAddr, code_size: usize, stack: usize) -> Task {
+    pub fn new_user(fun: MappedAddr, code_size: usize) -> Task {
         Task {
-            arch_task: UnsafeCell::new(ArchTask::new_user(fun, code_size, stack)),
+            arch_task: UnsafeCell::new(ArchTask::new_user(fun, code_size)),
             id: crate::kernel::sched::new_task_id(),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),

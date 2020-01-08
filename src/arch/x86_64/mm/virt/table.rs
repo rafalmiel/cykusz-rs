@@ -3,9 +3,9 @@ use core::marker::PhantomData;
 use crate::arch::mm::virt::entry;
 use crate::arch::mm::virt::entry::Entry;
 use crate::arch::x86_64::mm::phys::PhysPage;
-use crate::kernel::mm::*;
-use crate::kernel::mm::Frame;
 use crate::kernel::mm::virt;
+use crate::kernel::mm::Frame;
+use crate::kernel::mm::*;
 use crate::kernel::sync::MutexGuard;
 
 use super::page;
@@ -35,6 +35,7 @@ impl TableLevel for Level1 {}
 impl LastLevel for Level1 {}
 impl TopLevel for Level4 {}
 impl HugePageLevel for Level2 {}
+
 impl NotLastLevel for Level4 {
     type NextLevel = Level3;
 }

@@ -6,9 +6,9 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use linked_list_allocator::{align_up, Heap};
 
 use crate::arch::mm::heap::{HEAP_END, HEAP_SIZE, HEAP_START};
-use crate::kernel::mm::*;
 use crate::kernel::mm::map;
 use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::*;
 use crate::kernel::sync::Mutex;
 
 pub fn init() {

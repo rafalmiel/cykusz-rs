@@ -16,7 +16,8 @@ rust_os := target/$(target)/release/libcykusz_rs.a
 all: $(kernel)
 
 userspace/program: userspace/program.asm
-	nasm -f bin $< -o $@
+	nasm -f elf64 $<
+	gcc -s -nostdlib -no-pie userspace/program.o -o userspace/program
 
 clean:
 	cargo clean

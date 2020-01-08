@@ -6,6 +6,6 @@ ata0-master:     type=cdrom, path=build/os-x86_64.iso, status=inserted
 boot:            cdrom
 log:             bochslog.txt
 clock:           sync=realtime, rtc_sync=1, time0=local
-cpu:             count=4, ips=1000000, reset_on_triple_fault=0, model=corei7_haswell_4770
+cpu:             count=1, ips=1000000, reset_on_triple_fault=0, model=corei7_haswell_4770
 cpuid:           1g_pages=0, apic=x2apic
 debug:           CMOS=report

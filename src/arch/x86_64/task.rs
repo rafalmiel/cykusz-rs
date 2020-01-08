@@ -3,6 +3,7 @@ use core::ptr::Unique;
 use crate::arch::gdt;
 use crate::arch::mm::virt::p4_table_addr;
 use crate::arch::raw::segmentation::SegmentSelector;
+use crate::arch::x86_64::mm::PAGE_SIZE;
 use crate::kernel::mm::heap::allocate_align as heap_allocate_align;
 use crate::kernel::mm::heap::deallocate_align as heap_deallocate_align;
 use crate::kernel::mm::MappedAddr;
@@ -62,7 +63,7 @@ fn task_finished() {
     crate::kernel::sched::task_finished();
 }
 
-fn allocate_page_table(fun: MappedAddr, code_size: usize) -> PhysAddr {
+fn allocate_page_table(fun: MappedAddr, _code_size: usize) -> (PhysAddr, VirtAddr, VirtAddr) {
     use crate::arch::mm::phys::allocate;
     use crate::arch::mm::virt::{current_p4_table, table::P4Table};
     use crate::kernel::mm::virt;
@@ -77,19 +78,61 @@ fn allocate_page_table(fun: MappedAddr, code_size: usize) -> PhysAddr {
         new_p4.set_entry(i, current_p4.entry_at(i));
     }
 
-    let code = allocate().expect("Out of mem!");
-    for i in 0..code_size {
-        unsafe {
-            (code.address_mapped() + i).store((fun + i).read::<u8>());
+    use crate::drivers::elf::types::ProgramFlags;
+    use crate::drivers::elf::types::ProgramType;
+    use crate::drivers::elf::ElfHeader;
+
+    let hdr = unsafe { ElfHeader::load(fun) };
+
+    for p in hdr.programs() {
+        if p.p_type == ProgramType::Load {
+            let mut flags = virt::PageFlags::USER;
+
+            if p.p_flags.contains(ProgramFlags::WRITABLE) {
+                flags |= virt::PageFlags::WRITABLE;
+            }
+
+            if !p.p_flags.contains(ProgramFlags::EXECUTABLE) {
+                flags |= virt::PageFlags::NO_EXECUTE;
+            }
+
+            let pv = p.p_vaddr;
+            let pv_end = p.p_vaddr + p.p_memsz;
+
+            let code_addr = fun + p.p_offset as usize;
+            let mut remaining = p.p_filesz;
+
+            //This should be done in a page fault in future
+            for virt_addr in (pv as usize..pv_end as usize).step_by(PAGE_SIZE) {
+                let code = allocate().expect("Out of mem!");
+
+                for pos in 0..PAGE_SIZE {
+                    if remaining == 0 {
+                        break;
+                    }
+
+                    unsafe {
+                        (code.address_mapped() + pos).store::<u8>((code_addr + pos).read::<u8>());
+                    }
+
+                    remaining -= 1;
+                }
+
+                new_p4.map_to_flags(VirtAddr(virt_addr as usize), code.address(), flags);
+            }
         }
     }
 
-    new_p4.map_to_flags(VirtAddr(0x40000), code.address(), virt::PageFlags::USER);
     new_p4.map_flags(
-        VirtAddr(0x60000),
+        VirtAddr(0x600000),
         virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,
     );
-    new_p4.phys_addr()
+
+    (
+        new_p4.phys_addr(),
+        VirtAddr(hdr.e_entry as usize),
+        VirtAddr(0x600000),
+    )
 }
 
 #[repr(C, packed)]
@@ -98,7 +141,7 @@ struct IretqFrame {
     pub cs: usize,
     pub rlfags: usize,
     pub sp: usize,
-    pub ds: usize,
+    pub ss: usize,
     pub task_finished_fun: usize,
 }
 
@@ -141,7 +184,7 @@ impl Task {
                 as *mut IretqFrame);
 
             frame.task_finished_fun = task_finished as usize;
-            frame.ds = ds.bits() as usize;
+            frame.ss = ds.bits() as usize;
             frame.sp = user_stack.unwrap_or(sp.offset(-8) as usize);
             frame.rlfags = if int_enabled { 0x200 } else { 0x0 };
             frame.cs = cs.bits() as usize;
@@ -208,10 +251,10 @@ impl Task {
         )
     }
 
-    pub fn new_user(fun: MappedAddr, code_size: usize, stack: usize) -> Task {
-        let new_p4 = allocate_page_table(fun, code_size);
+    pub fn new_user(elf: MappedAddr, code_size: usize) -> Task {
+        let (new_p4, entry, stack) = allocate_page_table(elf, code_size);
 
-        let f = unsafe { ::core::mem::transmute::<usize, fn()>(0x40000) };
+        let f = unsafe { ::core::mem::transmute::<usize, fn()>(entry.0) };
 
         Task::new(
             f,
@@ -219,7 +262,7 @@ impl Task {
             gdt::ring3_ds(),
             true,
             new_p4,
-            Some(stack),
+            Some(stack.0),
         )
     }
 

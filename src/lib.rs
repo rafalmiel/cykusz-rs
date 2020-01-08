@@ -84,7 +84,7 @@ pub fn rust_main(stack_top: VirtAddr) {
     println!("[ OK ] Local Timer Started");
 
     // Start test tasks on this cpu
-    //task_test::start();
+    task_test::start();
 
     idle();
 }
@@ -107,7 +107,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::timer::start();
 
     // Start test tasks on this cpu
-    //task_test::start();
+    task_test::start();
 
     idle();
 }

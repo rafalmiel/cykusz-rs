@@ -1,5 +1,5 @@
-use core::sync::atomic::{AtomicBool, AtomicUsize};
 use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicBool, AtomicUsize};
 
 use spin::Once;
 
@@ -67,10 +67,10 @@ impl Scheduler {
         self.cpu_queues.add_task(task);
     }
 
-    fn add_user_task(&self, fun: MappedAddr, code_size: usize, stack: usize) {
+    fn add_user_task(&self, fun: MappedAddr, code_size: usize) {
         let _g = IrqGuard::new();
 
-        let task = self.tasks.add_user_task(fun, code_size, stack);
+        let task = self.tasks.add_user_task(fun, code_size);
 
         self.cpu_queues.add_task(task);
     }
@@ -130,8 +130,8 @@ pub fn create_task(fun: fn()) {
     scheduler().add_task(fun);
 }
 
-pub fn create_user_task(fun: MappedAddr, code_size: u64, stack: usize) {
-    scheduler().add_user_task(fun, code_size as usize, stack);
+pub fn create_user_task(fun: MappedAddr, code_size: u64) {
+    scheduler().add_user_task(fun, code_size as usize);
 }
 
 fn lock_protection_ready() -> bool {

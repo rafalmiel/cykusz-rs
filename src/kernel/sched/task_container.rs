@@ -26,8 +26,8 @@ impl TaskContainer {
         task
     }
 
-    pub fn add_user_task(&self, fun: MappedAddr, code_size: usize, stack: usize) -> Arc<Task> {
-        let task = Arc::new(Task::new_user(fun, code_size, stack));
+    pub fn add_user_task(&self, fun: MappedAddr, code_size: usize) -> Arc<Task> {
+        let task = Arc::new(Task::new_user(fun, code_size));
 
         self.tasks.lock().insert(task.id(), task.clone());
 

@@ -1,9 +1,12 @@
 BITS 64
+section .text
+global _start
+_start:
 loop:
 mov rax, 0xDEADBEEF
 mov rbx, 0x10000000
 loop2:
-mov rcx, 0x60000
+mov rcx, 0x600000
 mov [rcx], rax
 dec rbx
 cmp rbx, 0

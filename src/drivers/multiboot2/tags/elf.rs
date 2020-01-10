@@ -14,7 +14,7 @@ pub struct Elf {
 pub struct ElfSection {
     name: u32,
     pub typ: u32,
-    pub flags: u64,
+    pub flags: ElfSectionFlags,
     addr: u64,
     offset: u64,
     pub size: u64,
@@ -46,12 +46,13 @@ pub enum ElfSectionType {
     DynamicLoaderSymbolTable = 11,
 }
 
-#[repr(u32)]
-pub enum ElfSectionFlags {
-    Writable = 0x1,
-    Allocated = 0x2,
-    Executable = 0x4,
-}
+bitflags!(
+    pub struct ElfSectionFlags: u64 {
+        const WRITABLE = 1;
+        const ALLOCATED = 2;
+        const EXECUTABLE = 4;
+    }
+);
 
 impl Elf {
     pub fn sections(&'static self) -> ElfSectionIter {
@@ -91,7 +92,7 @@ impl Iterator for ElfSectionIter {
             self.remaining -= 1;
 
             if (section.typ == ElfSectionType::Unused as u32)
-                || (section.flags & ElfSectionFlags::Allocated as u64 == 0)
+                || !section.flags.contains(ElfSectionFlags::ALLOCATED)
             {
                 self.next()
             } else {

@@ -15,9 +15,8 @@ rust_os := target/$(target)/release/libcykusz_rs.a
 
 all: $(kernel)
 
-userspace/program: userspace/program.asm
-	nasm -f elf64 $<
-	gcc -s -nostdlib -no-pie userspace/program.o -o userspace/program
+userspace/target/debug/program: userspace/src/main.rs
+	cd userspace && cargo rustc -- -C link-arg=-no-pie -C link-arg=-nostartfiles -C link-arg=-static
 
 clean:
 	cargo clean
@@ -41,11 +40,11 @@ bochs: $(iso)
 
 iso: $(iso)
 
-$(iso): $(kernel) $(grub_cfg) userspace/program
+$(iso): $(kernel) $(grub_cfg) userspace/target/debug/program
 	mkdir -p build/isofiles/boot/grub
 	cp $(kernel) build/isofiles/boot/kernel.bin
 	cp $(grub_cfg) build/isofiles/boot/grub
-	cp userspace/program build/isofiles/boot/program
+	cp userspace/target/debug/program build/isofiles/boot/program
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)

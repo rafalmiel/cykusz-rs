@@ -4,6 +4,7 @@ use crate::arch::gdt;
 use crate::arch::mm::virt::p4_table_addr;
 use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::x86_64::mm::PAGE_SIZE;
+use crate::arch::x86_64::mm::virt::table::P4Table;
 use crate::kernel::mm::heap::allocate_align as heap_allocate_align;
 use crate::kernel::mm::heap::deallocate_align as heap_deallocate_align;
 use crate::kernel::mm::MappedAddr;
@@ -63,10 +64,9 @@ fn task_finished() {
     crate::kernel::sched::task_finished();
 }
 
-fn allocate_page_table(fun: MappedAddr, _code_size: usize) -> (PhysAddr, VirtAddr, VirtAddr) {
+fn prepare_p4<'a>() -> &'a mut P4Table {
     use crate::arch::mm::phys::allocate;
-    use crate::arch::mm::virt::{current_p4_table, table::P4Table};
-    use crate::kernel::mm::virt;
+    use crate::arch::mm::virt::current_p4_table;
 
     let current_p4 = current_p4_table();
     let frame = allocate().expect("Out of mem!");
@@ -74,65 +74,68 @@ fn allocate_page_table(fun: MappedAddr, _code_size: usize) -> (PhysAddr, VirtAdd
 
     new_p4.clear();
 
+    // Map kernel code to the user space, don't care about intel exploits for now
     for i in 256..512 {
         new_p4.set_entry(i, current_p4.entry_at(i));
     }
 
-    use crate::drivers::elf::types::ProgramFlags;
+    new_p4
+}
+
+fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, VirtAddr, VirtAddr) {
+    use crate::arch::mm::phys::allocate;
+    use crate::kernel::mm::virt;
     use crate::drivers::elf::types::ProgramType;
     use crate::drivers::elf::ElfHeader;
 
-    let hdr = unsafe { ElfHeader::load(fun) };
+    let hdr = unsafe { ElfHeader::load(elf_module) };
 
     for p in hdr.programs() {
         if p.p_type == ProgramType::Load {
-            let mut flags = virt::PageFlags::USER;
+            let flags = virt::PageFlags::USER | virt::PageFlags::from(p.p_flags);
 
-            if p.p_flags.contains(ProgramFlags::WRITABLE) {
-                flags |= virt::PageFlags::WRITABLE;
-            }
+            let virt_begin = p.p_vaddr as usize;
+            let virt_end = p.p_vaddr as usize + p.p_memsz as usize;
 
-            if !p.p_flags.contains(ProgramFlags::EXECUTABLE) {
-                flags |= virt::PageFlags::NO_EXECUTE;
-            }
-
-            let pv = p.p_vaddr;
-            let pv_end = p.p_vaddr + p.p_memsz;
-
-            let code_addr = fun + p.p_offset as usize;
-            let mut remaining = p.p_filesz;
+            let mut code_addr = elf_module + p.p_offset as usize;
 
             //This should be done in a page fault in future
-            for virt_addr in (pv as usize..pv_end as usize).step_by(PAGE_SIZE) {
-                let code = allocate().expect("Out of mem!");
+            for virt_addr in (virt_begin..virt_end).step_by(PAGE_SIZE) {
+                let code_page = allocate().expect("Out of mem!");
 
-                for pos in 0..PAGE_SIZE {
-                    if remaining == 0 {
-                        break;
-                    }
-
-                    unsafe {
-                        (code.address_mapped() + pos).store::<u8>((code_addr + pos).read::<u8>());
-                    }
-
-                    remaining -= 1;
+                unsafe {
+                    code_addr.copy_to(code_page.address_mapped().0,
+                                      core::cmp::min(PAGE_SIZE,
+                                                     virt_end - virt_addr)
+                    );
                 }
 
-                new_p4.map_to_flags(VirtAddr(virt_addr as usize), code.address(), flags);
+                code_addr += PAGE_SIZE;
+
+                // Map user program to the location indicated by Elf Program Section
+                new_p4.map_to_flags(VirtAddr(virt_addr as usize), code_page.address(), flags);
             }
         }
     }
 
+    // Map stack
     new_p4.map_flags(
         VirtAddr(0x600000),
         virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,
     );
 
-    (
-        new_p4.phys_addr(),
-        VirtAddr(hdr.e_entry as usize),
-        VirtAddr(0x600000),
-    )
+    return (
+        new_p4.phys_addr(),             // page table root address
+        VirtAddr(hdr.e_entry as usize), // entry point to the program
+        VirtAddr(0x601000),             // stack pointer (4KB for now)
+    );
+}
+
+fn allocate_page_table(elf_module: MappedAddr, _code_size: usize) -> (PhysAddr, VirtAddr, VirtAddr) {
+
+    let new_p4 = prepare_p4();
+
+    map_user(new_p4, elf_module)
 }
 
 #[repr(C, packed)]

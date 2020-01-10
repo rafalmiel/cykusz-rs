@@ -1,9 +1,9 @@
 use crate::arch::raw::ctrlregs;
 use crate::arch::raw::mm;
-use crate::kernel::mm::allocate;
-use crate::kernel::mm::virt;
-use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::mm::{PhysAddr, VirtAddr};
+use crate::kernel::mm::allocate;
+use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::virt;
 
 use self::table::*;
 
@@ -67,22 +67,13 @@ fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
         let s = elf.address().align_down(PAGE_SIZE);
         let e = elf.end_address().align_up(PAGE_SIZE);
 
-        let mut flags = virt::PageFlags::empty();
-
         use crate::drivers::multiboot2::elf::ElfSectionFlags;
 
-        if (elf.flags as usize & ElfSectionFlags::Allocated as usize) == 0 as usize {
+        if !elf.flags.contains(ElfSectionFlags::ALLOCATED) {
             continue;
         }
 
-        if (elf.flags as usize & ElfSectionFlags::Writable as usize)
-            == ElfSectionFlags::Writable as usize
-        {
-            flags.insert(virt::PageFlags::WRITABLE);
-        }
-        if (elf.flags as usize & ElfSectionFlags::Executable as usize) == 0 {
-            flags.insert(virt::PageFlags::NO_EXECUTE);
-        }
+        let flags = virt::PageFlags::from(elf.flags as ElfSectionFlags);
 
         for addr in (s..e).step_by(PAGE_SIZE) {
             table.map_to_flags(addr, addr.to_phys(), flags);

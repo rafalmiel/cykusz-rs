@@ -74,13 +74,13 @@ pub fn start() {
 
         let tramp = &trampoline as *const _ as usize;
 
-        let p = PhysAddr(start).to_mapped().0 as *const u8;
+        let p = PhysAddr(start).to_mapped();
 
-        p.copy_to(AP_INIT.to_mapped().0 as *mut u8, end - start);
+        p.copy_to(AP_INIT.to_mapped().0, end - start);
 
-        let pt = PhysAddr(tramp).to_mapped().0 as *const u8;
+        let pt = PhysAddr(tramp).to_mapped();
 
-        pt.copy_to(TRAMPOLINE.to_mapped().0 as *mut u8, 0x100);
+        pt.copy_to(TRAMPOLINE.to_mapped().0, 0x100);
     }
 
     crate::arch::dev::lapic::start_ap();

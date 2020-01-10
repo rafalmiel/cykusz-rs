@@ -157,6 +157,10 @@ macro_rules! enable_unsigned_ops {
             pub unsafe fn read_mut<'a, T>(&self) -> &'a mut T {
                 return &mut *(self.0 as *mut T);
             }
+
+            pub unsafe fn copy_to(&self, to: usize, count: usize) {
+                (self.0 as *const u8).copy_to(to as *mut u8, count);
+            }
         }
 
         impl ::core::iter::Step for $type_ {

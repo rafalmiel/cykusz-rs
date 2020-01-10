@@ -87,6 +87,7 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
     use crate::kernel::mm::virt;
     use crate::drivers::elf::types::ProgramType;
     use crate::drivers::elf::ElfHeader;
+    use core::cmp::min;
 
     let hdr = unsafe { ElfHeader::load(elf_module) };
 
@@ -94,23 +95,26 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
         if p.p_type == ProgramType::Load {
             let flags = virt::PageFlags::USER | virt::PageFlags::from(p.p_flags);
 
-            let virt_begin = p.p_vaddr as usize;
-            let virt_end = p.p_vaddr as usize + p.p_memsz as usize;
+            let virt_begin = VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);
+            let virt_end = VirtAddr(p.p_vaddr as usize + p.p_memsz as usize);
 
+            let mut page_offset = p.p_vaddr as usize - virt_begin.0;
             let mut code_addr = elf_module + p.p_offset as usize;
 
             //This should be done in a page fault in future
-            for virt_addr in (virt_begin..virt_end).step_by(PAGE_SIZE) {
+            for VirtAddr(virt_addr) in (virt_begin..virt_end).step_by(PAGE_SIZE) {
                 let code_page = allocate().expect("Out of mem!");
 
+                let to_copy = PAGE_SIZE - page_offset;
+
                 unsafe {
-                    code_addr.copy_to(code_page.address_mapped().0,
-                                      core::cmp::min(PAGE_SIZE,
-                                                     virt_end - virt_addr)
+                    code_addr.copy_to(code_page.address_mapped().0 + page_offset,
+                                      min(to_copy,virt_end.0 - virt_addr)
                     );
                 }
 
-                code_addr += PAGE_SIZE;
+                code_addr += to_copy;
+                page_offset = 0;
 
                 // Map user program to the location indicated by Elf Program Section
                 new_p4.map_to_flags(VirtAddr(virt_addr as usize), code_page.address(), flags);
@@ -120,14 +124,14 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
 
     // Map stack
     new_p4.map_flags(
-        VirtAddr(0x600000),
+        VirtAddr(0x7ffffffff000),
         virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,
     );
 
     return (
         new_p4.phys_addr(),             // page table root address
         VirtAddr(hdr.e_entry as usize), // entry point to the program
-        VirtAddr(0x601000),             // stack pointer (4KB for now)
+        VirtAddr(0x7fffffffffff),       // stack pointer (4KB for now)
     );
 }
 

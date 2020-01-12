@@ -131,7 +131,7 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
     return (
         new_p4.phys_addr(),             // page table root address
         VirtAddr(hdr.e_entry as usize), // entry point to the program
-        VirtAddr(0x7fffffffffff),       // stack pointer (4KB for now)
+        VirtAddr(0x800000000000),       // stack pointer (4KB for now)
     );
 }
 
@@ -150,6 +150,13 @@ struct IretqFrame {
     pub sp: usize,
     pub ss: usize,
     pub task_finished_fun: usize,
+}
+
+#[repr(C, packed)]
+struct SysretqFrame {
+    pub rflags: usize,
+    pub rip: usize,
+    pub stack: usize,
 }
 
 impl Task {
@@ -174,6 +181,51 @@ impl Task {
         }
     }
 
+    unsafe fn prepare_iretq_ctx(fun: fn(), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, sp: *mut u8, cr3: PhysAddr) -> Unique<Context> {
+        let frame: &mut IretqFrame = &mut *(sp
+            .offset(-(::core::mem::size_of::<IretqFrame>() as isize))
+            as *mut IretqFrame);
+
+        frame.task_finished_fun = task_finished as usize;
+        frame.ss = ds.bits() as usize;
+        frame.sp = sp.offset(-8) as usize;
+        frame.rlfags = if int_enabled { 0x200 } else { 0x0 };
+        frame.cs = cs.bits() as usize;
+        frame.ip = fun as usize;
+
+        let mut ctx = Unique::new_unchecked(sp.offset(
+            -(::core::mem::size_of::<Context>() as isize
+                + ::core::mem::size_of::<IretqFrame>() as isize),
+        ) as *mut Context);
+
+        ctx.as_ptr().write(Context::empty());
+        ctx.as_mut().rip = isr_return as usize;
+        ctx.as_mut().cr3 = cr3.0;
+
+        ctx
+    }
+
+    unsafe fn prepare_sysretq_ctx(fun: fn(), int_enabled: bool, user_stack: Option<usize>, sp: *mut u8, cr3: PhysAddr) -> Unique<Context> {
+        let frame: &mut SysretqFrame = &mut *(sp
+            .offset(-(::core::mem::size_of::<SysretqFrame>() as isize))
+            as *mut SysretqFrame);
+
+        frame.stack = user_stack.unwrap() as usize;
+        frame.rflags = if int_enabled { 0x200 } else { 0x0 };
+        frame.rip = fun as usize;
+
+        let mut ctx = Unique::new_unchecked(sp.offset(
+            -(::core::mem::size_of::<Context>() as isize
+                + ::core::mem::size_of::<SysretqFrame>() as isize),
+        ) as *mut Context);
+
+        ctx.as_ptr().write(Context::empty());
+        ctx.as_mut().rip = asm_sysretq_userinit as usize;
+        ctx.as_mut().cr3 = cr3.0;
+
+        ctx
+    }
+
     fn new_sp(
         fun: fn(),
         cs: SegmentSelector,
@@ -186,24 +238,13 @@ impl Task {
     ) -> Task {
         unsafe {
             let sp = (stack as *mut u8).offset(stack_size as isize);
-            let frame: &mut IretqFrame = &mut *(sp
-                .offset(-(::core::mem::size_of::<IretqFrame>() as isize))
-                as *mut IretqFrame);
 
-            frame.task_finished_fun = task_finished as usize;
-            frame.ss = ds.bits() as usize;
-            frame.sp = user_stack.unwrap_or(sp.offset(-8) as usize);
-            frame.rlfags = if int_enabled { 0x200 } else { 0x0 };
-            frame.cs = cs.bits() as usize;
-            frame.ip = fun as usize;
-
-            let mut ctx = Unique::new_unchecked(sp.offset(
-                -(::core::mem::size_of::<Context>() as isize
-                    + ::core::mem::size_of::<IretqFrame>() as isize),
-            ) as *mut Context);
-            ctx.as_ptr().write(Context::empty());
-            ctx.as_mut().rip = isr_return as usize;
-            ctx.as_mut().cr3 = cr3.0;
+            let ctx = if user_stack.is_none() {
+                Task::prepare_iretq_ctx(fun, cs, ds, int_enabled, sp, cr3)
+            } else {
+                // Userspace transition is done using sysretq call
+                Task::prepare_sysretq_ctx(fun, int_enabled, user_stack, sp, cr3)
+            };
 
             Task {
                 ctx,
@@ -284,6 +325,7 @@ extern "C" {
     pub fn switch_to(old_ctx: &mut Unique<Context>, new_ctx: &Context);
     pub fn activate_to(new_ctx: &Context);
     fn isr_return();
+    fn asm_sysretq_userinit();
 }
 
 pub fn switch(from: &mut Task, to: &Task) {

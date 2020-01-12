@@ -24,10 +24,11 @@ static mut GDT: [gdt::GdtEntry; 7] = [
     gdt::GdtEntry::new(dsc::Flags::SEG_RING0_CODE, gdt::GdtFlags::LONG_MODE),
     // Kernel data
     gdt::GdtEntry::new(dsc::Flags::SEG_RING0_DATA, gdt::GdtFlags::LONG_MODE),
+    // User data
+    // Order of user segments (DS, CS) is required by syscall specific handling
+    gdt::GdtEntry::new(dsc::Flags::SEG_RING3_DATA, gdt::GdtFlags::LONG_MODE),
     // User code
     gdt::GdtEntry::new(dsc::Flags::SEG_RING3_CODE, gdt::GdtFlags::LONG_MODE),
-    // User data
-    gdt::GdtEntry::new(dsc::Flags::SEG_RING3_DATA, gdt::GdtFlags::LONG_MODE),
     // TSS
     gdt::GdtEntry::new(dsc::Flags::SEG_RING3_TASK, gdt::GdtFlags::MISSING),
     // TSS must be 16 bytes long, twice the normal size
@@ -35,7 +36,7 @@ static mut GDT: [gdt::GdtEntry; 7] = [
 ];
 
 #[thread_local]
-static mut TSS: TaskStateSegment = TaskStateSegment::new();
+pub static mut TSS: TaskStateSegment = TaskStateSegment::new();
 
 #[thread_local]
 static mut GDTR: dsc::DescriptorTablePointer<gdt::GdtEntry> =
@@ -50,11 +51,11 @@ pub const fn ring0_ds() -> sgm::SegmentSelector {
 }
 
 pub const fn ring3_cs() -> sgm::SegmentSelector {
-    sgm::SegmentSelector::new(3, sgm::SegmentSelector::RPL_3)
+    sgm::SegmentSelector::new(4, sgm::SegmentSelector::RPL_3)
 }
 
 pub const fn ring3_ds() -> sgm::SegmentSelector {
-    sgm::SegmentSelector::new(4, sgm::SegmentSelector::RPL_3)
+    sgm::SegmentSelector::new(3, sgm::SegmentSelector::RPL_3)
 }
 
 pub fn early_init() {

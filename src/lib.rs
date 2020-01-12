@@ -102,6 +102,8 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
     kernel::smp::notify_ap_ready();
 
+    kernel::syscall::init_ap();
+
     kernel::timer::setup();
 
     kernel::timer::start();

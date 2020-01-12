@@ -38,8 +38,8 @@ fn task() {
 
 pub fn start() {
     crate::kernel::sched::create_task(task);
-    //crate::kernel::sched::create_task(task);
-    //crate::kernel::sched::create_task(task);
+    crate::kernel::sched::create_task(task);
+    crate::kernel::sched::create_task(task);
     crate::kernel::sched::create_user_task(
         crate::kernel::user::get_user_program(),
         crate::kernel::user::get_user_program_size(),

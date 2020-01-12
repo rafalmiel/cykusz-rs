@@ -8,6 +8,7 @@ extern crate rlibc;
 
 use core::panic::PanicInfo;
 
+#[allow(unused)]
 macro_rules! int {
     ( $x:expr) => {
         {
@@ -16,8 +17,24 @@ macro_rules! int {
     };
 }
 
+pub unsafe fn syscall0(mut a: usize) -> usize {
+    asm!("syscall"
+        : "={rax}"(a)
+        : "{rax}"(a)
+        : "rcx", "r11", "memory"
+        : "intel", "volatile");
+
+    a
+}
+
+#[allow(unused)]
+pub fn bochs() {
+    unsafe {
+        asm!("xchg %bx, %bx");
+    }
+}
+
 const WORK_COUNT: usize = 0x5000000;
-const ITERS: usize = 1; //<usize>::max_value();
 
 pub fn dummy_work() {
     let a = &3 as *const i32;
@@ -35,7 +52,7 @@ pub extern "C" fn _start() -> ! {
         dummy_work();
 
         unsafe {
-            int!(80);
+            syscall0(32);
         }
     }
 }

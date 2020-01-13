@@ -11,5 +11,7 @@ pub mod utils;
 
 #[macro_use]
 pub mod sched;
+#[macro_use]
+pub mod module;
 
 //pub mod sched_2;

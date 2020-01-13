@@ -28,9 +28,9 @@ static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::em
 
 #[macro_use]
 pub mod arch;
-mod drivers;
 #[macro_use]
 pub mod kernel;
+mod drivers;
 pub mod lang_items;
 pub mod task_test;
 
@@ -82,6 +82,9 @@ pub fn rust_main(stack_top: VirtAddr) {
     kernel::timer::start();
 
     println!("[ OK ] Local Timer Started");
+
+    kernel::module::init_all();
+    kernel::module::fini_all();
 
     // Start test tasks on this cpu
     task_test::start();

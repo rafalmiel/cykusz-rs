@@ -8,7 +8,7 @@ unsafe impl Sync for ModuleFun {}
 macro_rules! module_init {
     ($name: ident) => {
         #[used]
-        #[link_section = ".devinit"]
+        #[link_section = ".devinit.drv"]
         static __PTR_INIT: crate::kernel::module::ModuleFun =
             crate::kernel::module::ModuleFun($name as *const ());
     };
@@ -18,7 +18,27 @@ macro_rules! module_init {
 macro_rules! module_fini {
     ($name: ident) => {
         #[used]
-        #[link_section = ".devfini"]
+        #[link_section = ".devfini.drv"]
+        static __PTR_FINI: crate::kernel::module::ModuleFun =
+            crate::kernel::module::ModuleFun($name as *const ());
+    };
+}
+
+#[macro_export]
+macro_rules! platform_init {
+    ($name: ident) => {
+        #[used]
+        #[link_section = ".devinit.plat"]
+        static __PTR_INIT: crate::kernel::module::ModuleFun =
+            crate::kernel::module::ModuleFun($name as *const ());
+    };
+}
+
+#[macro_export]
+macro_rules! platform_fini {
+    ($name: ident) => {
+        #[used]
+        #[link_section = ".devfini.plat"]
         static __PTR_FINI: crate::kernel::module::ModuleFun =
             crate::kernel::module::ModuleFun($name as *const ());
     };

@@ -77,7 +77,8 @@ SECTIONS {
 
         .devinit : AT(ADDR(.devinit) - KERNEL_OFFSET)
         {
-                KEEP(*(.devinit .devinit.*))
+                KEEP(*(.devinit.plat))
+                KEEP(*(.devinit.drv))
         }
 
         __kernel_devinit_end = .;
@@ -85,7 +86,8 @@ SECTIONS {
 
         .devfini : AT(ADDR(.devfini) - KERNEL_OFFSET)
         {
-                KEEP(*(.devfini .devfini.*))
+                KEEP(*(.devfini.drv))
+                KEEP(*(.devfini.plat))
         }
 
         __kernel_devfini_end = .;

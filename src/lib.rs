@@ -87,7 +87,7 @@ pub fn rust_main(stack_top: VirtAddr) {
     kernel::module::fini_all();
 
     // Start test tasks on this cpu
-    task_test::start();
+    //task_test::start();
 
     idle();
 }
@@ -112,7 +112,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::timer::start();
 
     // Start test tasks on this cpu
-    task_test::start();
+    //task_test::start();
 
     idle();
 }

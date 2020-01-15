@@ -96,7 +96,6 @@ impl IOApic {
         if let Some(base) = self.ioapic_base {
             unsafe {
                 write_volatile::<u32>(base.0 as *mut u32, reg);
-
                 write_volatile::<u32>((base.0 + 0x10) as *mut u32, value);
             }
         } else {
@@ -134,9 +133,12 @@ impl IOApic {
         let mut l = RegRedTblL(self.read(reg_redtbl_low(src)));
         let mut h = RegRedTblH(self.read(reg_redtbl_high(src)));
 
+        l.0 = 0;
+        h.0 = 0;
+
         l.set_vector(dest);
         l.set_masked(false);
-        h.set_destination(0);
+        h.set_destination(self.id());
 
         self.write(reg_redtbl_low(src), l.0);
         self.write(reg_redtbl_high(src), h.0);

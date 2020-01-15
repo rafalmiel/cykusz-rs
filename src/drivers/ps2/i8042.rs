@@ -1,23 +1,39 @@
-use crate::drivers::ps2::PS2Controller;
+use crate::drivers::ps2::{PS2Controller, Command, StatusFlags};
 use crate::drivers::ps2::register_controller;
+use crate::arch::raw::cpuio::Port;
+use crate::kernel::sync::Mutex;
 
-struct PS2 {}
+struct I8042PS2Controller {
+    data: Mutex<Port<u8>>,
+    status: Mutex<Port<u8>>,
+    command: Mutex<Port<u8>>,
+}
 
-impl PS2Controller for PS2 {
-    fn write_data(&self, _byte: u8) {
-        unimplemented!();
+impl PS2Controller for I8042PS2Controller {
+    fn write(&self, byte: u8) {
+        self.data.lock().write(byte);
     }
 
-    fn read_status(&self) -> u8 {
-        unimplemented!()
+    fn read(&self) -> u8 {
+        self.data.lock().read()
     }
 
-    fn write_cmd(&self, _byte: u8) {
-        unimplemented!();
+    fn command(&self, byte: Command) {
+        self.command.lock().write(byte as u8);
+    }
+
+    fn status(&self) -> StatusFlags {
+        StatusFlags::from_bits_truncate(self.status.lock().read())
     }
 }
 
-static PS : PS2 = PS2{};
+static PS : I8042PS2Controller = unsafe {
+    I8042PS2Controller {
+        data: Mutex::new(Port::<u8>::new(0x60)),
+        status: Mutex::new(Port::<u8>::new(0x64)),
+        command: Mutex::new(Port::<u8>::new(0x64)),
+    }
+};
 
 pub(crate) fn init() {
     register_controller(&PS);

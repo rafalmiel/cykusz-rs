@@ -10,6 +10,7 @@
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
 #![feature(nll)]
+#![recursion_limit="256"]
 
 extern crate alloc;
 #[macro_use]
@@ -86,7 +87,7 @@ pub fn rust_main(stack_top: VirtAddr) {
     kernel::module::init_all();
 
     // Start test tasks on this cpu
-    //task_test::start();
+    task_test::start();
 
     idle();
 }
@@ -111,7 +112,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::timer::start();
 
     // Start test tasks on this cpu
-    //task_test::start();
+    task_test::start();
 
     idle();
 }

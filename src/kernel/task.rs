@@ -11,7 +11,8 @@ pub enum TaskState {
     Running = 1,
     Runnable = 2,
     ToReschedule = 3,
-    ToDelete = 4,
+    AwaitingIo = 4,
+    ToDelete = 5,
 }
 
 impl From<usize> for TaskState {
@@ -23,7 +24,8 @@ impl From<usize> for TaskState {
             1 => Running,
             2 => Runnable,
             3 => ToReschedule,
-            4 => ToDelete,
+            4 => AwaitingIo,
+            5 => ToDelete,
             _ => unreachable!(),
         }
     }
@@ -32,6 +34,7 @@ impl From<usize> for TaskState {
 pub struct Task {
     pub arch_task: UnsafeCell<ArchTask>,
     id: usize,
+    prev_state: AtomicUsize,
     state: AtomicUsize,
     locks: AtomicUsize,
 }
@@ -43,6 +46,7 @@ impl Task {
         Task {
             arch_task: UnsafeCell::new(ArchTask::empty()),
             id: new_task_id(),
+            prev_state: AtomicUsize::new(TaskState::Unused as usize),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
         }
@@ -52,6 +56,7 @@ impl Task {
         Task {
             arch_task: UnsafeCell::new(ArchTask::new_sched(fun)),
             id: new_task_id(),
+            prev_state: AtomicUsize::new(TaskState::Unused as usize),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
         }
@@ -61,6 +66,7 @@ impl Task {
         Task {
             arch_task: UnsafeCell::new(ArchTask::new_kern(fun)),
             id: crate::kernel::sched::new_task_id(),
+            prev_state: AtomicUsize::new(TaskState::Unused as usize),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
         }
@@ -70,6 +76,7 @@ impl Task {
         Task {
             arch_task: UnsafeCell::new(ArchTask::new_user(fun, code_size)),
             id: crate::kernel::sched::new_task_id(),
+            prev_state: AtomicUsize::new(TaskState::Unused as usize),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
         }
@@ -77,6 +84,17 @@ impl Task {
 
     pub fn set_state(&self, state: TaskState) {
         self.state.store(state as usize, Ordering::SeqCst);
+    }
+
+    pub fn mark_to_reschedule(&self) {
+        self.prev_state.store(self.state.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.state.store(TaskState::ToReschedule as usize, Ordering::SeqCst);
+    }
+
+    pub fn unmark_to_reschedule(&self) {
+        self.state.store(self.prev_state.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.prev_state.store(TaskState::Unused as usize, Ordering::SeqCst);
+
     }
 
     pub fn state(&self) -> TaskState {

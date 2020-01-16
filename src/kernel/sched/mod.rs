@@ -9,6 +9,8 @@ use crate::kernel::sync::IrqGuard;
 use self::cpu_queue::CpuQueue;
 use self::cpu_queues::CpuQueues;
 use self::task_container::TaskContainer;
+use alloc::sync::Arc;
+use crate::kernel::task::Task;
 
 #[macro_export]
 macro_rules! switch {
@@ -72,6 +74,8 @@ impl Scheduler {
 
         let task = self.tasks.add_user_task(fun, code_size);
 
+        println!("Created user task {}", task.id());
+
         self.cpu_queues.add_task(task);
     }
 
@@ -104,6 +108,12 @@ impl Scheduler {
             .remove_task(CURRENT_TASK_ID.load(Ordering::SeqCst));
         self.cpu_queues.current_task_finished();
     }
+
+    fn current_task(&self) -> Arc<Task> {
+        let _g = IrqGuard::new();
+
+        self.cpu_queues.current_task().clone()
+    }
 }
 
 static SCHEDULER: Once<Scheduler> = Once::new();
@@ -123,6 +133,7 @@ pub fn reschedule() -> bool {
 }
 
 pub fn task_finished() {
+    println!("Task finished?");
     scheduler().current_task_finished();
 }
 
@@ -132,6 +143,10 @@ pub fn create_task(fun: fn()) {
 
 pub fn create_user_task(fun: MappedAddr, code_size: u64) {
     scheduler().add_user_task(fun, code_size as usize);
+}
+
+pub fn current_task() -> Arc<Task> {
+    scheduler().current_task()
 }
 
 fn lock_protection_ready() -> bool {

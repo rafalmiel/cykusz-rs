@@ -1,4 +1,4 @@
-use crate::drivers::ps2::{PS2Controller, Command, StatusFlags};
+use crate::drivers::ps2::{PS2Controller, StatusFlags, Command};
 use crate::drivers::ps2::register_controller;
 use crate::arch::raw::cpuio::Port;
 use crate::kernel::sync::Mutex;

@@ -50,6 +50,8 @@ impl CpuQueue {
     fn switch(&self, to: &Task, lock: MutexGuard<()>) {
         drop(lock);
 
+        self.finalize();
+
         unsafe {
             switch!(&self.sched_task, &to);
         }
@@ -71,6 +73,15 @@ impl CpuQueue {
         }
     }
 
+    fn finalize(&self) {
+        crate::kernel::int::finish();
+        crate::kernel::timer::reset_counter();
+    }
+
+    pub fn current_task(&self, lock: MutexGuard<()>) -> Arc<Task>{
+        self.tasks[self.current].clone()
+    }
+
     pub unsafe fn schedule_next(&mut self, sched_lock: MutexGuard<()>) {
         if self.tasks[self.current].state() == TaskState::ToDelete {
             self.remove_task(self.current);
@@ -82,7 +93,8 @@ impl CpuQueue {
             self.schedule_next(sched_lock);
             return;
         } else if self.tasks[self.current].locks() > 0 {
-            self.tasks[self.current].set_state(TaskState::ToReschedule);
+            self.tasks[self.current].mark_to_reschedule();
+
             self.switch(&self.tasks[self.current], sched_lock);
 
             return;
@@ -125,10 +137,6 @@ impl CpuQueue {
 
         QUEUE_LEN.store(self.tasks.len(), Ordering::SeqCst);
 
-        crate::kernel::int::finish();
-
-        crate::kernel::timer::reset_counter();
-
         self.switch(&self.tasks[found], sched_lock);
     }
 
@@ -148,7 +156,7 @@ impl CpuQueue {
         t.locks_dec();
 
         if t.locks() == 0 && t.state() == TaskState::ToReschedule {
-            t.set_state(TaskState::Running);
+            t.unmark_to_reschedule();
 
             self.reschedule(mutex);
         }

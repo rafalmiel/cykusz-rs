@@ -11,6 +11,7 @@ pub fn reset_counter() {
 }
 
 fn timer_handler() {
+    //println!("Timer handler");
     crate::kernel::sched::reschedule();
 }
 

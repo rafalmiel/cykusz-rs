@@ -9,12 +9,17 @@ pub fn init_ap() {
 }
 
 pub fn syscall_handler(_num: u32) {
-    println!(
-        "U( {:<6} PID: {:<6} CPU: {:<6} MEM: {:<8}{:<12}),",
-        "",
-        crate::kernel::sched::current_id(),
-        unsafe { crate::CPU_ID },
-        crate::kernel::mm::heap::ALLOCED_MEM.load(Ordering::SeqCst),
-        ""
-    );
+    println!("[ Syscall ] blocking on read {}", crate::kernel::sched::current_id());
+
+    crate::drivers::ps2::kbd::handler::read();
+
+    println!("[ Syscall ] Finished reading {}", crate::kernel::sched::current_id());
+    //println!(
+    //    "U( {:<6} PID: {:<6} CPU: {:<6} MEM: {:<8}{:<12}),",
+    //    "",
+    //    crate::kernel::sched::current_id(),
+    //    unsafe { crate::CPU_ID },
+    //    crate::kernel::mm::heap::ALLOCED_MEM.load(Ordering::SeqCst),
+    //    ""
+    //);
 }

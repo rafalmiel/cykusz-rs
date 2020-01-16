@@ -1,5 +1,5 @@
 mod i8042;
-mod kbd;
+pub mod kbd;
 
 use spin::Once;
 use crate::drivers::ps2::Command::{DisableFirst, DisableSecond};
@@ -96,6 +96,10 @@ impl PS {
         self.command(Command::WriteConfig);
         self.write(config.bits());
     }
+
+    fn read_available(&self) -> bool {
+        self.status().contains(StatusFlags::OUTPUT_FULL)
+    }
 }
 
 impl PS2Controller for PS {
@@ -134,7 +138,6 @@ fn init() {
         let mut config = ctrl.config();
         config.insert(ConfigFlags::FIRST_DISABLED);
         config.insert(ConfigFlags::SECOND_DISABLED);
-        config.insert(ConfigFlags::FIRST_TRANSLATE);
         config.remove(ConfigFlags::FIRST_INTERRUPT);
         config.remove(ConfigFlags::SECOND_INTERRUPT);
         ctrl.set_config(config);

@@ -1,11 +1,16 @@
+mod scancode;
+pub mod handler;
+
 use crate::drivers::ps2::PS2Controller;
 use crate::drivers::ps2::controller;
 use crate::drivers::ps2::PS;
 use crate::drivers::ps2::ConfigFlags;
+use crate::drivers::ps2::StatusFlags;
 
 #[repr(u8)]
 #[allow(dead_code)]
 enum KeyboardCommand {
+    Identify = 0xF2,
     EnableReporting = 0xF4,
     SetDefaultsDisable = 0xF5,
     SetDefaults = 0xF6,
@@ -13,6 +18,7 @@ enum KeyboardCommand {
 }
 
 #[repr(u8)]
+#[derive(PartialEq, Copy, Clone)]
 enum KeyboardCommandData {
     ScancodeSet = 0xF0
 }
@@ -21,7 +27,7 @@ impl PS {
     fn keyboard_command_inner(&self, command: u8) -> u8 {
         let mut ret = 0xFE;
         for i in 0..4 {
-            self.write(command as u8);
+            self.write(command);
             ret = self.read();
             if ret == 0xFE {
                 println!("ps2d: retry keyboard command {:X}: {}", command, i);
@@ -42,7 +48,8 @@ impl PS {
             return res;
         }
         self.write(data as u8);
-        self.read()
+        let res = self.read();
+        res
     }
 }
 
@@ -63,8 +70,8 @@ fn init() {
 
     ctrl.flush_read();
 
-    if ctrl.keyboard_command_data(KeyboardCommandData::ScancodeSet, 1) != 0xFA {
-        println!("Keyboard failed to set scancode");
+    if ctrl.keyboard_command(KeyboardCommand::SetDefaultsDisable) != 0xFA {
+        println!("Keyboard scanning disabled failed");
     }
 
     ctrl.flush_read();
@@ -81,7 +88,7 @@ fn init() {
     {
         let mut config = ctrl.config();
         config.remove(ConfigFlags::FIRST_DISABLED);
-        config.insert(ConfigFlags::FIRST_TRANSLATE);
+        config.remove(ConfigFlags::FIRST_TRANSLATE); // Use scancode set 2
         config.insert(ConfigFlags::FIRST_INTERRUPT);
         ctrl.set_config(config);
     }
@@ -94,7 +101,8 @@ fn init() {
 }
 
 extern "x86-interrupt" fn keyboard_interrupt(_frame: &mut crate::arch::raw::idt::ExceptionStackFrame) {
-    println!("GOT KEYBOARD INT {}", controller().read());
+    handler::handle_interrupt();
+
     crate::arch::int::end_of_int();
 }
 

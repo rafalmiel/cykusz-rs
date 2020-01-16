@@ -9,7 +9,7 @@ assembly_object_files := $(patsubst src/arch/$(arch)/asm/%.asm, \
 		build/arch/$(arch)/asm/%.o, $(assembly_source_files))
 
 target ?= $(arch)-unknown-none-gnu
-rust_os := target/$(target)/release/libcykusz_rs.a
+rust_os := target/$(target)/debug/libcykusz_rs.a
 
 .PHONY: all clean run iso
 
@@ -48,13 +48,13 @@ $(iso): $(kernel) $(grub_cfg) userspace/target/release/program
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
-	ld -n --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
+	ld -n --whole-archive --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 build:
 	./update_core_nightly.sh ../rust
 
 cargo:
-	RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads"  xargo build --release --target $(target) --verbose
+	RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads"  xargo build --target $(target) --verbose
 
 # compile assembly files
 build/arch/$(arch)/asm/%.o: src/arch/$(arch)/asm/%.asm

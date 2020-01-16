@@ -73,4 +73,12 @@ impl CpuQueues {
             self.this_cpu_queue().current_task_finished(mutex);
         }
     }
+
+    pub fn current_task(&self) -> Arc<Task> {
+        let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
+
+        unsafe {
+            self.this_cpu_queue().current_task(mutex).clone()
+        }
+    }
 }

@@ -10,7 +10,6 @@
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
 #![feature(nll)]
-#![recursion_limit="256"]
 
 extern crate alloc;
 #[macro_use]

@@ -4,6 +4,8 @@ use crate::kernel::sync::Mutex;
 use crate::kernel::utils::wait_queue::WaitQueue;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
+use crate::drivers::input::KeyListener;
+use alloc::vec::Vec;
 
 struct KbdState {
     buffer: Mutex<Buffer>,
@@ -91,13 +93,18 @@ impl KbdState {
                 return;
             },
             _ => {
-                if !state.f {
-                    self.buffer.lock().append_data(42);
-                    self.wait_queue.notify_one();
-                }
+                let released = state.f;
+
+                let key = scancode::get(data as usize, state.e);
 
                 state.e = false;
                 state.f = false;
+
+                drop(state);
+
+                println!("0x{:x}", data);
+
+                crate::drivers::input::key_notify(key, released);
             }
         }
    }

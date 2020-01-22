@@ -10,12 +10,13 @@ assembly_object_files := $(patsubst src/arch/$(arch)/asm/%.asm, \
 
 target ?= $(arch)-unknown-none-gnu
 rust_os := target/$(target)/release/libcykusz_rs.a
+user := userspace/$(target)/release/program
 
 .PHONY: all clean run iso
 
-all: $(kernel)
+all: $(kernel) $(user)
 
-userspace/$(target)/release/program: userspace/src/main.rs
+$(user): userspace/src/**
 	cd userspace && RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads -C link-arg=-no-pie -C link-arg=-static"  xargo build --release --target ../$(target) --verbose
 
 clean:
@@ -40,11 +41,11 @@ bochs: $(iso)
 
 iso: $(iso)
 
-$(iso): $(kernel) $(grub_cfg) userspace/$(target)/release/program
+$(iso): $(kernel) $(grub_cfg) $(user)
 	mkdir -p build/isofiles/boot/grub
 	cp $(kernel) build/isofiles/boot/kernel.bin
 	cp $(grub_cfg) build/isofiles/boot/grub
-	cp userspace/$(target)/release/program build/isofiles/boot/program
+	cp $(user) build/isofiles/boot/program
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)

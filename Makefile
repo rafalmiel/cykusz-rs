@@ -1,23 +1,26 @@
 arch ?= x86_64
-kernel := build/kernel-$(arch).bin
 iso := build/os-$(arch).iso
 
-linker_script := src/arch/$(arch)/asm/linker.ld
-grub_cfg := src/arch/$(arch)/asm/grub.cfg
-assembly_source_files := $(wildcard src/arch/$(arch)/asm/*.asm)
-assembly_object_files := $(patsubst src/arch/$(arch)/asm/%.asm, \
+linker_script := cykusz-rs/src/arch/$(arch)/asm/linker.ld
+grub_cfg := cykusz-rs/src/arch/$(arch)/asm/grub.cfg
+assembly_source_files := $(wildcard cykusz-rs/src/arch/$(arch)/asm/*.asm)
+assembly_object_files := $(patsubst cykusz-rs/src/arch/$(arch)/asm/%.asm, \
 		build/arch/$(arch)/asm/%.o, $(assembly_source_files))
 
 target ?= $(arch)-unknown-none-gnu
+ifdef dev
+rust_os := target/$(target)/debug/libcykusz_rs.a
+user := target/$(target)/debug/program
+kernel := build/kernel-$(arch)-g.bin
+else
 rust_os := target/$(target)/release/libcykusz_rs.a
-user := userspace/$(target)/release/program
+user := target/$(target)/release/program
+kernel := build/kernel-$(arch).bin
+endif
 
 .PHONY: all clean run iso
 
 all: $(kernel) $(user)
-
-$(user): userspace/src/**
-	cd userspace && RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads -C link-arg=-no-pie -C link-arg=-static"  xargo build --release --target ../$(target) --verbose
 
 clean:
 	cargo clean
@@ -52,9 +55,13 @@ $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
 	ld -n --whole-archive --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 cargo:
-	RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads"  xargo build --release --target $(target) --verbose
+ifdef dev
+	RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads"  xargo build --workspace --target $(target) --verbose
+else
+	RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads"  xargo build --workspace --release --target $(target) --verbose
+endif
 
 # compile assembly files
-build/arch/$(arch)/asm/%.o: src/arch/$(arch)/asm/%.asm
+build/arch/$(arch)/asm/%.o: cykusz-rs/src/arch/$(arch)/asm/%.asm
 	mkdir -p $(shell dirname $@)
 	nasm -felf64 $< -o $@

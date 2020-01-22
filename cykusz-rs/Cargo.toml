@@ -1,0 +1,19 @@
+[package]
+authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
+edition = "2018"
+name = "cykusz_rs"
+version = "0.1.0"
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+bitflags = "*"
+linked_list_allocator = "*"
+raw-cpuid = "*"
+rlibc = "*"
+spin = "*"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "*"

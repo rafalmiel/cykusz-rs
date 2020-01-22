@@ -1,21 +1,3 @@
-[package]
-name = "cykusz_rs"
-version = "0.1.0"
-authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
-edition = "2018"
-
-[lib]
-crate-type = ["staticlib"]
-
-[dependencies]
-rlibc = "*"
-spin = "*"
-bitflags = "*"
-linked_list_allocator = "*"
-raw-cpuid = "*"
-
-[dependencies.lazy_static]
-version = "*"
-features = ["spin_no_std"]
-
+[workspace]
+members = ["userspace", "cykusz-rs"]
 

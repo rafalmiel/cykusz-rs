@@ -131,7 +131,7 @@ boot_stack_bottom:
     resb 512
 boot_stack_top:
 
-%include "src/arch/x86_64/asm/gdt.inc"
+%include "cykusz-rs/src/arch/x86_64/asm/gdt.inc"
 
 ; lower half gdt
 section .rodata

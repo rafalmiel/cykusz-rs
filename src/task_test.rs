@@ -36,16 +36,9 @@ fn task() {
     crate::kernel::sched::create_task(task);
 }
 
-fn task2() {
-    loop {
-        crate::drivers::ps2::kbd::handler::read();
-        println!("Read from kbd!");
-    }
-}
-
 pub fn start() {
     //crate::kernel::sched::create_task(task2);
-    //crate::kernel::sched::create_task(task);
+    crate::kernel::sched::create_task(task);
     //crate::kernel::sched::create_task(task);
     crate::kernel::sched::create_user_task(
         crate::kernel::user::get_user_program(),

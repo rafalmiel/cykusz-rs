@@ -27,11 +27,19 @@ pub fn init_ap() {
     enable_syscall_extension();
 }
 
+#[repr(C, packed)]
+pub struct SyscallFrame {
+    rax: u64,
+    rdi: u64,
+    rsi: u64,
+}
+
 #[no_mangle]
-pub extern "C" fn fast_syscall_handler() {
-    crate::kernel::syscall::syscall_handler(0);
+pub extern "C" fn fast_syscall_handler(frame: &SyscallFrame) -> u64 {
+    crate::kernel::syscall::syscall_handler(frame.rax, frame.rdi, frame.rsi)
 }
 
 extern "x86-interrupt" fn syscall_handler(_frame: &mut ridt::ExceptionStackFrame) {
-    crate::kernel::syscall::syscall_handler(0);
+
+    crate::kernel::syscall::syscall_handler(0, 0, 0);
 }

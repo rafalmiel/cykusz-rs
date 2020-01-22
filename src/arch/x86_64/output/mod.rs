@@ -1,40 +1,41 @@
-use crate::arch::raw::cpuio::Port;
-use crate::drivers::video::vga::{Color, Writer};
-use crate::kernel::mm::MappedAddr;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::{Mutex, MutexGuard};
+use core::fmt::Error;
 
-const VGA_BUFFER: MappedAddr = MappedAddr(0xffff8000000b8000);
-
-static CURSOR_INDEX: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D4) });
-static CURSOR_DATA: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D5) });
-
-fn update_cursor(offset: u16) {
-    let idx = &mut *CURSOR_INDEX.lock_irq();
-    let dta = &mut *CURSOR_DATA.lock_irq();
-
-    idx.write(0x0F);
-    dta.write((offset & 0xFF) as u8);
-
-    idx.write(0x0E);
-    dta.write((offset >> 8) as u8);
+pub trait ConsoleDriver : Sync + Send {
+    fn write_str(&mut self, s: &str) -> Result<(), Error>;
+    fn clear(&mut self);
+    fn remove_last_n(&mut self, n: usize);
 }
 
-lazy_static! {
-    pub static ref WRITER: Mutex<Writer> =
-        Mutex::new(Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER));
+impl core::fmt::Write for dyn ConsoleDriver {
+    fn write_str(&mut self, s: &str) -> Result<(), Error> {
+        <Self as ConsoleDriver>::write_str(self, s)
+    }
 }
 
-pub fn clear() {
-    let w = &mut *WRITER.lock_irq();
-    w.clear();
-    update_cursor(w.buffer_pos());
+type ConsoleDriverType = &'static mut dyn ConsoleDriver;
+
+static WRITER: Mutex<Option<ConsoleDriverType>> = Mutex::new(None);
+
+pub fn register_console_driver(driver: ConsoleDriverType) {
+    *WRITER.lock() = Some(driver);
+}
+
+pub fn writer<'a>() -> MutexGuard<'a, Option<ConsoleDriverType>> {
+    let l = WRITER.lock_irq();
+    l
 }
 
 pub fn write_fmt(args: ::core::fmt::Arguments) -> ::core::fmt::Result {
-    let mut w = &mut *WRITER.lock_irq();
-    let r = ::core::fmt::write(&mut w, args);
-    update_cursor(w.buffer_pos());
-    return r;
+    let mut w = writer();
+    let w = w.as_mut().unwrap();
+    ::core::fmt::write(w, args)
+}
+
+pub fn init() {
+    crate::drivers::video::vga::init();
+    let mut w = writer();
+    w.as_mut().unwrap().clear();
 }
 
 #[macro_export]

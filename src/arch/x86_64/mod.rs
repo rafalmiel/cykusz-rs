@@ -21,7 +21,7 @@ pub mod user;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr) {
-    output::clear();
+    output::init();
 
     gdt::early_init();
 

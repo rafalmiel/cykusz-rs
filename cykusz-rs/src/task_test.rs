@@ -1,4 +1,6 @@
-use bitflags::_core::sync::atomic::AtomicU64;
+#![allow(dead_code)]
+
+use core::sync::atomic::AtomicU64;
 use core::sync::atomic::Ordering;
 
 const WORK_COUNT: usize = 0x5000000;
@@ -38,7 +40,7 @@ fn task() {
 
 pub fn start() {
     //crate::kernel::sched::create_task(task2);
-    crate::kernel::sched::create_task(task);
+    //crate::kernel::sched::create_task(task);
     //crate::kernel::sched::create_task(task);
     crate::kernel::sched::create_user_task(
         crate::kernel::user::get_user_program(),

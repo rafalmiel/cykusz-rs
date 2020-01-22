@@ -3,7 +3,7 @@ global gdt64.code
 global gdt64.data
 global gdt64.pointer
 
-%include "src/arch/x86_64/asm/gdt.inc"
+%include "cykusz-rs/src/arch/x86_64/asm/gdt.inc"
 
 ; higher half gdt
 section .data

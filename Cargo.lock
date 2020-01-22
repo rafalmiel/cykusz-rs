@@ -8,9 +8,9 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
 name = "cc"
-version = "1.0.49"
+version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e450b8da92aa6f274e7c6437692f9f2ce6d701fb73bacfcf87897b3f89a4c20e"
+checksum = "95e28fa049fda1c330bcf9d723be7663a899c4679724b34c81e9f5a326aab8cd"
 
 [[package]]
 name = "cykusz_rs"
@@ -35,11 +35,18 @@ dependencies = [
 
 [[package]]
 name = "linked_list_allocator"
-version = "0.6.4"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47314ec1d29aa869ee7cb5a5be57be9b1055c56567d59c3fb6689926743e0bea"
+checksum = "f3705e6d8ce20b80fde2ae549e69b91e958653f2d0aefdc8867e8432c840fb24"
 dependencies = [
  "spin",
+]
+
+[[package]]
+name = "program"
+version = "0.1.0"
+dependencies = [
+ "rlibc",
 ]
 
 [[package]]

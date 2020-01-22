@@ -5,7 +5,6 @@ use crate::drivers::ps2::PS2Controller;
 use crate::drivers::ps2::controller;
 use crate::drivers::ps2::PS;
 use crate::drivers::ps2::ConfigFlags;
-use crate::drivers::ps2::StatusFlags;
 
 #[repr(u8)]
 #[allow(dead_code)]
@@ -19,6 +18,7 @@ enum KeyboardCommand {
 
 #[repr(u8)]
 #[derive(PartialEq, Copy, Clone)]
+#[allow(dead_code)]
 enum KeyboardCommandData {
     ScancodeSet = 0xF0
 }
@@ -42,6 +42,7 @@ impl PS {
         self.keyboard_command_inner(command as u8)
     }
 
+    #[allow(dead_code)]
     fn keyboard_command_data(&self, command: KeyboardCommandData, data: u8) -> u8 {
         let res = self.keyboard_command_inner(command as u8);
         if res != 0xFA {

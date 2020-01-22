@@ -96,10 +96,6 @@ impl PS {
         self.command(Command::WriteConfig);
         self.write(config.bits());
     }
-
-    fn read_available(&self) -> bool {
-        self.status().contains(StatusFlags::OUTPUT_FULL)
-    }
 }
 
 impl PS2Controller for PS {

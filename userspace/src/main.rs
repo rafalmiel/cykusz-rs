@@ -6,26 +6,12 @@
 
 extern crate rlibc;
 
+#[macro_use]
+pub mod print;
+pub mod syscall;
+
+use core::str;
 use core::panic::PanicInfo;
-
-#[allow(unused)]
-macro_rules! int {
-    ( $x:expr) => {
-        {
-            asm!("int $0" :: "N"($x));
-        }
-    };
-}
-
-pub unsafe fn syscall0(mut a: usize) -> usize {
-    asm!("syscall"
-        : "={rax}"(a)
-        : "{rax}"(a)
-        : "rcx", "r11", "memory"
-        : "intel", "volatile");
-
-    a
-}
 
 #[allow(unused)]
 pub fn bochs() {
@@ -34,7 +20,7 @@ pub fn bochs() {
     }
 }
 
-const WORK_COUNT: usize = 0x5000000;
+const WORK_COUNT: usize = 0x50;
 
 pub fn dummy_work() {
     let a = &3 as *const i32;
@@ -49,11 +35,14 @@ pub fn dummy_work() {
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {
     loop {
-        dummy_work();
+        let mut buf = [0u8; 256];
 
-        unsafe {
-            syscall0(32);
-        }
+        let r = syscall::read(buf.as_mut_ptr(), buf.len());
+
+        let s = &buf[..r];
+
+        println!("Got {}, bytes: {}", str::from_utf8(s).unwrap(), r);
+
     }
 }
 

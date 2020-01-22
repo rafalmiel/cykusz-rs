@@ -5,6 +5,13 @@ global asm_sysretq_userinit
 extern fast_syscall_handler
 
 asm_syscall_handler:
+    push rbx
+    push rbp
+    push r12
+    push r13
+    push r14
+    push r15
+
     swapgs
 
     mov [gs:28], rsp  ; Temporarily save user stack
@@ -22,7 +29,18 @@ asm_syscall_handler:
     push r11                ; Push rflags
 
     cld
+
+    push rsi
+    push rdi
+    push rax
+
+    mov rdi, rsp
+
     call fast_syscall_handler
+
+    add rsp, 8              ; Preserve syscall return value in rax
+    pop rdi
+    pop rsi
 
 asm_sysretq:
     cli
@@ -37,6 +55,13 @@ asm_sysretq:
     swapgs
 
     pop rsp                 ; Restore user stack
+
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop rbp
+    pop rbx
 
     o64 sysret
 

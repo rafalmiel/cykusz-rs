@@ -123,10 +123,12 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
     }
 
     // Map stack
-    new_p4.map_flags(
-        VirtAddr(0x7ffffffff000),
-        virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,
-    );
+    for a in (VirtAddr(0x7fffffffc000)..=VirtAddr(0x7ffffffff000)).step_by(PAGE_SIZE) {
+        new_p4.map_flags(
+            a,
+            virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,
+        );
+    }
 
     return (
         new_p4.phys_addr(),             // page table root address

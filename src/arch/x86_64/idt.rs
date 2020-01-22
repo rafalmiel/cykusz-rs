@@ -89,7 +89,7 @@ extern "x86-interrupt" fn bound_range_exceeded(_frame: &mut idt::ExceptionStackF
 }
 
 extern "x86-interrupt" fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) {
-    println!("Invalid Opcode error! {:?}", _frame);
+    println!("Invalid Opcode error! {:?} {}", _frame, unsafe { crate::CPU_ID });
     loop {}
 }
 
@@ -133,7 +133,8 @@ extern "x86-interrupt" fn general_protection_fault(
 }
 
 extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
-    println!("PAGE FAULT! 0b{:x} CPU: {}", err, unsafe { crate::CPU_ID });
+    crate::bochs();
+    println!("PAGE FAULT! 0x{:x} CPU: {}, rip: {:?}", err, unsafe { crate::CPU_ID }, _frame);
     loop {}
 }
 

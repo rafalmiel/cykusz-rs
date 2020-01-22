@@ -86,7 +86,6 @@ apinit_start:
 
 long_mode_start_ap:
 bits 64
-    ;call setup_SSE
     mov rax, higher_half_start_ap
     jmp rax
 

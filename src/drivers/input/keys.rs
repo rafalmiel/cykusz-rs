@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+pub const NR_KEYS: usize = 256;
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[allow(non_camel_case_types, dead_code)]
 pub enum KeyCode {

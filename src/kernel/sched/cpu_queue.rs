@@ -78,7 +78,7 @@ impl CpuQueue {
         crate::kernel::timer::reset_counter();
     }
 
-    pub fn current_task(&self, lock: MutexGuard<()>) -> Arc<Task>{
+    pub fn current_task(&self, _lock: MutexGuard<()>) -> Arc<Task>{
         self.tasks[self.current].clone()
     }
 

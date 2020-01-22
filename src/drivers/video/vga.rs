@@ -1,6 +1,9 @@
 use core::ptr::Unique;
 
 use crate::kernel::mm::MappedAddr;
+use crate::arch::output::ConsoleDriver;
+use crate::kernel::sync::Mutex;
+use crate::arch::raw::cpuio::Port;
 
 #[allow(unused)]
 #[repr(u8)]
@@ -39,6 +42,22 @@ struct ScreenChar {
     color: ColorCode,
 }
 
+const VGA_BUFFER: MappedAddr = MappedAddr(0xffff8000000b8000);
+
+static CURSOR_INDEX: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D4) });
+static CURSOR_DATA: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D5) });
+
+fn update_cursor(offset: u16) {
+    let idx = &mut *CURSOR_INDEX.lock_irq();
+    let dta = &mut *CURSOR_DATA.lock_irq();
+
+    idx.write(0x0F);
+    dta.write((offset & 0xFF) as u8);
+
+    idx.write(0x0E);
+    dta.write((offset >> 8) as u8);
+}
+
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
@@ -61,7 +80,7 @@ fn mk_scr_char(c: u8, clr: ColorCode) -> ScreenChar {
 }
 
 impl Writer {
-    pub fn new(fg: Color, bg: Color, buf: MappedAddr) -> Writer {
+    pub const fn new(fg: Color, bg: Color, buf: MappedAddr) -> Writer {
         Writer {
             column: 0,
             row: 0,
@@ -122,14 +141,6 @@ impl Writer {
         self.row += 1;
     }
 
-    pub fn clear(&mut self) {
-        let blank = mk_scr_char(b' ', self.color);
-
-        for i in 0..(BUFFER_HEIGHT * BUFFER_WIDTH) {
-            self.buffer().chars[i] = blank;
-        }
-    }
-
     #[allow(unused)]
     fn clear_row(&mut self) {
         let blank = mk_scr_char(b' ', self.color);
@@ -140,21 +151,51 @@ impl Writer {
         }
     }
 
-    #[allow(unused)]
-    pub fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        for byte in s.bytes() {
-            self.write_byte(byte)
-        }
-        self.scroll();
-        Ok(())
-    }
 }
 
-impl ::core::fmt::Write for Writer {
+impl ConsoleDriver for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         for byte in s.bytes() {
             self.write_byte(byte)
         }
+        self.scroll();
+        update_cursor(self.buffer_pos());
         Ok(())
+    }
+
+    fn clear(&mut self) {
+        let blank = mk_scr_char(b' ', self.color);
+
+        for i in 0..(BUFFER_HEIGHT * BUFFER_WIDTH) {
+            self.buffer().chars[i] = blank;
+        }
+        update_cursor(self.buffer_pos());
+    }
+
+    fn remove_last_n(&mut self, mut n: usize) {
+        let blank = mk_scr_char(b' ', self.color);
+        while n > 0 {
+            let pos = self.buffer_pos();
+            if pos == 0 {
+                return;
+            }
+            self.buffer().chars[pos as usize - 1] = blank;
+            if self.column == 0 {
+                self.column = 79;
+                self.row -= 1;
+            } else {
+                self.column -= 1;
+            }
+            n -= 1;
+        }
+        update_cursor(self.buffer_pos());
+    }
+}
+
+static mut WRITER: Writer = Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER);
+
+pub fn init() {
+    unsafe {
+        crate::arch::output::register_console_driver(&mut WRITER);
     }
 }

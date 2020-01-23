@@ -51,7 +51,7 @@ macro_rules! int {
 
 pub type ExceptionHandlerFn = extern "x86-interrupt" fn(&mut ExceptionStackFrame);
 pub type ExceptionHandlerFnErrCode =
-    extern "x86-interrupt" fn(&mut ExceptionStackFrame, err_code: u64);
+extern "x86-interrupt" fn(&mut ExceptionStackFrame, err_code: u64);
 
 impl IdtEntry {
     pub const MISSING: IdtEntry = IdtEntry {

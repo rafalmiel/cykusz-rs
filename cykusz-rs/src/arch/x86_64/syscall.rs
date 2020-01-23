@@ -2,7 +2,7 @@ use crate::arch::idt;
 use crate::arch::raw::idt as ridt;
 
 extern "C" {
-  fn asm_syscall_handler();
+    fn asm_syscall_handler();
 }
 
 fn enable_syscall_extension() {
@@ -13,7 +13,10 @@ fn enable_syscall_extension() {
         msr::wrmsr(msr::IA32_STAR, 0x0013_0008_0000_0000);
         msr::wrmsr(msr::IA32_LSTAR, asm_syscall_handler as u64);
         msr::wrmsr(msr::IA32_FMASK, 0x200);
-        msr::wrmsr(msr::IA32_KERNEL_GS_BASE, &crate::arch::gdt::TSS as *const _ as u64);
+        msr::wrmsr(
+            msr::IA32_KERNEL_GS_BASE,
+            &crate::arch::gdt::TSS as *const _ as u64,
+        );
     }
 }
 
@@ -40,6 +43,5 @@ pub extern "C" fn fast_syscall_handler(frame: &SyscallFrame) -> u64 {
 }
 
 extern "x86-interrupt" fn syscall_handler(_frame: &mut ridt::ExceptionStackFrame) {
-
     crate::kernel::syscall::syscall_handler(0, 0, 0);
 }

@@ -1,10 +1,10 @@
-mod scancode;
-pub mod handler;
-
-use crate::drivers::ps2::PS2Controller;
+use crate::drivers::ps2::ConfigFlags;
 use crate::drivers::ps2::controller;
 use crate::drivers::ps2::PS;
-use crate::drivers::ps2::ConfigFlags;
+use crate::drivers::ps2::PS2Controller;
+
+pub mod handler;
+mod scancode;
 
 #[repr(u8)]
 #[allow(dead_code)]
@@ -13,14 +13,14 @@ enum KeyboardCommand {
     EnableReporting = 0xF4,
     SetDefaultsDisable = 0xF5,
     SetDefaults = 0xF6,
-    Reset = 0xFF
+    Reset = 0xFF,
 }
 
 #[repr(u8)]
 #[derive(PartialEq, Copy, Clone)]
 #[allow(dead_code)]
 enum KeyboardCommandData {
-    ScancodeSet = 0xF0
+    ScancodeSet = 0xF0,
 }
 
 impl PS {
@@ -101,7 +101,9 @@ fn init() {
     int::enable();
 }
 
-extern "x86-interrupt" fn keyboard_interrupt(_frame: &mut crate::arch::raw::idt::ExceptionStackFrame) {
+extern "x86-interrupt" fn keyboard_interrupt(
+    _frame: &mut crate::arch::raw::idt::ExceptionStackFrame,
+) {
     handler::handle_interrupt();
 
     crate::arch::int::end_of_int();

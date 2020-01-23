@@ -9,7 +9,8 @@ macro_rules! init_arr (
 pub static MAP_L1: [KeyCode; 256] = {
     let mut arr = [KeyCode::KEY_RESERVED; 256];
 
-    init_arr!(arr,
+    init_arr!(
+        arr,
         [0x1c, KeyCode::KEY_A],
         [0x32, KeyCode::KEY_B],
         [0x21, KeyCode::KEY_C],
@@ -103,7 +104,8 @@ pub static MAP_L1: [KeyCode; 256] = {
 pub static MAP_L2: [KeyCode; 127] = {
     let mut arr = [KeyCode::KEY_RESERVED; 127];
 
-    init_arr!(arr,
+    init_arr!(
+        arr,
         [0x1f, KeyCode::KEY_LEFTMETA],
         [0x14, KeyCode::KEY_RIGHTCTRL],
         [0x27, KeyCode::KEY_RIGHTMETA],
@@ -127,6 +129,9 @@ pub static MAP_L2: [KeyCode; 127] = {
 };
 
 pub fn get(sc: usize, l2: bool) -> KeyCode {
-    if !l2 { MAP_L1[sc] } else { MAP_L2[sc] }
+    if !l2 {
+        MAP_L1[sc]
+    } else {
+        MAP_L2[sc]
+    }
 }
-

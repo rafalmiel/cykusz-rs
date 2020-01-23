@@ -1,6 +1,6 @@
-use crate::drivers::ps2::{PS2Controller, StatusFlags, Command};
-use crate::drivers::ps2::register_controller;
 use crate::arch::raw::cpuio::Port;
+use crate::drivers::ps2::{Command, PS2Controller, StatusFlags};
+use crate::drivers::ps2::register_controller;
 use crate::kernel::sync::Mutex;
 
 struct I8042PS2Controller {
@@ -27,7 +27,7 @@ impl PS2Controller for I8042PS2Controller {
     }
 }
 
-static PS : I8042PS2Controller = unsafe {
+static PS: I8042PS2Controller = unsafe {
     I8042PS2Controller {
         data: Mutex::new(Port::<u8>::new(0x60)),
         status: Mutex::new(Port::<u8>::new(0x64)),

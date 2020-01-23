@@ -18,6 +18,7 @@ pub struct IrqGuard {
 }
 
 unsafe impl<T: ?Sized + Send> Sync for IrqLock<T> {}
+
 unsafe impl<T: ?Sized + Send> Send for IrqLock<T> {}
 
 pub struct MutexGuard<'a, T: ?Sized + 'a> {

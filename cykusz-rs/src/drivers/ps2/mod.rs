@@ -1,10 +1,11 @@
+use spin::Once;
+
+use crate::drivers::ps2::Command::{DisableFirst, DisableSecond};
+
 mod i8042;
 pub mod kbd;
 
-use spin::Once;
-use crate::drivers::ps2::Command::{DisableFirst, DisableSecond};
-
-pub trait PS2Controller : Sync {
+pub trait PS2Controller: Sync {
     fn write(&self, byte: u8);
     fn read(&self) -> u8;
     fn command(&self, byte: Command);
@@ -12,19 +13,19 @@ pub trait PS2Controller : Sync {
 }
 
 struct PS {
-    ops: &'static dyn PS2Controller
+    ops: &'static dyn PS2Controller,
 }
 
 static CONTROLLER: Once<PS> = Once::new();
 
 fn controller() -> &'static PS {
-    CONTROLLER.r#try().expect("PS2 Controller is not initialised!")
+    CONTROLLER
+        .r#try()
+        .expect("PS2 Controller is not initialised!")
 }
 
 pub fn register_controller(ctrl: &'static dyn PS2Controller) {
-    CONTROLLER.call_once(|| {
-        PS { ops: ctrl }
-    });
+    CONTROLLER.call_once(|| PS { ops: ctrl });
 }
 
 bitflags! {
@@ -68,17 +69,16 @@ pub enum Command {
     Diagnostic = 0xAC,
     DisableFirst = 0xAD,
     EnableFirst = 0xAE,
-    WriteSecond = 0xD4
+    WriteSecond = 0xD4,
 }
 
 impl PS {
-
     fn wait_write(&self) {
         while self.status().contains(StatusFlags::INPUT_FULL) {}
     }
 
     fn wait_read(&self) {
-        while ! self.status().contains(StatusFlags::OUTPUT_FULL) {}
+        while !self.status().contains(StatusFlags::OUTPUT_FULL) {}
     }
 
     fn flush_read(&self) {
@@ -99,7 +99,6 @@ impl PS {
 }
 
 impl PS2Controller for PS {
-
     fn write(&self, byte: u8) {
         self.wait_write();
         self.ops.write(byte);
@@ -142,7 +141,10 @@ fn init() {
     ctrl.command(Command::TestController);
     let read = ctrl.read();
     if read != 0x55 {
-        panic!("[ ERROR ] Could not initialise PS/2 - Self Test Failed (got: 0x{:x})", read);
+        panic!(
+            "[ ERROR ] Could not initialise PS/2 - Self Test Failed (got: 0x{:x})",
+            read
+        );
     }
 
     ctrl.command(Command::EnableFirst);
@@ -160,5 +162,3 @@ fn ps2_init() {
 }
 
 platform_init!(ps2_init);
-
-

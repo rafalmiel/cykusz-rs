@@ -1,7 +1,8 @@
-use crate::kernel::sync::{Mutex, MutexGuard};
 use core::fmt::Error;
 
-pub trait ConsoleDriver : Sync + Send {
+use crate::kernel::sync::{Mutex, MutexGuard};
+
+pub trait ConsoleDriver: Sync + Send {
     fn write_str(&self, s: &str) -> Result<(), Error>;
     fn clear(&self);
     fn remove_last_n(&self, n: usize);
@@ -9,7 +10,7 @@ pub trait ConsoleDriver : Sync + Send {
 
 pub struct OutputWriter {}
 
-static OUTPUT_WRITER: Mutex<OutputWriter> = Mutex::new(OutputWriter{});
+static OUTPUT_WRITER: Mutex<OutputWriter> = Mutex::new(OutputWriter {});
 
 impl core::fmt::Write for OutputWriter {
     fn write_str(&mut self, s: &str) -> Result<(), Error> {
@@ -19,15 +20,24 @@ impl core::fmt::Write for OutputWriter {
 
 impl ConsoleDriver for OutputWriter {
     fn write_str(&self, s: &str) -> Result<(), Error> {
-        WRITER.lock_irq().expect("Output driver not initialised").write_str(s)
+        WRITER
+            .lock_irq()
+            .expect("Output driver not initialised")
+            .write_str(s)
     }
 
     fn clear(&self) {
-        WRITER.lock_irq().expect("Output driver not initialised").clear()
+        WRITER
+            .lock_irq()
+            .expect("Output driver not initialised")
+            .clear()
     }
 
     fn remove_last_n(&self, n: usize) {
-        WRITER.lock_irq().expect("Output driver not initialised").remove_last_n(n)
+        WRITER
+            .lock_irq()
+            .expect("Output driver not initialised")
+            .remove_last_n(n)
     }
 }
 

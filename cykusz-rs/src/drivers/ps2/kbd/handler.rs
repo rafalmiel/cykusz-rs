@@ -1,6 +1,7 @@
-use crate::drivers::ps2::{PS2Controller, controller};
-use super::scancode;
+use crate::drivers::ps2::{controller, PS2Controller};
 use crate::kernel::sync::Mutex;
+
+use super::scancode;
 
 struct KbdState {
     state: Mutex<State>,
@@ -13,10 +14,7 @@ struct State {
 
 impl State {
     const fn new() -> State {
-        State {
-            e: false,
-            f: false,
-        }
+        State { e: false, f: false }
     }
 }
 
@@ -25,7 +23,6 @@ static KEYBOARD: KbdState = KbdState {
 };
 
 impl KbdState {
-
     fn handle_interrupt(&self) {
         let data = controller().read();
 
@@ -35,11 +32,11 @@ impl KbdState {
             0xf0 => {
                 state.f = true;
                 return;
-            },
+            }
             0xe0 => {
                 state.e = true;
                 return;
-            },
+            }
             _ => {
                 let released = state.f;
 
@@ -53,7 +50,7 @@ impl KbdState {
                 crate::drivers::input::key_notify(key, released);
             }
         }
-   }
+    }
 }
 
 pub fn handle_interrupt() {

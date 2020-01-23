@@ -3,9 +3,9 @@ use core::marker::PhantomData;
 use crate::arch::mm::virt::entry;
 use crate::arch::mm::virt::entry::Entry;
 use crate::arch::x86_64::mm::phys::PhysPage;
-use crate::kernel::mm::virt;
-use crate::kernel::mm::Frame;
 use crate::kernel::mm::*;
+use crate::kernel::mm::Frame;
+use crate::kernel::mm::virt;
 use crate::kernel::sync::MutexGuard;
 
 use super::page;
@@ -13,35 +13,49 @@ use super::page;
 const ENTRIES_COUNT: usize = 512;
 
 pub enum Level4 {}
+
 #[allow(dead_code)]
 pub enum Level3 {}
+
 #[allow(dead_code)]
 pub enum Level2 {}
+
 pub enum Level1 {}
 
 pub trait NotLastLevel: TableLevel {
     type NextLevel: TableLevel;
 }
+
 pub trait TableLevel {}
+
 pub trait LastLevel: TableLevel {}
+
 pub trait HugePageLevel: TableLevel {}
+
 pub trait TopLevel: TableLevel {}
 
 impl TableLevel for Level4 {}
+
 impl TableLevel for Level3 {}
+
 impl TableLevel for Level2 {}
+
 impl TableLevel for Level1 {}
 
 impl LastLevel for Level1 {}
+
 impl TopLevel for Level4 {}
+
 impl HugePageLevel for Level2 {}
 
 impl NotLastLevel for Level4 {
     type NextLevel = Level3;
 }
+
 impl NotLastLevel for Level3 {
     type NextLevel = Level2;
 }
+
 impl NotLastLevel for Level2 {
     type NextLevel = Level1;
 }
@@ -54,8 +68,8 @@ pub struct Table<L: TableLevel> {
 pub type P4Table = Table<Level4>;
 
 impl<L> Table<L>
-where
-    L: TableLevel,
+    where
+        L: TableLevel,
 {
     fn new_at_frame_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
         unsafe { frame.address_mapped().read_mut::<Table<L>>() }
@@ -81,8 +95,8 @@ where
 }
 
 impl<L> Table<L>
-where
-    L: NotLastLevel,
+    where
+        L: NotLastLevel,
 {
     pub fn next_level_mut(&mut self, idx: usize) -> Option<&mut Table<L::NextLevel>> {
         let entry = &self.entries[idx];
@@ -138,8 +152,8 @@ where
 }
 
 impl<L> Table<L>
-where
-    L: HugePageLevel,
+    where
+        L: HugePageLevel,
 {
     pub fn set_hugepage(&mut self, idx: usize, frame: &Frame) {
         let entry = &mut self.entries[idx];
@@ -154,8 +168,8 @@ where
 }
 
 impl<L> Table<L>
-where
-    L: LastLevel,
+    where
+        L: LastLevel,
 {
     pub fn alloc(&mut self, idx: usize) {
         let entry = &mut self.entries[idx];

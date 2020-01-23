@@ -1,12 +1,13 @@
-use crate::drivers::input::keys::KeyCode;
-use crate::kernel::sync::Mutex;
 use alloc::vec::Vec;
 
+use crate::drivers::input::keys::KeyCode;
+use crate::kernel::sync::Mutex;
+
+pub mod keymap;
 pub mod keys;
 pub mod tty;
-pub mod keymap;
 
-pub trait KeyListener : Sync {
+pub trait KeyListener: Sync {
     fn on_new_key(&self, key: keys::KeyCode, released: bool);
 }
 

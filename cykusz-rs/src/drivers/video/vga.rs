@@ -1,9 +1,9 @@
 use core::ptr::Unique;
 
-use crate::kernel::mm::MappedAddr;
 use crate::arch::output::ConsoleDriver;
-use crate::kernel::sync::Mutex;
 use crate::arch::raw::cpuio::Port;
+use crate::kernel::mm::MappedAddr;
+use crate::kernel::sync::Mutex;
 
 #[allow(unused)]
 #[repr(u8)]
@@ -73,7 +73,7 @@ struct State {
 }
 
 pub struct Writer {
-    state: Mutex<State>
+    state: Mutex<State>,
 }
 
 fn mk_scr_char(c: u8, clr: ColorCode) -> ScreenChar {

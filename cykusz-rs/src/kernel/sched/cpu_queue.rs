@@ -78,7 +78,7 @@ impl CpuQueue {
         crate::kernel::timer::reset_counter();
     }
 
-    pub fn current_task(&self, _lock: MutexGuard<()>) -> Arc<Task>{
+    pub fn current_task(&self, _lock: MutexGuard<()>) -> Arc<Task> {
         self.tasks[self.current].clone()
     }
 
@@ -122,7 +122,7 @@ impl CpuQueue {
             c = (c % (len - 1)) + 1;
             loops += 1;
         }
-        .expect("SCHEDULER BUG");
+            .expect("SCHEDULER BUG");
 
         if self.tasks[self.current].state() == TaskState::Running {
             self.tasks[self.current].set_state(TaskState::Runnable);

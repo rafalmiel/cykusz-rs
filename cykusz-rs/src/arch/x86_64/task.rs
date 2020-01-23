@@ -84,9 +84,9 @@ fn prepare_p4<'a>() -> &'a mut P4Table {
 
 fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, VirtAddr, VirtAddr) {
     use crate::arch::mm::phys::allocate;
-    use crate::kernel::mm::virt;
     use crate::drivers::elf::types::ProgramType;
     use crate::drivers::elf::ElfHeader;
+    use crate::kernel::mm::virt;
     use core::cmp::min;
 
     let hdr = unsafe { ElfHeader::load(elf_module) };
@@ -108,8 +108,9 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
                 let to_copy = PAGE_SIZE - page_offset;
 
                 unsafe {
-                    code_addr.copy_to(code_page.address_mapped().0 + page_offset,
-                                      min(to_copy,virt_end.0 - virt_addr)
+                    code_addr.copy_to(
+                        code_page.address_mapped().0 + page_offset,
+                        min(to_copy, virt_end.0 - virt_addr),
                     );
                 }
 
@@ -137,8 +138,10 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
     );
 }
 
-fn allocate_page_table(elf_module: MappedAddr, _code_size: usize) -> (PhysAddr, VirtAddr, VirtAddr) {
-
+fn allocate_page_table(
+    elf_module: MappedAddr,
+    _code_size: usize,
+) -> (PhysAddr, VirtAddr, VirtAddr) {
     let new_p4 = prepare_p4();
 
     map_user(new_p4, elf_module)
@@ -183,10 +186,16 @@ impl Task {
         }
     }
 
-    unsafe fn prepare_iretq_ctx(fun: fn(), cs: SegmentSelector, ds: SegmentSelector, int_enabled: bool, sp: *mut u8, cr3: PhysAddr) -> Unique<Context> {
-        let frame: &mut IretqFrame = &mut *(sp
-            .offset(-(::core::mem::size_of::<IretqFrame>() as isize))
-            as *mut IretqFrame);
+    unsafe fn prepare_iretq_ctx(
+        fun: fn(),
+        cs: SegmentSelector,
+        ds: SegmentSelector,
+        int_enabled: bool,
+        sp: *mut u8,
+        cr3: PhysAddr,
+    ) -> Unique<Context> {
+        let frame: &mut IretqFrame =
+            &mut *(sp.offset(-(::core::mem::size_of::<IretqFrame>() as isize)) as *mut IretqFrame);
 
         frame.task_finished_fun = task_finished as usize;
         frame.ss = ds.bits() as usize;
@@ -207,7 +216,13 @@ impl Task {
         ctx
     }
 
-    unsafe fn prepare_sysretq_ctx(fun: fn(), int_enabled: bool, user_stack: Option<usize>, sp: *mut u8, cr3: PhysAddr) -> Unique<Context> {
+    unsafe fn prepare_sysretq_ctx(
+        fun: fn(),
+        int_enabled: bool,
+        user_stack: Option<usize>,
+        sp: *mut u8,
+        cr3: PhysAddr,
+    ) -> Unique<Context> {
         let frame: &mut SysretqFrame = &mut *(sp
             .offset(-(::core::mem::size_of::<SysretqFrame>() as isize))
             as *mut SysretqFrame);

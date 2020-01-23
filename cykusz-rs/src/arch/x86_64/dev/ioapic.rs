@@ -20,8 +20,11 @@ const fn reg_redtbl_high(num: u32) -> u32 {
 }
 
 struct RegId(u32);
+
 struct RegVer(u32);
+
 struct RegRedTblL(u32);
+
 struct RegRedTblH(u32);
 
 impl RegId {

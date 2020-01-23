@@ -32,13 +32,16 @@ purge: clean
 
 run: $(iso)
 	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -m 512 -smp cpus=4 -no-shutdown
+
 debug: $(iso)
 	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -s -S -smp cpus=4 -no-shutdown
+
 gdb:
-	#@rust-os-gdb/bin/rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"
-	@rust-gdb "build/kernel-x86_64.bin" -ex "target remote :1234"
+	@rust-gdb "$(kernel)" -ex "target remote :1234"
+
 kdbg:
-	@kdbg -r localhost:1234 "build/kernel-x86_64.bin"
+	@kdbg -r localhost:1234 "$(kernel)"
+
 bochs: $(iso)
 	bochs -f bochsrc.txt -q
 

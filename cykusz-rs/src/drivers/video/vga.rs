@@ -65,11 +65,15 @@ struct Buffer {
     chars: [ScreenChar; BUFFER_WIDTH * BUFFER_HEIGHT],
 }
 
-pub struct Writer {
+struct State {
     column: usize,
     row: usize,
     color: ColorCode,
     buffer: Unique<Buffer>,
+}
+
+pub struct Writer {
+    state: Mutex<State>
 }
 
 fn mk_scr_char(c: u8, clr: ColorCode) -> ScreenChar {
@@ -79,14 +83,18 @@ fn mk_scr_char(c: u8, clr: ColorCode) -> ScreenChar {
     }
 }
 
-impl Writer {
-    pub const fn new(fg: Color, bg: Color, buf: MappedAddr) -> Writer {
-        Writer {
+impl State {
+    pub const fn new(fg: Color, bg: Color, buf: MappedAddr) -> State {
+        State {
             column: 0,
             row: 0,
             color: ColorCode::new(fg, bg),
             buffer: unsafe { Unique::new_unchecked(buf.0 as *mut _) },
         }
+    }
+
+    fn buffer(&mut self) -> &mut Buffer {
+        unsafe { self.buffer.as_mut() }
     }
 
     pub fn write_byte(&mut self, byte: u8) {
@@ -111,10 +119,6 @@ impl Writer {
 
     pub fn buffer_pos(&self) -> u16 {
         (BUFFER_WIDTH * self.row + self.column) as u16
-    }
-
-    fn buffer(&mut self) -> &mut Buffer {
-        unsafe { self.buffer.as_mut() }
     }
 
     fn scroll(&mut self) {
@@ -151,9 +155,6 @@ impl Writer {
         }
     }
 
-}
-
-impl ConsoleDriver for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         for byte in s.bytes() {
             self.write_byte(byte)
@@ -192,10 +193,30 @@ impl ConsoleDriver for Writer {
     }
 }
 
-static mut WRITER: Writer = Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER);
+impl Writer {
+    pub const fn new(fg: Color, bg: Color, buf: MappedAddr) -> Writer {
+        Writer {
+            state: Mutex::new(State::new(fg, bg, buf)),
+        }
+    }
+}
+
+impl ConsoleDriver for Writer {
+    fn write_str(&self, s: &str) -> ::core::fmt::Result {
+        self.state.lock().write_str(s)
+    }
+
+    fn clear(&self) {
+        self.state.lock().clear()
+    }
+
+    fn remove_last_n(&self, n: usize) {
+        self.state.lock().remove_last_n(n)
+    }
+}
+
+static WRITER: Writer = Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER);
 
 pub fn init() {
-    unsafe {
-        crate::arch::output::register_console_driver(&mut WRITER);
-    }
+    crate::arch::output::register_console_driver(&WRITER);
 }

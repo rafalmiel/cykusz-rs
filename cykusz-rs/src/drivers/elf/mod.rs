@@ -1,10 +1,10 @@
-pub mod headers;
-pub mod types;
-
 pub use headers::elf::ElfHeader;
 pub use headers::program::ProgramHeader;
 
 use crate::arch::raw::mm::MappedAddr;
+
+pub mod headers;
+pub mod types;
 
 impl ElfHeader {
     pub unsafe fn load(addr: MappedAddr) -> &'static ElfHeader {

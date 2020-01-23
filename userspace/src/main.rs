@@ -1,17 +1,16 @@
 #![no_std]
 #![no_main]
-
 #![feature(asm)]
 #![feature(lang_items)]
 
 extern crate rlibc;
 
+use core::panic::PanicInfo;
+use core::str;
+
 #[macro_use]
 pub mod print;
 pub mod syscall;
-
-use core::str;
-use core::panic::PanicInfo;
 
 #[allow(unused)]
 pub fn bochs() {
@@ -32,6 +31,7 @@ pub fn dummy_work() {
         }
     }
 }
+
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {
     loop {
@@ -42,7 +42,6 @@ pub extern "C" fn _start() -> ! {
         let s = &buf[..r];
 
         println!("Got {}, bytes: {}", str::from_utf8(s).unwrap(), r);
-
     }
 }
 

@@ -4,7 +4,7 @@ use core::sync::atomic::Ordering;
 use spin::Once;
 
 use crate::drivers::multiboot2;
-use crate::kernel::mm::{PhysAddr, PAGE_SIZE};
+use crate::kernel::mm::{PAGE_SIZE, PhysAddr};
 use crate::kernel::sync::{Mutex, MutexGuard};
 
 pub use self::alloc::allocate;

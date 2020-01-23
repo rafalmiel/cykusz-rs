@@ -1,4 +1,4 @@
-struct Writer{}
+struct Writer {}
 
 impl core::fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
@@ -8,7 +8,7 @@ impl core::fmt::Write for Writer {
 }
 
 pub fn write_fmt(args: ::core::fmt::Arguments) -> ::core::fmt::Result {
-    let mut w = Writer{};
+    let mut w = Writer {};
     let r = ::core::fmt::write(&mut w, args);
     r
 }

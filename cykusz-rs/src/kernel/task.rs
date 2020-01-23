@@ -87,14 +87,17 @@ impl Task {
     }
 
     pub fn mark_to_reschedule(&self) {
-        self.prev_state.store(self.state.load(Ordering::SeqCst), Ordering::SeqCst);
-        self.state.store(TaskState::ToReschedule as usize, Ordering::SeqCst);
+        self.prev_state
+            .store(self.state.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.state
+            .store(TaskState::ToReschedule as usize, Ordering::SeqCst);
     }
 
     pub fn unmark_to_reschedule(&self) {
-        self.state.store(self.prev_state.load(Ordering::SeqCst), Ordering::SeqCst);
-        self.prev_state.store(TaskState::Unused as usize, Ordering::SeqCst);
-
+        self.state
+            .store(self.prev_state.load(Ordering::SeqCst), Ordering::SeqCst);
+        self.prev_state
+            .store(TaskState::Unused as usize, Ordering::SeqCst);
     }
 
     pub fn state(&self) -> TaskState {

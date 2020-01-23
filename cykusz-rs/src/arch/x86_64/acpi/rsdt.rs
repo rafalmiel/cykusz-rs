@@ -27,6 +27,7 @@ impl RsdtPtrType for u32 {
         self as usize
     }
 }
+
 impl RsdtPtrType for u64 {
     fn as_usize(self) -> usize {
         self as usize

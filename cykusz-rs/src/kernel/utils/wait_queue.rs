@@ -1,17 +1,18 @@
-use alloc::vec::Vec;
-use alloc::sync::Weak;
-use crate::kernel::task::{Task, TaskState};
 use alloc::sync::Arc;
+use alloc::sync::Weak;
+use alloc::vec::Vec;
+
 use crate::kernel::sync::Mutex;
+use crate::kernel::task::{Task, TaskState};
 
 pub struct WaitQueue {
-    tasks: Mutex<Vec<Weak<Task>>>
+    tasks: Mutex<Vec<Weak<Task>>>,
 }
 
 impl WaitQueue {
     pub const fn new() -> WaitQueue {
         WaitQueue {
-            tasks: Mutex::new(Vec::new())
+            tasks: Mutex::new(Vec::new()),
         }
     }
 
@@ -29,7 +30,7 @@ impl WaitQueue {
             return false;
         }
 
-        for  i in (0..len).rev() {
+        for i in (0..len).rev() {
             if let Some(t) = tasks[i].upgrade() {
                 t.set_state(TaskState::Runnable);
                 tasks.remove(i);

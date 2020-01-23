@@ -1,6 +1,6 @@
 use crate::kernel::mm::VirtAddr;
 
-pub struct ModuleFun(pub *const());
+pub struct ModuleFun(pub *const ());
 
 unsafe impl Sync for ModuleFun {}
 
@@ -58,8 +58,10 @@ pub fn init_all() {
 
     // Iterate over .devinit section containing pointers to module initialisation functions
     unsafe {
-        run_range(VirtAddr(&__kernel_devinit_start as *const usize as usize),
-                  VirtAddr(&__kernel_devinit_end as *const usize as usize));
+        run_range(
+            VirtAddr(&__kernel_devinit_start as *const usize as usize),
+            VirtAddr(&__kernel_devinit_end as *const usize as usize),
+        );
     }
 }
 
@@ -71,7 +73,9 @@ pub fn fini_all() {
 
     // Iterate over .devfini section containing pointers to module finalisation functions
     unsafe {
-        run_range(VirtAddr(&__kernel_devfini_start as *const usize as usize),
-                  VirtAddr(&__kernel_devfini_end as *const usize as usize));
+        run_range(
+            VirtAddr(&__kernel_devfini_start as *const usize as usize),
+            VirtAddr(&__kernel_devfini_end as *const usize as usize),
+        );
     }
 }

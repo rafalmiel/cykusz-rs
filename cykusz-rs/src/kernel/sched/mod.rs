@@ -1,16 +1,16 @@
-use core::sync::atomic::Ordering;
+use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicUsize};
+use core::sync::atomic::Ordering;
 
 use spin::Once;
 
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sync::IrqGuard;
+use crate::kernel::task::Task;
 
 use self::cpu_queue::CpuQueue;
 use self::cpu_queues::CpuQueues;
 use self::task_container::TaskContainer;
-use alloc::sync::Arc;
-use crate::kernel::task::Task;
 
 #[macro_export]
 macro_rules! switch {

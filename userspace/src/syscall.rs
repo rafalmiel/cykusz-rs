@@ -9,9 +9,7 @@ pub unsafe fn syscall2(mut a: usize, b: usize, c: usize) -> usize {
 }
 
 pub fn read(buf: *mut u8, len: usize) -> usize {
-    unsafe {
-        syscall2(1, buf as usize, len)
-    }
+    unsafe { syscall2(1, buf as usize, len) }
 }
 
 pub fn print(v: &str) {

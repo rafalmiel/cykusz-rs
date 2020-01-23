@@ -1,7 +1,7 @@
-use crate::kernel::mm::virt;
 use crate::kernel::mm::Frame;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
+use crate::kernel::mm::virt;
 
 bitflags! {
     pub struct Entry: usize {

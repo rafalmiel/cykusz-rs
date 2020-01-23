@@ -1,6 +1,6 @@
 use crate::drivers::multiboot2::memory::MemoryIter;
-use crate::kernel::mm::PhysAddr;
 use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::PhysAddr;
 
 pub struct PhysMemIterator {
     current: PhysAddr,

@@ -5,6 +5,7 @@ use crate::kernel::sync::Mutex;
 use core::fmt::Debug;
 use core::fmt::{Formatter, Error};
 use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::arch::output::ConsoleDriver;
 
 struct State {
     lshift: bool,
@@ -200,12 +201,12 @@ impl KeyListener for Tty {
                 use crate::arch::output::writer;
                 let n = self.buffer.lock().remove_last_n(1);
                 if n > 0 {
-                    let mut w = writer();
-                    w.as_mut().unwrap().remove_last_n(n);
+                    let w = writer();
+                    w.remove_last_n(n);
                     return;
                 }
             },
-            KeyCode::KEY_ENTER if !released => {
+            KeyCode::KEY_ENTER | KeyCode::KEY_KPENTER if !released => {
                 self.buffer.lock().commit_write();
                 print!("\n");
                 self.wait_queue.notify_one();

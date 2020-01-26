@@ -1,7 +1,7 @@
 use core::ops::*;
 
-use crate::arch::x86_64::mm::PAGE_SIZE;
 use crate::arch::x86_64::mm::phys::PhysPage;
+use crate::arch::x86_64::mm::PAGE_SIZE;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
 pub struct VirtAddr(pub usize);

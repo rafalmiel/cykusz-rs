@@ -1,7 +1,7 @@
-use crate::drivers::ps2::ConfigFlags;
 use crate::drivers::ps2::controller;
-use crate::drivers::ps2::PS;
+use crate::drivers::ps2::ConfigFlags;
 use crate::drivers::ps2::PS2Controller;
+use crate::drivers::ps2::PS;
 
 pub mod handler;
 mod scancode;

@@ -1,12 +1,12 @@
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicBool, AtomicUsize};
 use core::sync::atomic::Ordering;
+use core::sync::atomic::{AtomicBool, AtomicUsize};
 
 use spin::Once;
 
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sync::IrqGuard;
-use crate::kernel::task::Task;
+use crate::kernel::task::{Task, TaskState};
 
 use self::cpu_queue::CpuQueue;
 use self::cpu_queues::CpuQueues;
@@ -74,8 +74,6 @@ impl Scheduler {
 
         let task = self.tasks.add_user_task(fun, code_size);
 
-        println!("Created user task {}", task.id());
-
         self.cpu_queues.add_task(task);
     }
 
@@ -112,7 +110,7 @@ impl Scheduler {
     fn current_task(&self) -> Arc<Task> {
         let _g = IrqGuard::new();
 
-        self.cpu_queues.current_task().clone()
+        self.cpu_queues.current_task()
     }
 }
 

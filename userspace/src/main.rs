@@ -37,7 +37,7 @@ pub extern "C" fn _start() -> ! {
     loop {
         let mut buf = [0u8; 256];
 
-        let r = syscall::read(buf.as_mut_ptr(), buf.len());
+        let r = syscall::read(1, buf.as_mut_ptr(), buf.len());
 
         let s = &buf[..r];
 

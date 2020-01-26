@@ -212,10 +212,10 @@ impl LApic {
 
         let ticks = 0xFFFFFFFFu32
             - if !self.x2 {
-            self.reg_read(REG_TIMCUR)
-        } else {
-            unsafe { msr::rdmsr(msr::IA32_X2APIC_CUR_COUNT) as u32 }
-        };
+                self.reg_read(REG_TIMCUR)
+            } else {
+                unsafe { msr::rdmsr(msr::IA32_X2APIC_CUR_COUNT) as u32 }
+            };
 
         self.ticks_in_1_ms = ticks;
 

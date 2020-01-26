@@ -1,6 +1,6 @@
 use crate::arch::raw::cpuio::Port;
-use crate::drivers::ps2::{Command, PS2Controller, StatusFlags};
 use crate::drivers::ps2::register_controller;
+use crate::drivers::ps2::{Command, PS2Controller, StatusFlags};
 use crate::kernel::sync::Mutex;
 
 struct I8042PS2Controller {

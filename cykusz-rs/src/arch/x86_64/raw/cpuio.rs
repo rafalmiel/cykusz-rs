@@ -78,4 +78,4 @@ impl<T: InOut> UnsafePort<T> {
     }
 }
 
-impl<T> ! Sync for UnsafePort<T> {}
+impl<T> !Sync for UnsafePort<T> {}

@@ -35,13 +35,14 @@ pub struct SyscallFrame {
     rax: u64,
     rdi: u64,
     rsi: u64,
+    rdx: u64,
 }
 
 #[no_mangle]
 pub extern "C" fn fast_syscall_handler(frame: &SyscallFrame) -> u64 {
-    crate::kernel::syscall::syscall_handler(frame.rax, frame.rdi, frame.rsi)
+    crate::kernel::syscall::syscall_handler(frame.rax, frame.rdi, frame.rsi, frame.rdx)
 }
 
 extern "x86-interrupt" fn syscall_handler(_frame: &mut ridt::ExceptionStackFrame) {
-    crate::kernel::syscall::syscall_handler(0, 0, 0);
+    crate::kernel::syscall::syscall_handler(0, 0, 0, 0);
 }

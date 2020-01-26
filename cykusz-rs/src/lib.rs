@@ -16,10 +16,7 @@ extern crate alloc;
 extern crate bitflags;
 #[macro_use]
 extern crate lazy_static;
-extern crate linked_list_allocator;
-extern crate raw_cpuid;
 extern crate rlibc;
-extern crate spin;
 
 use crate::kernel::mm::VirtAddr;
 
@@ -66,6 +63,10 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Scheduler Initialised");
 
+    kernel::fs::init();
+
+    println!("[ OK ] VFS Initialized");
+
     kernel::smp::start();
 
     println!(
@@ -84,6 +85,8 @@ pub fn rust_main(stack_top: VirtAddr) {
     println!("[ OK ] Local Timer Started");
 
     kernel::module::init_all();
+
+    println!("[ OK ] Modules Initialized");
 
     // Start test tasks on this cpu
     task_test::start();

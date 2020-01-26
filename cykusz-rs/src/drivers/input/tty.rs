@@ -1,10 +1,10 @@
-use core::fmt::{Error, Formatter};
 use core::fmt::Debug;
+use core::fmt::{Error, Formatter};
 
 use crate::arch::output::ConsoleDriver;
-use crate::drivers::input::KeyListener;
 use crate::drivers::input::keymap;
 use crate::drivers::input::keys::KeyCode;
+use crate::drivers::input::KeyListener;
 use crate::kernel::sync::Mutex;
 use crate::kernel::utils::wait_queue::WaitQueue;
 

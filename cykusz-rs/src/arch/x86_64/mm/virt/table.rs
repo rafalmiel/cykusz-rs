@@ -3,9 +3,9 @@ use core::marker::PhantomData;
 use crate::arch::mm::virt::entry;
 use crate::arch::mm::virt::entry::Entry;
 use crate::arch::x86_64::mm::phys::PhysPage;
-use crate::kernel::mm::*;
-use crate::kernel::mm::Frame;
 use crate::kernel::mm::virt;
+use crate::kernel::mm::Frame;
+use crate::kernel::mm::*;
 use crate::kernel::sync::MutexGuard;
 
 use super::page;
@@ -68,8 +68,8 @@ pub struct Table<L: TableLevel> {
 pub type P4Table = Table<Level4>;
 
 impl<L> Table<L>
-    where
-        L: TableLevel,
+where
+    L: TableLevel,
 {
     fn new_at_frame_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
         unsafe { frame.address_mapped().read_mut::<Table<L>>() }
@@ -95,8 +95,8 @@ impl<L> Table<L>
 }
 
 impl<L> Table<L>
-    where
-        L: NotLastLevel,
+where
+    L: NotLastLevel,
 {
     pub fn next_level_mut(&mut self, idx: usize) -> Option<&mut Table<L::NextLevel>> {
         let entry = &self.entries[idx];
@@ -152,8 +152,8 @@ impl<L> Table<L>
 }
 
 impl<L> Table<L>
-    where
-        L: HugePageLevel,
+where
+    L: HugePageLevel,
 {
     pub fn set_hugepage(&mut self, idx: usize, frame: &Frame) {
         let entry = &mut self.entries[idx];
@@ -168,8 +168,8 @@ impl<L> Table<L>
 }
 
 impl<L> Table<L>
-    where
-        L: LastLevel,
+where
+    L: LastLevel,
 {
     pub fn alloc(&mut self, idx: usize) {
         let entry = &mut self.entries[idx];

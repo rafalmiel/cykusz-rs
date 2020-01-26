@@ -30,6 +30,7 @@ asm_syscall_handler:
 
     cld
 
+    push rdx
     push rsi
     push rdi
     push rax
@@ -41,6 +42,7 @@ asm_syscall_handler:
     add rsp, 8              ; Preserve syscall return value in rax
     pop rdi
     pop rsi
+    pop rdx
 
 asm_sysretq:
     cli

@@ -51,6 +51,7 @@ impl CpuQueue {
         drop(lock);
 
         self.finalize();
+        CURRENT_TASK_ID.store(to.id(), Ordering::SeqCst);
 
         unsafe {
             switch!(&self.sched_task, &to);
@@ -122,7 +123,7 @@ impl CpuQueue {
             c = (c % (len - 1)) + 1;
             loops += 1;
         }
-            .expect("SCHEDULER BUG");
+        .expect("SCHEDULER BUG");
 
         if self.tasks[self.current].state() == TaskState::Running {
             self.tasks[self.current].set_state(TaskState::Runnable);
@@ -132,8 +133,6 @@ impl CpuQueue {
 
         self.previous = self.current;
         self.current = found;
-
-        CURRENT_TASK_ID.store(self.tasks[found].id(), Ordering::SeqCst);
 
         QUEUE_LEN.store(self.tasks.len(), Ordering::SeqCst);
 

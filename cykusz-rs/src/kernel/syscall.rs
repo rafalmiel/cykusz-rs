@@ -1,5 +1,3 @@
-use core::slice;
-use core::str;
 use core::sync::atomic::Ordering;
 use crate::kernel::sched::current_task;
 

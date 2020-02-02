@@ -37,8 +37,4 @@ impl TaskContainer {
     pub fn remove_task(&self, id: usize) {
         self.tasks.lock().remove(&id);
     }
-
-    pub fn get_task(&self, id: usize) -> Option<Arc<Task>> {
-        self.tasks.lock().get(&id).cloned()
-    }
 }

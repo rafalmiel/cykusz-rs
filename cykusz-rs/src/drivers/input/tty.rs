@@ -1,10 +1,15 @@
-use core::fmt::Debug;
+use alloc::string::String;
+use alloc::sync::{Arc, Weak};
 use core::fmt::{Error, Formatter};
+use core::fmt::Debug;
 
 use crate::arch::output::ConsoleDriver;
+use crate::drivers::input::KeyListener;
 use crate::drivers::input::keymap;
 use crate::drivers::input::keys::KeyCode;
-use crate::drivers::input::KeyListener;
+use crate::kernel::device::Device;
+use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sync::Mutex;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -99,9 +104,11 @@ impl Buffer {
 }
 
 struct Tty {
+    dev_id: usize,
     state: Mutex<State>,
     buffer: Mutex<Buffer>,
     wait_queue: WaitQueue,
+    self_ptr: Weak<Tty>
 }
 
 impl State {
@@ -141,11 +148,25 @@ impl State {
 }
 
 impl Tty {
-    const fn new() -> Tty {
+    fn new() -> Tty {
         Tty {
+            dev_id: crate::kernel::device::alloc_id(),
             state: Mutex::new(State::new()),
             buffer: Mutex::new(Buffer::new()),
             wait_queue: WaitQueue::new(),
+            self_ptr: Weak::default(),
+        }
+    }
+
+    fn wrap(self) -> Arc<Self> {
+        let arc = Arc::new(self);
+
+        let weak = Arc::downgrade(&arc);
+        let ptr = Arc::into_raw(arc) as *mut Self;
+
+        unsafe {
+            (*ptr).self_ptr = weak;
+            Arc::from_raw(ptr)
         }
     }
 
@@ -221,7 +242,33 @@ impl KeyListener for Tty {
     }
 }
 
-static LISTENER: Tty = Tty::new();
+impl Device for Tty {
+    fn id(&self) -> usize {
+        self.dev_id
+    }
+
+    fn name(&self) -> String {
+        String::from("tty")
+    }
+
+    fn inode(&self) -> Arc<dyn INode> {
+        self.self_ptr.upgrade().unwrap()
+    }
+}
+
+impl INode for Tty {
+    fn id(&self) -> usize {
+        self.dev_id
+    }
+
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
+        Ok(self.read(buf.as_mut_ptr(), buf.len()))
+    }
+}
+
+lazy_static! {
+    static ref LISTENER: Arc<Tty> = Tty::new().wrap();
+}
 
 pub fn read(buf: *mut u8, len: usize) -> usize {
     let l = &LISTENER;
@@ -230,7 +277,10 @@ pub fn read(buf: *mut u8, len: usize) -> usize {
 }
 
 fn init() {
-    crate::drivers::input::register_key_listener(&LISTENER);
+    crate::drivers::input::register_key_listener(LISTENER.as_ref());
+    if let Err(v) = crate::kernel::device::register_device(LISTENER.clone()) {
+        panic!("Failed to register Tty device: {:?}", v);
+    }
 }
 
 module_init!(init);

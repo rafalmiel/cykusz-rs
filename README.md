@@ -20,7 +20,9 @@ Currently implemented:
 - [x] SMP
 - [x] Per-CPU-Storage using thread_local
 - [x] Preemptive per-cpu scheduler
-- [ ] Userspace support (work in progress)
+- [x] PS2/Keyboard driver + basic TTY
+- [x] Virtual File System
+- [x] Userspace support
 
 ## Building
 

@@ -2,7 +2,6 @@ use alloc::string::String;
 use alloc::sync::Arc;
 
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::FsError;
 use crate::kernel::fs::vfs::Result;
 use spin::Once;
 
@@ -13,7 +12,7 @@ impl INode for StdOut {
         0
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         print!("{}", String::from_utf8_lossy(buf));
         Ok(buf.len())
     }
@@ -26,7 +25,7 @@ impl INode for StdIn {
         0
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         Ok(crate::drivers::input::tty::read(buf.as_mut_ptr(), buf.len()))
     }
 }

@@ -1,12 +1,9 @@
-use alloc::sync::Arc;
-use alloc::vec::Vec;
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::new_task_id;
-use crate::kernel::sync::Mutex;
 use crate::kernel::task::filetable::FileHandle;
 
 pub mod filetable;
@@ -83,7 +80,7 @@ impl Task {
     }
 
     pub fn new_user(fun: MappedAddr, code_size: usize) -> Task {
-        let mut task = Task {
+        let task = Task {
             arch_task: UnsafeCell::new(ArchTask::new_user(fun, code_size)),
             id: crate::kernel::sched::new_task_id(),
             prev_state: AtomicUsize::new(TaskState::Unused as usize),

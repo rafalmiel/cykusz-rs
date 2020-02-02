@@ -6,7 +6,7 @@ use spin::Once;
 
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sync::IrqGuard;
-use crate::kernel::task::{Task, TaskState};
+use crate::kernel::task::Task;
 
 use self::cpu_queue::CpuQueue;
 use self::cpu_queues::CpuQueues;

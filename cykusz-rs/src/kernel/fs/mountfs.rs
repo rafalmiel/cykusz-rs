@@ -3,10 +3,10 @@ use alloc::sync::{Arc, Weak};
 
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::FsError;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::sync::RwLock;
 
+#[allow(dead_code)]
 pub struct MountFS {
     fs: Arc<dyn Filesystem>,
     mounts: RwLock<BTreeMap<usize, Arc<MountFS>>>,
@@ -52,11 +52,11 @@ impl Filesystem for MountFS {
 }
 
 pub struct MNode {
-    /// The inner INode
-    pub inode: Arc<dyn INode>,
-    /// Associated MountFilesystem
-    pub vfs: Arc<MountFS>,
-    /// Weak reference to self
+    // The inner INode
+    inode: Arc<dyn INode>,
+    // Associated MountFilesystem
+    vfs: Arc<MountFS>,
+    // Weak reference to self
     self_ref: Weak<MNode>,
 }
 
@@ -124,23 +124,23 @@ impl INode for MNode {
         Ok(self.lookup(name)?)
     }
 
-    fn mkdir(&self, name: &str) -> Result<Arc<INode>> {
+    fn mkdir(&self, name: &str) -> Result<Arc<dyn INode>> {
         Ok(self.mkdir(name)?)
     }
 
-    fn open(&self, name: &str) -> Result<Arc<INode>> {
-        unimplemented!()
+    fn open(&self, name: &str) -> Result<Arc<dyn INode>> {
+        Ok(self.inode.open(name)?)
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        unimplemented!()
+        Ok(self.inode.read_at(offset, buf)?)
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        unimplemented!()
+        Ok(self.inode.write_at(offset, buf)?)
     }
 
     fn close(&self) -> Result<()> {
-        unimplemented!()
+        Ok(self.inode.close()?)
     }
 }

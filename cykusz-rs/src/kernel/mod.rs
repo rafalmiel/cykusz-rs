@@ -1,3 +1,4 @@
+pub mod device;
 pub mod fs;
 pub mod int;
 pub mod mm;

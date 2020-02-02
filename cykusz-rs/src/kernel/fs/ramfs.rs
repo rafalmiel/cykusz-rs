@@ -1,4 +1,6 @@
-use alloc::collections::btree_map::{BTreeMap, RangeMut};
+#![allow(unused_variables)]
+
+use alloc::collections::btree_map::{BTreeMap};
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::sync::atomic::AtomicUsize;
@@ -56,7 +58,7 @@ impl INode for LockedRamINode {
         Ok(inode.clone())
     }
 
-    fn open(&self, name: &str) -> Result<Arc<INode>> {
+    fn open(&self, name: &str) -> Result<Arc<dyn INode>> {
         unimplemented!()
     }
 

@@ -1,19 +1,22 @@
 use alloc::sync::Arc;
 
-use crate::kernel::fs::inode::INode;
 use spin::Once;
-use crate::kernel::fs::filesystem::Filesystem;
 
+use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::mountfs::MNode;
+
+pub mod devfs;
 pub mod filesystem;
 pub mod inode;
 pub mod mountfs;
+pub mod path;
 pub mod ramfs;
 pub mod stdio;
 pub mod vfs;
 
-static ROOT_INODE: Once<Arc<dyn INode>> = Once::new();
+static ROOT_INODE: Once<Arc<MNode>> = Once::new();
 
-fn root_inode() -> &'static Arc<dyn INode> {
+fn root_inode() -> &'static Arc<MNode> {
     ROOT_INODE.r#try().unwrap()
 }
 
@@ -25,29 +28,33 @@ pub fn init() {
 
         let root = mount_fs.root_inode();
 
-        let dev = root.mkdir("dev").expect("Failed to create dev");
-
-        let devfs = ramfs::RamFS::new();
-
-        devfs.root_inode().mkdir("tty").expect("Dev2");
-
-        dev.mount(devfs);
+        root.mkdir("dev")
+            .expect("Failed to create /dev directory")
+            .mount(devfs::DevFS::new())
+            .expect("Failed to mount DevFS filesystem");
 
         root
     });
 
     stdio::init();
+}
 
-    if cfg!(not_exists) {
-        if let Ok(dev) = root_inode().lookup("dev") {
-            println!("Found dev!");
+pub fn lookup_by_path(path: &str) -> Option<Arc<dyn INode>> {
+    let path = path::Path::new(path);
 
-            if let Ok(dev2) = dev.lookup("tty") {
-                println!("Found /dev/tty");
-            }
-        } else {
-            println!("Dev not found!");
-        }
-
+    if !path.is_absolute() {
+        panic!("Absolute path not yet supprted");
     }
+
+    let mut inode = root_inode().clone();
+
+    for name in path.components() {
+        if let Ok(res) = inode.lookup(name) {
+            inode = res;
+        } else {
+            return None;
+        }
+    }
+
+    Some(inode)
 }

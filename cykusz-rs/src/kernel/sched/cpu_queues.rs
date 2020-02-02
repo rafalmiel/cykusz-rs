@@ -25,7 +25,7 @@ impl Default for CpuQueues {
 
 impl CpuQueues {
     unsafe fn this_cpu_queue(&self) -> &mut CpuQueue {
-        (&mut *(self.cpu_queues.this_cpu_mut().get()))
+        &mut *(self.cpu_queues.this_cpu_mut().get())
     }
 
     pub fn schedule_next(&self) {

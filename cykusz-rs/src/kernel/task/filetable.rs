@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::RwLock;
 
@@ -6,7 +7,7 @@ const FILE_NUM: usize = 16;
 
 pub struct FileHandle {
     pub fd: usize,
-    pub inode: Arc<dyn INode>
+    pub inode: Arc<dyn INode>,
 }
 
 impl Clone for FileHandle {
@@ -19,13 +20,16 @@ impl Clone for FileHandle {
 }
 
 pub struct FileTable {
-    files: RwLock<[Option<FileHandle>; FILE_NUM]>
+    files: RwLock<[Option<FileHandle>; FILE_NUM]>,
 }
 
 impl FileTable {
     pub const fn new() -> FileTable {
         FileTable {
-            files: RwLock::new([None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]),
+            files: RwLock::new([
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None,
+            ]),
         }
     }
 
@@ -53,5 +57,4 @@ impl FileTable {
 
         None
     }
-
 }

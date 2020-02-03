@@ -4,6 +4,7 @@ use spin::Once;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::mountfs::MNode;
+use crate::kernel::fs::vfs::Result;
 
 pub mod devfs;
 pub mod filesystem;
@@ -39,22 +40,18 @@ pub fn init() {
     stdio::init();
 }
 
-pub fn lookup_by_path(path: &str) -> Option<Arc<dyn INode>> {
+pub fn lookup_by_path(path: &str) -> Result<Arc<dyn INode>> {
     let path = path::Path::new(path);
 
     if !path.is_absolute() {
-        panic!("Absolute path not yet supprted");
+        panic!("Absolute paths not yet supprted");
     }
 
     let mut inode = root_inode().clone();
 
     for name in path.components() {
-        if let Ok(res) = inode.lookup(name) {
-            inode = res;
-        } else {
-            return None;
-        }
+        inode = inode.lookup(name)?;
     }
 
-    Some(inode)
+    Ok(inode)
 }

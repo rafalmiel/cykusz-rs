@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use alloc::collections::btree_map::{BTreeMap};
+use alloc::collections::btree_map::BTreeMap;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::sync::atomic::AtomicUsize;
@@ -49,9 +49,7 @@ impl INode for LockedRamINode {
 
         let inode = this.fs.upgrade().unwrap().alloc_inode();
 
-        inode.setup(&this.this,
-                    &Arc::downgrade(&inode),
-                    &this.fs);
+        inode.setup(&this.this, &Arc::downgrade(&inode), &this.fs);
 
         this.children.insert(String::from(name), inode.clone());
 
@@ -105,9 +103,11 @@ impl RamFS {
             next_id: AtomicUsize::new(1),
         });
 
-        root.setup(&Arc::downgrade(&fs.root),
-                   &Arc::downgrade(&root),
-                   &Arc::downgrade(&fs));
+        root.setup(
+            &Arc::downgrade(&fs.root),
+            &Arc::downgrade(&root),
+            &Arc::downgrade(&fs),
+        );
 
         return fs;
     }

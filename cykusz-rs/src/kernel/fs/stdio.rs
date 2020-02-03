@@ -1,9 +1,10 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 
+use spin::Once;
+
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
-use spin::Once;
 
 pub struct StdOut {}
 
@@ -26,7 +27,10 @@ impl INode for StdIn {
     }
 
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        Ok(crate::drivers::input::tty::read(buf.as_mut_ptr(), buf.len()))
+        Ok(crate::drivers::input::tty::read(
+            buf.as_mut_ptr(),
+            buf.len(),
+        ))
     }
 }
 
@@ -42,10 +46,6 @@ pub fn stdin() -> &'static Arc<StdIn> {
 }
 
 pub fn init() {
-    STDOUT.call_once(|| {
-        Arc::new(StdOut{})
-    });
-    STDIN.call_once(|| {
-        Arc::new(StdIn{})
-    });
+    STDOUT.call_once(|| Arc::new(StdOut {}));
+    STDIN.call_once(|| Arc::new(StdIn {}));
 }

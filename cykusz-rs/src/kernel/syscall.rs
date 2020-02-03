@@ -1,4 +1,5 @@
 use core::sync::atomic::Ordering;
+
 use crate::kernel::sched::current_task;
 
 pub fn init() {
@@ -17,11 +18,9 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64) -> u64 {
             let task = current_task();
             if let Some(f) = task.get_handle(fd) {
                 let ptr = b as *const u8;
-                let buf = unsafe {
-                    core::slice::from_raw_parts(ptr, c as usize)
-                };
+                let buf = unsafe { core::slice::from_raw_parts(ptr, c as usize) };
 
-                return f.inode.write_at(0, buf).unwrap_or(0)as u64;
+                return f.inode.write_at(0, buf).unwrap_or(0) as u64;
             }
 
             return 0;
@@ -31,9 +30,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64) -> u64 {
 
             let task = current_task();
             let n = if let Some(f) = task.get_handle(fd) {
-                let buf = unsafe {
-                    core::slice::from_raw_parts_mut(b as *mut u8, c as usize)
-                };
+                let buf = unsafe { core::slice::from_raw_parts_mut(b as *mut u8, c as usize) };
                 f.inode.read_at(0, buf).unwrap_or(0)
             } else {
                 0

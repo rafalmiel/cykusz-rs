@@ -7,7 +7,7 @@ impl<'a> Path<'a> {
         Path::<'a>(path)
     }
 
-    pub fn is_absolute(&self) -> bool{
+    pub fn is_absolute(&self) -> bool {
         self.0.starts_with("/")
     }
 

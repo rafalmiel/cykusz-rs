@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use crate::kernel::fs::vfs::{Result, FsError};
+use crate::kernel::fs::vfs::{FsError, Result};
 
 pub trait INode: Send + Sync {
     fn id(&self) -> usize;

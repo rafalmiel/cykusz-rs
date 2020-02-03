@@ -37,11 +37,24 @@ pub extern "C" fn _start() -> ! {
     loop {
         let mut buf = [0u8; 256];
 
+        print!("[root /]# ");
         let r = syscall::read(1, buf.as_mut_ptr(), buf.len());
 
-        let s = &buf[..r];
+        if r > 1 {
+            let s = &buf[..r - 1];
 
-        println!("Got {}, bytes: {}", str::from_utf8(s).unwrap(), r);
+            println!(
+                "shell: {}: command not found",
+                str::from_utf8(s)
+                    .unwrap()
+                    .split(" ")
+                    .next()
+                    .unwrap()
+                    .trim_end_matches("\n")
+            );
+        }
+
+        //println!("Got {}, bytes: {}", str::from_utf8(s).unwrap(), r);
     }
 }
 

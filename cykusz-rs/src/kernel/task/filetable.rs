@@ -23,6 +23,12 @@ pub struct FileTable {
     files: RwLock<[Option<FileHandle>; FILE_NUM]>,
 }
 
+impl Default for FileTable {
+    fn default() -> FileTable {
+        FileTable::new()
+    }
+}
+
 impl FileTable {
     pub const fn new() -> FileTable {
         FileTable {

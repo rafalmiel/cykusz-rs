@@ -5,16 +5,16 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::ramfs::RamFS;
 use crate::kernel::fs::vfs::Result;
 
-struct DevFSINode{
+struct DevFSINode {
     inner: Arc<dyn INode>,
 }
 
 impl DevFSINode {
-    fn lookup_dev(&self, name: &str) -> Option<Arc<dyn INode>>{
+    fn lookup_dev(&self, name: &str) -> Option<Arc<dyn INode>> {
         let devs = crate::kernel::device::devices().read();
 
         if let Some(dev) = devs.values().find(|v| v.name().as_str() == name) {
-            return Some(dev.inode())
+            return Some(dev.inode());
         }
 
         None
@@ -28,7 +28,7 @@ pub struct DevFS {
 impl DevFS {
     pub fn new() -> Arc<DevFS> {
         Arc::new(DevFS {
-            ramfs: RamFS::new()
+            ramfs: RamFS::new(),
         })
     }
 }
@@ -71,8 +71,7 @@ impl INode for DevFSINode {
 impl Filesystem for DevFS {
     fn root_inode(&self) -> Arc<dyn INode> {
         Arc::new(DevFSINode {
-            inner: self.ramfs.root_inode()
+            inner: self.ramfs.root_inode(),
         })
     }
 }
-

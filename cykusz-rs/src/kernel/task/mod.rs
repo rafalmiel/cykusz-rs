@@ -89,8 +89,10 @@ impl Task {
             filetable: filetable::FileTable::new(),
         };
 
-        task.filetable.open_file(crate::kernel::fs::stdio::stdout().clone());
-        task.filetable.open_file(crate::kernel::fs::stdio::stdin().clone());
+        task.filetable
+            .open_file(crate::kernel::fs::stdio::stdout().clone());
+        task.filetable
+            .open_file(crate::kernel::fs::stdio::stdin().clone());
 
         task
     }

@@ -1,12 +1,12 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
-use core::fmt::{Error, Formatter};
 use core::fmt::Debug;
+use core::fmt::{Error, Formatter};
 
 use crate::arch::output::ConsoleDriver;
-use crate::drivers::input::KeyListener;
 use crate::drivers::input::keymap;
 use crate::drivers::input::keys::KeyCode;
+use crate::drivers::input::KeyListener;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
@@ -108,7 +108,7 @@ struct Tty {
     state: Mutex<State>,
     buffer: Mutex<Buffer>,
     wait_queue: WaitQueue,
-    self_ptr: Weak<Tty>
+    self_ptr: Weak<Tty>,
 }
 
 impl State {

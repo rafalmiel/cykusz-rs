@@ -3,7 +3,7 @@ use alloc::sync::{Arc, Weak};
 
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::Result;
+use crate::kernel::fs::vfs::{Metadata, Result};
 use crate::kernel::sync::RwLock;
 
 #[allow(dead_code)]
@@ -80,7 +80,7 @@ impl MNode {
         }
         .wrap();
 
-        self.vfs.mounts.write().insert(self.id(), fs.clone());
+        self.vfs.mounts.write().insert(self.id()?, fs.clone());
 
         Ok(fs)
     }
@@ -88,21 +88,49 @@ impl MNode {
     fn covering_node(&self) -> Arc<MNode> {
         let id = self.id();
 
-        match self.vfs.mounts.read().get(&id) {
+        if id.is_err() {
+            return self.self_ref.upgrade().unwrap();
+        }
+
+        match self.vfs.mounts.read().get(&id.unwrap()) {
             Some(node) => node.root_inode(),
             None => self.self_ref.upgrade().unwrap(),
         }
     }
 
+    fn is_root(&self) -> bool {
+        let id1 = self.inode.fs().root_inode().id().unwrap();
+        let id2 = self.inode.id().unwrap();
+        let is = id1 == id2;
+        is
+    }
+
     pub fn lookup(&self, name: &str) -> Result<Arc<MNode>> {
-        //handle only down lookup for now
-        Ok(MNode {
-            inode: self.covering_node().inode.lookup(name)?,
-            vfs: self.vfs.clone(),
-            self_ref: Weak::default(),
+        match name {
+            "" | "." => Ok(self.self_ref.upgrade().unwrap()),
+            ".." => {
+                if self.is_root() {
+                    match &self.vfs.self_mount {
+                        Some(inode) => inode.lookup(".."),
+                        None => Ok(self.self_ref.upgrade().unwrap()),
+                    }
+                } else {
+                    Ok(MNode {
+                        inode: self.inode.lookup(name)?,
+                        vfs: self.vfs.clone(),
+                        self_ref: Weak::default(),
+                    }
+                    .wrap())
+                }
+            }
+            _ => Ok(MNode {
+                inode: self.covering_node().inode.lookup(name)?,
+                vfs: self.vfs.clone(),
+                self_ref: Weak::default(),
+            }
+            .wrap()
+            .covering_node()),
         }
-        .wrap()
-        .covering_node())
     }
 
     pub fn mkdir(&self, name: &str) -> Result<Arc<MNode>> {
@@ -113,11 +141,15 @@ impl MNode {
         }
         .wrap())
     }
+
+    pub fn self_inode(&self) -> Arc<dyn INode> {
+        self.self_ref.upgrade().unwrap()
+    }
 }
 
 impl INode for MNode {
-    fn id(&self) -> usize {
-        self.inode.id()
+    fn metadata(&self) -> Result<Metadata> {
+        self.inode.metadata()
     }
 
     fn lookup(&self, name: &str) -> Result<Arc<dyn INode>> {
@@ -128,19 +160,15 @@ impl INode for MNode {
         Ok(self.mkdir(name)?)
     }
 
-    fn open(&self, name: &str) -> Result<Arc<dyn INode>> {
-        Ok(self.inode.open(name)?)
-    }
-
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        Ok(self.inode.read_at(offset, buf)?)
+        self.inode.read_at(offset, buf)
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        Ok(self.inode.write_at(offset, buf)?)
+        self.inode.write_at(offset, buf)
     }
 
-    fn close(&self) -> Result<()> {
-        Ok(self.inode.close()?)
+    fn mknode(&self, name: &str, devid: usize) -> Result<Arc<dyn INode>> {
+        self.inode.mknode(name, devid)
     }
 }

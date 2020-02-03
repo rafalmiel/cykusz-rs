@@ -9,10 +9,6 @@ use crate::kernel::fs::vfs::Result;
 pub struct StdOut {}
 
 impl INode for StdOut {
-    fn id(&self) -> usize {
-        0
-    }
-
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         print!("{}", String::from_utf8_lossy(buf));
         Ok(buf.len())
@@ -22,10 +18,6 @@ impl INode for StdOut {
 pub struct StdIn {}
 
 impl INode for StdIn {
-    fn id(&self) -> usize {
-        0
-    }
-
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         Ok(crate::drivers::input::tty::read(
             buf.as_mut_ptr(),

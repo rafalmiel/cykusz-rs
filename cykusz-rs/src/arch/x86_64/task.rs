@@ -164,6 +164,12 @@ struct SysretqFrame {
     pub stack: usize,
 }
 
+impl Default for Task {
+    fn default() -> Task {
+        Task::empty()
+    }
+}
+
 impl Task {
     pub const fn empty() -> Task {
         Task {

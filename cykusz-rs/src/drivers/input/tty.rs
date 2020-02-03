@@ -60,6 +60,18 @@ impl Buffer {
         }
     }
 
+    fn remove_all_edit(&mut self) -> usize {
+        let edit_size = if self.e < self.w {
+            BUFFER_SIZE as u32 - (self.w - self.e)
+        } else {
+            self.e - self.w
+        };
+
+        self.e = self.w;
+
+        edit_size as usize
+    }
+
     fn remove_last_n(&mut self, n: usize) -> usize {
         let mut remaining = n;
 
@@ -212,13 +224,20 @@ impl KeyListener for Tty {
                 if n > 0 {
                     let w = writer();
                     w.remove_last_n(n);
-                    return;
                 }
             }
             KeyCode::KEY_ENTER | KeyCode::KEY_KPENTER if !released => {
+                self.buffer.lock().put_char('\n' as u8);
                 self.buffer.lock().commit_write();
-                print!("\n");
                 self.wait_queue.notify_one();
+            }
+            KeyCode::KEY_U if (state.lctrl || state.rctrl) && !released => {
+                use crate::arch::output::writer;
+                let n = self.buffer.lock().remove_all_edit();
+                if n > 0 {
+                    let w = writer();
+                    w.remove_last_n(n);
+                }
             }
             _ if !released => {
                 if let Some(finalmap) = state.map(false).map_or(None, |map| {
@@ -257,10 +276,6 @@ impl Device for Tty {
 }
 
 impl INode for Tty {
-    fn id(&self) -> usize {
-        self.dev_id
-    }
-
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
         Ok(self.read(buf.as_mut_ptr(), buf.len()))
     }

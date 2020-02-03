@@ -1,9 +1,12 @@
+use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::arch::task::Task as ArchTask;
+use crate::kernel::fs::inode::INode;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::new_task_id;
+use crate::kernel::sync::RwLock;
 use crate::kernel::task::filetable::FileHandle;
 
 pub mod filetable;
@@ -41,12 +44,11 @@ pub struct Task {
     state: AtomicUsize,
     locks: AtomicUsize,
     filetable: filetable::FileTable,
+    cwd: RwLock<Weak<dyn INode>>,
 }
 
-unsafe impl Sync for Task {}
-
-impl Task {
-    pub fn this() -> Task {
+impl Default for Task {
+    fn default() -> Self {
         Task {
             arch_task: UnsafeCell::new(ArchTask::empty()),
             id: new_task_id(),
@@ -54,40 +56,35 @@ impl Task {
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
             filetable: filetable::FileTable::new(),
+            cwd: RwLock::new(Arc::downgrade(
+                &crate::kernel::fs::root_inode().self_inode(),
+            )),
         }
+    }
+}
+
+unsafe impl Sync for Task {}
+
+impl Task {
+    pub fn this() -> Task {
+        Task::default()
     }
 
     pub fn new_sched(fun: fn()) -> Task {
-        Task {
-            arch_task: UnsafeCell::new(ArchTask::new_sched(fun)),
-            id: new_task_id(),
-            prev_state: AtomicUsize::new(TaskState::Unused as usize),
-            state: AtomicUsize::new(TaskState::Runnable as usize),
-            locks: AtomicUsize::new(0),
-            filetable: filetable::FileTable::new(),
-        }
+        let mut task = Task::default();
+        task.arch_task = UnsafeCell::new(ArchTask::new_sched(fun));
+        task
     }
 
     pub fn new_kern(fun: fn()) -> Task {
-        Task {
-            arch_task: UnsafeCell::new(ArchTask::new_kern(fun)),
-            id: crate::kernel::sched::new_task_id(),
-            prev_state: AtomicUsize::new(TaskState::Unused as usize),
-            state: AtomicUsize::new(TaskState::Runnable as usize),
-            locks: AtomicUsize::new(0),
-            filetable: filetable::FileTable::new(),
-        }
+        let mut task = Task::default();
+        task.arch_task = UnsafeCell::new(ArchTask::new_kern(fun));
+        task
     }
 
     pub fn new_user(fun: MappedAddr, code_size: usize) -> Task {
-        let task = Task {
-            arch_task: UnsafeCell::new(ArchTask::new_user(fun, code_size)),
-            id: crate::kernel::sched::new_task_id(),
-            prev_state: AtomicUsize::new(TaskState::Unused as usize),
-            state: AtomicUsize::new(TaskState::Runnable as usize),
-            locks: AtomicUsize::new(0),
-            filetable: filetable::FileTable::new(),
-        };
+        let mut task = Task::default();
+        task.arch_task = UnsafeCell::new(ArchTask::new_user(fun, code_size));
 
         task.filetable
             .open_file(crate::kernel::fs::stdio::stdout().clone());
@@ -99,6 +96,14 @@ impl Task {
 
     pub fn get_handle(&self, fd: usize) -> Option<FileHandle> {
         self.filetable.get_handle(fd)
+    }
+
+    pub fn get_cwd(&self) -> Option<Arc<dyn INode>> {
+        self.cwd.read().upgrade()
+    }
+
+    pub fn set_cwd(&self, inode: Arc<dyn INode>) {
+        *self.cwd.write() = Arc::downgrade(&inode);
     }
 
     pub fn set_state(&self, state: TaskState) {

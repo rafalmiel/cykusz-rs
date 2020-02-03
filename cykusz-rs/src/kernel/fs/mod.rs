@@ -2,11 +2,13 @@ use alloc::sync::Arc;
 
 use spin::Once;
 
+use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::mountfs::MNode;
 use crate::kernel::fs::vfs::Result;
+use crate::kernel::sched::current_task;
 
-pub mod devfs;
+pub mod devnode;
 pub mod filesystem;
 pub mod inode;
 pub mod mountfs;
@@ -17,9 +19,25 @@ pub mod vfs;
 
 static ROOT_INODE: Once<Arc<MNode>> = Once::new();
 
-fn root_inode() -> &'static Arc<MNode> {
+pub fn root_inode() -> &'static Arc<MNode> {
     ROOT_INODE.r#try().unwrap()
 }
+
+struct DevListener {}
+
+impl DeviceListener for DevListener {
+    fn device_added(&self, dev: Arc<dyn Device>) {
+        if let Ok(dev_dir) = root_inode().lookup("dev") {
+            dev_dir
+                .mknode(dev.name().as_str(), dev.id())
+                .expect("Failed to mknode for device");
+        } else {
+            panic!("Failed to mknode for device {}", dev.name());
+        }
+    }
+}
+
+static DEV_LISTENER: Once<Arc<DevListener>> = Once::new();
 
 pub fn init() {
     ROOT_INODE.call_once(|| {
@@ -29,12 +47,17 @@ pub fn init() {
 
         let root = mount_fs.root_inode();
 
-        root.mkdir("dev")
-            .expect("Failed to create /dev directory")
-            .mount(devfs::DevFS::new())
-            .expect("Failed to mount DevFS filesystem");
+        root.mkdir("dev").expect("Failed to create /dev directory");
 
         root
+    });
+
+    DEV_LISTENER.call_once(|| {
+        let dev = Arc::new(DevListener {});
+
+        register_device_listener(dev.clone());
+
+        dev
     });
 
     stdio::init();
@@ -43,11 +66,11 @@ pub fn init() {
 pub fn lookup_by_path(path: &str) -> Result<Arc<dyn INode>> {
     let path = path::Path::new(path);
 
-    if !path.is_absolute() {
-        panic!("Absolute paths not yet supprted");
-    }
-
-    let mut inode = root_inode().clone();
+    let mut inode = if path.is_absolute() {
+        root_inode().clone()
+    } else {
+        current_task().get_cwd().unwrap_or(root_inode().clone())
+    };
 
     for name in path.components() {
         inode = inode.lookup(name)?;

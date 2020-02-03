@@ -1,26 +1,42 @@
 use alloc::sync::Arc;
 
-use crate::kernel::fs::vfs::{FsError, Result};
+use crate::kernel::fs::filesystem::Filesystem;
+use crate::kernel::fs::vfs::{FileType, FsError, Metadata, Result};
 
 pub trait INode: Send + Sync {
-    fn id(&self) -> usize;
+    fn id(&self) -> Result<usize> {
+        Ok(self.metadata()?.id)
+    }
+
+    fn ftype(&self) -> Result<FileType> {
+        Ok(self.metadata()?.typ)
+    }
+
+    fn metadata(&self) -> Result<Metadata> {
+        Err(FsError::NotSupported)
+    }
+
     fn lookup(&self, _name: &str) -> Result<Arc<dyn INode>> {
         Err(FsError::NotSupported)
     }
+
     fn mkdir(&self, _name: &str) -> Result<Arc<dyn INode>> {
         Err(FsError::NotSupported)
     }
 
-    fn open(&self, _name: &str) -> Result<Arc<dyn INode>> {
-        Err(FsError::NotSupported)
-    }
     fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
         Err(FsError::NotSupported)
     }
+
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
         Err(FsError::NotSupported)
     }
-    fn close(&self) -> Result<()> {
-        Err(FsError::NotSupported)
+
+    fn fs(&self) -> Arc<dyn Filesystem> {
+        unimplemented!()
+    }
+
+    fn mknode(&self, _name: &str, _devid: usize) -> Result<Arc<dyn INode>> {
+        return Err(FsError::NotSupported);
     }
 }

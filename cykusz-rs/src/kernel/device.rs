@@ -57,7 +57,7 @@ pub fn register_device(dev: Arc<dyn Device>) -> Result<()> {
 pub fn register_device_listener(listener: Arc<dyn DeviceListener>) {
     let mut l = DEVICE_LISTEMERS.write();
 
-    l.push(listener.clone());
+    l.push(listener);
 }
 
 pub fn devices() -> &'static RwLock<BTreeMap<usize, Arc<dyn Device>>> {

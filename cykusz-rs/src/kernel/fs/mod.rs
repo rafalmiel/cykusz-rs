@@ -5,7 +5,7 @@ use spin::Once;
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::mountfs::MNode;
-use crate::kernel::fs::vfs::Result;
+use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
 
 pub mod devnode;
@@ -29,6 +29,7 @@ impl DeviceListener for DevListener {
     fn device_added(&self, dev: Arc<dyn Device>) {
         if let Ok(dev_dir) = root_inode().lookup("dev") {
             dev_dir
+                .inode
                 .mknode(dev.name().as_str(), dev.id())
                 .expect("Failed to mknode for device");
         } else {
@@ -72,8 +73,15 @@ pub fn lookup_by_path(path: &str) -> Result<Arc<dyn INode>> {
         current_task().get_cwd().unwrap_or(root_inode().clone())
     };
 
-    for name in path.components() {
-        inode = inode.lookup(name)?;
+    let count = path.components().count();
+
+    for (idx, name) in path.components().enumerate() {
+        match inode.lookup(name) {
+            Ok(i) => inode = i.inode,
+            Err(e) => {
+                return Ok(inode.create(name)?);
+            }
+        }
     }
 
     Ok(inode)

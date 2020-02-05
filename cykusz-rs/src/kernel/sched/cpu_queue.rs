@@ -112,7 +112,8 @@ impl CpuQueue {
         let mut loops = 0;
 
         let found = loop {
-            if self.tasks[c].state() == TaskState::Runnable {
+            let state = self.tasks[c].state();
+            if state == TaskState::Runnable {
                 break Some(c);
             } else if c == self.current && self.tasks[self.current].state() == TaskState::Running {
                 break Some(self.current);

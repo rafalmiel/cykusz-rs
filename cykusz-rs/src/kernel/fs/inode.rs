@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::vfs::{FileType, FsError, Metadata, Result};
+use crate::kernel::fs::vfs::{DirEntry, FileType, FsError, Metadata, Result};
 
 pub trait INode: Send + Sync {
     fn id(&self) -> Result<usize> {
@@ -16,7 +16,7 @@ pub trait INode: Send + Sync {
         Err(FsError::NotSupported)
     }
 
-    fn lookup(&self, _name: &str) -> Result<Arc<dyn INode>> {
+    fn lookup(&self, _name: &str) -> Result<DirEntry> {
         Err(FsError::NotSupported)
     }
 
@@ -36,7 +36,15 @@ pub trait INode: Send + Sync {
         unimplemented!()
     }
 
+    fn create(&self, _name: &str) -> Result<Arc<dyn INode>> {
+        Err(FsError::NotSupported)
+    }
+
     fn mknode(&self, _name: &str, _devid: usize) -> Result<Arc<dyn INode>> {
+        return Err(FsError::NotSupported);
+    }
+
+    fn truncate(&self) -> Result<()> {
         return Err(FsError::NotSupported);
     }
 }

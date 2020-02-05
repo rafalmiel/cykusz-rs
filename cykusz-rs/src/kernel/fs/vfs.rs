@@ -1,4 +1,9 @@
-#[derive(Debug)]
+use alloc::string::String;
+use alloc::sync::Arc;
+
+use crate::kernel::fs::inode::INode;
+
+#[derive(Debug, PartialEq)]
 pub enum FsError {
     NotSupported,
     NotFile,
@@ -16,6 +21,11 @@ pub enum FileType {
     File = 0x1,
     Dir = 0x2,
     DevNode = 0x3,
+}
+
+pub struct DirEntry {
+    pub name: String,
+    pub inode: Arc<dyn INode>,
 }
 
 impl Default for FileType {

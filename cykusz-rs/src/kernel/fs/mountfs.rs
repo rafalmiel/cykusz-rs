@@ -1,9 +1,10 @@
 use alloc::collections::btree_map::BTreeMap;
+use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::{Metadata, Result};
+use crate::kernel::fs::vfs::{DirEntry, Metadata, Result};
 use crate::kernel::sync::RwLock;
 
 #[allow(dead_code)]
@@ -37,6 +38,7 @@ impl MountFS {
 
     pub fn root_inode(&self) -> Arc<MNode> {
         MNode {
+            name: String::from("/"),
             inode: self.fs.root_inode(),
             vfs: self.self_ref.upgrade().unwrap(),
             self_ref: Weak::default(),
@@ -52,6 +54,7 @@ impl Filesystem for MountFS {
 }
 
 pub struct MNode {
+    name: String,
     // The inner INode
     inode: Arc<dyn INode>,
     // Associated MountFilesystem
@@ -105,36 +108,56 @@ impl MNode {
         is
     }
 
-    pub fn lookup(&self, name: &str) -> Result<Arc<MNode>> {
+    pub fn lookup(&self, name: &str) -> Result<DirEntry> {
         match name {
-            "" | "." => Ok(self.self_ref.upgrade().unwrap()),
+            "" | "." => Ok(DirEntry {
+                name: self.name.clone(),
+                inode: self.self_ref.upgrade().unwrap(),
+            }),
             ".." => {
                 if self.is_root() {
                     match &self.vfs.self_mount {
                         Some(inode) => inode.lookup(".."),
-                        None => Ok(self.self_ref.upgrade().unwrap()),
+                        None => Ok(DirEntry {
+                            name: self.name.clone(),
+                            inode: self.self_ref.upgrade().unwrap(),
+                        }),
                     }
                 } else {
-                    Ok(MNode {
-                        inode: self.inode.lookup(name)?,
+                    let mnode = MNode {
+                        name: String::from(name),
+                        inode: self.inode.lookup(name)?.inode,
                         vfs: self.vfs.clone(),
                         self_ref: Weak::default(),
                     }
-                    .wrap())
+                    .wrap();
+                    Ok(DirEntry {
+                        name: mnode.name.clone(),
+                        inode: mnode,
+                    })
                 }
             }
-            _ => Ok(MNode {
-                inode: self.covering_node().inode.lookup(name)?,
-                vfs: self.vfs.clone(),
-                self_ref: Weak::default(),
+            _ => {
+                let mnode = MNode {
+                    name: String::from(name),
+                    inode: self.covering_node().inode.lookup(name)?.inode,
+                    vfs: self.vfs.clone(),
+                    self_ref: Weak::default(),
+                }
+                .wrap()
+                .covering_node();
+
+                Ok(DirEntry {
+                    name: mnode.name.clone(),
+                    inode: mnode,
+                })
             }
-            .wrap()
-            .covering_node()),
         }
     }
 
     pub fn mkdir(&self, name: &str) -> Result<Arc<MNode>> {
         Ok(MNode {
+            name: String::from(name),
             inode: self.inode.mkdir(name)?,
             vfs: self.vfs.clone(),
             self_ref: Weak::default(),
@@ -152,7 +175,7 @@ impl INode for MNode {
         self.inode.metadata()
     }
 
-    fn lookup(&self, name: &str) -> Result<Arc<dyn INode>> {
+    fn lookup(&self, name: &str) -> Result<DirEntry> {
         Ok(self.lookup(name)?)
     }
 
@@ -170,5 +193,13 @@ impl INode for MNode {
 
     fn mknode(&self, name: &str, devid: usize) -> Result<Arc<dyn INode>> {
         self.inode.mknode(name, devid)
+    }
+
+    fn create(&self, name: &str) -> Result<Arc<dyn INode>> {
+        self.inode.create(name)
+    }
+
+    fn truncate(&self) -> Result<()> {
+        self.inode.truncate()
     }
 }

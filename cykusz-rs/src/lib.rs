@@ -88,13 +88,13 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Modules Initialized");
 
-    if let Ok(inode) = crate::kernel::fs::lookup_by_path("/dev/tty") {
-        println!("FOUND");
-        let mut buf = [0u8; 16];
-        inode.read_at(0, buf.as_mut()).expect("Read failed");
-    } else {
-        println!("Not found");
-    }
+    //if let Ok(inode) = crate::kernel::fs::lookup_by_path("/dev/tty") {
+    //    println!("FOUND");
+    //    let mut buf = [0u8; 16];
+    //    inode.read_at(0, buf.as_mut()).expect("Read failed");
+    //} else {
+    //    println!("Not found");
+    //}
 
     // Start test tasks on this cpu
     task_test::start();

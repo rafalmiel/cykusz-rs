@@ -10,26 +10,28 @@ use core::sync::atomic::Ordering;
 use crate::kernel::fs::devnode::DevNode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::Result;
+use crate::kernel::fs::vfs::{DirEntry, Result};
 use crate::kernel::fs::vfs::{FileType, FsError, Metadata};
-use crate::kernel::sync::RwLock;
+use crate::kernel::sync::{Mutex, RwLock};
 
 struct LockedRamINode(RwLock<RamINode>);
 
 enum Content {
-    Bytes(Vec<u8>),
+    Bytes(Mutex<Vec<u8>>),
     DevNode(Option<Arc<DevNode>>),
+    None,
 }
 
 impl Default for Content {
     fn default() -> Self {
-        Content::Bytes(Vec::new())
+        Content::Bytes(Mutex::new(Vec::new()))
     }
 }
 
 #[derive(Default)]
 struct RamINode {
     id: usize,
+    name: String,
     typ: FileType,
     parent: Weak<LockedRamINode>,
     this: Weak<LockedRamINode>,
@@ -47,59 +49,94 @@ impl INode for LockedRamINode {
             typ: i.typ,
         })
     }
-    fn lookup(&self, name: &str) -> Result<Arc<dyn INode>> {
+    fn lookup(&self, name: &str) -> Result<DirEntry> {
         let this = self.0.read();
         match name {
-            "." => Ok(this.this.upgrade().ok_or(FsError::EntryNotFound)?),
-            ".." => Ok(this.parent.upgrade().ok_or(FsError::EntryNotFound)?),
+            "." => Ok(DirEntry {
+                name: this.name.clone(),
+                inode: this.this.upgrade().ok_or(FsError::EntryNotFound)?,
+            }),
+            ".." => {
+                let parent = this.parent.upgrade().ok_or(FsError::EntryNotFound)?;
+                let parent_lock = parent.0.read();
+                Ok(DirEntry {
+                    name: parent_lock.name.clone(),
+                    inode: parent.clone(),
+                })
+            }
             _ => {
                 let child = this.children.get(name).ok_or(FsError::EntryNotFound)?;
 
-                Ok(child.clone())
+                Ok(DirEntry {
+                    name: child.0.read().name.clone(),
+                    inode: child.clone(),
+                })
             }
         }
     }
 
+    fn create(&self, name: &str) -> Result<Arc<dyn INode>> {
+        //println!("RAM FS: Creating file {}", name);
+        let inode = self.make_inode(name, FileType::File, |_| Ok(()));
+
+        //println!("INODE READY");
+
+        inode
+    }
+
     fn mkdir(&self, name: &str) -> Result<Arc<dyn INode>> {
-        let mut this = self.0.write();
-
-        if this.children.contains_key(&String::from(name)) {
-            return Err(FsError::EntryExists);
-        }
-
-        let inode = this.fs.upgrade().unwrap().alloc_inode(FileType::Dir);
-
-        inode.setup(&this.this, &Arc::downgrade(&inode), &this.fs);
-
-        this.children.insert(String::from(name), inode.clone());
-
-        Ok(inode.clone())
+        self.make_inode(name, FileType::Dir, |_| Ok(()))
     }
 
     fn mknode(&self, name: &str, devid: usize) -> Result<Arc<dyn INode>> {
-        let mut this = self.0.write();
+        self.make_inode(name, FileType::DevNode, |inode| {
+            inode.0.write().content = Content::DevNode(Some(
+                DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
+            ));
+            Ok(())
+        })
+    }
 
-        if this.children.contains_key(&String::from(name)) {
-            return Err(FsError::EntryExists);
+    fn truncate(&self) -> Result<()> {
+        let node = self.0.write();
+
+        match &node.content {
+            Content::Bytes(vec) => {
+                let mut v = vec.lock();
+
+                v.clear();
+
+                return Ok(());
+            }
+            _ => {
+                return Err(FsError::NotSupported);
+            }
         }
-
-        let inode = this.fs.upgrade().unwrap().alloc_inode(FileType::DevNode);
-        inode.setup(&this.this, &Arc::downgrade(&inode), &this.fs);
-
-        inode.0.write().content = Content::DevNode(Some(
-            DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
-        ));
-
-        this.children.insert(String::from(name), inode.clone());
-
-        Ok(inode.clone())
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         let i = self.0.read();
 
         match &i.content {
-            Content::Bytes(_) => Err(FsError::NotSupported),
+            Content::Bytes(vec) => {
+                let vec = vec.lock();
+
+                if offset >= buf.len() {
+                    return Err(FsError::InvalidParam);
+                }
+
+                let to_copy = core::cmp::min(buf.len(), vec.len() - offset);
+
+                unsafe {
+                    core::ptr::copy(
+                        vec.as_ptr().offset(offset as isize),
+                        buf.as_mut_ptr(),
+                        to_copy,
+                    );
+                }
+
+                Ok(to_copy)
+            }
             Content::DevNode(Some(node)) => node.read_at(offset, buf),
             _ => Err(FsError::NotSupported),
         }
@@ -109,7 +146,23 @@ impl INode for LockedRamINode {
         let i = self.0.read();
 
         match &i.content {
-            Content::Bytes(_) => Err(FsError::NotSupported),
+            Content::Bytes(vec) => {
+                let mut vec = vec.lock();
+
+                if vec.len() < offset + buf.len() {
+                    vec.resize(offset + buf.len(), 0);
+                }
+
+                unsafe {
+                    core::ptr::copy(
+                        buf.as_ptr(),
+                        vec.as_mut_ptr().offset(offset as isize),
+                        buf.len(),
+                    );
+                }
+
+                Ok(buf.len())
+            }
             Content::DevNode(Some(node)) => node.write_at(offset, buf),
             _ => Err(FsError::NotSupported),
         }
@@ -121,13 +174,45 @@ impl INode for LockedRamINode {
 }
 
 impl LockedRamINode {
-    fn setup(&self, parent: &Weak<LockedRamINode>, this: &Weak<LockedRamINode>, fs: &Weak<RamFS>) {
+    fn setup(
+        &self,
+        name: &str,
+        parent: &Weak<LockedRamINode>,
+        this: &Weak<LockedRamINode>,
+        fs: &Weak<RamFS>,
+    ) {
         let mut i = self.0.write();
 
+        i.name = String::from(name);
         i.parent = parent.clone();
         i.this = this.clone();
         i.fs = fs.clone();
         i.id = fs.upgrade().unwrap().alloc_id();
+    }
+
+    fn make_inode(
+        &self,
+        name: &str,
+        typ: FileType,
+        init: impl Fn(&Arc<LockedRamINode>) -> Result<()>,
+    ) -> Result<Arc<dyn INode>> {
+        let mut this = self.0.write();
+
+        if this.children.contains_key(&String::from(name)) {
+            return Err(FsError::EntryExists);
+        }
+
+        let inode = this.fs.upgrade().unwrap().alloc_inode(typ);
+
+        inode.setup(name, &this.this, &Arc::downgrade(&inode), &this.fs);
+
+        init(&inode)?;
+
+        this.children.insert(String::from(name), inode.clone());
+
+        let res: Result<Arc<dyn INode>> = Ok(inode.clone());
+
+        res
     }
 }
 
@@ -152,6 +237,7 @@ impl RamFS {
         });
 
         root.setup(
+            "/",
             &Arc::downgrade(&fs.root),
             &Arc::downgrade(&root),
             &Arc::downgrade(&fs),
@@ -163,15 +249,16 @@ impl RamFS {
     fn alloc_inode(&self, typ: FileType) -> Arc<LockedRamINode> {
         let inode = Arc::new(LockedRamINode(RwLock::new(RamINode {
             id: self.alloc_id(),
+            name: String::new(),
             typ,
             parent: Weak::default(),
             this: Weak::default(),
             children: BTreeMap::new(),
             fs: Weak::default(),
-            content: if typ == FileType::DevNode {
-                Content::DevNode(None)
-            } else {
-                Content::Bytes(Vec::new())
+            content: match typ {
+                FileType::DevNode => Content::DevNode(None),
+                FileType::File => Content::Bytes(Mutex::new(Vec::new())),
+                FileType::Dir => Content::None,
             },
         })));
 

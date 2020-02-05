@@ -124,7 +124,7 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
     }
 
     // Map stack
-    for a in (VirtAddr(0x7fffffffc000)..=VirtAddr(0x7ffffffff000)).step_by(PAGE_SIZE) {
+    for a in (VirtAddr(0x7fffffff0000)..=VirtAddr(0x7ffffffff000)).step_by(PAGE_SIZE) {
         new_p4.map_flags(
             a,
             virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,

@@ -22,6 +22,7 @@ dependencies = [
  "raw-cpuid",
  "rlibc",
  "spin",
+ "syscall-defs",
 ]
 
 [[package]]
@@ -35,9 +36,9 @@ dependencies = [
 
 [[package]]
 name = "linked_list_allocator"
-version = "0.6.5"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3705e6d8ce20b80fde2ae549e69b91e958653f2d0aefdc8867e8432c840fb24"
+checksum = "47de1a43fad0250ee197e9e124e5b5deab3d7b39d4428ae8a6d741ceb340c362"
 dependencies = [
  "spin",
 ]
@@ -47,6 +48,7 @@ name = "program"
 version = "0.1.0"
 dependencies = [
  "rlibc",
+ "syscall-user",
 ]
 
 [[package]]
@@ -95,3 +97,14 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
+
+[[package]]
+name = "syscall-defs"
+version = "0.1.0"
+
+[[package]]
+name = "syscall-user"
+version = "0.1.0"
+dependencies = [
+ "syscall-defs",
+]

@@ -108,7 +108,6 @@ impl<T> RwLock<T> {
 
     pub fn read_irq(&self) -> RwLockReadGuard<T> {
         let ints = int::is_enabled();
-        //::kernel::sched::enter_critical_section();
         int::disable();
         RwLockReadGuard {
             g: Some(self.l.read()),
@@ -128,7 +127,6 @@ impl<T> RwLock<T> {
 
     pub fn write_irq(&self) -> RwLockWriteGuard<T> {
         let ints = int::is_enabled();
-        //::kernel::sched::enter_critical_section();
         int::disable();
         RwLockWriteGuard {
             g: Some(self.l.write()),

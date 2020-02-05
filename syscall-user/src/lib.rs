@@ -1,3 +1,11 @@
+#![no_std]
+#![feature(asm)]
+
+#[macro_use]
+pub mod print;
+
+use syscall_defs::*;
+
 pub unsafe fn syscall0(mut a: usize) -> usize {
     asm!("syscall"
         : "={rax}"(a)
@@ -71,17 +79,17 @@ pub unsafe fn syscall6(
 }
 
 pub fn read(fd: usize, buf: *mut u8, len: usize) -> usize {
-    unsafe { syscall3(0, fd, buf as usize, len) }
+    unsafe { syscall3(SYS_READ, fd, buf as usize, len) }
 }
 
 pub fn write(fd: usize, buf: *const u8, len: usize) -> usize {
-    unsafe { syscall3(1, fd, buf as usize, len) }
+    unsafe { syscall3(SYS_WRITE, fd, buf as usize, len) }
 }
 
 pub fn open(path: &str, reading: bool) -> usize {
     unsafe {
         syscall3(
-            2,
+            SYS_OPEN,
             path.as_ptr() as usize,
             path.len(),
             if reading { 0 } else { 1 },
@@ -90,7 +98,7 @@ pub fn open(path: &str, reading: bool) -> usize {
 }
 
 pub fn close(fd: usize) -> usize {
-    unsafe { syscall1(3, fd) }
+    unsafe { syscall1(SYS_CLOSE, fd) }
 }
 
 pub fn print(v: &str) {

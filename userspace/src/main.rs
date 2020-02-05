@@ -4,13 +4,10 @@
 #![feature(lang_items)]
 
 extern crate rlibc;
+#[macro_use]
+extern crate syscall_user as syscall;
 
 use core::panic::PanicInfo;
-use core::str;
-
-#[macro_use]
-pub mod print;
-pub mod syscall;
 
 #[allow(unused)]
 pub fn bochs() {
@@ -40,35 +37,24 @@ pub extern "C" fn _start() -> ! {
         print!("[root /]# ");
         let r = syscall::read(1, buf.as_mut_ptr(), buf.len());
 
-        if false && r > 1 {
-            let s = &buf[..r - 1];
-
-            println!(
-                "shell: {}: command not found",
-                str::from_utf8(s)
-                    .unwrap()
-                    .split(" ")
-                    .next()
-                    .unwrap()
-                    .trim_end_matches("\n")
-            );
-        }
-
-        println!("got {}", str::from_utf8(&buf[..r - 1]).unwrap());
-
+        println!("[open: /dev/test_file]");
         let mut fd = syscall::open("/dev/test_file", false);
+        println!("[write: {} bytes to fd = {}]", r, fd);
         syscall::write(fd, buf.as_ptr(), r);
+        println!("[close: fd = {}]", fd);
         syscall::close(fd);
 
         let mut buf2 = [0u8; 256];
+        println!("[open: /dev/test_file]");
         fd = syscall::open("/dev/test_file", true);
+        println!("[read: fd = {}]", fd);
         let read = syscall::read(fd, buf2.as_mut_ptr(), buf2.len());
-        println!("FD Opened for reading: {} read: {}", fd, read);
+        println!("[close: fd = {}]", fd);
         syscall::close(fd);
 
-        let s = core::str::from_utf8(&buf2[0..read]).unwrap();
+        let s = core::str::from_utf8(&buf2[0..read]).unwrap().trim_end_matches("\n");
 
-        print!("content of the file: {}", s);
+        println!("[got: {} bytes: {}]", read, s);
     }
 }
 

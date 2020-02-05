@@ -14,6 +14,9 @@ raw-cpuid = "*"
 rlibc = "*"
 spin = "*"
 
+[dependencies.syscall-defs]
+path = "../syscall-defs"
+
 [dependencies.lazy_static]
 features = ["spin_no_std"]
 version = "*"

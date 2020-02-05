@@ -58,9 +58,9 @@ impl INode for LockedRamINode {
             }),
             ".." => {
                 let parent = this.parent.upgrade().ok_or(FsError::EntryNotFound)?;
-                let parent_lock = parent.0.read();
+                let parent_locked = parent.0.read();
                 Ok(DirEntry {
-                    name: parent_lock.name.clone(),
+                    name: parent_locked.name.clone(),
                     inode: parent.clone(),
                 })
             }
@@ -75,43 +75,8 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn create(&self, name: &str) -> Result<Arc<dyn INode>> {
-        //println!("RAM FS: Creating file {}", name);
-        let inode = self.make_inode(name, FileType::File, |_| Ok(()));
-
-        //println!("INODE READY");
-
-        inode
-    }
-
     fn mkdir(&self, name: &str) -> Result<Arc<dyn INode>> {
         self.make_inode(name, FileType::Dir, |_| Ok(()))
-    }
-
-    fn mknode(&self, name: &str, devid: usize) -> Result<Arc<dyn INode>> {
-        self.make_inode(name, FileType::DevNode, |inode| {
-            inode.0.write().content = Content::DevNode(Some(
-                DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
-            ));
-            Ok(())
-        })
-    }
-
-    fn truncate(&self) -> Result<()> {
-        let node = self.0.write();
-
-        match &node.content {
-            Content::Bytes(vec) => {
-                let mut v = vec.lock();
-
-                v.clear();
-
-                return Ok(());
-            }
-            _ => {
-                return Err(FsError::NotSupported);
-            }
-        }
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
@@ -170,6 +135,36 @@ impl INode for LockedRamINode {
 
     fn fs(&self) -> Arc<dyn Filesystem> {
         self.0.read().fs.upgrade().unwrap().clone()
+    }
+
+    fn create(&self, name: &str) -> Result<Arc<dyn INode>> {
+        self.make_inode(name, FileType::File, |_| Ok(()))
+    }
+
+    fn mknode(&self, name: &str, devid: usize) -> Result<Arc<dyn INode>> {
+        self.make_inode(name, FileType::DevNode, |inode| {
+            inode.0.write().content = Content::DevNode(Some(
+                DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
+            ));
+            Ok(())
+        })
+    }
+
+    fn truncate(&self) -> Result<()> {
+        let node = self.0.write();
+
+        match &node.content {
+            Content::Bytes(vec) => {
+                let mut v = vec.lock();
+
+                v.clear();
+
+                return Ok(());
+            }
+            _ => {
+                return Err(FsError::NotSupported);
+            }
+        }
     }
 }
 

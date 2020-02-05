@@ -1,11 +1,5 @@
 [package]
-name = "program"
+name = "syscall-defs"
 version = "0.1.0"
 authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
 edition = "2018"
-
-[dependencies]
-rlibc = "*"
-
-[dependencies.syscall-user]
-path = "../syscall-user"

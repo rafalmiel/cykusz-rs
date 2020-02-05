@@ -14,7 +14,9 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> u64 {
             let task = current_task();
 
             if mode == 1 {
-                inode.truncate();
+                if let Err(e) = inode.truncate() {
+                    println!("Truncate failed: {:?}", e);
+                }
             }
 
             if let Some(fd) = task.open_file(inode) {

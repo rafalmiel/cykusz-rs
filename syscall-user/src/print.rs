@@ -2,7 +2,7 @@ struct Writer {}
 
 impl core::fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        crate::syscall::print(s);
+        crate::print(s);
         Ok(())
     }
 }
@@ -22,6 +22,6 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
-        crate::print::write_fmt(format_args!($($arg)*)).unwrap();
+        $crate::print::write_fmt(format_args!($($arg)*)).unwrap();
     });
 }

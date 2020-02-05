@@ -1,3 +1,3 @@
 [workspace]
-members = ["userspace", "cykusz-rs"]
+members = ["syscall-defs", "syscall-user", "userspace", "cykusz-rs"]
 

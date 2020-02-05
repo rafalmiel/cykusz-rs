@@ -102,6 +102,14 @@ impl Task {
         self.cwd.read().upgrade()
     }
 
+    pub fn open_file(&self, inode: Arc<dyn INode>) -> Option<usize> {
+        self.filetable.open_file(inode)
+    }
+
+    pub fn close_file(&self, fd: usize) -> bool {
+        self.filetable.close_file(fd)
+    }
+
     pub fn set_cwd(&self, inode: Arc<dyn INode>) {
         *self.cwd.write() = Arc::downgrade(&inode);
     }
@@ -111,10 +119,12 @@ impl Task {
     }
 
     pub fn mark_to_reschedule(&self) {
-        self.prev_state
-            .store(self.state.load(Ordering::SeqCst), Ordering::SeqCst);
-        self.state
-            .store(TaskState::ToReschedule as usize, Ordering::SeqCst);
+        if self.state.load(Ordering::SeqCst) != TaskState::ToReschedule as usize {
+            self.prev_state
+                .store(self.state.load(Ordering::SeqCst), Ordering::SeqCst);
+            self.state
+                .store(TaskState::ToReschedule as usize, Ordering::SeqCst);
+        }
     }
 
     pub fn unmark_to_reschedule(&self) {

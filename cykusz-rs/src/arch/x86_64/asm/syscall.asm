@@ -30,6 +30,9 @@ asm_syscall_handler:
 
     cld
 
+    push r9
+    push r8
+    push r10
     push rdx
     push rsi
     push rdi
@@ -43,6 +46,9 @@ asm_syscall_handler:
     pop rdi
     pop rsi
     pop rdx
+    pop r10
+    pop r8
+    pop r9
 
 asm_sysretq:
     cli

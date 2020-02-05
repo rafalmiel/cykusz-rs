@@ -40,7 +40,7 @@ pub extern "C" fn _start() -> ! {
         print!("[root /]# ");
         let r = syscall::read(1, buf.as_mut_ptr(), buf.len());
 
-        if r > 1 {
+        if false && r > 1 {
             let s = &buf[..r - 1];
 
             println!(
@@ -54,13 +54,28 @@ pub extern "C" fn _start() -> ! {
             );
         }
 
-        //println!("Got {}, bytes: {}", str::from_utf8(s).unwrap(), r);
+        println!("got {}", str::from_utf8(&buf[..r - 1]).unwrap());
+
+        let mut fd = syscall::open("/dev/test_file", false);
+        syscall::write(fd, buf.as_ptr(), r);
+        syscall::close(fd);
+
+        let mut buf2 = [0u8; 256];
+        fd = syscall::open("/dev/test_file", true);
+        let read = syscall::read(fd, buf2.as_mut_ptr(), buf2.len());
+        println!("FD Opened for reading: {} read: {}", fd, read);
+        syscall::close(fd);
+
+        let s = core::str::from_utf8(&buf2[0..read]).unwrap();
+
+        print!("content of the file: {}", s);
     }
 }
 
 /// This function is called on panic.
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
+    println!("Panicked... {:?}", info);
     loop {}
 }
 

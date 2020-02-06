@@ -92,13 +92,7 @@ impl INode for LockedRamINode {
 
                 let to_copy = core::cmp::min(buf.len(), vec.len() - offset);
 
-                unsafe {
-                    core::ptr::copy(
-                        vec.as_ptr().offset(offset as isize),
-                        buf.as_mut_ptr(),
-                        to_copy,
-                    );
-                }
+                buf[..to_copy].copy_from_slice(&vec.as_slice()[offset..offset + to_copy]);
 
                 Ok(to_copy)
             }
@@ -118,13 +112,7 @@ impl INode for LockedRamINode {
                     vec.resize(offset + buf.len(), 0);
                 }
 
-                unsafe {
-                    core::ptr::copy(
-                        buf.as_ptr(),
-                        vec.as_mut_ptr().offset(offset as isize),
-                        buf.len(),
-                    );
-                }
+                vec.as_mut_slice()[offset..buf.len()].copy_from_slice(buf);
 
                 Ok(buf.len())
             }

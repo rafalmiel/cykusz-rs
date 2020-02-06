@@ -42,7 +42,7 @@ pub struct SyscallFrame {
 }
 
 #[no_mangle]
-pub extern "C" fn fast_syscall_handler(frame: &SyscallFrame) -> u64 {
+pub extern "C" fn fast_syscall_handler(frame: &SyscallFrame) -> isize {
     crate::kernel::syscall::syscall_handler(
         frame.rax, frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
     )

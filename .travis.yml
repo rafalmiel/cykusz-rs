@@ -21,4 +21,4 @@ addons:
 
 script:
   - make clean
-  - make
+  - make iso

@@ -16,10 +16,7 @@ extern crate alloc;
 extern crate bitflags;
 #[macro_use]
 extern crate lazy_static;
-extern crate linked_list_allocator;
-extern crate raw_cpuid;
 extern crate rlibc;
-extern crate spin;
 
 use crate::kernel::mm::VirtAddr;
 

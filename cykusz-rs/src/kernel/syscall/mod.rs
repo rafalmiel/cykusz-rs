@@ -10,9 +10,8 @@ pub fn init_ap() {
 }
 
 #[allow(unused_variables)]
-pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> u64 {
+pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> isize {
     use syscall_defs::*;
-    //syscall_defs::user::hello();
     match num as usize {
         SYS_READ => sys::sys_read(a, b, c),
         SYS_WRITE => sys::sys_write(a, b, c),
@@ -20,8 +19,8 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_CLOSE => sys::sys_close(a),
 
         _ => {
-            return 0;
+            Err(SyscallError::Inval)
         }
-    }
+    }.syscall_into()
 
 }

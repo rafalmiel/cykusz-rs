@@ -1,4 +1,6 @@
 use crate::kernel::sched::current_task;
+use syscall_defs::SyscallResult;
+use syscall_defs::SyscallError;
 
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
     unsafe { core::slice::from_raw_parts_mut(b as *mut u8, len as usize) }
@@ -8,7 +10,7 @@ fn make_buf(b: u64, len: u64) -> &'static [u8] {
     unsafe { core::slice::from_raw_parts(b as *const u8, len as usize) }
 }
 
-pub fn sys_open(path: u64, len: u64, mode: u64) -> u64 {
+pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
         if let Ok(inode) = crate::kernel::fs::lookup_by_path(path) {
             let task = current_task();
@@ -20,46 +22,47 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> u64 {
             }
 
             if let Some(fd) = task.open_file(inode) {
-                return fd as u64;
+                return Ok(fd);
+            } else {
+                Err(SyscallError::NoDev)
             }
         } else {
             println!("Failed lookup_by_path");
+            Err(SyscallError::NoEnt)
         }
+    } else {
+        Err(SyscallError::Inval)
     }
-
-    return 0;
 }
 
-pub fn sys_close(fd: u64) -> u64 {
+pub fn sys_close(fd: u64) -> SyscallResult {
     let task = current_task();
 
     if task.close_file(fd as usize) {
-        return 0;
+        return Ok(0);
     } else {
-        return 666;
+        return Err(SyscallError::BadFD);
     }
 }
 
-pub fn sys_write(fd: u64, buf: u64, len: u64) -> u64 {
+pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task();
-    let n = if let Some(f) = task.get_handle(fd) {
-        f.write(make_buf(buf, len)).unwrap()
+    return if let Some(f) = task.get_handle(fd) {
+        Ok(f.write(make_buf(buf, len))?)
     } else {
-        0
+        Err(SyscallError::BadFD)
     };
-
-    return n as u64;
 }
 
-pub fn sys_read(fd: u64, buf: u64, len: u64) -> u64 {
+pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task();
     if let Some(f) = task.get_handle(fd) {
-        return f.read(make_buf_mut(buf, len)).unwrap() as u64;
+        return Ok(f.read(make_buf_mut(buf, len))?);
     }
 
-    return 0;
+    return Err(SyscallError::BadFD);
 }

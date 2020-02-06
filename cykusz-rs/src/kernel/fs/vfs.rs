@@ -2,6 +2,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 
 use crate::kernel::fs::inode::INode;
+use syscall_defs::SyscallError;
 
 #[derive(Debug, PartialEq)]
 pub enum FsError {
@@ -12,6 +13,20 @@ pub enum FsError {
     EntryNotFound,
     EntryExists,
     InvalidParam,
+}
+
+impl From<FsError> for syscall_defs::SyscallError {
+    fn from(e: FsError) -> Self {
+        match e {
+            FsError::NotSupported => SyscallError::Access,
+            FsError::NotFile => SyscallError::NoEnt,
+            FsError::IsDir => SyscallError::IsDir,
+            FsError::NotDir => SyscallError::NotDir,
+            FsError::EntryNotFound => SyscallError::NoEnt,
+            FsError::EntryExists => SyscallError::Exists,
+            FsError::InvalidParam => SyscallError::Inval,
+        }
+    }
 }
 
 pub type Result<T> = core::result::Result<T, FsError>;

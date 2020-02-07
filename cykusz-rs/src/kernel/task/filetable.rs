@@ -4,8 +4,9 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::sync::RwLock;
+use alloc::vec::Vec;
 
-const FILE_NUM: usize = 16;
+const FILE_NUM: usize = 256;
 
 pub struct FileHandle {
     pub fd: usize,
@@ -46,7 +47,7 @@ impl FileHandle {
 }
 
 pub struct FileTable {
-    files: RwLock<[Option<FileHandle>; FILE_NUM]>,
+    files: RwLock<Vec<Option<FileHandle>>>,
 }
 
 impl Default for FileTable {
@@ -56,26 +57,35 @@ impl Default for FileTable {
 }
 
 impl FileTable {
-    pub const fn new() -> FileTable {
+    pub fn new() -> FileTable {
+        let mut files = Vec::new();
+        files.resize(FILE_NUM, None);
+
         FileTable {
-            files: RwLock::new([
-                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-                None, None,
-            ]),
+            files: RwLock::new(files),
         }
     }
 
     pub fn open_file(&self, inode: Arc<dyn INode>) -> Option<usize> {
         let mut files = self.files.write();
 
-        if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
-            *f = Some(FileHandle {
-                fd: idx,
-                inode: inode,
+        let mk_handle = |fd: usize, inode: Arc<dyn INode>| {
+            Some(FileHandle {
+                fd,
+                inode,
                 offset: AtomicUsize::new(0),
-            });
+            })
+        };
+
+        if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
+            *f = mk_handle(idx, inode);
 
             return Some(idx);
+        } else if files.len() < FILE_NUM {
+            let len = files.len();
+            files.push(mk_handle(len, inode));
+
+            return Some(len);
         }
 
         None

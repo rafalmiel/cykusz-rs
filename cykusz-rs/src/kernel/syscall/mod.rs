@@ -1,4 +1,3 @@
-
 pub mod sys;
 
 pub fn init() {
@@ -18,9 +17,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_OPEN => sys::sys_open(a, b, c),
         SYS_CLOSE => sys::sys_close(a),
 
-        _ => {
-            Err(SyscallError::Inval)
-        }
-    }.syscall_into()
-
+        _ => Err(SyscallError::Inval),
+    }
+    .syscall_into()
 }

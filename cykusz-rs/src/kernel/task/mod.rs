@@ -86,11 +86,6 @@ impl Task {
         let mut task = Task::default();
         task.arch_task = UnsafeCell::new(ArchTask::new_user(fun, code_size));
 
-        task.filetable
-            .open_file(crate::kernel::fs::stdio::stdout().clone());
-        task.filetable
-            .open_file(crate::kernel::fs::stdio::stdin().clone());
-
         task
     }
 

@@ -183,17 +183,19 @@ impl Tty {
     }
 
     fn read(&self, buf: *mut u8, len: usize) -> usize {
-        while !self.buffer.lock().has_data() {
+        // Lock shared with irq handler, we don't want to be interrupted while holding it
+        while !self.buffer.lock_irq().has_data() {
             use crate::kernel::sched::current_task;
 
             self.wait_queue.add_task(current_task().clone());
         }
-        self.buffer.lock().read(buf, len)
+        self.buffer.lock_irq().read(buf, len)
     }
 }
 
 impl KeyListener for Tty {
     fn on_new_key(&self, key: KeyCode, released: bool) {
+        //println!("new key begin");
         let mut state = self.state.lock();
 
         match key {
@@ -227,8 +229,11 @@ impl KeyListener for Tty {
                 }
             }
             KeyCode::KEY_ENTER | KeyCode::KEY_KPENTER if !released => {
-                self.buffer.lock().put_char('\n' as u8);
-                self.buffer.lock().commit_write();
+                {
+                    let mut buf = self.buffer.lock();
+                    buf.put_char('\n' as u8);
+                    buf.commit_write();
+                }
                 self.wait_queue.notify_one();
             }
             KeyCode::KEY_U if (state.lctrl || state.rctrl) && !released => {

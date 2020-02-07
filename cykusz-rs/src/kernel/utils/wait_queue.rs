@@ -17,13 +17,19 @@ impl WaitQueue {
     }
 
     pub fn add_task(&self, task: Arc<Task>) {
-        task.set_state(TaskState::AwaitingIo);
-        self.tasks.lock().push(Arc::<Task>::downgrade(&task));
+        debug_assert_eq!(task.locks(), 0, "AwaitintIo while holding a lock");
+
+        {
+            let mut l = self.tasks.lock_irq();
+            l.push(Arc::<Task>::downgrade(&task));
+            task.set_state(TaskState::AwaitingIo);
+        }
+
         crate::kernel::sched::reschedule();
     }
 
     pub fn notify_one(&self) -> bool {
-        let mut tasks = self.tasks.lock();
+        let mut tasks = self.tasks.lock_irq();
         let len = tasks.len();
 
         if len == 0 {

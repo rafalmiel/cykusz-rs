@@ -30,6 +30,7 @@ pub struct MutexGuard<'a, T: ?Sized + 'a> {
     g: Option<MG<'a, T>>,
     irq: bool,
     notify: bool,
+    debug: usize,
 }
 
 pub struct RwLockReadGuard<'a, T: ?Sized + 'a> {
@@ -74,18 +75,34 @@ impl<T> Mutex<T> {
             g: Some(self.l.lock()),
             irq: false,
             notify: true,
+            debug: 0,
+        }
+    }
+
+    pub fn lock_debug(&self, id: usize) -> MutexGuard<T> {
+        crate::kernel::sched::enter_critical_section();
+
+        println!("-{} ints: {}", id, crate::kernel::int::is_enabled());
+        let l = self.l.lock();
+        println!("+{}", id);
+
+        MutexGuard {
+            g: Some(l),
+            irq: false,
+            notify: true,
+            debug: id,
         }
     }
 
     pub fn lock_irq(&self) -> MutexGuard<T> {
         let ints = int::is_enabled();
-        //::kernel::sched::enter_critical_section();
         int::disable();
         MutexGuard {
             g: Some(self.l.lock()),
             //reenable ints if they were enabled before
             irq: ints,
             notify: false,
+            debug: 0,
         }
     }
 }
@@ -204,6 +221,9 @@ impl<'a, T: ?Sized> DerefMut for RwLockWriteGuard<'a, T> {
 impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
+        if self.debug > 0 {
+            println!("U {}", self.debug);
+        }
         if self.notify {
             crate::kernel::sched::leave_critical_section();
         }

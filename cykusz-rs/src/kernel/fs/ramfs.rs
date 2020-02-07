@@ -96,7 +96,13 @@ impl INode for LockedRamINode {
 
                 Ok(to_copy)
             }
-            Content::DevNode(Some(node)) => node.read_at(offset, buf),
+            Content::DevNode(Some(node)) => {
+                let n = node.clone();
+                drop(i);
+
+                // read_at may sleep, so drop the lock
+                n.read_at(offset, buf)
+            }
             _ => Err(FsError::NotSupported),
         }
     }
@@ -116,7 +122,13 @@ impl INode for LockedRamINode {
 
                 Ok(buf.len())
             }
-            Content::DevNode(Some(node)) => node.write_at(offset, buf),
+            Content::DevNode(Some(node)) => {
+                let n = node.clone();
+                drop(i);
+
+                // write_at may sleep, so drop the lock
+                n.write_at(offset, buf)
+            },
             _ => Err(FsError::NotSupported),
         }
     }
@@ -149,9 +161,7 @@ impl INode for LockedRamINode {
 
                 return Ok(());
             }
-            _ => {
-                return Ok(())
-            }
+            _ => return Ok(()),
         }
     }
 }

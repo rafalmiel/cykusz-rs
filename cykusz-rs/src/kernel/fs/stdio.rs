@@ -3,9 +3,9 @@ use alloc::sync::Arc;
 
 use spin::Once;
 
+use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
-use crate::kernel::device::{Device, alloc_id, register_device};
 
 pub struct StdOut {
     id: usize,
@@ -71,12 +71,8 @@ pub fn stdin() -> &'static Arc<StdIn> {
 }
 
 pub fn init() {
-    STDOUT.call_once(|| Arc::new(StdOut {
-        id: alloc_id()
-    }));
-    STDIN.call_once(|| Arc::new(StdIn {
-        id: alloc_id()
-    }));
+    STDOUT.call_once(|| Arc::new(StdOut { id: alloc_id() }));
+    STDIN.call_once(|| Arc::new(StdIn { id: alloc_id() }));
 
     register_device(stdin().clone()).expect("Failed to register stdin device");
     register_device(stdout().clone()).expect("Failed to register stdout device");

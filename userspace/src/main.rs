@@ -18,7 +18,8 @@ fn make_str(buf: &[u8]) -> &str {
 
 fn main() -> ! {
     use file::*;
-    loop { // We are not allowed to exit yet, need to implement exit system call
+    loop {
+        // We are not allowed to exit yet, need to implement exit system call
         let mut buf = [0u8; 256];
 
         print!("[root /]# ");
@@ -28,8 +29,7 @@ fn main() -> ! {
 
         {
             // Write data from stdin into the file
-            File::new_writeonly("/dev/test_file")
-                .write(&buf[..r]);
+            File::new_writeonly("/dev/test_file").write(&buf[..r]);
         }
 
         unsafe {
@@ -39,8 +39,7 @@ fn main() -> ! {
 
         {
             // Read data from the file and print the result
-            let read = File::new_readonly("/dev/test_file")
-                .read(&mut buf);
+            let read = File::new_readonly("/dev/test_file").read(&mut buf);
 
             let s = make_str(&buf[..read]);
 
@@ -48,4 +47,3 @@ fn main() -> ! {
         }
     }
 }
-

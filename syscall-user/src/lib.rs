@@ -51,7 +51,14 @@ pub unsafe fn syscall4(mut a: usize, b: usize, c: usize, d: usize, e: usize) -> 
 
     SyscallResult::syscall_from(a as isize)
 }
-pub unsafe fn syscall5(mut a: usize, b: usize, c: usize, d: usize, e: usize, f: usize) -> SyscallResult {
+pub unsafe fn syscall5(
+    mut a: usize,
+    b: usize,
+    c: usize,
+    d: usize,
+    e: usize,
+    f: usize,
+) -> SyscallResult {
     asm!("syscall"
         : "={rax}"(a)
         : "{rax}"(a), "{rdi}"(b), "{rsi}"(c), "{rdx}"(d), "{r10}"(e), "{r8}"(f)

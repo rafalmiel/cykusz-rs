@@ -1,6 +1,6 @@
 use crate::kernel::sched::current_task;
-use syscall_defs::SyscallResult;
 use syscall_defs::SyscallError;
+use syscall_defs::SyscallResult;
 
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
     unsafe { core::slice::from_raw_parts_mut(b as *mut u8, len as usize) }

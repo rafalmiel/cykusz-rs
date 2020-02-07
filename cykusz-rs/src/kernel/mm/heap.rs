@@ -1,4 +1,4 @@
-use core::alloc::{AllocRef, AllocErr, GlobalAlloc, Layout};
+use core::alloc::{AllocErr, AllocRef, GlobalAlloc, Layout};
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicUsize, Ordering};

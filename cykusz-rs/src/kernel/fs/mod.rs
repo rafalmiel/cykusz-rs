@@ -80,7 +80,7 @@ pub fn lookup_by_path(path: &str) -> Result<Arc<dyn INode>> {
             Ok(i) => inode = i.inode,
             Err(e) if idx == count - 1 && e == FsError::EntryNotFound => {
                 return Ok(inode.create(name)?);
-            },
+            }
             Err(e) => {
                 return Err(e);
             }

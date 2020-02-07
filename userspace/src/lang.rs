@@ -9,6 +9,11 @@ pub fn bochs() {
 
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {
+    /* fd 0 */ syscall::open("/dev/stdout", true)
+        .expect("Failed to open /dev/stdout");
+    
+    /* fd 1 */ syscall::open("/dev/stdin", false)
+        .expect("Failed to open /dev/stdin");
     super::main()
 }
 

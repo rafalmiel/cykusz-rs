@@ -150,7 +150,7 @@ impl INode for LockedRamINode {
                 return Ok(());
             }
             _ => {
-                return Err(FsError::NotSupported);
+                return Ok(())
             }
         }
     }

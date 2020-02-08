@@ -1,5 +1,8 @@
 #![no_std]
 
+#[macro_use]
+extern crate bitflags;
+
 pub const SYS_READ: usize = 0;
 pub const SYS_WRITE: usize = 1;
 pub const SYS_OPEN: usize = 2;
@@ -22,6 +25,15 @@ pub enum SyscallError {
     IsDir = 21,
     Inval = 22,
     UnknownError = 0xffff,
+}
+
+bitflags! {
+    pub struct OpenFlags: usize {
+        const RDONLY      = 1 << 0;
+        const WRONLY      = 1 << 1;
+        const RDWR        = 1 << 2;
+        const CREAT       = 0o100;
+    }
 }
 
 pub type SyscallResult = Result<usize, SyscallError>;

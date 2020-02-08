@@ -1,10 +1,12 @@
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
+
+use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::sync::RwLock;
-use alloc::vec::Vec;
 
 const FILE_NUM: usize = 256;
 
@@ -12,6 +14,7 @@ pub struct FileHandle {
     pub fd: usize,
     pub inode: Arc<dyn INode>,
     pub offset: AtomicUsize,
+    pub flags: OpenFlags,
 }
 
 impl Clone for FileHandle {
@@ -20,6 +23,7 @@ impl Clone for FileHandle {
             fd: self.fd,
             inode: self.inode.clone(),
             offset: AtomicUsize::new(self.offset.load(Ordering::SeqCst)),
+            flags: self.flags,
         }
     }
 }
@@ -66,7 +70,7 @@ impl FileTable {
         }
     }
 
-    pub fn open_file(&self, inode: Arc<dyn INode>) -> Option<usize> {
+    pub fn open_file(&self, inode: Arc<dyn INode>, flags: OpenFlags) -> Option<usize> {
         let mut files = self.files.write();
 
         let mk_handle = |fd: usize, inode: Arc<dyn INode>| {
@@ -74,6 +78,7 @@ impl FileTable {
                 fd,
                 inode,
                 offset: AtomicUsize::new(0),
+                flags,
             })
         };
 

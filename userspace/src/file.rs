@@ -3,15 +3,9 @@ pub struct File {
 }
 
 impl File {
-    pub fn new_readonly(path: &str) -> File {
+    pub fn new(path: &str, flags: syscall_defs::OpenFlags) -> File {
         File {
-            fd: syscall::open(path, true).expect("Failed to open file"),
-        }
-    }
-
-    pub fn new_writeonly(path: &str) -> File {
-        File {
-            fd: syscall::open(path, false).expect("Failed to open file"),
+            fd: syscall::open(path, flags).expect("Failed to open file"),
         }
     }
 

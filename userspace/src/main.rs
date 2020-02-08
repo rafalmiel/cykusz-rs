@@ -4,8 +4,11 @@
 #![feature(lang_items)]
 
 extern crate rlibc;
+extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
+
+use syscall_defs::OpenFlags;
 
 pub mod file;
 pub mod lang;
@@ -29,7 +32,7 @@ fn main() -> ! {
 
         {
             // Write data from stdin into the file
-            File::new_writeonly("/dev/test_file").write(&buf[..r]);
+            File::new("/dev/test_file", OpenFlags::WRONLY | OpenFlags::CREAT).write(&buf[..r]);
         }
 
         unsafe {
@@ -39,7 +42,7 @@ fn main() -> ! {
 
         {
             // Read data from the file and print the result
-            let read = File::new_readonly("/dev/test_file").read(&mut buf);
+            let read = File::new("/dev/test_file", OpenFlags::RDONLY).read(&mut buf);
 
             let s = make_str(&buf[..read]);
 

@@ -67,7 +67,23 @@ pub fn init() {
     stdio::init();
 }
 
-pub fn lookup_by_path(path: Path, open_flags: OpenFlags) -> Result<Arc<dyn INode>> {
+#[derive(Copy, Clone, PartialEq)]
+pub enum LookupMode {
+    None,
+    Create,
+}
+
+impl From<OpenFlags> for LookupMode {
+    fn from(f: OpenFlags) -> Self {
+        if f.contains(OpenFlags::CREAT) {
+            LookupMode::Create
+        } else {
+            LookupMode::None
+        }
+    }
+}
+
+pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<Arc<dyn INode>> {
     let mut inode = if path.is_absolute() {
         root_inode().clone()
     } else {
@@ -82,7 +98,7 @@ pub fn lookup_by_path(path: Path, open_flags: OpenFlags) -> Result<Arc<dyn INode
             Err(e)
                 if e == FsError::EntryNotFound
                     && idx == len - 1
-                    && open_flags.contains(OpenFlags::CREAT) =>
+                    && lookup_mode == LookupMode::Create =>
             {
                 inode = inode.create(name)?;
             }

@@ -3,6 +3,8 @@ use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::path::Path;
 use crate::kernel::sched::current_task;
+use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::fs::vfs::FileType;
 
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
     unsafe { core::slice::from_raw_parts_mut(b as *mut u8, len as usize) }
@@ -16,7 +18,7 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::Inval)?;
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        if let Ok(inode) = crate::kernel::fs::lookup_by_path(Path::new(path), flags) {
+        if let Ok(inode) = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into()) {
             let task = current_task();
 
             if flags.contains(OpenFlags::CREAT) {
@@ -77,4 +79,23 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     } else {
         Err(SyscallError::BadFD)
     };
+}
+
+pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
+    if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
+        if let Ok(dir) = lookup_by_path(Path::new(path), LookupMode::None) {
+            if dir.ftype()? == FileType::Dir {
+                let task = current_task();
+                task.set_cwd(dir);
+                Ok(0)
+            } else {
+                Err(SyscallError::NotDir)
+            }
+        } else {
+            Err(SyscallError::Inval)
+        }
+    } else {
+        Err(SyscallError::Inval)
+    }
+
 }

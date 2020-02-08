@@ -7,6 +7,7 @@ pub const SYS_READ: usize = 0;
 pub const SYS_WRITE: usize = 1;
 pub const SYS_OPEN: usize = 2;
 pub const SYS_CLOSE: usize = 3;
+pub const SYS_CHDIR: usize = 4;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

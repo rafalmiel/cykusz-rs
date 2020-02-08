@@ -101,6 +101,12 @@ pub fn close(fd: usize) -> SyscallResult {
     unsafe { syscall1(SYS_CLOSE, fd) }
 }
 
+pub fn chdir(path: &str) -> SyscallResult {
+    unsafe {
+        syscall2(SYS_CHDIR, path.as_ptr() as usize, path.len())
+    }
+}
+
 pub fn print(v: &str) {
     write(0, v.as_ptr(), v.len()).unwrap();
 }

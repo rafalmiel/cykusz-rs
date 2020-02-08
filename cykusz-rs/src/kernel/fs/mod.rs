@@ -2,9 +2,12 @@ use alloc::sync::Arc;
 
 use spin::Once;
 
+use syscall_defs::OpenFlags;
+
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::mountfs::MNode;
+use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
 
@@ -64,22 +67,24 @@ pub fn init() {
     stdio::init();
 }
 
-pub fn lookup_by_path(path: &str) -> Result<Arc<dyn INode>> {
-    let path = path::Path::new(path);
-
+pub fn lookup_by_path(path: Path, open_flags: OpenFlags) -> Result<Arc<dyn INode>> {
     let mut inode = if path.is_absolute() {
         root_inode().clone()
     } else {
         current_task().get_cwd().unwrap_or(root_inode().clone())
     };
 
-    let count = path.components().count();
+    let len = path.components().count();
 
     for (idx, name) in path.components().enumerate() {
         match inode.lookup(name) {
             Ok(i) => inode = i.inode,
-            Err(e) if idx == count - 1 && e == FsError::EntryNotFound => {
-                return Ok(inode.create(name)?);
+            Err(e)
+                if e == FsError::EntryNotFound
+                    && idx == len - 1
+                    && open_flags.contains(OpenFlags::CREAT) =>
+            {
+                inode = inode.create(name)?;
             }
             Err(e) => {
                 return Err(e);

@@ -1,8 +1,9 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 
-use crate::kernel::fs::inode::INode;
 use syscall_defs::SyscallError;
+
+use crate::kernel::fs::inode::INode;
 
 #[derive(Debug, PartialEq)]
 pub enum FsError {

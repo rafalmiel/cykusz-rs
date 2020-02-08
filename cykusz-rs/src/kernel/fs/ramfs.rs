@@ -128,7 +128,7 @@ impl INode for LockedRamINode {
 
                 // write_at may sleep, so drop the lock
                 n.write_at(offset, buf)
-            },
+            }
             _ => Err(FsError::NotSupported),
         }
     }

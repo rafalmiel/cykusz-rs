@@ -2,6 +2,8 @@ use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use syscall_defs::OpenFlags;
+
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::mm::MappedAddr;
@@ -97,8 +99,8 @@ impl Task {
         self.cwd.read().upgrade()
     }
 
-    pub fn open_file(&self, inode: Arc<dyn INode>) -> Option<usize> {
-        self.filetable.open_file(inode)
+    pub fn open_file(&self, inode: Arc<dyn INode>, flags: OpenFlags) -> Option<usize> {
+        self.filetable.open_file(inode, flags)
     }
 
     pub fn close_file(&self, fd: usize) -> bool {

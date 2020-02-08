@@ -21,7 +21,10 @@ fn make_str(buf: &[u8]) -> &str {
 
 fn main() -> ! {
     use file::*;
+
     loop {
+        syscall::chdir("dev").expect("Failed to change dir");
+
         // We are not allowed to exit yet, need to implement exit system call
         let mut buf = [0u8; 256];
 
@@ -32,7 +35,7 @@ fn main() -> ! {
 
         {
             // Write data from stdin into the file
-            File::new("/dev/test_file", OpenFlags::WRONLY | OpenFlags::CREAT).write(&buf[..r]);
+            File::new("test_file", OpenFlags::WRONLY | OpenFlags::CREAT).write(&buf[..r]);
         }
 
         unsafe {
@@ -42,11 +45,13 @@ fn main() -> ! {
 
         {
             // Read data from the file and print the result
-            let read = File::new("/dev/test_file", OpenFlags::RDONLY).read(&mut buf);
+            let read = File::new("test_file", OpenFlags::RDONLY).read(&mut buf);
 
             let s = make_str(&buf[..read]);
 
             println!("> read {} bytes: {}]", read, s);
         }
+
+        syscall::chdir("../").expect("Failed to change dir");
     }
 }

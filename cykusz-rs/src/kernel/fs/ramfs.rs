@@ -235,6 +235,7 @@ impl RamFS {
             &Arc::downgrade(&root),
             &Arc::downgrade(&fs),
         );
+        root.0.write().typ = FileType::Dir;
 
         return fs;
     }

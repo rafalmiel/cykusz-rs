@@ -8,7 +8,7 @@ extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
 
-use syscall_defs::OpenFlags;
+use syscall_defs::{OpenFlags, SysDirEntry};
 
 pub mod file;
 pub mod lang;
@@ -19,19 +19,66 @@ fn make_str(buf: &[u8]) -> &str {
         .trim_end_matches("\n")
 }
 
+fn ls(path: &str) {
+    if let Ok(fd) = syscall::open(path, OpenFlags::DIRECTORY) {
+        let mut buf = [0u8; 1024];
+
+        loop {
+            if let Ok(datalen) = syscall::getdents(fd, buf.as_mut_ptr(), buf.len()) {
+                if datalen == 0 {
+                    break;
+                }
+
+                let mut offset = 0;
+                let struct_len = core::mem::size_of::<SysDirEntry>();
+
+                loop {
+                    let dentry = unsafe {
+                        (buf.as_ptr().offset(offset) as *const SysDirEntry).read_unaligned()
+                    };
+                    let namebytes =
+                        &buf[offset as usize + struct_len..offset as usize + dentry.reclen];
+                    if let Ok(name) = core::str::from_utf8(namebytes) {
+                        println!("{:<12} {:?}", name, dentry.typ);
+                    } else {
+                        break;
+                    }
+
+                    offset += dentry.reclen as isize;
+                    if offset as usize >= datalen {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if let Err(_) = syscall::close(fd) {
+            println!("Failed to close file {}", fd);
+        }
+    } else {
+        println!("Failed to open a directory")
+    }
+}
+
 fn exec(cmd: &str) {
-    if cmd.starts_with("cd ") {
+    if cmd.trim_start_matches(" ").starts_with("cd ") {
         let path = &cmd[3..];
 
-        if let Err(e) = syscall::chdir(path) {
+        if let Err(e) = syscall::chdir(path.trim()) {
             println!("Failed to change dir: {:?}", e);
         }
-    } else if cmd.starts_with("mkdir ") {
+    } else if cmd.trim_start_matches(" ").starts_with("mkdir ") {
         let path = &cmd[6..];
 
-        if let Err(e) = syscall::mkdir(path) {
+        if let Err(e) = syscall::mkdir(path.trim()) {
             println!("Failed to mkdir: {:?}", e);
         }
+    } else if cmd.trim_start().starts_with("ls ") {
+        let path = &cmd[3..];
+
+        ls(path.trim());
+    } else if cmd.trim() == "ls" {
+        ls(".")
     } else {
         println!(
             "shell: {}: command not found",

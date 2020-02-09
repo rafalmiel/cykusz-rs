@@ -1,5 +1,3 @@
-use core::str::Split;
-
 pub struct Path<'a>(&'a str);
 
 impl<'a> Path<'a> {
@@ -11,7 +9,10 @@ impl<'a> Path<'a> {
         self.0.starts_with("/")
     }
 
-    pub fn components(&self) -> Split<'a, &str> {
-        self.0.trim_start_matches("/").split("/")
+    pub fn components(&self) -> impl Iterator<Item = &str> {
+        self.0
+            .trim_start_matches("/")
+            .split("/")
+            .filter(|e| *e != "" && *e != ".")
     }
 }

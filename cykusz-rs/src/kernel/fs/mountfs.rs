@@ -202,4 +202,8 @@ impl INode for MNode {
     fn truncate(&self) -> Result<()> {
         self.inode.truncate()
     }
+
+    fn dirent(&self, idx: usize) -> Result<Option<DirEntry>> {
+        self.inode.dirent(idx)
+    }
 }

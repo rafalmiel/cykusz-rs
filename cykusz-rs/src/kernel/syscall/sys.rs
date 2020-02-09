@@ -1,8 +1,7 @@
-use syscall_defs::SyscallResult;
+use syscall_defs::{FileType, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::path::Path;
-use crate::kernel::fs::vfs::FileType;
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::sched::current_task;
 
@@ -20,6 +19,10 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
         if let Ok(inode) = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into()) {
             let task = current_task();
+
+            if flags.contains(OpenFlags::DIRECTORY) && inode.ftype()? != FileType::Dir {
+                return Err(SyscallError::NotDir);
+            }
 
             if flags.contains(OpenFlags::CREAT) {
                 if let Err(e) = inode.truncate() {
@@ -144,4 +147,15 @@ pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
     } else {
         Err(SyscallError::Inval)
     }
+}
+
+pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
+    let fd = fd as usize;
+
+    let task = current_task();
+    return if let Some(f) = task.get_handle(fd) {
+        Ok(f.getdents(make_buf_mut(buf, len))?)
+    } else {
+        Err(SyscallError::BadFD)
+    };
 }

@@ -7,11 +7,13 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
+use syscall_defs::FileType;
+
 use crate::kernel::fs::devnode::DevNode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Result};
-use crate::kernel::fs::vfs::{FileType, FsError, Metadata};
+use crate::kernel::fs::vfs::{FsError, Metadata};
 use crate::kernel::sync::{Mutex, RwLock};
 
 struct LockedRamINode(RwLock<RamINode>);
@@ -163,6 +165,37 @@ impl INode for LockedRamINode {
             }
             _ => return Ok(()),
         }
+    }
+
+    fn dirent(&self, idx: usize) -> Result<Option<DirEntry>> {
+        let d = self.0.read();
+
+        if d.typ != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
+        let dir = match idx {
+            0 => Some(DirEntry {
+                name: String::from("."),
+                inode: d.this.upgrade().unwrap(),
+            }),
+            1 => Some(DirEntry {
+                name: String::from(".."),
+                inode: d.parent.upgrade().unwrap(),
+            }),
+            idx => {
+                if let Some(e) = d.children.iter().nth(idx - 2) {
+                    Some(DirEntry {
+                        name: e.0.clone(),
+                        inode: e.1.clone(),
+                    })
+                } else {
+                    None
+                }
+            }
+        };
+
+        Ok(dir)
     }
 }
 

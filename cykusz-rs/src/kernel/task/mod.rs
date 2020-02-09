@@ -1,4 +1,4 @@
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
@@ -6,11 +6,15 @@ use syscall_defs::OpenFlags;
 
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::root_inode;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::new_task_id;
 use crate::kernel::sync::RwLock;
+use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
+use alloc::string::String;
 
+pub mod cwd;
 pub mod filetable;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -46,7 +50,7 @@ pub struct Task {
     state: AtomicUsize,
     locks: AtomicUsize,
     filetable: filetable::FileTable,
-    cwd: RwLock<Weak<dyn INode>>,
+    cwd: RwLock<Cwd>,
 }
 
 impl Default for Task {
@@ -58,9 +62,7 @@ impl Default for Task {
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
             filetable: filetable::FileTable::new(),
-            cwd: RwLock::new(Arc::downgrade(
-                &crate::kernel::fs::root_inode().self_inode(),
-            )),
+            cwd: RwLock::new(Cwd::new("/", root_inode().self_inode())),
         }
     }
 }
@@ -96,7 +98,11 @@ impl Task {
     }
 
     pub fn get_cwd(&self) -> Option<Arc<dyn INode>> {
-        self.cwd.read().upgrade()
+        Some(self.cwd.read().inode.clone())
+    }
+
+    pub fn get_pwd(&self) -> String {
+        self.cwd.read().pwd.clone()
     }
 
     pub fn open_file(&self, inode: Arc<dyn INode>, flags: OpenFlags) -> Option<usize> {
@@ -107,8 +113,11 @@ impl Task {
         self.filetable.close_file(fd)
     }
 
-    pub fn set_cwd(&self, inode: Arc<dyn INode>) {
-        *self.cwd.write() = Arc::downgrade(&inode);
+    pub fn set_cwd(&self, inode: Arc<dyn INode>, path: &str) {
+        let mut cwd = self.cwd.write();
+
+        cwd.inode = inode;
+        cwd.apply_path(path);
     }
 
     pub fn set_state(&self, state: TaskState) {

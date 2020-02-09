@@ -109,6 +109,10 @@ pub fn getcwd(buf: *mut u8, len: usize) -> SyscallResult {
     unsafe { syscall2(SYS_GETCWD, buf as usize, len) }
 }
 
+pub fn mkdir(path: &str) -> SyscallResult {
+    unsafe { syscall2(SYS_MKDIR, path.as_ptr() as usize, path.len()) }
+}
+
 pub fn print(v: &str) {
     write(0, v.as_ptr(), v.len()).unwrap();
 }

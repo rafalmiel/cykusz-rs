@@ -26,6 +26,12 @@ fn exec(cmd: &str) {
         if let Err(e) = syscall::chdir(path) {
             println!("Failed to change dir: {:?}", e);
         }
+    } else if cmd.starts_with("mkdir ") {
+        let path = &cmd[6..];
+
+        if let Err(e) = syscall::mkdir(path) {
+            println!("Failed to mkdir: {:?}", e);
+        }
     } else {
         println!(
             "shell: {}: command not found",
@@ -37,7 +43,7 @@ fn exec(cmd: &str) {
 fn main_cd() -> ! {
     loop {
         let mut buf = [0u8; 256];
-        let mut pwd = [0u8; 16];
+        let mut pwd = [0u8; 1024];
         let pwd_r = syscall::getcwd(pwd.as_mut_ptr(), pwd.len()).expect("Failed to get cwd");
 
         print!("[root {}]# ", make_str(&pwd[0..pwd_r]));
@@ -50,6 +56,7 @@ fn main_cd() -> ! {
     }
 }
 
+#[allow(dead_code)]
 fn main() -> ! {
     use file::*;
 

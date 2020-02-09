@@ -102,9 +102,11 @@ pub fn close(fd: usize) -> SyscallResult {
 }
 
 pub fn chdir(path: &str) -> SyscallResult {
-    unsafe {
-        syscall2(SYS_CHDIR, path.as_ptr() as usize, path.len())
-    }
+    unsafe { syscall2(SYS_CHDIR, path.as_ptr() as usize, path.len()) }
+}
+
+pub fn getcwd(buf: *mut u8, len: usize) -> SyscallResult {
+    unsafe { syscall2(SYS_GETCWD, buf as usize, len) }
 }
 
 pub fn print(v: &str) {

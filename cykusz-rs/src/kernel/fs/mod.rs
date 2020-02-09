@@ -52,6 +52,10 @@ pub fn init() {
         let root = mount_fs.root_inode();
 
         root.mkdir("dev").expect("Failed to create /dev directory");
+        root.mkdir("etc").expect("Failed to create /dev directory");
+        root.mkdir("home").expect("Failed to create /dev directory");
+        root.mkdir("var").expect("Failed to create /dev directory");
+        root.mkdir("tmp").expect("Failed to create /dev directory");
 
         root
     });
@@ -87,7 +91,7 @@ pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<Arc<dyn INo
     let mut inode = if path.is_absolute() {
         root_inode().clone()
     } else {
-        current_task().get_cwd().unwrap_or(root_inode().clone())
+        current_task().get_cwd().expect("CWD inode invalid")
     };
 
     let len = path.components().count();

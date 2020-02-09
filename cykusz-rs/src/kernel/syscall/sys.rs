@@ -2,9 +2,10 @@ use syscall_defs::SyscallResult;
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::path::Path;
-use crate::kernel::sched::current_task;
-use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::fs::vfs::FileType;
+use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::sched::current_task;
+use syscall_defs::SyscallError::Perm;
 
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
     unsafe { core::slice::from_raw_parts_mut(b as *mut u8, len as usize) }
@@ -86,7 +87,7 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
         if let Ok(dir) = lookup_by_path(Path::new(path), LookupMode::None) {
             if dir.ftype()? == FileType::Dir {
                 let task = current_task();
-                task.set_cwd(dir);
+                task.set_cwd(dir, path);
                 Ok(0)
             } else {
                 Err(SyscallError::NotDir)
@@ -97,5 +98,17 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
     } else {
         Err(SyscallError::Inval)
     }
+}
 
+pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
+    let buf = make_buf_mut(buf, len);
+
+    let pwd = current_task().get_pwd();
+
+    if pwd.len() > len as usize {
+        Err(SyscallError::IO)
+    } else {
+        buf[..pwd.len()].copy_from_slice(pwd.as_bytes());
+        Ok(pwd.len())
+    }
 }

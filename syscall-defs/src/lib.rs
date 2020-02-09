@@ -10,6 +10,7 @@ pub const SYS_CLOSE: usize = 3;
 pub const SYS_CHDIR: usize = 4;
 pub const SYS_GETCWD: usize = 5;
 pub const SYS_MKDIR: usize = 6;
+pub const SYS_GETDENTS: usize = 7;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {
@@ -36,7 +37,31 @@ bitflags! {
         const WRONLY      = 1 << 1;
         const RDWR        = 1 << 2;
         const CREAT       = 0o100;
+        const DIRECTORY   = 0o200;
     }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+#[repr(u8)]
+pub enum FileType {
+    File = 0x1,
+    Dir = 0x2,
+    DevNode = 0x3,
+}
+
+impl Default for FileType {
+    fn default() -> FileType {
+        FileType::File
+    }
+}
+
+#[repr(C, packed)]
+pub struct SysDirEntry {
+    pub ino: usize,
+    pub off: usize,
+    pub reclen: usize,
+    pub typ: FileType,
+    pub name: [u8; 0],
 }
 
 pub type SyscallResult = Result<usize, SyscallError>;

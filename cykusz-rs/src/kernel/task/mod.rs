@@ -93,7 +93,7 @@ impl Task {
         task
     }
 
-    pub fn get_handle(&self, fd: usize) -> Option<FileHandle> {
+    pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {
         self.filetable.get_handle(fd)
     }
 

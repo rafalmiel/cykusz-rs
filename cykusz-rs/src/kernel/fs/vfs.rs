@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 
-use syscall_defs::SyscallError;
+use syscall_defs::{FileType, SyscallError};
 
 use crate::kernel::fs::inode::INode;
 
@@ -32,22 +32,9 @@ impl From<FsError> for syscall_defs::SyscallError {
 
 pub type Result<T> = core::result::Result<T, FsError>;
 
-#[derive(Copy, Clone, PartialEq)]
-pub enum FileType {
-    File = 0x1,
-    Dir = 0x2,
-    DevNode = 0x3,
-}
-
 pub struct DirEntry {
     pub name: String,
     pub inode: Arc<dyn INode>,
-}
-
-impl Default for FileType {
-    fn default() -> FileType {
-        FileType::File
-    }
 }
 
 #[derive(Copy, Clone)]

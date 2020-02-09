@@ -19,6 +19,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_CHDIR => sys::sys_chdir(a, b),
         SYS_GETCWD => sys::sys_getcwd(a, b),
         SYS_MKDIR => sys::sys_mkdir(a, b),
+        SYS_GETDENTS => sys::sys_getdents(a, b, c),
 
         _ => Err(SyscallError::Inval),
     }

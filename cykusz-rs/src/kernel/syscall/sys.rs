@@ -5,7 +5,6 @@ use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::FileType;
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::sched::current_task;
-use syscall_defs::SyscallError::Perm;
 
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
     unsafe { core::slice::from_raw_parts_mut(b as *mut u8, len as usize) }
@@ -110,5 +109,39 @@ pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
     } else {
         buf[..pwd.len()].copy_from_slice(pwd.as_bytes());
         Ok(pwd.len())
+    }
+}
+
+pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
+    if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
+        let path = path.trim_end_matches("/");
+        let containing_dir = path.rfind("/");
+
+        let (inode, name) = if containing_dir.is_none() {
+            (current_task().get_cwd().unwrap(), path)
+        } else {
+            let cdir = containing_dir.unwrap();
+
+            if cdir == 0 {
+                (
+                    lookup_by_path(Path::new("/"), LookupMode::None)?,
+                    &path[cdir + 1..],
+                )
+            } else {
+                (
+                    lookup_by_path(Path::new(&path[..cdir]), LookupMode::None)?,
+                    &path[cdir + 1..],
+                )
+            }
+        };
+
+        if inode.ftype()? == FileType::Dir {
+            inode.mkdir(name)?;
+            Ok(0)
+        } else {
+            Err(SyscallError::NotDir)
+        }
+    } else {
+        Err(SyscallError::Inval)
     }
 }

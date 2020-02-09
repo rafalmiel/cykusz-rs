@@ -1,8 +1,9 @@
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
-use alloc::string::String;
-use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
 
 pub struct Cwd {
     pub pwd: String,
@@ -20,24 +21,24 @@ impl Cwd {
     pub fn apply_path(&mut self, path: &str) {
         let p = Path::new(path);
 
-        if p.is_absolute() {
-            self.pwd = String::from(path);
-            return;
-        }
-
-        let mut comps = self.pwd.split("/").collect::<Vec<&str>>();
+        let mut comps = if !p.is_absolute() {
+            self.pwd.split("/").collect::<Vec<&str>>()
+        } else {
+            Vec::<&str>::new()
+        };
 
         for el in p.components() {
-            if el == ".." && comps.len() > 1 {
+            if el == ".." && comps.len() > 0 {
                 comps.remove(comps.len() - 1);
             } else {
-                comps.push(el);
+                if el != ".." {
+                    comps.push(el);
+                }
             }
         }
 
         let mut pwd = String::from("/");
 
-        use core::ops::Add;
         pwd.push_str(
             comps
                 .join("/")

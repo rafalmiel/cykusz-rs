@@ -113,6 +113,10 @@ pub fn mkdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_MKDIR, path.as_ptr() as usize, path.len()) }
 }
 
+pub fn getdents(fd: usize, buf: *mut u8, len: usize) -> SyscallResult {
+    unsafe { syscall3(SYS_GETDENTS, fd as usize, buf as usize, len) }
+}
+
 pub fn print(v: &str) {
     write(0, v.as_ptr(), v.len()).unwrap();
 }

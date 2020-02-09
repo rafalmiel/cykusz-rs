@@ -1,7 +1,9 @@
 use alloc::sync::Arc;
 
+use syscall_defs::FileType;
+
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::vfs::{DirEntry, FileType, FsError, Metadata, Result};
+use crate::kernel::fs::vfs::{DirEntry, FsError, Metadata, Result};
 
 pub trait INode: Send + Sync {
     fn id(&self) -> Result<usize> {
@@ -45,6 +47,10 @@ pub trait INode: Send + Sync {
     }
 
     fn truncate(&self) -> Result<()> {
+        return Err(FsError::NotSupported);
+    }
+
+    fn dirent(&self, _idx: usize) -> Result<Option<DirEntry>> {
         return Err(FsError::NotSupported);
     }
 }

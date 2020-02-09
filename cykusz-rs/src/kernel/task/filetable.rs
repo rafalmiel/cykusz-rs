@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use syscall_defs::OpenFlags;
+use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
@@ -15,17 +15,6 @@ pub struct FileHandle {
     pub inode: Arc<dyn INode>,
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
-}
-
-impl Clone for FileHandle {
-    fn clone(&self) -> Self {
-        FileHandle {
-            fd: self.fd,
-            inode: self.inode.clone(),
-            offset: AtomicUsize::new(self.offset.load(Ordering::SeqCst)),
-            flags: self.flags,
-        }
-    }
 }
 
 impl FileHandle {
@@ -48,10 +37,52 @@ impl FileHandle {
 
         Ok(wrote)
     }
+
+    pub fn getdents(&self, buf: &mut [u8]) -> Result<usize> {
+        let mut offset = 0usize;
+
+        let struct_len = core::mem::size_of::<SysDirEntry>();
+
+        Ok(loop {
+            let dentry = self.inode.dirent(self.offset.load(Ordering::SeqCst))?;
+
+            if let Some(d) = &dentry {
+                let mut sysd = SysDirEntry {
+                    ino: d.inode.id()?,
+                    off: offset,
+                    reclen: 0,
+                    typ: d.inode.ftype()?,
+                    name: [],
+                };
+
+                sysd.reclen = struct_len + d.name.len();
+                sysd.off = offset + sysd.reclen;
+
+                if (buf.len() - offset) < sysd.reclen {
+                    break offset;
+                }
+
+                self.offset.fetch_add(1, Ordering::SeqCst);
+
+                unsafe {
+                    buf.as_mut_ptr()
+                        .offset(offset as isize)
+                        .copy_from(&sysd as *const _ as *const u8, struct_len);
+                    buf.as_mut_ptr()
+                        .offset(offset as isize + struct_len as isize)
+                        .copy_from(d.name.as_ptr(), d.name.len());
+                }
+
+                offset += sysd.reclen;
+            } else {
+                break offset;
+            }
+        })
+    }
 }
 
 pub struct FileTable {
-    files: RwLock<Vec<Option<FileHandle>>>,
+    files: RwLock<Vec<Option<Arc<FileHandle>>>>,
 }
 
 impl Default for FileTable {
@@ -74,12 +105,12 @@ impl FileTable {
         let mut files = self.files.write();
 
         let mk_handle = |fd: usize, inode: Arc<dyn INode>| {
-            Some(FileHandle {
+            Some(Arc::new(FileHandle {
                 fd,
                 inode,
                 offset: AtomicUsize::new(0),
                 flags,
-            })
+            }))
         };
 
         if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
@@ -107,7 +138,7 @@ impl FileTable {
         false
     }
 
-    pub fn get_handle(&self, fd: usize) -> Option<FileHandle> {
+    pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {
         let files = self.files.read();
 
         if let Some(handle) = &files[fd] {

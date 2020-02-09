@@ -19,6 +19,37 @@ fn make_str(buf: &[u8]) -> &str {
         .trim_end_matches("\n")
 }
 
+fn exec(cmd: &str) {
+    if cmd.starts_with("cd ") {
+        let path = &cmd[3..];
+
+        if let Err(e) = syscall::chdir(path) {
+            println!("Failed to change dir: {:?}", e);
+        }
+    } else {
+        println!(
+            "shell: {}: command not found",
+            cmd.split(" ").nth(0).unwrap()
+        );
+    }
+}
+
+fn main_cd() -> ! {
+    loop {
+        let mut buf = [0u8; 256];
+        let mut pwd = [0u8; 16];
+        let pwd_r = syscall::getcwd(pwd.as_mut_ptr(), pwd.len()).expect("Failed to get cwd");
+
+        print!("[root {}]# ", make_str(&pwd[0..pwd_r]));
+
+        let r = syscall::read(1, buf.as_mut_ptr(), buf.len()).unwrap();
+
+        let cmd = make_str(&buf[..r]);
+
+        exec(cmd);
+    }
+}
+
 fn main() -> ! {
     use file::*;
 
@@ -28,7 +59,10 @@ fn main() -> ! {
         // We are not allowed to exit yet, need to implement exit system call
         let mut buf = [0u8; 256];
 
-        print!("[root /]# ");
+        let mut pwd = [0u8; 16];
+        let pwd_r = syscall::getcwd(pwd.as_mut_ptr(), pwd.len()).expect("Failed to get cwd");
+
+        print!("[root {}]# ", make_str(&pwd[0..pwd_r]));
 
         // Read some data from stdin
         let r = syscall::read(1, buf.as_mut_ptr(), buf.len()).unwrap();

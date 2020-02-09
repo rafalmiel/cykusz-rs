@@ -17,6 +17,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_OPEN => sys::sys_open(a, b, c),
         SYS_CLOSE => sys::sys_close(a),
         SYS_CHDIR => sys::sys_chdir(a, b),
+        SYS_GETCWD => sys::sys_getcwd(a, b),
 
         _ => Err(SyscallError::Inval),
     }

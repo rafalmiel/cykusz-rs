@@ -17,7 +17,7 @@ pub extern "C" fn _start() -> ! {
     /* fd 1 */
     syscall::open("/dev/stdin", OpenFlags::RDONLY).expect("Failed to open /dev/stdin");
 
-    super::main()
+    super::main_cd()
 }
 
 /// This function is called on panic.

@@ -55,7 +55,7 @@ impl Default for FileType {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct SysDirEntry {
     pub ino: usize,
     pub off: usize,

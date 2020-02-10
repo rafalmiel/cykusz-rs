@@ -224,11 +224,7 @@ impl LockedRamINode {
     ) -> Result<Arc<dyn INode>> {
         let mut this = self.0.write();
 
-        if this.children.contains_key(&String::from(name))
-            || name == ""
-            || name == ".."
-            || name == "."
-        {
+        if this.children.contains_key(&String::from(name)) || ["", ".", ".."].contains(&name) {
             return Err(FsError::EntryExists);
         }
 

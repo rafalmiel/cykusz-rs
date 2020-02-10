@@ -33,11 +33,12 @@ fn ls(path: &str) {
                 let struct_len = core::mem::size_of::<SysDirEntry>();
 
                 loop {
-                    let dentry = unsafe {
-                        &*(buf.as_ptr().offset(offset) as *const SysDirEntry)
-                    };
+                    let dentry = unsafe { &*(buf.as_ptr().offset(offset) as *const SysDirEntry) };
                     let namebytes = unsafe {
-                        core::slice::from_raw_parts(dentry.name.as_ptr(), dentry.reclen - struct_len)
+                        core::slice::from_raw_parts(
+                            dentry.name.as_ptr(),
+                            dentry.reclen - struct_len,
+                        )
                     };
                     if let Ok(name) = core::str::from_utf8(namebytes) {
                         println!("{:<12} {:?}", name, dentry.typ);
@@ -81,7 +82,7 @@ fn exec(cmd: &str) {
         let p = path.split_whitespace();
         let print_hdr = path.contains(" ");
         for (idx, name) in p.enumerate() {
-            let name=  name.trim();
+            let name = name.trim();
             if print_hdr {
                 if idx > 0 {
                     println!("");
@@ -90,11 +91,10 @@ fn exec(cmd: &str) {
             }
             ls(name);
         }
-
     } else if cmd == "ls" {
         ls(".")
     } else if cmd == "cd" {
-        // do nothing for now, TODO: move  to home?
+        // do nothing for now, TODO: move to home?
     } else {
         println!(
             "shell: {}: command not found",

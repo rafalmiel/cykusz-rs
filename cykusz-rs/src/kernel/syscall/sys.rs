@@ -90,16 +90,14 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
             if dir.ftype()? == FileType::Dir {
                 let task = current_task();
                 task.set_cwd(dir, path);
-                Ok(0)
+                return Ok(0);
             } else {
-                Err(SyscallError::NotDir)
+                return Err(SyscallError::NotDir);
             }
-        } else {
-            Err(SyscallError::Inval)
         }
-    } else {
-        Err(SyscallError::Inval)
     }
+
+    Err(SyscallError::Inval)
 }
 
 pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
@@ -117,30 +115,21 @@ pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
 
 pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        let path = path.trim_end_matches("/");
-        let containing_dir = path.rfind("/");
+        let path = Path::new(path);
 
-        let (inode, name) = if containing_dir.is_none() {
-            (current_task().get_cwd().unwrap(), path)
-        } else {
-            let cdir = containing_dir.unwrap();
+        let (inode, name) = {
+            let (dir, target) = path.containing_dir();
 
-            if cdir == 0 {
-                (
-                    lookup_by_path(Path::new("/"), LookupMode::None)?,
-                    &path[cdir + 1..],
-                )
-            } else {
-                (
-                    lookup_by_path(Path::new(&path[..cdir]), LookupMode::None)?,
-                    &path[cdir + 1..],
-                )
-            }
+            (lookup_by_path(dir, LookupMode::None)?, target)
         };
 
         if inode.ftype()? == FileType::Dir {
-            inode.mkdir(name)?;
-            Ok(0)
+            if !["", ".", ".."].contains(&name.str()) {
+                inode.mkdir(name.str())?;
+                Ok(0)
+            } else {
+                Err(SyscallError::Exists)
+            }
         } else {
             Err(SyscallError::NotDir)
         }

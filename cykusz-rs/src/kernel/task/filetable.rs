@@ -38,7 +38,7 @@ impl FileHandle {
         Ok(wrote)
     }
 
-    pub fn getdents(&self, buf: &mut [u8]) -> Result<usize> {
+    pub fn getdents(&self, mut buf: &mut [u8]) -> Result<usize> {
         let mut offset = 0usize;
 
         let struct_len = core::mem::size_of::<SysDirEntry>();
@@ -58,7 +58,7 @@ impl FileHandle {
                 sysd.reclen = struct_len + d.name.len();
                 sysd.off = offset + sysd.reclen;
 
-                if (buf.len() - offset) < sysd.reclen {
+                if buf.len() < sysd.reclen {
                     break offset;
                 }
 
@@ -66,14 +66,14 @@ impl FileHandle {
 
                 unsafe {
                     buf.as_mut_ptr()
-                        .offset(offset as isize)
                         .copy_from(&sysd as *const _ as *const u8, struct_len);
-                    buf.as_mut_ptr()
-                        .offset(offset as isize + struct_len as isize)
-                        .copy_from(d.name.as_ptr(), d.name.len());
+
+                    let sysd_ref = &mut *(buf.as_mut_ptr() as *mut SysDirEntry);
+                    sysd_ref.name.as_mut_ptr().copy_from(d.name.as_ptr(), d.name.len());
                 }
 
                 offset += sysd.reclen;
+                buf = &mut buf[sysd.reclen..];
             } else {
                 break offset;
             }

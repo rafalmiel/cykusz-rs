@@ -44,7 +44,7 @@ impl FileHandle {
         let struct_len = core::mem::size_of::<SysDirEntry>();
 
         Ok(loop {
-            let dentry = self.inode.dirent(self.offset.load(Ordering::SeqCst))?;
+            let dentry = self.inode.dirent(self.offset.fetch_add(1, Ordering::SeqCst))?;
 
             if let Some(d) = &dentry {
                 let mut sysd = SysDirEntry {
@@ -62,14 +62,15 @@ impl FileHandle {
                     break offset;
                 }
 
-                self.offset.fetch_add(1, Ordering::SeqCst);
-
                 unsafe {
                     buf.as_mut_ptr()
                         .copy_from(&sysd as *const _ as *const u8, struct_len);
 
                     let sysd_ref = &mut *(buf.as_mut_ptr() as *mut SysDirEntry);
-                    sysd_ref.name.as_mut_ptr().copy_from(d.name.as_ptr(), d.name.len());
+                    sysd_ref
+                        .name
+                        .as_mut_ptr()
+                        .copy_from(d.name.as_ptr(), d.name.len());
                 }
 
                 offset += sysd.reclen;

@@ -34,10 +34,11 @@ fn ls(path: &str) {
 
                 loop {
                     let dentry = unsafe {
-                        (buf.as_ptr().offset(offset) as *const SysDirEntry).read_unaligned()
+                        &*(buf.as_ptr().offset(offset) as *const SysDirEntry)
                     };
-                    let namebytes =
-                        &buf[offset as usize + struct_len..offset as usize + dentry.reclen];
+                    let namebytes = unsafe {
+                        core::slice::from_raw_parts(dentry.name.as_ptr(), dentry.reclen - struct_len)
+                    };
                     if let Ok(name) = core::str::from_utf8(namebytes) {
                         println!("{:<12} {:?}", name, dentry.typ);
                     } else {

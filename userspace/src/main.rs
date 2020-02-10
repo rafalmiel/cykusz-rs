@@ -62,7 +62,6 @@ fn ls(path: &str) {
 }
 
 fn exec(cmd: &str) {
-    let cmd = cmd.trim();
     if cmd.starts_with("cd ") {
         let path = &cmd[3..];
 
@@ -94,6 +93,8 @@ fn exec(cmd: &str) {
 
     } else if cmd == "ls" {
         ls(".")
+    } else if cmd == "cd" {
+        // do nothing for now, TODO: move  to home?
     } else {
         println!(
             "shell: {}: command not found",
@@ -107,14 +108,22 @@ fn main_cd() -> ! {
         let mut buf = [0u8; 256];
         let mut pwd = [0u8; 1024];
         let pwd_r = syscall::getcwd(pwd.as_mut_ptr(), pwd.len()).expect("Failed to get cwd");
+        let pwd_str = make_str(&pwd[0..pwd_r]);
 
-        print!("[root {}]# ", make_str(&pwd[0..pwd_r]));
+        let mut to_p = pwd_str.split("/").last().unwrap();
+        to_p = if to_p == "" { "/" } else { to_p };
+
+        print!("[root {}]# ", to_p);
 
         let r = syscall::read(1, buf.as_mut_ptr(), buf.len()).unwrap();
 
-        let cmd = make_str(&buf[..r]);
+        let cmd = make_str(&buf[..r]).trim();
 
-        exec(cmd);
+        if cmd == "pwd" {
+            println!("{}", pwd_str);
+        } else {
+            exec(cmd);
+        }
     }
 }
 

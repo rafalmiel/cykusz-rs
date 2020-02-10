@@ -61,23 +61,37 @@ fn ls(path: &str) {
 }
 
 fn exec(cmd: &str) {
-    if cmd.trim_start_matches(" ").starts_with("cd ") {
+    let cmd = cmd.trim();
+    if cmd.starts_with("cd ") {
         let path = &cmd[3..];
 
         if let Err(e) = syscall::chdir(path.trim()) {
             println!("Failed to change dir: {:?}", e);
         }
-    } else if cmd.trim_start_matches(" ").starts_with("mkdir ") {
+    } else if cmd.starts_with("mkdir ") {
         let path = &cmd[6..];
 
-        if let Err(e) = syscall::mkdir(path.trim()) {
-            println!("Failed to mkdir: {:?}", e);
+        for p in path.split_whitespace() {
+            if let Err(e) = syscall::mkdir(p.trim()) {
+                println!("Failed to mkdir: {:?}", e);
+            }
         }
-    } else if cmd.trim_start().starts_with("ls ") {
+    } else if cmd.starts_with("ls ") {
         let path = &cmd[3..];
+        let p = path.split_whitespace();
+        let print_hdr = path.contains(" ");
+        for (idx, name) in p.enumerate() {
+            let name=  name.trim();
+            if print_hdr {
+                if idx > 0 {
+                    println!("");
+                }
+                println!("{}:", name);
+            }
+            ls(name);
+        }
 
-        ls(path.trim());
-    } else if cmd.trim() == "ls" {
+    } else if cmd == "ls" {
         ls(".")
     } else {
         println!(

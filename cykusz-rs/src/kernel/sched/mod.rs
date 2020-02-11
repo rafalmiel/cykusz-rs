@@ -99,12 +99,12 @@ impl Scheduler {
         self.cpu_queues.leave_critical_section();
     }
 
-    fn current_task_finished(&self) {
+    fn current_task_finished(&self) -> !{
         let _g = IrqGuard::new();
 
         self.tasks
             .remove_task(CURRENT_TASK_ID.load(Ordering::SeqCst));
-        self.cpu_queues.current_task_finished();
+        self.cpu_queues.current_task_finished()
     }
 
     fn current_task(&self) -> Arc<Task> {
@@ -130,9 +130,8 @@ pub fn reschedule() -> bool {
     scheduler().reschedule()
 }
 
-pub fn task_finished() {
-    println!("Task finished?");
-    scheduler().current_task_finished();
+pub fn task_finished() -> !{
+    scheduler().current_task_finished()
 }
 
 pub fn create_task(fun: fn()) {

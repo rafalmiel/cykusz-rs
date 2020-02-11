@@ -18,6 +18,9 @@ bitflags! {
     }
 }
 
+pub const ADDRESS_MASK: usize = 0x000f_ffff_ffff_f000;
+pub const COUNTER_MASK: usize = 0x3ff0_0000_0000_0000;
+
 impl Entry {
     pub fn new_empty() -> Entry {
         Entry { bits: 0 }
@@ -62,7 +65,7 @@ impl Entry {
     }
 
     pub fn address(&self) -> PhysAddr {
-        PhysAddr(self.bits).align_down(crate::kernel::mm::PAGE_SIZE)
+        PhysAddr(self.bits & ADDRESS_MASK)
     }
 
     pub fn frame(&self) -> Option<Frame> {
@@ -84,5 +87,26 @@ impl Entry {
 
     pub fn set_flags(&mut self, flags: Entry) {
         self.insert(flags);
+    }
+
+    pub fn get_entry_count(&self) -> usize {
+        (self.bits & COUNTER_MASK) >> 52
+    }
+
+    pub fn set_entry_count(&mut self, count: usize) {
+        self.bits = (self.bits & !COUNTER_MASK) | (count << 52);
+    }
+
+    pub fn inc_entry_count(&mut self) {
+        let c = self.get_entry_count();
+        self.set_entry_count(c + 1);
+    }
+
+    pub fn dec_entry_count(&mut self) {
+        let c = self.get_entry_count();
+
+        assert_ne!(c, 0);
+
+        self.set_entry_count(c - 1);
     }
 }

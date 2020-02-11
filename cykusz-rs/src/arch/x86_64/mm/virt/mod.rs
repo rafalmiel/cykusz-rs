@@ -16,7 +16,11 @@ pub fn p4_table_addr() -> PhysAddr {
 }
 
 pub fn current_p4_table() -> &'static mut P4Table {
-    P4Table::new_mut_at_phys(p4_table_addr())
+    p4_table(p4_table_addr())
+}
+
+pub fn p4_table(addr: PhysAddr) -> &'static mut P4Table {
+    P4Table::new_mut_at_phys(addr)
 }
 
 pub fn flush(virt: VirtAddr) {

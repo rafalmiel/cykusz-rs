@@ -95,6 +95,8 @@ fn exec(cmd: &str) {
         ls(".")
     } else if cmd == "cd" {
         // do nothing for now, TODO: move to home?
+    } else if cmd == "exit" {
+        syscall::exit();
     } else {
         println!(
             "shell: {}: command not found",

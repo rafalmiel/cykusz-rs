@@ -44,7 +44,9 @@ impl FileHandle {
         let struct_len = core::mem::size_of::<SysDirEntry>();
 
         Ok(loop {
-            let dentry = self.inode.dirent(self.offset.fetch_add(1, Ordering::SeqCst))?;
+            let dentry = self
+                .inode
+                .dirent(self.offset.fetch_add(1, Ordering::SeqCst))?;
 
             if let Some(d) = &dentry {
                 let mut sysd = SysDirEntry {

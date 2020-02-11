@@ -3,6 +3,7 @@ use core::ptr::Unique;
 use crate::arch::gdt;
 use crate::arch::mm::virt::p4_table_addr;
 use crate::arch::raw::segmentation::SegmentSelector;
+use crate::arch::x86_64::mm::virt::p4_table;
 use crate::arch::x86_64::mm::virt::table::P4Table;
 use crate::arch::x86_64::mm::PAGE_SIZE;
 use crate::kernel::mm::heap::allocate_align as heap_allocate_align;
@@ -338,6 +339,13 @@ impl Task {
     }
 
     pub fn deallocate(&mut self) {
+        let cr3 = unsafe {
+            self.ctx.as_ref().cr3
+        };
+
+        let p4 = p4_table(PhysAddr(cr3));
+        p4.deallocate_user();
+
         self.ctx = Unique::empty();
         heap_deallocate_align(self.stack_top as *mut u8, self.stack_size, 4096);
         self.stack_top = 0;

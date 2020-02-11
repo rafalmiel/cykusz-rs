@@ -66,12 +66,14 @@ impl CpuQueue {
         }
     }
 
-    fn activate_sched(&self, lock: MutexGuard<()>) {
+    fn activate_sched(&self, lock: MutexGuard<()>) -> ! {
         drop(lock);
 
         unsafe {
-            activate_task!(&self.sched_task);
+            activate_task!(&self.sched_task)
         }
+
+        unreachable!()
     }
 
     fn finalize(&self) {
@@ -162,9 +164,10 @@ impl CpuQueue {
         }
     }
 
-    pub fn current_task_finished(&mut self, lock: MutexGuard<()>) {
+    pub fn current_task_finished(&mut self, lock: MutexGuard<()>) -> ! {
+        //println!("Strong count: {}", Arc::strong_count(&self.tasks[self.current]));
         self.tasks[self.current].set_state(TaskState::ToDelete);
-        self.activate_sched(lock);
+        self.activate_sched(lock)
     }
 
     pub fn add_task(&mut self, task: Arc<Task>) {

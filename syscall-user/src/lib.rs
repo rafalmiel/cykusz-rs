@@ -117,6 +117,14 @@ pub fn getdents(fd: usize, buf: *mut u8, len: usize) -> SyscallResult {
     unsafe { syscall3(SYS_GETDENTS, fd as usize, buf as usize, len) }
 }
 
+pub fn exit() -> ! {
+    unsafe {
+        syscall0(SYS_EXIT);
+    }
+
+    unreachable!()
+}
+
 pub fn print(v: &str) {
     write(0, v.as_ptr(), v.len()).unwrap();
 }

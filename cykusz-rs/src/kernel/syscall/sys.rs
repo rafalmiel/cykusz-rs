@@ -148,3 +148,7 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
         Err(SyscallError::BadFD)
     };
 }
+
+pub fn sys_exit() -> ! {
+    crate::kernel::sched::task_finished()
+}

@@ -34,7 +34,7 @@ run: $(iso)
 	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -m 512 -smp cpus=4 -no-shutdown
 
 debug: $(iso)
-	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -s -S -smp cpus=4 -no-shutdown
+	qemu-system-x86_64 -drive format=raw,file=$(iso) -no-reboot -s -S -smp cpus=1 -no-shutdown
 
 gdb:
 	@rust-gdb "$(kernel)" -ex "target remote :1234"

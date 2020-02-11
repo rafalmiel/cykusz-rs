@@ -11,6 +11,7 @@ pub const SYS_CHDIR: usize = 4;
 pub const SYS_GETCWD: usize = 5;
 pub const SYS_MKDIR: usize = 6;
 pub const SYS_GETDENTS: usize = 7;
+pub const SYS_EXIT: usize = 8;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

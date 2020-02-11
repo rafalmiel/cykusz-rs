@@ -99,18 +99,22 @@ impl Scheduler {
         self.cpu_queues.leave_critical_section();
     }
 
-    fn current_task_finished(&self) -> !{
+    fn current_task_finished(&self) -> ! {
         let _g = IrqGuard::new();
 
         self.tasks
-            .remove_task(CURRENT_TASK_ID.load(Ordering::SeqCst));
+            .remove_task(current_id());
         self.cpu_queues.current_task_finished()
     }
 
     fn current_task(&self) -> Arc<Task> {
         let _g = IrqGuard::new();
 
-        self.cpu_queues.current_task()
+        if crate::kernel::tls::is_ready() {
+            self.tasks.get_task(current_id())
+        } else {
+            self.cpu_queues.current_task()
+        }
     }
 }
 
@@ -130,7 +134,7 @@ pub fn reschedule() -> bool {
     scheduler().reschedule()
 }
 
-pub fn task_finished() -> !{
+pub fn task_finished() -> ! {
     scheduler().current_task_finished()
 }
 

@@ -125,7 +125,7 @@ fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, V
     }
 
     // Map stack
-    for a in (VirtAddr(0x7fffffffc000)..=VirtAddr(0x7ffffffff000)).step_by(PAGE_SIZE) {
+    for a in (VirtAddr(0x7fffffffc000)..VirtAddr(0x800000000000)).step_by(PAGE_SIZE) {
         new_p4.map_flags(
             a,
             virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,
@@ -354,7 +354,6 @@ impl Task {
 
 extern "C" {
     pub fn switch_to(old_ctx: &mut Unique<Context>, new_ctx: &Context);
-    pub fn activate_to(new_ctx: &Context);
     fn isr_return();
     fn asm_sysretq_userinit();
 }
@@ -365,14 +364,5 @@ pub fn switch(from: &mut Task, to: &Task) {
             crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
         switch_to(&mut from.ctx, to.ctx.as_ref());
-    }
-}
-
-pub fn activate_task(to: &Task) {
-    unsafe {
-        if to.is_user {
-            crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
-        }
-        activate_to(to.ctx.as_ref());
     }
 }

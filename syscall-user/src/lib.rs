@@ -119,7 +119,7 @@ pub fn getdents(fd: usize, buf: *mut u8, len: usize) -> SyscallResult {
 
 pub fn exit() -> ! {
     unsafe {
-        syscall0(SYS_EXIT);
+        syscall0(SYS_EXIT).expect("Failed to exit");
     }
 
     unreachable!()

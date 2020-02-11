@@ -150,5 +150,6 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
 }
 
 pub fn sys_exit() -> ! {
+    crate::task_test::start();
     crate::kernel::sched::task_finished()
 }

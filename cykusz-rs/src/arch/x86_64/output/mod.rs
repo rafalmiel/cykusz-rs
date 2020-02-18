@@ -54,6 +54,7 @@ pub fn register_console_driver(driver: ConsoleDriverType) {
 }
 
 pub fn init() {
+    crate::arch::dev::serial::init();
     crate::drivers::video::vga::init();
     let w = writer();
     w.clear()

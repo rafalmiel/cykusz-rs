@@ -5,6 +5,7 @@ pub mod lapic;
 pub mod pic;
 pub mod pit;
 pub mod rtc;
+pub mod serial;
 
 pub fn init() {
     pic::init();

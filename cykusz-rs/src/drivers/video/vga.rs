@@ -203,6 +203,7 @@ impl Writer {
 
 impl ConsoleDriver for Writer {
     fn write_str(&self, s: &str) -> ::core::fmt::Result {
+        crate::arch::dev::serial::write(s);
         self.state.lock().write_str(s)
     }
 

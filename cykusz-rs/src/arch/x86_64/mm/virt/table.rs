@@ -5,7 +5,7 @@ use crate::arch::x86_64::mm::phys::PhysPage;
 use crate::kernel::mm::virt;
 use crate::kernel::mm::Frame;
 use crate::kernel::mm::*;
-use crate::kernel::sync::MutexGuard;
+use crate::kernel::sync::SpinGuard;
 
 use super::page;
 
@@ -276,7 +276,7 @@ impl Table<Level1> {
 }
 
 impl Table<Level4> {
-    fn lock(&self) -> Option<MutexGuard<'static, ()>> {
+    fn lock(&self) -> Option<SpinGuard<'static, ()>> {
         if let Some(pp) = self.phys_page() {
             Some(pp.lock_pt())
         } else {

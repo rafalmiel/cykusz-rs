@@ -91,6 +91,12 @@ impl<T: RsdtPtrType> Rsdt<T> {
     pub fn find_hpet_entry(&'static self) -> Option<&'static HpetHeader> {
         Some(self.find_entry(b"HPET")?.into_hpet())
     }
+
+    pub fn print_tables(&'static self) {
+        self.entries().for_each(|e| {
+            println!("{}", core::str::from_utf8(&e.signature).unwrap());
+        })
+    }
 }
 
 impl<T: RsdtPtrType> Iterator for RsdtIter<T> {

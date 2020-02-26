@@ -2,17 +2,17 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
 
 use crate::kernel::mm::MappedAddr;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 use crate::kernel::task::Task;
 
 pub struct TaskContainer {
-    tasks: Mutex<BTreeMap<usize, Arc<Task>>>,
+    tasks: Spin<BTreeMap<usize, Arc<Task>>>,
 }
 
 impl Default for TaskContainer {
     fn default() -> TaskContainer {
         TaskContainer {
-            tasks: Mutex::new(BTreeMap::new()),
+            tasks: Spin::new(BTreeMap::new()),
         }
     }
 }

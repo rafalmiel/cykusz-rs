@@ -6,7 +6,7 @@ use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
-use crate::kernel::sync::RwLock;
+use crate::kernel::sync::RwSpin;
 
 const FILE_NUM: usize = 256;
 
@@ -85,7 +85,7 @@ impl FileHandle {
 }
 
 pub struct FileTable {
-    files: RwLock<Vec<Option<Arc<FileHandle>>>>,
+    files: RwSpin<Vec<Option<Arc<FileHandle>>>>,
 }
 
 impl Default for FileTable {
@@ -100,7 +100,7 @@ impl FileTable {
         files.resize(FILE_NUM, None);
 
         FileTable {
-            files: RwLock::new(files),
+            files: RwSpin::new(files),
         }
     }
 

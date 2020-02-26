@@ -10,7 +10,7 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::root_inode;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::new_task_id;
-use crate::kernel::sync::RwLock;
+use crate::kernel::sync::RwSpin;
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
 
@@ -50,7 +50,7 @@ pub struct Task {
     state: AtomicUsize,
     locks: AtomicUsize,
     filetable: filetable::FileTable,
-    cwd: RwLock<Cwd>,
+    cwd: RwSpin<Cwd>,
 }
 
 impl Default for Task {
@@ -62,7 +62,7 @@ impl Default for Task {
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
             filetable: filetable::FileTable::new(),
-            cwd: RwLock::new(Cwd::new("/", root_inode().self_inode())),
+            cwd: RwSpin::new(Cwd::new("/", root_inode().self_inode())),
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::arch::x86_64::raw::cpuio::Port;
 use spin::Once;
-use crate::kernel::sync::{Mutex, MutexGuard};
+use crate::kernel::sync::{Spin, SpinGuard};
 
 struct Serial {
     data: Port<u8>,
@@ -48,7 +48,7 @@ impl Serial {
     }
 }
 
-static SERIAL: Once<Mutex<Serial>> = Once::new();
+static SERIAL: Once<Spin<Serial>> = Once::new();
 
 pub fn init() {
     SERIAL.call_once(|| {
@@ -58,11 +58,11 @@ pub fn init() {
 
         s.init();
 
-        Mutex::new(s)
+        Spin::new(s)
     });
 }
 
-fn serial<'a>() -> MutexGuard<'a, Serial> {
+fn serial<'a>() -> SpinGuard<'a, Serial> {
     SERIAL.r#try().unwrap().lock_irq()
 }
 

@@ -10,13 +10,13 @@
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
 #![feature(nll)]
+#![feature(linkage)]
 
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
 extern crate lazy_static;
-extern crate rlibc;
 
 use crate::kernel::mm::VirtAddr;
 
@@ -30,6 +30,7 @@ pub mod kernel;
 mod drivers;
 pub mod lang_items;
 pub mod task_test;
+mod externs;
 
 #[thread_local]
 static mut CPU_ID: u8 = 0;
@@ -44,6 +45,8 @@ pub fn rust_main(stack_top: VirtAddr) {
     kernel::mm::init();
 
     println!("[ OK ] Heap Initialised");
+
+    arch::acpi::init_mem();
 
     arch::mm::phys::init_pages();
 

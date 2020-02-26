@@ -1,7 +1,7 @@
 use crate::arch::raw::idt;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
-static IDT: Mutex<idt::Idt> = Mutex::new(idt::Idt::new());
+static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
 
 pub fn init() {
     let mut idt = IDT.lock();

@@ -1,0 +1,30 @@
+SRCDIR := acpica/source/
+OBJDIR := $(OUT_DIR).obj/$(TARGET)/
+
+SRCS := $(wildcard $(SRCDIR)components/*/*.c)
+SRCS := $(filter-out $(SRCDIR)components/disassembler/%,$(SRCS))
+OBJS := $(SRCS:$(SRCDIR)%.c=$(OBJDIR)%.o)
+
+CPPFLAGS := -I $(SRCDIR)include/ -D CYKUSZ -DACPI_LIBRARY
+CFLAGS := -ffreestanding -Wno-redundant-decls -Wno-unused-function
+CFLAGS += -O2
+
+.PHONY: all clean srcdir
+
+all: acpica $(OUT_DIR)/libacpica-$(TARGET).a
+
+clean:
+	rm -rf $(OUT_DIR)libacpica-$(TARGET).a $(OBJDIR)
+
+$(OUT_DIR)/libacpica-$(TARGET).a: $(SRCDIR) $(OBJS)
+	@echo [AR] $@
+	@rm -f $@ && ar rc $@ $(OBJS)
+
+acpica:
+	git submodule update --init
+	cd acpica && git am ../0001-cykusz-patch.patch
+
+$(OBJDIR)%.o: $(SRCDIR)%.c _Makefile
+	@mkdir -p $(dir $@)
+	@echo [GCC] -o $@
+	@gcc -m64 -o $@ -c $< $(CFLAGS) $(CPPFLAGS) -mcmodel=large -fno-builtin -fno-stack-protector -mno-red-zone -nostdlib

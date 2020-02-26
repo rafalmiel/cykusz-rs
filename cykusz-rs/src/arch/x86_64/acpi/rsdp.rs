@@ -3,6 +3,7 @@ use core::mem::size_of;
 use crate::arch::acpi;
 use crate::arch::mm::*;
 
+#[derive(Debug)]
 pub enum Address {
     Rsdp(MappedAddr),
     Xsdp(MappedAddr),

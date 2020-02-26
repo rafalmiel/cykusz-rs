@@ -1,14 +1,14 @@
 use alloc::sync::Arc;
 use core::cell::UnsafeCell;
 
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 use crate::kernel::task::Task;
 use crate::kernel::utils::PerCpu;
 
 use super::CpuQueue;
 
 pub struct CpuQueues {
-    cpu_queues_locks: PerCpu<Mutex<()>>,
+    cpu_queues_locks: PerCpu<Spin<()>>,
     cpu_queues: PerCpu<UnsafeCell<CpuQueue>>,
 }
 
@@ -17,7 +17,7 @@ unsafe impl Sync for CpuQueues {}
 impl Default for CpuQueues {
     fn default() -> CpuQueues {
         CpuQueues {
-            cpu_queues_locks: PerCpu::new_fn(|| Mutex::<()>::new(())),
+            cpu_queues_locks: PerCpu::new_fn(|| Spin::<()>::new(())),
             cpu_queues: PerCpu::new_fn(|| UnsafeCell::new(CpuQueue::default())),
         }
     }

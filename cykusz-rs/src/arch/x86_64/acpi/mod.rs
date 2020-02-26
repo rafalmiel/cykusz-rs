@@ -1,15 +1,18 @@
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
 use self::rsdp::Address;
 use self::rsdt::Rsdt;
+use crate::kernel::int::disable;
+use bitflags::_core::mem::MaybeUninit;
 
 pub mod apic;
 pub mod hpet;
 mod rsdp;
 mod rsdt;
 mod util;
+mod os;
 
-pub static ACPI: Mutex<Acpi> = Mutex::new(Acpi::new());
+pub static ACPI: Spin<Acpi> = Spin::new(Acpi::new());
 
 enum Header {
     RSDT(Option<&'static Rsdt<u32>>),
@@ -51,6 +54,15 @@ impl Acpi {
             }
         }
     }
+    pub fn print_tables(&self) {
+        match self.hdr {
+            Header::RSDT(ref r) => r.unwrap().print_tables(),
+            Header::XSDT(ref r) => r.unwrap().print_tables(),
+            _ => {
+                panic!("ACPI Not Initialised");
+            }
+        }
+    }
 
     pub fn get_irq_mapping(&mut self, irq: u32) -> u32 {
         let apic = self.get_apic_entry().expect("APIC Entry not found");
@@ -67,5 +79,32 @@ pub fn init() {
     let acpi = &mut *ACPI.lock();
     let res = acpi.init();
 
+    acpi.print_tables();
+    //loop{}
+
     println!("[ OK ] ACPI Found...? {}", if res { "YES" } else { "NO" });
+}
+
+pub fn init_mem() {
+
+    unsafe {
+        //acpica::AcpiInitializeSubsystem();
+        //println!("init tables: {}", acpica::AcpiInitializeTables(0 as *mut _, 16, false));
+        //acpica::AcpiLoadTables();
+        //acpica::AcpiEnableSubsystem(0);
+
+        //acpica::AcpiEnterSleepStatePrep(5);
+        //disable();
+        //acpica::AcpiEnterSleepState(5);
+        //panic!("power off");
+
+        //let mut hdr: *mut acpica::ACPI_TABLE_HEADER = core::ptr::null_mut();
+
+        //println!("{}", acpica::AcpiGetTable(b"HPET".as_ptr() as *mut i8, 1, &mut hdr as *mut *mut acpica::ACPI_TABLE_HEADER));
+
+        //println!("{:?}", unsafe {
+        //    *hdr
+        //});
+    }
+
 }

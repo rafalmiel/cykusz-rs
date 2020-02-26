@@ -14,19 +14,19 @@ use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Result};
 use crate::kernel::fs::vfs::{FsError, Metadata};
-use crate::kernel::sync::{Mutex, RwLock};
+use crate::kernel::sync::{Spin, RwSpin};
 
-struct LockedRamINode(RwLock<RamINode>);
+struct LockedRamINode(RwSpin<RamINode>);
 
 enum Content {
-    Bytes(Mutex<Vec<u8>>),
+    Bytes(Spin<Vec<u8>>),
     DevNode(Option<Arc<DevNode>>),
     None,
 }
 
 impl Default for Content {
     fn default() -> Self {
-        Content::Bytes(Mutex::new(Vec::new()))
+        Content::Bytes(Spin::new(Vec::new()))
     }
 }
 
@@ -255,7 +255,7 @@ impl Filesystem for RamFS {
 
 impl RamFS {
     pub fn new() -> Arc<RamFS> {
-        let root = Arc::new(LockedRamINode(RwLock::new(RamINode::default())));
+        let root = Arc::new(LockedRamINode(RwSpin::new(RamINode::default())));
 
         let fs = Arc::new(RamFS {
             root: root.clone(),
@@ -274,7 +274,7 @@ impl RamFS {
     }
 
     fn alloc_inode(&self, typ: FileType) -> Arc<LockedRamINode> {
-        let inode = Arc::new(LockedRamINode(RwLock::new(RamINode {
+        let inode = Arc::new(LockedRamINode(RwSpin::new(RamINode {
             id: self.alloc_id(),
             name: String::new(),
             typ,
@@ -284,7 +284,7 @@ impl RamFS {
             fs: Weak::default(),
             content: match typ {
                 FileType::DevNode => Content::DevNode(None),
-                FileType::File => Content::Bytes(Mutex::new(Vec::new())),
+                FileType::File => Content::Bytes(Spin::new(Vec::new())),
                 FileType::Dir => Content::None,
             },
         })));

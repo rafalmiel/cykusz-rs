@@ -6,7 +6,7 @@ use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
 use crate::kernel::fs::inode::INode;
-use crate::kernel::sync::RwLock;
+use crate::kernel::sync::RwSpin;
 
 pub trait Device: Send + Sync {
     fn id(&self) -> usize;
@@ -17,8 +17,8 @@ pub trait Device: Send + Sync {
 static FREE_DEV_ID: AtomicUsize = AtomicUsize::new(1);
 
 lazy_static! {
-    static ref DEVICES: RwLock<BTreeMap<usize, Arc<dyn Device>>> = RwLock::new(BTreeMap::new());
-    static ref DEVICE_LISTEMERS: RwLock<Vec<Arc<dyn DeviceListener>>> = RwLock::new(Vec::new());
+    static ref DEVICES: RwSpin<BTreeMap<usize, Arc<dyn Device>>> = RwSpin::new(BTreeMap::new());
+    static ref DEVICE_LISTEMERS: RwSpin<Vec<Arc<dyn DeviceListener>>> = RwSpin::new(Vec::new());
 }
 
 #[derive(Debug)]
@@ -60,6 +60,6 @@ pub fn register_device_listener(listener: Arc<dyn DeviceListener>) {
     l.push(listener);
 }
 
-pub fn devices() -> &'static RwLock<BTreeMap<usize, Arc<dyn Device>>> {
+pub fn devices() -> &'static RwSpin<BTreeMap<usize, Arc<dyn Device>>> {
     &DEVICES
 }

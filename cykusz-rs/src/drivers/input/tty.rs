@@ -10,7 +10,7 @@ use crate::drivers::input::KeyListener;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 struct State {
@@ -117,8 +117,8 @@ impl Buffer {
 
 struct Tty {
     dev_id: usize,
-    state: Mutex<State>,
-    buffer: Mutex<Buffer>,
+    state: Spin<State>,
+    buffer: Spin<Buffer>,
     wait_queue: WaitQueue,
     self_ptr: Weak<Tty>,
 }
@@ -163,8 +163,8 @@ impl Tty {
     fn new() -> Tty {
         Tty {
             dev_id: crate::kernel::device::alloc_id(),
-            state: Mutex::new(State::new()),
-            buffer: Mutex::new(Buffer::new()),
+            state: Spin::new(State::new()),
+            buffer: Spin::new(Buffer::new()),
             wait_queue: WaitQueue::new(),
             self_ptr: Weak::default(),
         }

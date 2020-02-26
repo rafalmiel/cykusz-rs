@@ -3,9 +3,9 @@ use core::ptr::write_volatile;
 
 use crate::arch::acpi::apic::MatdHeader;
 use crate::kernel::mm::*;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
-pub static IOAPIC: Mutex<IOApic> = Mutex::new(IOApic::new());
+pub static IOAPIC: Spin<IOApic> = Spin::new(IOApic::new());
 
 const REG_ID: u32 = 0x00;
 const REG_VER: u32 = 0x01;

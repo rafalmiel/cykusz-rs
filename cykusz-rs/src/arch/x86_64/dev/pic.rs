@@ -1,7 +1,7 @@
 use crate::arch::raw::cpuio::{Port, UnsafePort};
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
-pub static PIC: Mutex<ChainedPics> = Mutex::new(unsafe { ChainedPics::new(0x20, 0x28) });
+pub static PIC: Spin<ChainedPics> = Spin::new(unsafe { ChainedPics::new(0x20, 0x28) });
 
 // Cmd sent to begin PIC initialization
 const CMD_INIT: u8 = 0x11;

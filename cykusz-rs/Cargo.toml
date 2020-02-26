@@ -11,11 +11,13 @@ crate-type = ["staticlib"]
 bitflags = "*"
 linked_list_allocator = "*"
 raw-cpuid = "*"
-rlibc = "*"
 spin = "*"
 
 [dependencies.syscall-defs]
 path = "../syscall-defs"
+
+[dependencies.acpica]
+path = "../acpica"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

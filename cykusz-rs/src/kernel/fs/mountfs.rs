@@ -5,12 +5,12 @@ use alloc::sync::{Arc, Weak};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Metadata, Result};
-use crate::kernel::sync::RwLock;
+use crate::kernel::sync::RwSpin;
 
 #[allow(dead_code)]
 pub struct MountFS {
     fs: Arc<dyn Filesystem>,
-    mounts: RwLock<BTreeMap<usize, Arc<MountFS>>>,
+    mounts: RwSpin<BTreeMap<usize, Arc<MountFS>>>,
     self_mount: Option<Arc<MNode>>,
     self_ref: Weak<MountFS>,
 }
@@ -29,7 +29,7 @@ impl MountFS {
     pub fn new(fs: Arc<dyn Filesystem>) -> Arc<MountFS> {
         MountFS {
             fs,
-            mounts: RwLock::new(BTreeMap::new()),
+            mounts: RwSpin::new(BTreeMap::new()),
             self_mount: None,
             self_ref: Weak::default(),
         }
@@ -77,7 +77,7 @@ impl MNode {
     pub fn mount(&self, fs: Arc<dyn Filesystem>) -> Result<Arc<MountFS>> {
         let fs = MountFS {
             fs,
-            mounts: RwLock::new(BTreeMap::new()),
+            mounts: RwSpin::new(BTreeMap::new()),
             self_mount: Some(self.self_ref.upgrade().unwrap()),
             self_ref: Weak::default(),
         }

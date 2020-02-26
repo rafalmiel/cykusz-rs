@@ -1,6 +1,6 @@
 use core::fmt::Error;
 
-use crate::kernel::sync::{Mutex, MutexGuard};
+use crate::kernel::sync::{Spin, SpinGuard};
 
 pub trait ConsoleDriver: Sync + Send {
     fn write_str(&self, s: &str) -> Result<(), Error>;
@@ -10,7 +10,7 @@ pub trait ConsoleDriver: Sync + Send {
 
 pub struct OutputWriter {}
 
-static OUTPUT_WRITER: Mutex<OutputWriter> = Mutex::new(OutputWriter {});
+static OUTPUT_WRITER: Spin<OutputWriter> = Spin::new(OutputWriter {});
 
 impl core::fmt::Write for OutputWriter {
     fn write_str(&mut self, s: &str) -> Result<(), Error> {
@@ -41,13 +41,13 @@ impl ConsoleDriver for OutputWriter {
     }
 }
 
-pub fn writer<'a>() -> MutexGuard<'a, OutputWriter> {
+pub fn writer<'a>() -> SpinGuard<'a, OutputWriter> {
     OUTPUT_WRITER.lock_irq()
 }
 
 type ConsoleDriverType = &'static dyn ConsoleDriver;
 
-static WRITER: Mutex<Option<ConsoleDriverType>> = Mutex::new(None);
+static WRITER: Spin<Option<ConsoleDriverType>> = Spin::new(None);
 
 pub fn register_console_driver(driver: ConsoleDriverType) {
     *WRITER.lock() = Some(driver);

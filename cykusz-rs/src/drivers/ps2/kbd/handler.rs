@@ -1,10 +1,10 @@
 use crate::drivers::ps2::{controller, PS2Controller};
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
 use super::scancode;
 
 struct KbdState {
-    state: Mutex<State>,
+    state: Spin<State>,
 }
 
 struct State {
@@ -19,7 +19,7 @@ impl State {
 }
 
 static KEYBOARD: KbdState = KbdState {
-    state: Mutex::new(State::new()),
+    state: Spin::new(State::new()),
 };
 
 impl KbdState {

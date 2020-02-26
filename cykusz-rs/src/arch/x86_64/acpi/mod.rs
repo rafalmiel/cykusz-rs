@@ -2,6 +2,8 @@ use crate::kernel::sync::Spin;
 
 use self::rsdp::Address;
 use self::rsdt::Rsdt;
+use crate::kernel::int::disable;
+use bitflags::_core::mem::MaybeUninit;
 
 pub mod apic;
 pub mod hpet;
@@ -78,6 +80,7 @@ pub fn init() {
     let res = acpi.init();
 
     acpi.print_tables();
+    //loop{}
 
     println!("[ OK ] ACPI Found...? {}", if res { "YES" } else { "NO" });
 }
@@ -85,10 +88,23 @@ pub fn init() {
 pub fn init_mem() {
 
     unsafe {
-        acpica::AcpiInitializeSubsystem();
-        acpica::AcpiInitializeTables(0 as *mut _, 16, false);
-        acpica::AcpiLoadTables();
-        acpica::AcpiEnableSubsystem(0);
+        //acpica::AcpiInitializeSubsystem();
+        //println!("init tables: {}", acpica::AcpiInitializeTables(0 as *mut _, 16, false));
+        //acpica::AcpiLoadTables();
+        //acpica::AcpiEnableSubsystem(0);
+
+        //acpica::AcpiEnterSleepStatePrep(5);
+        //disable();
+        //acpica::AcpiEnterSleepState(5);
+        //panic!("power off");
+
+        //let mut hdr: *mut acpica::ACPI_TABLE_HEADER = core::ptr::null_mut();
+
+        //println!("{}", acpica::AcpiGetTable(b"HPET".as_ptr() as *mut i8, 1, &mut hdr as *mut *mut acpica::ACPI_TABLE_HEADER));
+
+        //println!("{:?}", unsafe {
+        //    *hdr
+        //});
     }
 
 }

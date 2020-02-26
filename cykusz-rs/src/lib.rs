@@ -11,6 +11,8 @@
 #![feature(optin_builtin_traits)]
 #![feature(nll)]
 #![feature(linkage)]
+#![feature(c_variadic)]
+#![feature(maybe_uninit_ref)]
 
 extern crate alloc;
 #[macro_use]

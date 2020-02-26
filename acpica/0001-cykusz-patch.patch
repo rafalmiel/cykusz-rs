@@ -1,14 +1,14 @@
-From ccf7a602b826283a5016f4793f6f44715e1d9fc3 Mon Sep 17 00:00:00 2001
+From 04a518e80a7c2cb5dedc05d17a5a0092d8e8078c Mon Sep 17 00:00:00 2001
 From: Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>
 Date: Wed, 26 Feb 2020 15:54:34 +0000
 Subject: [PATCH] cykusz patch
 
 ---
  source/components/utilities/utclib.c |  3 ++-
- source/include/acclib.h              |  8 ++++----
- source/include/platform/accykusz.h   | 22 ++++++++++++++++++++++
+ source/include/acclib.h              |  8 +++----
+ source/include/platform/accykusz.h   | 31 ++++++++++++++++++++++++++++
  source/include/platform/acenv.h      |  5 ++++-
- 4 files changed, 32 insertions(+), 6 deletions(-)
+ 4 files changed, 41 insertions(+), 6 deletions(-)
  create mode 100644 source/include/platform/accykusz.h
 
 diff --git a/source/components/utilities/utclib.c b/source/components/utilities/utclib.c
@@ -68,10 +68,10 @@ index 4717f878f..59917576a 100644
      int                     Value,
 diff --git a/source/include/platform/accykusz.h b/source/include/platform/accykusz.h
 new file mode 100644
-index 000000000..2e93dd82f
+index 000000000..4509c8755
 --- /dev/null
 +++ b/source/include/platform/accykusz.h
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,31 @@
 +#ifndef __ACCYKUSZ_H__
 +#define __ACCYKUSZ_H__
 +
@@ -92,6 +92,15 @@ index 000000000..2e93dd82f
 +
 +#undef ACPI_USE_STANDARD_HEADERS
 +#undef ACPI_USE_SYSTEM_CLIBRARY
++
++// Make AcpiOsPrintf call AcpiOsVprintf, which rust can then handle
++extern void AcpiOsVprintf(const char *fmt, va_list args);
++static inline void AcpiOsPrintf(const char *fmt, ...) {
++	va_list	args;
++	va_start(args, fmt);
++	AcpiOsVprintf(fmt, args);
++	va_end(args);
++}
 +
 +#endif /* __ACCYKUSZ_H__ */
 diff --git a/source/include/platform/acenv.h b/source/include/platform/acenv.h

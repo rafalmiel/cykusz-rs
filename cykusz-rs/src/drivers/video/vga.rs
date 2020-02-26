@@ -3,7 +3,7 @@ use core::ptr::Unique;
 use crate::arch::output::ConsoleDriver;
 use crate::arch::raw::cpuio::Port;
 use crate::kernel::mm::MappedAddr;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
 #[allow(unused)]
 #[repr(u8)]
@@ -44,8 +44,8 @@ struct ScreenChar {
 
 const VGA_BUFFER: MappedAddr = MappedAddr(0xffff8000000b8000);
 
-static CURSOR_INDEX: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D4) });
-static CURSOR_DATA: Mutex<Port<u8>> = Mutex::new(unsafe { Port::new(0x3D5) });
+static CURSOR_INDEX: Spin<Port<u8>> = Spin::new(unsafe { Port::new(0x3D4) });
+static CURSOR_DATA: Spin<Port<u8>> = Spin::new(unsafe { Port::new(0x3D5) });
 
 fn update_cursor(offset: u16) {
     let idx = &mut *CURSOR_INDEX.lock_irq();
@@ -73,7 +73,7 @@ struct State {
 }
 
 pub struct Writer {
-    state: Mutex<State>,
+    state: Spin<State>,
 }
 
 fn mk_scr_char(c: u8, clr: ColorCode) -> ScreenChar {
@@ -196,7 +196,7 @@ impl State {
 impl Writer {
     pub const fn new(fg: Color, bg: Color, buf: MappedAddr) -> Writer {
         Writer {
-            state: Mutex::new(State::new(fg, bg, buf)),
+            state: Spin::new(State::new(fg, bg, buf)),
         }
     }
 }

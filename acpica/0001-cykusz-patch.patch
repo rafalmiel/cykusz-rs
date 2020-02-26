@@ -1,0 +1,124 @@
+From 04a518e80a7c2cb5dedc05d17a5a0092d8e8078c Mon Sep 17 00:00:00 2001
+From: Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>
+Date: Wed, 26 Feb 2020 15:54:34 +0000
+Subject: [PATCH] cykusz patch
+
+---
+ source/components/utilities/utclib.c |  3 ++-
+ source/include/acclib.h              |  8 +++----
+ source/include/platform/accykusz.h   | 31 ++++++++++++++++++++++++++++
+ source/include/platform/acenv.h      |  5 ++++-
+ 4 files changed, 41 insertions(+), 6 deletions(-)
+ create mode 100644 source/include/platform/accykusz.h
+
+diff --git a/source/components/utilities/utclib.c b/source/components/utilities/utclib.c
+index ad3fc0920..5df25aff9 100644
+--- a/source/components/utilities/utclib.c
++++ b/source/components/utilities/utclib.c
+@@ -202,6 +202,7 @@
+ #ifndef ACPI_USE_SYSTEM_CLIBRARY    /* Entire module */
+ 
+ 
++#if 0
+ /*******************************************************************************
+  *
+  * FUNCTION:    memcmp
+@@ -371,7 +372,7 @@ memset (
+  * DESCRIPTION: Returns the length of the input string
+  *
+  ******************************************************************************/
+-
++#endif
+ 
+ ACPI_SIZE
+ strlen (
+diff --git a/source/include/acclib.h b/source/include/acclib.h
+index 4717f878f..59917576a 100644
+--- a/source/include/acclib.h
++++ b/source/include/acclib.h
+@@ -270,25 +270,25 @@ strtoul (
+ 
+ /* Memory */
+ 
+-int
++extern int
+ memcmp (
+     void                    *Buffer1,
+     void                    *Buffer2,
+     ACPI_SIZE               Count);
+ 
+-void *
++extern void *
+ memcpy (
+     void                    *Dest,
+     const void              *Src,
+     ACPI_SIZE               Count);
+ 
+-void *
++extern void *
+ memmove (
+     void                    *Dest,
+     const void              *Src,
+     ACPI_SIZE               Count);
+ 
+-void *
++extern void *
+ memset (
+     void                    *Dest,
+     int                     Value,
+diff --git a/source/include/platform/accykusz.h b/source/include/platform/accykusz.h
+new file mode 100644
+index 000000000..4509c8755
+--- /dev/null
++++ b/source/include/platform/accykusz.h
+@@ -0,0 +1,31 @@
++#ifndef __ACCYKUSZ_H__
++#define __ACCYKUSZ_H__
++
++#include "acgcc.h"
++
++#include <stdint.h>
++#include <stdarg.h>
++
++#define COMPILER_DEPENDENT_INT64    int64_t
++#define COMPILER_DEPENDENT_UINT64   uint64_t
++
++#define ACPI_MACHINE_WIDTH          64
++#define ACPI_SINGLE_THREADED
++
++#define ACPI_USE_NATIVE_DIVIDE
++
++#undef ACPI_DISASSEMBLER
++
++#undef ACPI_USE_STANDARD_HEADERS
++#undef ACPI_USE_SYSTEM_CLIBRARY
++
++// Make AcpiOsPrintf call AcpiOsVprintf, which rust can then handle
++extern void AcpiOsVprintf(const char *fmt, va_list args);
++static inline void AcpiOsPrintf(const char *fmt, ...) {
++	va_list	args;
++	va_start(args, fmt);
++	AcpiOsVprintf(fmt, args);
++	va_end(args);
++}
++
++#endif /* __ACCYKUSZ_H__ */
+diff --git a/source/include/platform/acenv.h b/source/include/platform/acenv.h
+index 15f0c1e86..16ab3b357 100644
+--- a/source/include/platform/acenv.h
++++ b/source/include/platform/acenv.h
+@@ -305,7 +305,10 @@
+ 
+ #endif
+ 
+-#if defined(_LINUX) || defined(__linux__)
++#if defined(CYKUSZ)
++#include "accykusz.h"
++
++#elif defined(_LINUX) || defined(__linux__)
+ #include "aclinux.h"
+ 
+ #elif defined(_APPLE) || defined(__APPLE__)
+-- 
+2.25.0
+

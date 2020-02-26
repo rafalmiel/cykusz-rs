@@ -5,7 +5,7 @@ use crate::drivers::multiboot2;
 use crate::drivers::multiboot2::memory::MemoryIter;
 use crate::kernel::mm::{Frame, PAGE_SIZE};
 use crate::kernel::mm::{MappedAddr, PhysAddr};
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
 use super::iter;
 
@@ -21,7 +21,7 @@ struct PhysAllocatorList {
     head: PhysAddr,
 }
 
-static PHYS_LIST: Mutex<PhysAllocatorList> = Mutex::new(PhysAllocatorList {
+static PHYS_LIST: Spin<PhysAllocatorList> = Spin::new(PhysAllocatorList {
     head: LIST_ADDR_INVALID,
 });
 

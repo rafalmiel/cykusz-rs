@@ -2,9 +2,9 @@ use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::raw::cpuio::UnsafePort;
 use crate::arch::raw::idt as ridt;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
-static PIT: Mutex<Pit> = Mutex::new(Pit::new());
+static PIT: Spin<Pit> = Spin::new(Pit::new());
 
 pub struct Pit {
     pit_ch0: UnsafePort<u8>,

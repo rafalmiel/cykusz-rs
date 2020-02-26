@@ -9,7 +9,7 @@ use crate::arch::mm::heap::{HEAP_END, HEAP_SIZE, HEAP_START};
 use crate::kernel::mm::map;
 use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::mm::*;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 
 pub fn init() {
     use crate::HEAP;
@@ -28,14 +28,14 @@ fn map_more_heap(from: *const u8, size: usize) {
     }
 }
 
-pub struct LockedHeap(pub Mutex<Heap>);
+pub struct LockedHeap(pub Spin<Heap>);
 
 pub static ALLOCED_MEM: AtomicUsize = AtomicUsize::new(0);
 
 impl LockedHeap {
     /// Creates an empty heap. All allocate calls will return `None`.
     pub const fn empty() -> LockedHeap {
-        LockedHeap(Mutex::new(Heap::empty()))
+        LockedHeap(Spin::new(Heap::empty()))
     }
 
     unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, AllocErr> {
@@ -60,9 +60,9 @@ impl LockedHeap {
 }
 
 impl Deref for LockedHeap {
-    type Target = Mutex<Heap>;
+    type Target = Spin<Heap>;
 
-    fn deref(&self) -> &Mutex<Heap> {
+    fn deref(&self) -> &Spin<Heap> {
         &self.0
     }
 }

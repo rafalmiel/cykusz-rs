@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::Ordering;
 
-use crate::kernel::sync::MutexGuard;
+use crate::kernel::sync::SpinGuard;
 use crate::kernel::task::{Task, TaskState};
 
 use super::CURRENT_TASK_ID;
@@ -47,7 +47,7 @@ impl Default for CpuQueue {
 }
 
 impl CpuQueue {
-    fn switch(&self, to: &Task, lock: MutexGuard<()>) {
+    fn switch(&self, to: &Task, lock: SpinGuard<()>) {
         drop(lock);
 
         self.finalize();
@@ -58,7 +58,7 @@ impl CpuQueue {
         }
     }
 
-    fn switch_to_sched(&self, from: &Task, lock: MutexGuard<()>) {
+    fn switch_to_sched(&self, from: &Task, lock: SpinGuard<()>) {
         drop(lock);
 
         unsafe {
@@ -71,11 +71,11 @@ impl CpuQueue {
         crate::kernel::timer::reset_counter();
     }
 
-    pub fn current_task(&self, _lock: MutexGuard<()>) -> Arc<Task> {
+    pub fn current_task(&self, _lock: SpinGuard<()>) -> Arc<Task> {
         self.tasks[self.current].clone()
     }
 
-    pub unsafe fn schedule_next(&mut self, sched_lock: MutexGuard<()>) {
+    pub unsafe fn schedule_next(&mut self, sched_lock: SpinGuard<()>) {
         if self.tasks[self.current].state() == TaskState::ToDelete {
             self.remove_task(self.current);
 
@@ -132,7 +132,7 @@ impl CpuQueue {
         self.switch(&self.tasks[found], sched_lock);
     }
 
-    pub fn reschedule(&mut self, sched_lock: MutexGuard<()>) -> bool {
+    pub fn reschedule(&mut self, sched_lock: SpinGuard<()>) -> bool {
         self.switch_to_sched(&self.tasks[self.current], sched_lock);
 
         return self.current != self.previous;
@@ -142,7 +142,7 @@ impl CpuQueue {
         self.tasks[self.current].locks_inc();
     }
 
-    pub fn leave_critical_section(&mut self, mutex: MutexGuard<()>) {
+    pub fn leave_critical_section(&mut self, mutex: SpinGuard<()>) {
         let t = &self.tasks[self.current];
 
         t.locks_dec();
@@ -154,7 +154,7 @@ impl CpuQueue {
         }
     }
 
-    pub fn current_task_finished(&mut self, lock: MutexGuard<()>) -> ! {
+    pub fn current_task_finished(&mut self, lock: SpinGuard<()>) -> ! {
         let task = &self.tasks[self.current];
 
         task.set_state(TaskState::ToDelete);

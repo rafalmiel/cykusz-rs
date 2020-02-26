@@ -5,7 +5,7 @@ use spin::Once;
 
 use crate::drivers::multiboot2;
 use crate::kernel::mm::{PhysAddr, PAGE_SIZE};
-use crate::kernel::sync::{Mutex, MutexGuard};
+use crate::kernel::sync::{Spin, SpinGuard};
 
 pub use self::alloc::allocate;
 pub use self::alloc::deallocate;
@@ -15,7 +15,7 @@ mod iter;
 
 #[repr(C)]
 pub struct PhysPage {
-    pt_lock: Mutex<()>,
+    pt_lock: Spin<()>,
 }
 
 impl PhysPage {
@@ -31,7 +31,7 @@ impl PhysPage {
         (self.this_addr() - Self::base_addr()) / core::mem::size_of::<Self>() * PAGE_SIZE
     }
 
-    pub fn lock_pt(&self) -> MutexGuard<()> {
+    pub fn lock_pt(&self) -> SpinGuard<()> {
         self.pt_lock.lock()
     }
 }
@@ -39,7 +39,7 @@ impl PhysPage {
 impl Default for PhysPage {
     fn default() -> Self {
         PhysPage {
-            pt_lock: Mutex::new(()),
+            pt_lock: Spin::new(()),
         }
     }
 }

@@ -2,17 +2,17 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::Spin;
 use crate::kernel::task::{Task, TaskState};
 
 pub struct WaitQueue {
-    tasks: Mutex<Vec<Weak<Task>>>,
+    tasks: Spin<Vec<Weak<Task>>>,
 }
 
 impl WaitQueue {
     pub const fn new() -> WaitQueue {
         WaitQueue {
-            tasks: Mutex::new(Vec::new()),
+            tasks: Spin::new(Vec::new()),
         }
     }
 

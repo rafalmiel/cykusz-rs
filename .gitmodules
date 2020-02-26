@@ -1,0 +1,3 @@
+[submodule "acpica/acpica"]
+	path = acpica/acpica
+	url = https://github.com/acpica/acpica

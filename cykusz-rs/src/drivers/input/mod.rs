@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::drivers::input::keys::KeyCode;
-use crate::kernel::sync::RwLock;
+use crate::kernel::sync::RwSpin;
 
 pub mod keymap;
 pub mod keys;
@@ -11,7 +11,7 @@ pub trait KeyListener: Sync {
     fn on_new_key(&self, key: keys::KeyCode, released: bool);
 }
 
-static LISTENERS: RwLock<Vec<&'static dyn KeyListener>> = RwLock::new(Vec::new());
+static LISTENERS: RwSpin<Vec<&'static dyn KeyListener>> = RwSpin::new(Vec::new());
 
 pub fn key_notify(key: KeyCode, released: bool) {
     for l in LISTENERS.read().iter() {

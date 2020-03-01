@@ -1,4 +1,4 @@
-From 04a518e80a7c2cb5dedc05d17a5a0092d8e8078c Mon Sep 17 00:00:00 2001
+From 33cc155c16ec2002e478ceb52189345473138422 Mon Sep 17 00:00:00 2001
 From: Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>
 Date: Wed, 26 Feb 2020 15:54:34 +0000
 Subject: [PATCH] cykusz patch
@@ -6,9 +6,9 @@ Subject: [PATCH] cykusz patch
 ---
  source/components/utilities/utclib.c |  3 ++-
  source/include/acclib.h              |  8 +++----
- source/include/platform/accykusz.h   | 31 ++++++++++++++++++++++++++++
+ source/include/platform/accykusz.h   | 32 ++++++++++++++++++++++++++++
  source/include/platform/acenv.h      |  5 ++++-
- 4 files changed, 41 insertions(+), 6 deletions(-)
+ 4 files changed, 42 insertions(+), 6 deletions(-)
  create mode 100644 source/include/platform/accykusz.h
 
 diff --git a/source/components/utilities/utclib.c b/source/components/utilities/utclib.c
@@ -68,10 +68,10 @@ index 4717f878f..59917576a 100644
      int                     Value,
 diff --git a/source/include/platform/accykusz.h b/source/include/platform/accykusz.h
 new file mode 100644
-index 000000000..4509c8755
+index 000000000..6824928ac
 --- /dev/null
 +++ b/source/include/platform/accykusz.h
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,32 @@
 +#ifndef __ACCYKUSZ_H__
 +#define __ACCYKUSZ_H__
 +
@@ -89,6 +89,7 @@ index 000000000..4509c8755
 +#define ACPI_USE_NATIVE_DIVIDE
 +
 +#undef ACPI_DISASSEMBLER
++#undef ACPI_DEBUGGER
 +
 +#undef ACPI_USE_STANDARD_HEADERS
 +#undef ACPI_USE_SYSTEM_CLIBRARY

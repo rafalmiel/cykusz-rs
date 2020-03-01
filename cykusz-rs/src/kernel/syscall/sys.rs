@@ -153,3 +153,21 @@ pub fn sys_exit() -> ! {
     crate::task_test::start();
     crate::kernel::sched::task_finished()
 }
+
+pub fn sys_sleep(time_ns: u64) -> SyscallResult {
+    let t = current_task();
+    t.sleep(time_ns as usize);
+    Ok(0)
+}
+
+pub fn sys_poweroff() -> ! {
+    crate::arch::acpi::power_off()
+}
+
+pub fn sys_reboot() -> SyscallResult {
+    if !crate::arch::acpi::reboot() {
+        Err(SyscallError::NoEnt)
+    } else {
+        Ok(0)
+    }
+}

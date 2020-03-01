@@ -2,8 +2,6 @@ use crate::kernel::sync::Spin;
 
 use self::rsdp::Address;
 use self::rsdt::Rsdt;
-use crate::kernel::int::disable;
-use bitflags::_core::mem::MaybeUninit;
 
 pub mod apic;
 pub mod hpet;
@@ -54,6 +52,17 @@ impl Acpi {
             }
         }
     }
+
+    pub fn get_hpet_entry(&self) -> Option<&'static hpet::HpetHeader> {
+        match self.hdr {
+            Header::RSDT(ref r) => r.unwrap().find_hpet_entry(),
+            Header::XSDT(ref r) => r.unwrap().find_hpet_entry(),
+            _ => {
+                panic!("ACPI Not Initialised");
+            }
+        }
+    }
+
     pub fn print_tables(&self) {
         match self.hdr {
             Header::RSDT(ref r) => r.unwrap().print_tables(),
@@ -79,32 +88,34 @@ pub fn init() {
     let acpi = &mut *ACPI.lock();
     let res = acpi.init();
 
-    acpi.print_tables();
-    //loop{}
-
     println!("[ OK ] ACPI Found...? {}", if res { "YES" } else { "NO" });
 }
 
 pub fn init_mem() {
-
     unsafe {
-        //acpica::AcpiInitializeSubsystem();
-        //println!("init tables: {}", acpica::AcpiInitializeTables(0 as *mut _, 16, false));
-        //acpica::AcpiLoadTables();
-        //acpica::AcpiEnableSubsystem(0);
+        acpica::AcpiInitializeSubsystem();
+        acpica::AcpiInitializeTables(0 as *mut _, 16, false);
+        acpica::AcpiLoadTables();
+        acpica::AcpiEnableSubsystem(0);
+    }
+}
 
-        //acpica::AcpiEnterSleepStatePrep(5);
-        //disable();
-        //acpica::AcpiEnterSleepState(5);
-        //panic!("power off");
-
-        //let mut hdr: *mut acpica::ACPI_TABLE_HEADER = core::ptr::null_mut();
-
-        //println!("{}", acpica::AcpiGetTable(b"HPET".as_ptr() as *mut i8, 1, &mut hdr as *mut *mut acpica::ACPI_TABLE_HEADER));
-
-        //println!("{:?}", unsafe {
-        //    *hdr
-        //});
+pub fn power_off() -> ! {
+    unsafe {
+        acpica::AcpiEnterSleepStatePrep(5);
+        crate::kernel::int::disable();
+        acpica::AcpiEnterSleepState(5);
     }
 
+    panic!("power off failed");
+}
+
+pub fn reboot() -> bool {
+    unsafe {
+        if acpica::AcpiReset() != acpica::AE_OK {
+            return false;
+        }
+
+        return true;
+    }
 }

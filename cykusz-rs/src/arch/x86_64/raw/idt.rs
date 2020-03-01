@@ -4,7 +4,7 @@ use crate::arch::raw::descriptor as dsc;
 use crate::arch::raw::segmentation::cs;
 use crate::arch::raw::segmentation::SegmentSelector;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(C, packed)]
 pub struct IdtEntry {
     pub offset_1: u16,
@@ -115,6 +115,14 @@ impl Idt {
         Idt {
             entries: [IdtEntry::MISSING; 256],
         }
+    }
+
+    pub fn has_handler(&self, num: usize) -> bool {
+        self.entries[num] != IdtEntry::MISSING
+    }
+
+    pub fn remove_handler(&mut self, idx: usize) {
+        self.entries[idx] = IdtEntry::MISSING;
     }
 
     pub unsafe fn set_handler(&mut self, idx: usize, f: ExceptionHandlerFn) {

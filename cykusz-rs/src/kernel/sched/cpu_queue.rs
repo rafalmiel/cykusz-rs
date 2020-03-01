@@ -105,6 +105,18 @@ impl CpuQueue {
 
         let found = loop {
             let state = self.tasks[c].state();
+
+            if state == TaskState::AwaitingIo {
+                use crate::kernel::timer::current_ns;
+
+                let t = self.tasks[c].sleep_until.load(Ordering::SeqCst);
+                if t != 0 {
+                    if current_ns() as usize > t {
+                        self.tasks[c].set_state(TaskState::Runnable);
+                        break Some(c);
+                    }
+                }
+            }
             if state == TaskState::Runnable {
                 break Some(c);
             } else if c == self.current && self.tasks[self.current].state() == TaskState::Running {

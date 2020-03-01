@@ -3,6 +3,8 @@ OBJDIR := $(OUT_DIR).obj/$(TARGET)/
 
 SRCS := $(wildcard $(SRCDIR)components/*/*.c)
 SRCS := $(filter-out $(SRCDIR)components/disassembler/%,$(SRCS))
+SRCS := $(filter-out $(SRCDIR)components/debugger/%,$(SRCS))
+SRCS := $(filter-out $(SRCDIR)components/resources/rsdump.c, $(SRCS))
 OBJS := $(SRCS:$(SRCDIR)%.c=$(OBJDIR)%.o)
 
 CPPFLAGS := -I $(SRCDIR)include/ -D CYKUSZ -DACPI_LIBRARY
@@ -20,11 +22,12 @@ $(OUT_DIR)/libacpica-$(TARGET).a: $(SRCDIR) $(OBJS)
 	@echo [AR] $@
 	@rm -f $@ && ar rc $@ $(OBJS)
 
-acpica:
+acpica_patched:
 	git submodule update --init
 	cd acpica && git am ../0001-cykusz-patch.patch
+	touch acpica_patched
 
-$(OBJDIR)%.o: $(SRCDIR)%.c _Makefile
+$(OBJDIR)%.o: $(SRCDIR)%.c _Makefile acpica_patched
 	@mkdir -p $(dir $@)
 	@echo [GCC] -o $@
 	@gcc -m64 -o $@ -c $< $(CFLAGS) $(CPPFLAGS) -mcmodel=large -fno-builtin -fno-stack-protector -mno-red-zone -nostdlib

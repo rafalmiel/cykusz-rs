@@ -97,6 +97,12 @@ fn exec(cmd: &str) {
         // do nothing for now, TODO: move to home?
     } else if cmd == "exit" {
         syscall::exit();
+    } else if cmd == "sleep" {
+        syscall::sleep(3000);
+    } else if cmd == "poweroff" {
+        syscall::poweroff();
+    } else if cmd == "reboot" {
+        syscall::reboot();
     } else {
         println!(
             "shell: {}: command not found",

@@ -31,6 +31,14 @@ pub fn init() {
     pit::init();
     pit::disable();
 
+    if let Some(ref hpet) = crate::arch::acpi::ACPI.lock().get_hpet_entry() {
+        hpet::init(hpet);
+
+        println!("[ OK ] HPET Enabled")
+    } else {
+        panic!("[ ERROR ] HPET Not found");
+    }
+
     println!("[ OK ] PIT Disabled");
 }
 

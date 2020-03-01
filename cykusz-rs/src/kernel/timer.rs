@@ -18,3 +18,11 @@ fn timer_handler() {
 pub fn early_sleep(ms: u64) {
     crate::arch::timer::early_sleep(ms);
 }
+
+pub fn busy_sleep(ns: u64) {
+    crate::arch::timer::busy_sleep(ns)
+}
+
+pub fn current_ns() -> u64 {
+    crate::arch::timer::current_ns()
+}

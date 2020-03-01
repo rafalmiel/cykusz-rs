@@ -1,4 +1,5 @@
 .directory
+.idea
 bochslog.txt
 build
 target

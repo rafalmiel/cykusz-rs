@@ -103,3 +103,5 @@ pub const AE_CTRL_CONTINUE                : ACPI_STATUS = 0x4000 | 0x000A;
 pub const AE_CTRL_SKIP                    : ACPI_STATUS = 0x4000 | 0x000B;
 pub const AE_CTRL_PARSE_CONTINUE          : ACPI_STATUS = 0x4000 | 0x000C;
 pub const AE_CTRL_PARSE_PENDING           : ACPI_STATUS = 0x4000 | 0x000D;
+
+pub const ACPI_SIGNAL_FATAL: usize = 0;

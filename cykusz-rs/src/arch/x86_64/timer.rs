@@ -27,7 +27,15 @@ pub fn reset_counter() {
 }
 
 pub fn early_sleep(ms: u64) {
-    crate::arch::dev::pit::early_sleep(ms);
+    crate::arch::dev::pit::early_busy_sleep(ms);
+}
+
+pub fn busy_sleep(ns: u64) {
+    crate::arch::dev::hpet::busy_sleep(ns)
+}
+
+pub fn current_ns() -> u64 {
+    crate::arch::dev::hpet::current_ns()
 }
 
 pub extern "x86-interrupt" fn timer_handler(_frame: &mut ridt::ExceptionStackFrame) {

@@ -90,7 +90,7 @@ pub extern "x86-interrupt" fn pit_handler(_frame: &mut ridt::ExceptionStackFrame
     int::end_of_int();
 }
 
-pub fn early_sleep(mut ms: u64) {
+pub fn early_busy_sleep(mut ms: u64) {
     let mut pit = PIT.lock_irq();
     while ms > 0 {
         pit.init_sleep();

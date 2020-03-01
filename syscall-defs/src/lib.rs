@@ -12,6 +12,9 @@ pub const SYS_GETCWD: usize = 5;
 pub const SYS_MKDIR: usize = 6;
 pub const SYS_GETDENTS: usize = 7;
 pub const SYS_EXIT: usize = 8;
+pub const SYS_SLEEP: usize = 9;
+pub const SYS_POWEROFF: usize = 10;
+pub const SYS_REBOOT: usize = 11;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

@@ -12,6 +12,7 @@ bitflags = "*"
 linked_list_allocator = "*"
 raw-cpuid = "*"
 spin = "*"
+bit_field = "*"
 
 [dependencies.syscall-defs]
 path = "../syscall-defs"

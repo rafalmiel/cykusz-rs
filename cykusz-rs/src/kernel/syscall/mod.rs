@@ -21,6 +21,9 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_MKDIR => sys::sys_mkdir(a, b),
         SYS_GETDENTS => sys::sys_getdents(a, b, c),
         SYS_EXIT => sys::sys_exit(),
+        SYS_SLEEP => sys::sys_sleep(a),
+        SYS_POWEROFF => sys::sys_poweroff(),
+        SYS_REBOOT => sys::sys_reboot(),
 
         _ => Err(SyscallError::Inval),
     }

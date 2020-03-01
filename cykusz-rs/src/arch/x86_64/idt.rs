@@ -26,11 +26,11 @@ pub fn init() {
     idt.set_simd_floating_point_exception(simd_floating_point_exception);
     idt.set_virtualisation_exception(virtualisation_exception);
     idt.set_security_exception(security_exception);
-    for i in 32..256 {
-        unsafe {
-            idt.set_handler(i, dummy);
-        }
-    }
+    //for i in 32..256 {
+    //    unsafe {
+    //        idt.set_handler(i, dummy);
+    //    }
+    //}
 
     idt.load();
 }
@@ -41,6 +41,20 @@ pub fn set_handler(num: usize, f: idt::ExceptionHandlerFn) {
         let mut idt = IDT.lock();
         idt.set_handler(num, f);
     }
+}
+
+pub fn has_handler(num: usize) -> bool {
+    assert!(num <= 255);
+    let idt = IDT.lock();
+
+    idt.has_handler(num)
+}
+
+pub fn remove_handler(num: usize) {
+    assert!(num <= 255);
+    let mut idt = IDT.lock();
+
+    idt.remove_handler(num);
 }
 
 pub fn set_user_handler(num: usize, f: idt::ExceptionHandlerFn) {

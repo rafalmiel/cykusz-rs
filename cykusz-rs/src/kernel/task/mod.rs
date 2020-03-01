@@ -50,6 +50,7 @@ pub struct Task {
     state: AtomicUsize,
     locks: AtomicUsize,
     filetable: filetable::FileTable,
+    pub sleep_until: AtomicUsize,
     cwd: RwSpin<Cwd>,
 }
 
@@ -62,6 +63,7 @@ impl Default for Task {
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
             filetable: filetable::FileTable::new(),
+            sleep_until: AtomicUsize::new(0),
             cwd: RwSpin::new(Cwd::new("/", root_inode().self_inode())),
         }
     }
@@ -166,6 +168,14 @@ impl Task {
 
     pub unsafe fn arch_task(&self) -> &ArchTask {
         &(*self.arch_task.get())
+    }
+
+    pub fn sleep(&self, time_ns: usize) {
+        use crate::kernel::timer::current_ns;
+
+        self.sleep_until.store(current_ns() as usize + time_ns, Ordering::SeqCst);
+        self.set_state(TaskState::AwaitingIo);
+        crate::kernel::sched::reschedule();
     }
 }
 

@@ -5,6 +5,12 @@ name = "acpica"
 version = "0.1.0"
 
 [[package]]
+name = "bit_field"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a165d606cf084741d4ac3a28fb6e9b1eb0bd31f6cd999098cfddb0b2ab381dc0"
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -21,6 +27,7 @@ name = "cykusz_rs"
 version = "0.1.0"
 dependencies = [
  "acpica",
+ "bit_field",
  "bitflags",
  "lazy_static",
  "linked_list_allocator",

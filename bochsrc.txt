@@ -1,3 +1,4 @@
+display_library: x
 megs:            128
 magic_break: enabled=1
 romimage:        file=/usr/share/bochs/BIOS-bochs-latest
@@ -8,4 +9,4 @@ log:             bochslog.txt
 clock:           sync=realtime, rtc_sync=1, time0=local
 cpu:             count=1, ips=1000000, reset_on_triple_fault=0, model=corei7_haswell_4770
 cpuid:           1g_pages=0, apic=x2apic
-debug:           CMOS=report
+debug:           action=report

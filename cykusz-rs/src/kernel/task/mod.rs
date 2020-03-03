@@ -173,7 +173,8 @@ impl Task {
     pub fn sleep(&self, time_ns: usize) {
         use crate::kernel::timer::current_ns;
 
-        self.sleep_until.store(current_ns() as usize + time_ns, Ordering::SeqCst);
+        self.sleep_until
+            .store(current_ns() as usize + time_ns, Ordering::SeqCst);
         self.set_state(TaskState::AwaitingIo);
         crate::kernel::sched::reschedule();
     }

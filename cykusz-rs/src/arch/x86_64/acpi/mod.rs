@@ -3,12 +3,12 @@ use crate::kernel::sync::Spin;
 use self::rsdp::Address;
 use self::rsdt::Rsdt;
 
+mod acpica;
 pub mod apic;
 pub mod hpet;
 mod rsdp;
 mod rsdt;
 mod util;
-mod os;
 
 pub static ACPI: Spin<Acpi> = Spin::new(Acpi::new());
 
@@ -43,7 +43,7 @@ impl Acpi {
         return true;
     }
 
-    pub fn get_apic_entry(&self) -> Option<&'static apic::MatdHeader> {
+    pub fn get_apic_entry(&self) -> Option<&'static apic::MadtHeader> {
         match self.hdr {
             Header::RSDT(ref r) => r.unwrap().find_apic_entry(),
             Header::XSDT(ref r) => r.unwrap().find_apic_entry(),

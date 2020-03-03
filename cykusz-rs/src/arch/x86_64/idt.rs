@@ -65,6 +65,7 @@ pub fn set_user_handler(num: usize, f: idt::ExceptionHandlerFn) {
     }
 }
 
+#[allow(unused)]
 extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {
     println!("Dummy int");
     crate::arch::int::end_of_int();

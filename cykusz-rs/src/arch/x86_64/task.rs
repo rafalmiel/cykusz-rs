@@ -339,9 +339,7 @@ impl Task {
     }
 
     pub fn deallocate(&mut self) {
-        let cr3 = unsafe {
-            self.ctx.as_ref().cr3
-        };
+        let cr3 = unsafe { self.ctx.as_ref().cr3 };
 
         let p4 = p4_table(PhysAddr(cr3));
         p4.deallocate_user();

@@ -1,8 +1,7 @@
 use core::ops::{Deref, DerefMut};
 
-use crate::kernel::sync::raw_spin::{RawSpin as M, RawSpinGuard as MG};
-
 use crate::kernel::int;
+use crate::kernel::sync::raw_spin::{RawSpin as M, RawSpinGuard as MG};
 
 pub struct Spin<T: ?Sized> {
     l: M<T>,
@@ -40,7 +39,7 @@ impl<T> Spin<T> {
                 g: Some(g),
                 irq: false,
                 notify: true,
-                debug: 0
+                debug: 0,
             })
         } else {
             None
@@ -128,4 +127,3 @@ impl<'a, T: ?Sized> Drop for SpinGuard<'a, T> {
         }
     }
 }
-

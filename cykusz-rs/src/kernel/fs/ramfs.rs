@@ -14,7 +14,7 @@ use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Result};
 use crate::kernel::fs::vfs::{FsError, Metadata};
-use crate::kernel::sync::{Spin, RwSpin};
+use crate::kernel::sync::{RwSpin, Spin};
 
 struct LockedRamINode(RwSpin<RamINode>);
 

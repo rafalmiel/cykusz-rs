@@ -206,10 +206,7 @@ where
         let entry = &mut self.entries[idx];
 
         if !entry.contains(Entry::PRESENT) {
-            entry.set_frame_flags(
-                &frame,
-                Entry::PRESENT | Entry::WRITABLE | Entry::HUGE_PAGE,
-            );
+            entry.set_frame_flags(&frame, Entry::PRESENT | Entry::WRITABLE | Entry::HUGE_PAGE);
         }
     }
 }

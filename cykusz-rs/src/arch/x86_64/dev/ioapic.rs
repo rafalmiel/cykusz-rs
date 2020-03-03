@@ -1,7 +1,7 @@
 use core::ptr::read_volatile;
 use core::ptr::write_volatile;
 
-use crate::arch::acpi::apic::MatdHeader;
+use crate::arch::acpi::apic::MadtHeader;
 use crate::kernel::mm::*;
 use crate::kernel::sync::Spin;
 
@@ -150,7 +150,7 @@ impl IOApic {
     pub const fn new() -> IOApic {
         IOApic { ioapic_base: None }
     }
-    pub fn init(&mut self, hdr: &'static MatdHeader) {
+    pub fn init(&mut self, hdr: &'static MadtHeader) {
         if let Some(ref io) = hdr.ioapic_entries().nth(0) {
             self.ioapic_base = Some(io.ioapic_address());
         } else {
@@ -163,6 +163,6 @@ impl IOApic {
     }
 }
 
-pub fn init(hdr: &'static MatdHeader) {
+pub fn init(hdr: &'static MadtHeader) {
     IOAPIC.lock().init(hdr);
 }

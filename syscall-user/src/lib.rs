@@ -126,23 +126,21 @@ pub fn exit() -> ! {
 }
 
 pub fn sleep(time_ms: usize) -> SyscallResult {
-    unsafe {
-        syscall1(SYS_SLEEP, time_ms * 1_000_000)
-    }
+    unsafe { syscall1(SYS_SLEEP, time_ms * 1_000_000) }
 }
 
 pub fn poweroff() -> ! {
     unsafe {
-        syscall0(SYS_POWEROFF);
-    }
+        if let Err(e) = syscall0(SYS_POWEROFF) {
+            panic!("Power Off failed: {:?}", e);
+        }
 
-    unreachable!()
+        unreachable!()
+    }
 }
 
 pub fn reboot() -> SyscallResult {
-    unsafe {
-        syscall0(SYS_REBOOT)
-    }
+    unsafe { syscall0(SYS_REBOOT) }
 }
 
 pub fn print(v: &str) {

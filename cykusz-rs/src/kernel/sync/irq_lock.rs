@@ -11,7 +11,6 @@ pub struct IrqGuard {
     had_int: bool,
 }
 
-
 pub struct IrqLockGuard<'a, T: ?Sized + 'a> {
     data: &'a mut T,
     irq: bool,
@@ -20,7 +19,6 @@ pub struct IrqLockGuard<'a, T: ?Sized + 'a> {
 unsafe impl<T: ?Sized + Send> Sync for IrqLock<T> {}
 
 unsafe impl<T: ?Sized + Send> Send for IrqLock<T> {}
-
 
 impl IrqGuard {
     pub fn new() -> IrqGuard {

@@ -1,6 +1,6 @@
-use spin::{RwLock as RW, RwLockReadGuard as RWR, RwLockWriteGuard as RWW};
-
 use core::ops::{Deref, DerefMut};
+
+use spin::{RwLock as RW, RwLockReadGuard as RWR, RwLockWriteGuard as RWW};
 
 use crate::kernel::int;
 

@@ -1,8 +1,8 @@
 use crate::arch::raw::cpuio::Port;
 
 struct Pci {
-    addr: Port::<u32>,
-    data: Port::<u32>,
+    addr: Port<u32>,
+    data: Port<u32>,
 }
 
 impl Pci {
@@ -16,15 +16,15 @@ impl Pci {
     }
 
     fn read_u32(&mut self, bus: u8, slot: u8, func: u8, offset: u8) -> u32 {
-        let addr = ((bus as u32) << 16) |
-            ((slot as u32) << 11) |
-            ((func as u32) << 8) |
-            ((offset as u32) & 0xfc) |
-            0x80000000u32;
+        let addr = ((bus as u32) << 16)
+            | ((slot as u32) << 11)
+            | ((func as u32) << 8)
+            | ((offset as u32) & 0xfc)
+            | 0x80000000u32;
 
         self.addr.write(addr);
 
-        return self.data.read()
+        return self.data.read();
     }
 
     fn check(&mut self, bus: u8, device: u8, function: u8) {
@@ -44,9 +44,11 @@ impl Pci {
             let line = int & 0xff;
             let pin = (int >> 8) & 0xff;
 
-            println!("Vendor: 0x{:x} Dev: 0x{:x} Class: 0x{:x} SubClass: 0x{:x} pin: {}, line: {}", vendor_id, dev_id, ccode, subclass, pin, line);
+            println!(
+                "Vendor: 0x{:x} Dev: 0x{:x} Class: 0x{:x} SubClass: 0x{:x} pin: {}, line: {}",
+                vendor_id, dev_id, ccode, subclass, pin, line
+            );
         }
-
     }
 
     pub fn init(&mut self) {

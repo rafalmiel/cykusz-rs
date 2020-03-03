@@ -1,5 +1,6 @@
-use crate::arch::x86_64::raw::cpuio::Port;
 use spin::Once;
+
+use crate::arch::x86_64::raw::cpuio::Port;
 use crate::kernel::sync::{Spin, SpinGuard};
 
 struct Serial {
@@ -36,7 +37,7 @@ impl Serial {
 
     fn write(&mut self, data: &str) {
         for c in data.chars() {
-            while !self.is_tx_fifo_empty() {};
+            while !self.is_tx_fifo_empty() {}
 
             self.data.write(c as u8);
         }
@@ -52,9 +53,7 @@ static SERIAL: Once<Spin<Serial>> = Once::new();
 
 pub fn init() {
     SERIAL.call_once(|| {
-        let mut s = unsafe {
-            Serial::new(SERIAL_COM1_BASE)
-        };
+        let mut s = unsafe { Serial::new(SERIAL_COM1_BASE) };
 
         s.init();
 

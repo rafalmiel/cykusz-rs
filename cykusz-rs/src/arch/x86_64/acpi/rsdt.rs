@@ -2,7 +2,7 @@ use core::mem::size_of;
 
 use crate::kernel::mm::{MappedAddr, PhysAddr};
 
-use super::apic::MatdHeader;
+use super::apic::MadtHeader;
 use super::hpet::HpetHeader;
 
 #[repr(packed, C)]
@@ -84,7 +84,7 @@ impl<T: RsdtPtrType> Rsdt<T> {
         self.entries().find(|e| &e.signature == val && e.is_valid())
     }
 
-    pub fn find_apic_entry(&'static self) -> Option<&'static MatdHeader> {
+    pub fn find_apic_entry(&'static self) -> Option<&'static MadtHeader> {
         Some(self.find_entry(b"APIC")?.into_matd())
     }
 
@@ -138,10 +138,10 @@ impl AcpiStdHeader {
         panic!("AcpiStd: Tried to convert into invalid RSDT Header")
     }
 
-    pub fn into_matd(&'static self) -> &'static MatdHeader {
+    pub fn into_matd(&'static self) -> &'static MadtHeader {
         if self.is_valid() && &self.signature == b"APIC" {
             unsafe {
-                return self.to::<MatdHeader>();
+                return self.to::<MadtHeader>();
             }
         }
 

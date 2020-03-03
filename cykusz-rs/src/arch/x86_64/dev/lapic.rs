@@ -1,7 +1,7 @@
 use core::ptr::read_volatile;
 use core::ptr::write_volatile;
 
-use crate::arch::acpi::apic::MatdHeader;
+use crate::arch::acpi::apic::MadtHeader;
 use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::mm::MappedAddr;
@@ -65,7 +65,7 @@ impl LApic {
         }
     }
 
-    pub fn init(&mut self, hdr: &'static MatdHeader) {
+    pub fn init(&mut self, hdr: &'static MadtHeader) {
         self.x2 = crate::arch::dev::cpu::has_x2apic();
 
         if !self.x2 {
@@ -223,7 +223,7 @@ impl LApic {
     }
 }
 
-pub fn init(hdr: &'static MatdHeader) {
+pub fn init(hdr: &'static MadtHeader) {
     LAPIC.irq().init(hdr);
 }
 

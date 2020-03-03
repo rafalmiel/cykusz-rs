@@ -1,8 +1,8 @@
 use core::ops::{Deref, DerefMut};
 
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::spin_lock::{Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::WaitQueue;
-use crate::kernel::sched::current_task;
 
 pub struct Mutex<T: ?Sized> {
     wait_queue: WaitQueue,
@@ -27,7 +27,7 @@ impl<T> Mutex<T> {
             if let Some(g) = self.mutex.try_lock() {
                 return MutexGuard {
                     g: Some(g),
-                    m: &self
+                    m: &self,
                 };
             } else {
                 self.wait_queue.add_task(current_task());
@@ -40,7 +40,7 @@ impl<T> Mutex<T> {
             if let Some(g) = self.mutex.try_lock_irq() {
                 return MutexGuard {
                     g: Some(g),
-                    m: &self
+                    m: &self,
                 };
             } else {
                 self.wait_queue.add_task(current_task());
@@ -63,7 +63,7 @@ impl<'a, T: ?Sized> DerefMut for MutexGuard<'a, T> {
     }
 }
 
-impl<'a, T: ?Sized> Drop for MutexGuard<'a ,T> {
+impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
 

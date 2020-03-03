@@ -1,10 +1,10 @@
-use core::sync::atomic::{AtomicBool, Ordering, spin_loop_hint as cpu_relax};
 use core::cell::UnsafeCell;
-use core::marker::Sync;
-use core::ops::{Drop, Deref, DerefMut};
-use core::fmt;
-use core::option::Option::{self, None, Some};
 use core::default::Default;
+use core::fmt;
+use core::marker::Sync;
+use core::ops::{Deref, DerefMut, Drop};
+use core::option::Option::{self, None, Some};
+use core::sync::atomic::{spin_loop_hint as cpu_relax, AtomicBool, Ordering};
 
 /// This type provides MUTual EXclusion based on spinning.
 ///
@@ -69,8 +69,7 @@ use core::default::Default;
 /// let answer = { *spin_mutex.lock() };
 /// assert_eq!(answer, numthreads);
 /// ```
-pub struct RawSpin<T: ?Sized>
-{
+pub struct RawSpin<T: ?Sized> {
     lock: AtomicBool,
     data: UnsafeCell<T>,
 }
@@ -79,8 +78,7 @@ pub struct RawSpin<T: ?Sized>
 ///
 /// When the guard falls out of scope it will release the lock.
 #[derive(Debug)]
-pub struct RawSpinGuard<'a, T: ?Sized + 'a>
-{
+pub struct RawSpinGuard<'a, T: ?Sized + 'a> {
     lock: &'a AtomicBool,
     data: &'a mut T,
 }
@@ -89,8 +87,7 @@ pub struct RawSpinGuard<'a, T: ?Sized + 'a>
 unsafe impl<T: ?Sized + Send> Sync for RawSpin<T> {}
 unsafe impl<T: ?Sized + Send> Send for RawSpin<T> {}
 
-impl<T> RawSpin<T>
-{
+impl<T> RawSpin<T> {
     /// Creates a new spinlock wrapping the supplied data.
     ///
     /// May be used statically:
@@ -106,10 +103,8 @@ impl<T> RawSpin<T>
     ///     drop(lock);
     /// }
     /// ```
-    pub const fn new(user_data: T) -> RawSpin<T>
-    {
-        RawSpin
-        {
+    pub const fn new(user_data: T) -> RawSpin<T> {
+        RawSpin {
             lock: AtomicBool::new(false),
             data: UnsafeCell::new(user_data),
         }
@@ -124,15 +119,11 @@ impl<T> RawSpin<T>
     }
 }
 
-impl<T: ?Sized> RawSpin<T>
-{
-    fn obtain_lock(&self)
-    {
-        while self.lock.compare_and_swap(false, true, Ordering::Acquire) != false
-        {
+impl<T: ?Sized> RawSpin<T> {
+    fn obtain_lock(&self) {
+        while self.lock.compare_and_swap(false, true, Ordering::Acquire) != false {
             // Wait until the lock looks unlocked before retrying
-            while self.lock.load(Ordering::Relaxed)
-            {
+            while self.lock.load(Ordering::Relaxed) {
                 cpu_relax();
             }
         }
@@ -157,11 +148,9 @@ impl<T: ?Sized> RawSpin<T>
     /// }
     ///
     /// ```
-    pub fn lock(&self) -> RawSpinGuard<T>
-    {
+    pub fn lock(&self) -> RawSpinGuard<T> {
         self.obtain_lock();
-        RawSpinGuard
-        {
+        RawSpinGuard {
             lock: &self.lock,
             data: unsafe { &mut *self.data.get() },
         }
@@ -180,19 +169,13 @@ impl<T: ?Sized> RawSpin<T>
 
     /// Tries to lock the mutex. If it is already locked, it will return None. Otherwise it returns
     /// a guard within Some.
-    pub fn try_lock(&self) -> Option<RawSpinGuard<T>>
-    {
-        if self.lock.compare_and_swap(false, true, Ordering::Acquire) == false
-        {
-            Some(
-                RawSpinGuard {
-                    lock: &self.lock,
-                    data: unsafe { &mut *self.data.get() },
-                }
-            )
-        }
-        else
-        {
+    pub fn try_lock(&self) -> Option<RawSpinGuard<T>> {
+        if self.lock.compare_and_swap(false, true, Ordering::Acquire) == false {
+            Some(RawSpinGuard {
+                lock: &self.lock,
+                data: unsafe { &mut *self.data.get() },
+            })
+        } else {
             None
         }
     }
@@ -208,12 +191,9 @@ impl RawSpin<()> {
     }
 }
 
-impl<T: ?Sized + fmt::Debug> fmt::Debug for RawSpin<T>
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
-    {
-        match self.try_lock()
-        {
+impl<T: ?Sized + fmt::Debug> fmt::Debug for RawSpin<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.try_lock() {
             Some(guard) => write!(f, "Mutex {{ data: ")
                 .and_then(|()| (&*guard).fmt(f))
                 .and_then(|()| write!(f, "}}")),
@@ -228,22 +208,22 @@ impl<T: ?Sized + Default> Default for RawSpin<T> {
     }
 }
 
-impl<'a, T: ?Sized> Deref for RawSpinGuard<'a, T>
-{
+impl<'a, T: ?Sized> Deref for RawSpinGuard<'a, T> {
     type Target = T;
-    fn deref<'b>(&'b self) -> &'b T { &*self.data }
+    fn deref<'b>(&'b self) -> &'b T {
+        &*self.data
+    }
 }
 
-impl<'a, T: ?Sized> DerefMut for RawSpinGuard<'a, T>
-{
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { &mut *self.data }
+impl<'a, T: ?Sized> DerefMut for RawSpinGuard<'a, T> {
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T {
+        &mut *self.data
+    }
 }
 
-impl<'a, T: ?Sized> Drop for RawSpinGuard<'a, T>
-{
+impl<'a, T: ?Sized> Drop for RawSpinGuard<'a, T> {
     /// The dropping of the MutexGuard will release the lock it was created from.
-    fn drop(&mut self)
-    {
+    fn drop(&mut self) {
         self.lock.store(false, Ordering::Release);
     }
 }

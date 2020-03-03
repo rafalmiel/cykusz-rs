@@ -30,9 +30,9 @@ pub mod arch;
 #[macro_use]
 pub mod kernel;
 mod drivers;
+mod externs;
 pub mod lang_items;
 pub mod task_test;
-mod externs;
 
 #[thread_local]
 static mut CPU_ID: u8 = 0;

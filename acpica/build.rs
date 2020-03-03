@@ -10,6 +10,7 @@
 
 use std::env;
 use std::process::Command;
+
 fn main() {
     assert!(Command::new("make")
         .arg("-f")

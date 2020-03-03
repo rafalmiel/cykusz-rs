@@ -98,11 +98,15 @@ fn exec(cmd: &str) {
     } else if cmd == "exit" {
         syscall::exit();
     } else if cmd == "sleep" {
-        syscall::sleep(3000);
+        if let Err(e) = syscall::sleep(3000) {
+            println!("Sleep failed.. {:?}", e);
+        }
     } else if cmd == "poweroff" {
         syscall::poweroff();
     } else if cmd == "reboot" {
-        syscall::reboot();
+        if let Err(e) = syscall::reboot() {
+            println!("Reboot failed.. {:?}", e);
+        }
     } else {
         println!(
             "shell: {}: command not found",

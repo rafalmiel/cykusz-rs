@@ -102,8 +102,7 @@ impl Scheduler {
     fn current_task_finished(&self) -> ! {
         let _g = IrqGuard::new();
 
-        self.tasks
-            .remove_task(current_id());
+        self.tasks.remove_task(current_id());
         self.cpu_queues.current_task_finished()
     }
 

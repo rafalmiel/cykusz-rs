@@ -1,7 +1,8 @@
-use crate::arch::acpi::hpet::HpetHeader;
-use crate::kernel::mm::PhysAddr;
 use bit_field::BitField;
+
+use crate::arch::acpi::hpet::HpetHeader;
 use crate::arch::x86_64::raw::mm::MappedAddr;
+use crate::kernel::mm::PhysAddr;
 use crate::kernel::sync::Spin;
 
 pub struct Hpet {
@@ -24,11 +25,13 @@ impl RegCapabilities {
         (self.0 >> 32) as u32
     }
 
+    #[allow(unused)]
     pub fn timer_count(&self) -> u64 {
         self.0.get_bits(8..=12)
     }
 
-    pub fn can64(&self) -> bool {
+    #[allow(unused)]
+    pub fn is64bit_mode(&self) -> bool {
         self.0.get_bit(13)
     }
 }
@@ -37,17 +40,14 @@ impl RegConfig {
     pub fn set_enabled(&mut self, e: bool) {
         self.0.set_bit(0, e);
     }
-
-    pub fn store(&self, addr: PhysAddr) {
-        unsafe {
-            addr.to_mapped().store(self.0)
-        }
-    }
 }
 
 impl Hpet {
     pub const fn new() -> Hpet {
-        Hpet { hpet_base: None, period: 0 }
+        Hpet {
+            hpet_base: None,
+            period: 0,
+        }
     }
 
     pub fn init(&mut self, hdr: &'static HpetHeader) {
@@ -57,15 +57,11 @@ impl Hpet {
     }
 
     fn get<T: Copy>(&self, offset: usize) -> T {
-        unsafe {
-            (self.hpet_base.unwrap() + offset).read::<T>()
-        }
+        unsafe { (self.hpet_base.unwrap() + offset).read::<T>() }
     }
 
     fn save<T: Copy>(&self, offset: usize, v: T) {
-        unsafe {
-            (self.hpet_base.unwrap() + offset).store(v)
-        }
+        unsafe { (self.hpet_base.unwrap() + offset).store(v) }
     }
 
     pub fn counter_clk_period(&self) -> u32 {
@@ -75,7 +71,7 @@ impl Hpet {
 
     pub fn set_enabled(&self, e: bool) {
         let mut cfg = RegConfig(0);
-        cfg.set_enabled(true);
+        cfg.set_enabled(e);
 
         self.save(CONFIG_OFFSET, cfg);
     }

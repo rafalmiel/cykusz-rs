@@ -1,7 +1,7 @@
 use acpica::*;
 
+use crate::arch::x86_64::int::{mask_int, set_irq_dest};
 use crate::arch::x86_64::raw::idt::ExceptionStackFrame;
-use crate::arch::x86_64::int::{set_irq_dest, mask_int};
 use crate::kernel::sync::Spin;
 
 extern "x86-interrupt" fn acpi_irq(_frame: &mut ExceptionStackFrame) {

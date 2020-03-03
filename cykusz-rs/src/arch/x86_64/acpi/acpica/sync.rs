@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 
 use acpica::*;
 
-use crate::kernel::sync::{Spin, Semaphore};
+use crate::kernel::sync::{Semaphore, Spin};
 
 #[no_mangle]
 #[linkage = "external"]

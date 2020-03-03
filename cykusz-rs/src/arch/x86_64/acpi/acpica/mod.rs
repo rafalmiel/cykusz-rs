@@ -32,11 +32,10 @@ extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
     let mut val = 0;
     // SAFE: Called from within ACPI init context
     match unsafe { AcpiFindRootPointer(&mut val) } {
-        AE_OK => {
-            println!("Found root pointer: 0x{:x}", val);
-        }
+        AE_OK => {}
         e @ _ => {
             println!("Failed to find ACPI root pointer : {}", e);
+
             return 0;
         }
     }

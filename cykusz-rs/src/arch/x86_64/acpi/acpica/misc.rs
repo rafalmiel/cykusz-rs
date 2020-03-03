@@ -17,7 +17,6 @@ extern "C" fn AcpiOsSignal(Function: UINT32, Info: *mut ::core::ffi::c_void) -> 
     AE_OK
 }
 
-
 #[no_mangle]
 #[linkage = "external"]
 extern "C" fn AcpiOsEnterSleep(

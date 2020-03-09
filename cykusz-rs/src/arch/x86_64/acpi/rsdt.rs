@@ -92,9 +92,23 @@ impl<T: RsdtPtrType> Rsdt<T> {
         Some(self.find_entry(b"HPET")?.into_hpet())
     }
 
+    pub fn find_ecdt_entry(&'static self) -> Option<&'static acpica::acpi_table_ecdt> {
+        Some(self.find_entry(b"ECDT")?.into_ecdt())
+    }
+
+    pub fn find_fadt_entry(&'static self) -> Option<&'static acpica::acpi_table_fadt> {
+        Some(self.find_entry(b"FACP")?.into_fadt())
+    }
+
+    pub fn find_mcfg_entry(&'static self) -> Option<&'static acpica::acpi_table_mcfg> {
+        Some(self.find_entry(b"MCFG")?.into_mcfg())
+    }
+
     pub fn print_tables(&'static self) {
         self.entries().for_each(|e| {
-            println!("{}", core::str::from_utf8(&e.signature).unwrap());
+            println!("{}", unsafe {
+                core::str::from_utf8_unchecked(&e.signature)
+            });
         })
     }
 }
@@ -156,6 +170,36 @@ impl AcpiStdHeader {
         }
 
         panic!("AcpiStd: Tried to convert into invalid HPET Header")
+    }
+
+    pub fn into_ecdt(&'static self) -> &'static acpica::acpi_table_ecdt {
+        if self.is_valid() && &self.signature == b"ECDT" {
+            unsafe {
+                return self.to::<acpica::acpi_table_ecdt>();
+            }
+        }
+
+        panic!("Invalid ECDT");
+    }
+
+    pub fn into_fadt(&'static self) -> &'static acpica::acpi_table_fadt {
+        if self.is_valid() && &self.signature == b"FACP" {
+            unsafe {
+                return self.to::<acpica::acpi_table_fadt>();
+            }
+        }
+
+        panic!("Invalid FADT");
+    }
+
+    pub fn into_mcfg(&'static self) -> &'static acpica::acpi_table_mcfg {
+        if self.is_valid() && &self.signature == b"MCFG" {
+            unsafe {
+                return self.to::<acpica::acpi_table_mcfg>();
+            }
+        }
+
+        panic!("Invalid MCFG")
     }
 }
 

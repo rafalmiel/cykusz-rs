@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+
 use acpica::*;
 
 use crate::kernel::mm::*;
@@ -11,10 +14,10 @@ extern "C" fn AcpiOsReadMemory(
 ) -> ACPI_STATUS {
     unsafe {
         *Value = match Width {
-            8 => PhysAddr(Address as usize).to_mapped().read::<u8>() as i64,
-            16 => PhysAddr(Address as usize).to_mapped().read::<u16>() as i64,
-            32 => PhysAddr(Address as usize).to_mapped().read::<u32>() as i64,
-            64 => PhysAddr(Address as usize).to_mapped().read::<u64>() as i64,
+            8 => PhysAddr(Address as usize).to_mapped().read::<u8>() as u64,
+            16 => PhysAddr(Address as usize).to_mapped().read::<u16>() as u64,
+            32 => PhysAddr(Address as usize).to_mapped().read::<u32>() as u64,
+            64 => PhysAddr(Address as usize).to_mapped().read::<u64>() as u64,
             _ => panic!("Invalid Width"),
         };
 

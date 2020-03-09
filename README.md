@@ -16,7 +16,7 @@ Currently implemented:
 - [x] Paging
 - [x] Kernel heap
 - [x] Interrupt handlers
-- [x] Partial ACPI support (ioapic, lapic)
+- [x] ACPI support (ioapic, lapic, acpica)
 - [x] SMP
 - [x] Per-CPU-Storage using thread_local
 - [x] Preemptive per-cpu scheduler

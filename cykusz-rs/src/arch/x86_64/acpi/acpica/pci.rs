@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+
 use acpica::*;
 
 #[no_mangle]
@@ -8,7 +11,18 @@ extern "C" fn AcpiOsReadPciConfiguration(
     Value: *mut UINT64,
     Width: UINT32,
 ) -> ACPI_STATUS {
-    unimplemented!()
+    unsafe {
+        *Value = crate::arch::dev::expci::read(
+            (*PciId).Segment,
+            (*PciId).Bus,
+            (*PciId).Device,
+            (*PciId).Function,
+            Reg,
+            Width,
+        );
+        //println!("PCI: R {:?} r 0x{:x} {}: {}", unsafe {*PciId}, Reg, Width, *Value);
+    }
+    AE_OK
 }
 
 #[no_mangle]
@@ -19,5 +33,17 @@ extern "C" fn AcpiOsWritePciConfiguration(
     Value: UINT64,
     Width: UINT32,
 ) -> ACPI_STATUS {
-    unimplemented!()
+    //println!("PCI: W {:?} r 0x{:x} {}", unsafe {*PciId}, Reg, Width);
+    unsafe {
+        crate::arch::dev::expci::write(
+            (*PciId).Segment,
+            (*PciId).Bus,
+            (*PciId).Device,
+            (*PciId).Function,
+            Reg,
+            Value,
+            Width,
+        );
+    }
+    AE_OK
 }

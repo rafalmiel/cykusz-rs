@@ -3,7 +3,6 @@ mod pic;
 
 pub trait InterruptController: Send + Sync {
     fn end_of_int(&self);
-    fn irq_remap(&self, rq: u32) -> u32;
     fn mask_int(&self, int: u8, masked: bool);
     fn set_irq_dest(&self, src: u8, dest: u8);
 }

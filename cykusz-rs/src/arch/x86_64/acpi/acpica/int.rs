@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+
 use acpica::*;
 
 use crate::arch::x86_64::int::{mask_int, set_irq_dest};
@@ -12,6 +15,10 @@ extern "x86-interrupt" fn acpi_irq(_frame: &mut ExceptionStackFrame) {
     unsafe {
         ctx.handler.unwrap()(ctx.ctx);
     }
+
+    core::mem::drop(c);
+
+    crate::arch::int::end_of_int();
 }
 
 struct Ctx {

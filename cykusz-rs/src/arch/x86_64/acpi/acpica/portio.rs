@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+
 use acpica::*;
 
 use crate::arch::x86_64::raw::cpuio::Port;
@@ -9,11 +12,12 @@ extern "C" fn AcpiOsReadPort(
     Value: *mut UINT32,
     Width: UINT32,
 ) -> ACPI_STATUS {
+    //println!("Read port 0x{:x} width: {}", Address, Width);
     unsafe {
         *Value = match Width {
-            8 => Port::<u8>::new(Address as u16).read() as i32,
-            16 => Port::<u16>::new(Address as u16).read() as i32,
-            32 => Port::<u32>::new(Address as u16).read() as i32,
+            8 => Port::<u8>::new(Address as u16).read() as u32,
+            16 => Port::<u16>::new(Address as u16).read() as u32,
+            32 => Port::<u32>::new(Address as u16).read() as u32,
             _ => panic!("Unsupported port"),
         };
 
@@ -28,6 +32,7 @@ extern "C" fn AcpiOsWritePort(
     Value: UINT32,
     Width: UINT32,
 ) -> ACPI_STATUS {
+    //println!("Write port 0x{:x} value: {}, width: {}", Address, Value, Width);
     unsafe {
         match Width {
             8 => Port::<u8>::new(Address as u16).write(Value as u8),

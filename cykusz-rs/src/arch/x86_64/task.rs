@@ -150,6 +150,7 @@ fn allocate_page_table(
 
 #[repr(C, packed)]
 struct IretqFrame {
+    pub rdi: usize,
     pub ip: usize,
     pub cs: usize,
     pub rlfags: usize,
@@ -194,12 +195,13 @@ impl Task {
     }
 
     unsafe fn prepare_iretq_ctx(
-        fun: fn(),
+        fun: usize,
         cs: SegmentSelector,
         ds: SegmentSelector,
         int_enabled: bool,
         sp: *mut u8,
         cr3: PhysAddr,
+        param: usize,
     ) -> Unique<Context> {
         let frame: &mut IretqFrame =
             &mut *(sp.offset(-(::core::mem::size_of::<IretqFrame>() as isize)) as *mut IretqFrame);
@@ -210,6 +212,7 @@ impl Task {
         frame.rlfags = if int_enabled { 0x200 } else { 0x0 };
         frame.cs = cs.bits() as usize;
         frame.ip = fun as usize;
+        frame.rdi = param;
 
         let mut ctx = Unique::new_unchecked(sp.offset(
             -(::core::mem::size_of::<Context>() as isize
@@ -224,7 +227,7 @@ impl Task {
     }
 
     unsafe fn prepare_sysretq_ctx(
-        fun: fn(),
+        fun: usize,
         int_enabled: bool,
         user_stack: Option<usize>,
         sp: *mut u8,
@@ -251,7 +254,7 @@ impl Task {
     }
 
     fn new_sp(
-        fun: fn(),
+        fun: usize,
         cs: SegmentSelector,
         ds: SegmentSelector,
         int_enabled: bool,
@@ -259,12 +262,13 @@ impl Task {
         stack_size: usize,
         cr3: PhysAddr,
         user_stack: Option<usize>,
+        param: usize,
     ) -> Task {
         unsafe {
             let sp = (stack as *mut u8).offset(stack_size as isize);
 
             let ctx = if user_stack.is_none() {
-                Task::prepare_iretq_ctx(fun, cs, ds, int_enabled, sp, cr3)
+                Task::prepare_iretq_ctx(fun, cs, ds, int_enabled, sp, cr3, param)
             } else {
                 // Userspace transition is done using sysretq call
                 Task::prepare_sysretq_ctx(fun, int_enabled, user_stack, sp, cr3)
@@ -280,12 +284,13 @@ impl Task {
     }
 
     fn new(
-        fun: fn(),
+        fun: usize,
         cs: SegmentSelector,
         ds: SegmentSelector,
         int_enabled: bool,
         cr3: PhysAddr,
         user_stack: Option<usize>,
+        param: usize,
     ) -> Task {
         let sp = heap_allocate_align(4096 * 16, 4096).unwrap();
 
@@ -298,10 +303,23 @@ impl Task {
             4096 * 16,
             cr3,
             user_stack,
+            param,
         )
     }
 
     pub fn new_kern(fun: fn()) -> Task {
+        Task::new(
+            fun as usize,
+            gdt::ring0_cs(),
+            gdt::ring0_ds(),
+            true,
+            p4_table_addr(),
+            None,
+            0,
+        )
+    }
+
+    pub fn new_param_kern(fun: usize, val: usize) -> Task {
         Task::new(
             fun,
             gdt::ring0_cs(),
@@ -309,17 +327,19 @@ impl Task {
             true,
             p4_table_addr(),
             None,
+            val,
         )
     }
 
     pub fn new_sched(fun: fn()) -> Task {
         Task::new(
-            fun,
+            fun as usize,
             gdt::ring0_cs(),
             gdt::ring0_ds(),
             false,
             p4_table_addr(),
             None,
+            0,
         )
     }
 
@@ -329,12 +349,13 @@ impl Task {
         let f = unsafe { ::core::mem::transmute::<usize, fn()>(entry.0) };
 
         Task::new(
-            f,
+            f as usize,
             gdt::ring3_cs(),
             gdt::ring3_ds(),
             true,
             new_p4,
             Some(stack.0),
+            0,
         )
     }
 

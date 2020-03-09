@@ -1,8 +1,10 @@
+use crate::arch::x86_64::acpi::apic::MadtEntryIntSrc;
 use crate::kernel::sync::Spin;
 
 use self::rsdp::Address;
 use self::rsdt::Rsdt;
 
+pub mod acpi_init;
 mod acpica;
 pub mod apic;
 pub mod hpet;
@@ -63,6 +65,34 @@ impl Acpi {
         }
     }
 
+    pub fn get_ecdt_entry(&self) -> Option<&'static acpica::acpi_table_ecdt> {
+        match self.hdr {
+            Header::RSDT(ref r) => r.unwrap().find_ecdt_entry(),
+            Header::XSDT(ref r) => r.unwrap().find_ecdt_entry(),
+            _ => {
+                panic!("ACPI Not Initialised");
+            }
+        }
+    }
+
+    pub fn get_fadt_entry(&self) -> Option<&'static acpica::acpi_table_fadt> {
+        match self.hdr {
+            Header::RSDT(ref r) => r.unwrap().find_fadt_entry(),
+            Header::XSDT(ref r) => r.unwrap().find_fadt_entry(),
+            _ => {
+                panic!("ACPI Not Initialised");
+            }
+        }
+    }
+
+    pub fn get_mcfg_entry(&self) -> Option<&'static acpica::acpi_table_mcfg> {
+        match self.hdr {
+            Header::RSDT(ref r) => r.unwrap().find_mcfg_entry(),
+            Header::XSDT(ref r) => r.unwrap().find_mcfg_entry(),
+            _ => panic!("ACPI Not Initialised"),
+        }
+    }
+
     pub fn print_tables(&self) {
         match self.hdr {
             Header::RSDT(ref r) => r.unwrap().print_tables(),
@@ -73,7 +103,7 @@ impl Acpi {
         }
     }
 
-    pub fn get_irq_mapping(&mut self, irq: u32) -> u32 {
+    pub fn get_irq_mapping(&mut self, irq: u32) -> Option<&'static MadtEntryIntSrc> {
         let apic = self.get_apic_entry().expect("APIC Entry not found");
         apic.find_irq_remap(irq)
     }
@@ -89,15 +119,6 @@ pub fn init() {
     let res = acpi.init();
 
     println!("[ OK ] ACPI Found...? {}", if res { "YES" } else { "NO" });
-}
-
-pub fn init_mem() {
-    unsafe {
-        acpica::AcpiInitializeSubsystem();
-        acpica::AcpiInitializeTables(0 as *mut _, 16, false);
-        acpica::AcpiLoadTables();
-        acpica::AcpiEnableSubsystem(0);
-    }
 }
 
 pub fn power_off() -> ! {

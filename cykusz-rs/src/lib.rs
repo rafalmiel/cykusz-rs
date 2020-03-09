@@ -48,8 +48,6 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Heap Initialised");
 
-    arch::acpi::init_mem();
-
     arch::mm::phys::init_pages();
 
     println!("[ OK ] Phys Page Map Initialised");
@@ -71,6 +69,10 @@ pub fn rust_main(stack_top: VirtAddr) {
     kernel::sched::init();
 
     println!("[ OK ] Scheduler Initialised");
+
+    arch::acpi::acpi_init::init();
+
+    println!("[ OK ] Acpi Initialised");
 
     kernel::smp::start();
 

@@ -9,10 +9,13 @@ crate-type = ["staticlib"]
 
 [dependencies]
 bitflags = "*"
-linked_list_allocator = "*"
 raw-cpuid = "*"
 spin = "*"
 bit_field = "*"
+
+[dependencies.linked_list_allocator]
+version = "*"
+features = ["alloc_ref"]
 
 [dependencies.syscall-defs]
 path = "../syscall-defs"

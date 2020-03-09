@@ -11,10 +11,6 @@ impl InterruptController for Controller {
         PIC.lock().notify_end_of_interrupt();
     }
 
-    fn irq_remap(&self, irq: u32) -> u32 {
-        return irq;
-    }
-
     fn mask_int(&self, int: u8, masked: bool) {
         PIC.lock().mask_int(int, masked);
     }

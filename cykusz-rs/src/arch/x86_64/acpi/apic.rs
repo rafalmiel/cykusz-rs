@@ -46,6 +46,14 @@ impl MadtEntryIntSrc {
     pub fn global_sys_int(&'static self) -> u32 {
         self.global_sys_int
     }
+
+    pub fn level_triggered(&'static self) -> bool {
+        self.flags & 8 == 8
+    }
+
+    pub fn active_low(&'static self) -> bool {
+        self.flags & 2 == 2
+    }
 }
 
 #[repr(packed, C)]
@@ -128,10 +136,10 @@ impl MadtHeader {
         })
     }
 
-    pub fn find_irq_remap(&'static self, int: u32) -> u32 {
+    pub fn find_irq_remap(&'static self, int: u32) -> Option<&'static MadtEntryIntSrc> {
         self.intsrc_entries()
             .find(|i| i.irq_src() as u32 == int)
-            .map_or(int, |e| e.global_sys_int())
+            .map_or(None, |e| Some(e))
     }
 }
 

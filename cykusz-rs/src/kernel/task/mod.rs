@@ -88,6 +88,12 @@ impl Task {
         task
     }
 
+    pub fn new_param_kern(fun: usize, val: usize) -> Task {
+        let mut task = Task::default();
+        task.arch_task = UnsafeCell::new(ArchTask::new_param_kern(fun, val));
+        task
+    }
+
     pub fn new_user(fun: MappedAddr, code_size: usize) -> Task {
         let mut task = Task::default();
         task.arch_task = UnsafeCell::new(ArchTask::new_user(fun, code_size));

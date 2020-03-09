@@ -36,4 +36,5 @@ switch_to:
     ret
 
 isr_return:
+    pop rdi         ; Param passed to the function
     iretq

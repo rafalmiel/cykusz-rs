@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+
 use alloc::string::String;
 
 fn get_uint(Args: &mut core::ffi::VaList, size: usize) -> u64 {

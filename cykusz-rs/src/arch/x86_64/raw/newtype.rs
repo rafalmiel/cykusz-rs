@@ -142,6 +142,10 @@ macro_rules! enable_unsigned_ops {
                 *(self.0 as *mut T) = v;
             }
 
+            pub unsafe fn store_volatile<T: Copy>(&self, v: T) {
+                core::ptr::write_volatile(self.0 as *mut T, v);
+            }
+
             pub unsafe fn read<T: Copy>(&self) -> T {
                 return *(self.0 as *mut T);
             }

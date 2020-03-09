@@ -2,6 +2,7 @@ use core::ptr::read_volatile;
 use core::ptr::write_volatile;
 
 use crate::arch::acpi::apic::MadtHeader;
+use crate::arch::x86_64::acpi::apic::MadtEntryIntSrc;
 use crate::kernel::mm::*;
 use crate::kernel::sync::Spin;
 
@@ -122,7 +123,11 @@ impl IOApic {
         RegVer(self.read(REG_VER)).apic_version()
     }
 
-    pub fn mask_int(&mut self, i: u32, masked: bool) {
+    pub fn mask_int(&mut self, mut i: u32, masked: bool, ovride: Option<&'static MadtEntryIntSrc>) {
+        if let Some(ent) = ovride {
+            i = ent.global_sys_int();
+        }
+
         let mut l = RegRedTblL(self.read(reg_redtbl_low(i)));
         let h = RegRedTblH(self.read(reg_redtbl_high(i)));
 
@@ -132,7 +137,11 @@ impl IOApic {
         self.write(reg_redtbl_high(i), h.0);
     }
 
-    pub fn set_int(&mut self, src: u32, dest: u32) {
+    pub fn set_int(&mut self, mut src: u32, dest: u32, ovride: Option<&'static MadtEntryIntSrc>) {
+        if let Some(ent) = ovride {
+            src = ent.global_sys_int();
+        }
+
         let mut l = RegRedTblL(self.read(reg_redtbl_low(src)));
         let mut h = RegRedTblH(self.read(reg_redtbl_high(src)));
 
@@ -142,6 +151,15 @@ impl IOApic {
         l.set_vector(dest);
         l.set_masked(false);
         h.set_destination(self.id());
+
+        if let Some(ent) = ovride {
+            if ent.active_low() {
+                l.0 |= 1 << 13; //active low
+            }
+            if ent.level_triggered() {
+                l.0 |= 1 << 15; //level triggered
+            }
+        }
 
         self.write(reg_redtbl_low(src), l.0);
         self.write(reg_redtbl_high(src), h.0);
@@ -158,7 +176,7 @@ impl IOApic {
         }
 
         for i in 0..self.max_red_entry() + 1 {
-            self.mask_int(i, true);
+            self.mask_int(i, true, None);
         }
     }
 }

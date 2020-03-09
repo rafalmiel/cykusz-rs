@@ -69,6 +69,14 @@ impl Scheduler {
         self.cpu_queues.add_task(task);
     }
 
+    fn add_param_task(&self, fun: usize, val: usize) {
+        let _g = IrqGuard::new();
+
+        let task = self.tasks.add_param_task(fun, val);
+
+        self.cpu_queues.add_task(task);
+    }
+
     fn add_user_task(&self, fun: MappedAddr, code_size: usize) {
         let _g = IrqGuard::new();
 
@@ -139,6 +147,10 @@ pub fn task_finished() -> ! {
 
 pub fn create_task(fun: fn()) {
     scheduler().add_task(fun);
+}
+
+pub fn create_param_task(fun: usize, val: usize) {
+    scheduler().add_param_task(fun, val);
 }
 
 pub fn create_user_task(fun: MappedAddr, code_size: u64) {

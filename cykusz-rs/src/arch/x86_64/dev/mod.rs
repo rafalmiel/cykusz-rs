@@ -1,4 +1,5 @@
 pub mod cpu;
+pub mod expci;
 pub mod hpet;
 pub mod ioapic;
 pub mod lapic;
@@ -9,7 +10,7 @@ pub mod serial;
 
 pub fn init() {
     pic::init();
-    if let Some(ref apic) = crate::arch::acpi::ACPI.lock().get_apic_entry() {
+    if let Some(apic) = crate::arch::acpi::ACPI.lock().get_apic_entry() {
         //We have local apic, so disable PIC
         pic::disable();
 
@@ -37,6 +38,12 @@ pub fn init() {
         println!("[ OK ] HPET Enabled")
     } else {
         panic!("[ ERROR ] HPET Not found");
+    }
+
+    if let Some(ref mcfg) = crate::arch::acpi::ACPI.lock().get_mcfg_entry() {
+        expci::init(mcfg);
+
+        println!("[ OK ] Extended PCI Configuration Enabled");
     }
 
     println!("[ OK ] PIT Disabled");

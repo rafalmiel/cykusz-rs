@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+
 use acpica::*;
 
 use crate::kernel::timer::busy_sleep;
@@ -5,7 +8,7 @@ use crate::kernel::timer::busy_sleep;
 #[no_mangle]
 #[linkage = "external"]
 extern "C" fn AcpiOsGetThreadId() -> UINT64 {
-    1
+    crate::kernel::sched::current_id() as u64 + 1
 }
 
 #[no_mangle]
@@ -15,7 +18,9 @@ extern "C" fn AcpiOsExecute(
     Function: ACPI_OSD_EXEC_CALLBACK,
     Context: *mut ::core::ffi::c_void,
 ) -> ACPI_STATUS {
-    unimplemented!()
+    println!("AcpiOsExecute: Fun {:p}({:p})", Function.unwrap(), Context);
+    crate::kernel::sched::create_param_task(Function.unwrap() as usize, Context as usize);
+    AE_OK
 }
 
 #[no_mangle]

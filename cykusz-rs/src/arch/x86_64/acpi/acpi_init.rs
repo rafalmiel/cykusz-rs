@@ -87,6 +87,36 @@ unsafe extern "C" fn embedded_ctl(
     acpica::AE_OK
 }
 
+fn call_pic1() {
+    let mut arg = ACPI_OBJECT {
+        Type: ACPI_TYPE_INTEGER,
+    };
+    arg.Integer.Value = 1;
+
+    let mut arg_list = ACPI_OBJECT_LIST {
+        Count: 1,
+        Pointer: &mut arg as *mut ACPI_OBJECT,
+    };
+
+    let mut res = ACPI_BUFFER {
+        Length: -1isize as ACPI_SIZE,
+        Pointer: null_mut(),
+    };
+
+    let status = unsafe {
+        AcpiEvaluateObject(
+            null_mut(),
+            acpi_str(b"\\_PIC\0"),
+            &mut arg_list as *mut ACPI_OBJECT_LIST,
+            &mut res as *mut ACPI_BUFFER,
+        )
+    };
+
+    if status != AE_OK {
+        println!("PIC Execution failed");
+    }
+}
+
 #[allow(non_snake_case)]
 #[allow(unused_variables)]
 unsafe extern "C" fn embedded_ctl_setup(
@@ -122,7 +152,10 @@ pub fn init() {
         assert_eq!(AcpiInitializeObjects(0), AE_OK);
     }
 
+    call_pic1();
+
     pci_routing();
+    loop{}
 }
 
 fn acpi_str(v: &[u8]) -> *mut i8 {
@@ -199,7 +232,12 @@ unsafe extern "C" fn pci_add_root_dev(
         //println!("{:?}", tbl);
 
         if tbl.Source[0] == 0 {
-            println!("add irq {} {}", tbl.Address >> 16, tbl.Pin);
+            println!(
+                "add irq {} {} {}",
+                tbl.Address >> 16,
+                tbl.Pin,
+                tbl.SourceIndex
+            );
         } else {
             let mut src_handle: ACPI_HANDLE = null_mut();
 

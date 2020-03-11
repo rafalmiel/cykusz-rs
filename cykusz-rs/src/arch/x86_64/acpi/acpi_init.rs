@@ -121,4 +121,126 @@ pub fn init() {
 
         assert_eq!(AcpiInitializeObjects(0), AE_OK);
     }
+
+    pci_routing();
+}
+
+fn acpi_str(v: &[u8]) -> *mut i8 {
+    v.as_ptr() as *mut i8
+}
+
+#[allow(non_snake_case)]
+#[allow(unused_variables)]
+unsafe extern "C" fn get_irq_resource(
+    Resource: *mut ACPI_RESOURCE,
+    Context: *mut ::core::ffi::c_void,
+) -> ACPI_STATUS {
+    let res = &*Resource;
+    let tbl = &*(Context as *mut acpi_pci_routing_table);
+
+    match res.Type {
+        ACPI_RESOURCE_TYPE_IRQ => {
+            //println!("I Count {}", res.Data.Irq.InterruptCount);
+            println!(
+                "add r irq {} {} {}",
+                tbl.Address >> 16,
+                tbl.Pin as u8,
+                *res.Data
+                    .Irq
+                    .Interrupts
+                    .as_ptr()
+                    .offset(tbl.SourceIndex as u8 as isize)
+            );
+        }
+        ACPI_RESOURCE_TYPE_EXTENDED_IRQ => {
+            //println!("I Count {}", res.Data.ExtendedIrq.InterruptCount);
+            println!(
+                "add r2 irq {} {} {}",
+                tbl.Address >> 16,
+                tbl.Pin as u8,
+                *res.Data
+                    .ExtendedIrq
+                    .Interrupts
+                    .as_ptr()
+                    .offset(tbl.SourceIndex as u8 as isize)
+            );
+        }
+        _ => {}
+    }
+
+    AE_OK
+}
+
+#[allow(non_snake_case)]
+#[allow(unused_variables)]
+unsafe extern "C" fn pci_add_root_dev(
+    Object: ACPI_HANDLE,
+    _NestingLevel: UINT32,
+    _Context: *mut ::core::ffi::c_void,
+    _ReturnValue: *mut *mut ::core::ffi::c_void,
+) -> ACPI_STATUS {
+    println!("Found PCI root bridge");
+
+    let mut buf: ACPI_BUFFER = ACPI_BUFFER {
+        Length: -1isize as ACPI_SIZE, // ACPI_ALLOCATE_BUFFER
+        Pointer: null_mut(),
+    };
+
+    assert_eq!(
+        AcpiGetIrqRoutingTable(Object, &mut buf as *mut ACPI_BUFFER),
+        AE_OK
+    );
+
+    println!("{:?}", buf);
+
+    let mut tbl = &mut *(buf.Pointer as *mut acpi_pci_routing_table);
+
+    while tbl.Length != 0 {
+        //println!("{:?}", tbl);
+
+        if tbl.Source[0] == 0 {
+            println!("add irq {} {}", tbl.Address >> 16, tbl.Pin);
+        } else {
+            let mut src_handle: ACPI_HANDLE = null_mut();
+
+            assert_eq!(
+                AcpiGetHandle(
+                    Object,
+                    tbl.Source.as_mut_ptr(),
+                    &mut src_handle as *mut ACPI_HANDLE
+                ),
+                AE_OK
+            );
+
+            assert_eq!(
+                AcpiWalkResources(
+                    src_handle,
+                    acpi_str(b"_CRS\0"),
+                    Some(get_irq_resource),
+                    tbl as *mut _ as *mut core::ffi::c_void
+                ),
+                AE_OK
+            );
+        }
+
+        buf.Pointer = buf.Pointer.offset(tbl.Length as isize);
+        tbl = &mut *(buf.Pointer as *mut acpi_pci_routing_table);
+
+        crate::bochs();
+    }
+    AE_OK
+}
+pub fn pci_routing() {
+    println!("PCI Routing:");
+    unsafe {
+        assert_eq!(
+            AcpiGetDevices(
+                acpi_str(b"PNP0A03\0"),
+                Some(pci_add_root_dev),
+                null_mut(),
+                null_mut()
+            ),
+            AE_OK
+        );
+    }
 }

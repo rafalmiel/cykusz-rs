@@ -39,7 +39,7 @@ extern "C" fn AcpiOsInstallInterruptHandler(
 ) -> ACPI_STATUS {
     use crate::arch::idt::*;
 
-    if ServiceRoutine.is_none() || Context.is_null() {
+    if ServiceRoutine.is_none() {
         return AE_BAD_PARAMETER;
     }
 

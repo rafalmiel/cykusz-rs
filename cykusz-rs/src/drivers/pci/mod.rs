@@ -1,4 +1,5 @@
 use crate::arch::raw::cpuio::Port;
+use crate::kernel::sync::Spin;
 
 struct Pci {
     addr: Port<u32>,
@@ -24,7 +25,9 @@ impl Pci {
 
         self.addr.write(addr);
 
-        return self.data.read();
+        let res = self.data.read();
+
+        return res;
     }
 
     fn check(&mut self, bus: u8, device: u8, function: u8) {
@@ -45,8 +48,8 @@ impl Pci {
             let pin = (int >> 8) & 0xff;
 
             println!(
-                "Vendor: 0x{:x} Dev: 0x{:x} Class: 0x{:x} SubClass: 0x{:x} pin: {}, line: {}",
-                vendor_id, dev_id, ccode, subclass, pin, line
+                "({}, {}, {})V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {}",
+                bus, device, function, vendor_id, dev_id, ccode, subclass, pin, line
             );
         }
     }
@@ -68,9 +71,21 @@ impl Pci {
 }
 
 pub fn pci_init() {
-    let mut pci = Pci::new();
+    let mut pci = PCI.lock();
 
-    pci.init();
+    *pci = Some(Pci::new());
+
+    pci.as_mut().unwrap().init();
+}
+
+static PCI: Spin<Option<Pci>> = Spin::new(None);
+
+pub fn read_u32(bus: u8, slot: u8, func: u8, offset: u8) -> u32 {
+    if let Some(ref mut pci) = *PCI.lock() {
+        pci.read_u32(bus, slot, func, offset)
+    } else {
+        panic!("PCI read failed");
+    }
 }
 
 platform_init!(pci_init);

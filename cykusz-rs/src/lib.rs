@@ -70,10 +70,6 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Scheduler Initialised");
 
-    arch::acpi::acpi_init::init();
-
-    println!("[ OK ] Acpi Initialised");
-
     kernel::smp::start();
 
     println!(
@@ -94,6 +90,10 @@ pub fn rust_main(stack_top: VirtAddr) {
     kernel::module::init_all();
 
     println!("[ OK ] Modules Initialized");
+
+    arch::acpi::acpi_init::init();
+
+    println!("[ OK ] Acpi Initialised");
 
     // Start test tasks on this cpu
     task_test::start();

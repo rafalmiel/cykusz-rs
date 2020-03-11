@@ -38,7 +38,11 @@ impl LockedHeap {
         LockedHeap(Spin::new(Heap::empty()))
     }
 
-    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<(NonNull<u8>, usize), AllocErr> {
+    unsafe fn allocate(
+        &self,
+        heap: &mut Heap,
+        layout: Layout,
+    ) -> Result<(NonNull<u8>, usize), AllocErr> {
         ALLOCED_MEM.fetch_add(layout.size(), Ordering::SeqCst);
         heap.alloc(layout.clone()).or_else(|e| match e {
             AllocErr { .. } => {

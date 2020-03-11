@@ -73,7 +73,13 @@ impl Mcfg {
             }
         }
 
-        panic!("Failed pci write")
+        assert_eq!(width, 8);
+
+        let res = crate::drivers::pci::read_u32(bus as u8, dev as u8, fun as u8, reg as u8) as u64;
+
+        let offset = (reg & 0b11) * 8;
+
+        (res >> offset) as u8 as u64
     }
 }
 

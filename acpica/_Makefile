@@ -24,7 +24,7 @@ $(OUT_DIR)/libacpica-$(TARGET).a: $(SRCDIR) $(OBJS)
 
 acpica_patched:
 	git submodule update --init
-	cd acpica && git am ../0001-cykusz-patch.patch
+	cd acpica && git apply ../0001-cykusz-patch.patch
 	touch acpica_patched
 
 $(OBJDIR)%.o: $(SRCDIR)%.c _Makefile acpica_patched

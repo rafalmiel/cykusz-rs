@@ -155,7 +155,6 @@ pub fn init() {
     call_pic1();
 
     pci_routing();
-    loop{}
 }
 
 fn acpi_str(v: &[u8]) -> *mut i8 {

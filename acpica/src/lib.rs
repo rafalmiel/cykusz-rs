@@ -5,6 +5,12 @@ pub use raw64::*;
 #[allow(bad_style)]
 mod raw64;
 
+pub fn acpi_str(v: &[u8]) -> *mut i8 {
+    v.as_ptr() as *mut i8
+}
+
+pub const ACPI_ROOT_OBJECT: *mut core::ffi::c_void = 0xFFFFFFFFFFFFFFFF as *mut core::ffi::c_void;
+
 pub const AE_OK: ACPI_STATUS = 0;
 
 pub const AE_ERROR: ACPI_STATUS = 0x0001;

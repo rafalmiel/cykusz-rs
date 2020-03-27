@@ -3,6 +3,7 @@
 
 pub use acpica::*;
 
+pub mod ec;
 mod int;
 mod mem;
 mod memio;

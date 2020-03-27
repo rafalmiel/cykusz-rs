@@ -13,6 +13,7 @@
 #![feature(linkage)]
 #![feature(c_variadic)]
 #![feature(maybe_uninit_ref)]
+#![feature(negative_impls)]
 
 extern crate alloc;
 #[macro_use]

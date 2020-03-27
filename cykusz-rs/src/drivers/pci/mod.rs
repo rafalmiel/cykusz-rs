@@ -44,13 +44,21 @@ impl Pci {
 
             let int = self.read_u32(bus, device, function, 0x3c);
 
+            let hdr = (self.read_u32(bus, device, function, 0xc) >> 16) & 0xff;
+
             let line = int & 0xff;
             let pin = (int >> 8) & 0xff;
 
             println!(
-                "({}, {}, {})V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {}",
-                bus, device, function, vendor_id, dev_id, ccode, subclass, pin, line
+                "({}, {}, {})V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {} h: 0x{:x}",
+                bus, device, function, vendor_id, dev_id, ccode, subclass, pin, line, hdr
             );
+
+            if hdr & 0b1 == 0b1 {
+                let map = self.read_u32(bus, device, function, 0x18) & 0xffff;
+
+                println!("{} -> {}", map & 0xff, map >> 8);
+            }
         }
     }
 
@@ -61,7 +69,7 @@ impl Pci {
                 let header = (self.read_u32(bus, device, 0, 0xc) >> 16) & 0xff;
 
                 if header & 0x80 > 0 {
-                    for f in 0..8 {
+                    for f in 1..8 {
                         self.check(bus, device, f);
                     }
                 }

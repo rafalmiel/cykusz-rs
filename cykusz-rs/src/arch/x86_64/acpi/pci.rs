@@ -168,7 +168,7 @@ unsafe extern "C" fn pci_add_root_dev(
 
 struct PciBridge {
     acpi_handle: ACPI_HANDLE,
-    irqs: [i32; 32 * 4],
+    irqs: [Option<u32>; 32 * 4],
 
     device: i32,
     function: i32,
@@ -191,7 +191,7 @@ impl PciBridge {
     fn new(handle: ACPI_HANDLE) -> PciBridge {
         PciBridge {
             acpi_handle: handle,
-            irqs: [-1; 32 * 4],
+            irqs: [None; 32 * 4],
             device: -1,
             function: -1,
             primary: -1,
@@ -202,7 +202,8 @@ impl PciBridge {
 
     fn add_irq(&mut self, dev: u64, pin: u8, int: u32) {
         println!("[ ACPI ] Add irq {} {} {}", dev, pin, int);
-        self.irqs[dev as usize * 4 + pin as usize] = int as i32;
+
+        self.irqs[dev as usize * 4 + pin as usize] = Some(int);
     }
 
     fn init_dev_fun(&mut self) -> (i32, i32) {
@@ -312,6 +313,22 @@ impl PciBridge {
         );
         self.children.insert((dev, fun), Arc::new(bridge));
     }
+
+    fn find_bridge(&self, sbus: u32) -> Option<&PciBridge> {
+        if self.secondary == sbus as i32 {
+            return Some(self);
+        } else {
+            for (_, b) in &self.children {
+                let b = b.find_bridge(sbus);
+
+                if b.is_some() {
+                    return b;
+                }
+            }
+        }
+
+        None
+    }
 }
 
 pub fn pci_routing() {
@@ -332,4 +349,14 @@ pub fn init() {
     call_pic1();
 
     pci_routing();
+}
+
+pub fn get_irq_mapping(bus: u32, dev: u32, pin: u32) -> Option<u32> {
+    let root = root_bridge();
+
+    if let Some(b) = root.find_bridge(bus) {
+        b.irqs[(dev as usize) * 4 + pin as usize]
+    } else {
+        None
+    }
 }

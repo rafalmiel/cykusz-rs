@@ -4,11 +4,8 @@ use crate::kernel::sync::Spin;
 use self::rsdp::Address;
 use self::rsdt::Rsdt;
 
-pub mod acpi_init;
-mod acpica;
 pub mod apic;
 pub mod hpet;
-pub mod pci;
 mod rsdp;
 mod rsdt;
 mod util;

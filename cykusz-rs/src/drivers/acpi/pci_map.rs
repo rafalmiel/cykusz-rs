@@ -110,8 +110,9 @@ unsafe extern "C" fn add_pci_dev(
     if new_bridge.init_irq_routing() {
         let (dev, fun) = new_bridge.init_dev_fun();
 
-        let map = crate::drivers::pci::read_u32(bridge.secondary as u8, dev as u8, fun as u8, 0x18)
-            & 0xffff;
+        let map =
+            crate::drivers::pci::read(0, bridge.secondary as u16, dev as u16, fun as u16, 0x18, 32)
+                & 0xffff;
 
         new_bridge.primary = (map & 0xff) as i8 as i32;
         new_bridge.secondary = ((map >> 8) & 0xff) as i8 as i32;
@@ -351,6 +352,7 @@ pub fn init() {
     pci_routing();
 }
 
+#[allow(dead_code)]
 pub fn get_irq_mapping(bus: u32, dev: u32, pin: u32) -> Option<u32> {
     let root = root_bridge();
 

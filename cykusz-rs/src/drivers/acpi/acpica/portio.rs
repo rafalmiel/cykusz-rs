@@ -3,7 +3,7 @@
 
 use acpica::*;
 
-use crate::arch::x86_64::raw::cpuio::Port;
+use crate::arch::raw::cpuio::Port;
 
 #[no_mangle]
 #[linkage = "external"]

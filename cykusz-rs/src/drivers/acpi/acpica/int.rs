@@ -3,8 +3,8 @@
 
 use acpica::*;
 
-use crate::arch::x86_64::int::{mask_int, set_irq_dest};
-use crate::arch::x86_64::raw::idt::ExceptionStackFrame;
+use crate::arch::int::{mask_int, set_irq_dest};
+use crate::arch::raw::idt::ExceptionStackFrame;
 use crate::kernel::sync::Spin;
 
 extern "x86-interrupt" fn acpi_irq(_frame: &mut ExceptionStackFrame) {

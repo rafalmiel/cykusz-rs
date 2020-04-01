@@ -1,6 +1,9 @@
+pub mod acpica;
+pub mod pci_map;
+
 use core::ptr::*;
 
-use acpica::*;
+use ::acpica::*;
 
 pub fn init() {
     unsafe {
@@ -16,8 +19,8 @@ pub fn init() {
             AcpiInstallAddressSpaceHandler(
                 ACPI_ROOT_OBJECT,
                 3,
-                Some(super::acpica::ec::embedded_ctl),
-                Some(super::acpica::ec::embedded_ctl_setup),
+                Some(self::acpica::ec::embedded_ctl),
+                Some(self::acpica::ec::embedded_ctl_setup),
                 null_mut()
             ),
             AE_OK
@@ -26,5 +29,9 @@ pub fn init() {
         assert_eq!(AcpiInitializeObjects(0), AE_OK);
     }
 
-    crate::arch::acpi::pci::init();
+    pci_map::init();
+
+    println!("[ OK ] ACPI Initialized");
 }
+
+platform_2_init!(init);

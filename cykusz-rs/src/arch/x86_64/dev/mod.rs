@@ -1,5 +1,4 @@
 pub mod cpu;
-pub mod expci;
 pub mod hpet;
 pub mod ioapic;
 pub mod lapic;
@@ -38,12 +37,6 @@ pub fn init() {
         println!("[ OK ] HPET Enabled")
     } else {
         panic!("[ ERROR ] HPET Not found");
-    }
-
-    if let Some(ref mcfg) = crate::arch::acpi::ACPI.lock().get_mcfg_entry() {
-        expci::init(mcfg);
-
-        println!("[ OK ] Extended PCI Configuration Enabled");
     }
 
     println!("[ OK ] PIT Disabled");

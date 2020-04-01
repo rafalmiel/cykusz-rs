@@ -92,10 +92,6 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Modules Initialized");
 
-    arch::acpi::acpi_init::init();
-
-    println!("[ OK ] Acpi Initialised");
-
     // Start test tasks on this cpu
     task_test::start();
 

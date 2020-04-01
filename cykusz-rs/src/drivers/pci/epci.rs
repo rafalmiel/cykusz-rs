@@ -1,4 +1,5 @@
-use crate::arch::x86_64::raw::mm::{MappedAddr, PhysAddr};
+use crate::drivers::pci::PciAccess;
+use crate::kernel::mm::{MappedAddr, PhysAddr};
 use crate::kernel::sync::Spin;
 
 struct Mcfg(Option<&'static acpica::acpi_table_mcfg>);
@@ -73,36 +74,50 @@ impl Mcfg {
             }
         }
 
-        if width == 8 {
-            let res =
-                crate::drivers::pci::read_u32(bus as u8, dev as u8, fun as u8, reg as u8) as u64;
-
-            let offset = (reg & 0b11) * 8;
-
-            (res >> offset) as u8 as u64
-        } else if width == 32 {
-            let res =
-                crate::drivers::pci::read_u32(bus as u8, dev as u8, fun as u8, reg as u8) as u64;
-
-            res as u64
-        } else {
-            panic!("Unsupported width");
-        }
+        crate::drivers::pci::pci::read(seg, bus, dev, fun, reg, width)
     }
 }
 
 static EXPCI: Spin<Mcfg> = Spin::new(Mcfg::new());
 
-pub fn init(hdr: &'static acpica::acpi_table_mcfg) {
+static DRIVER: Driver = Driver {};
+
+struct Driver {}
+
+impl PciAccess for Driver {
+    fn read(&self, seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, width: u32) -> u64 {
+        EXPCI.lock().read(seg, bus, dev, fun, reg, width)
+    }
+
+    fn write(&self, seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, val: u64, width: u32) {
+        EXPCI.lock().write(seg, bus, dev, fun, reg, val, width);
+    }
+}
+
+pub fn init() -> bool {
+    if let Some(m) = crate::arch::acpi::ACPI.lock().get_mcfg_entry() {
+        init_pci(m);
+
+        super::register_pci_driver(&DRIVER);
+
+        return true;
+    }
+
+    return false;
+}
+
+pub fn init_pci(hdr: &'static acpica::acpi_table_mcfg) {
     let mut e = EXPCI.lock();
 
     e.init(hdr);
 }
 
+#[allow(dead_code)]
 pub fn write(seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, val: u64, width: u32) {
     EXPCI.lock().write(seg, bus, dev, fun, reg, val, width);
 }
 
+#[allow(dead_code)]
 pub fn read(seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, width: u32) -> u64 {
     EXPCI.lock().read(seg, bus, dev, fun, reg, width)
 }

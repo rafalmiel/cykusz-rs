@@ -44,6 +44,26 @@ macro_rules! platform_fini {
     };
 }
 
+#[macro_export]
+macro_rules! platform_2_init {
+    ($name: ident) => {
+        #[used]
+        #[link_section = ".devinit.plat_2"]
+        static __PTR_INIT: crate::kernel::module::ModuleFun =
+            crate::kernel::module::ModuleFun($name as *const ());
+    };
+}
+
+#[macro_export]
+macro_rules! platform_2_fini {
+    ($name: ident) => {
+        #[used]
+        #[link_section = ".devfini.plat_2"]
+        static __PTR_FINI: crate::kernel::module::ModuleFun =
+            crate::kernel::module::ModuleFun($name as *const ());
+    };
+}
+
 unsafe fn run_range(start: VirtAddr, end: VirtAddr) {
     (start..end).step_by(8).for_each(|ptr| {
         ptr.read::<fn()>()();

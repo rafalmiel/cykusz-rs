@@ -1,99 +1,36 @@
-use crate::arch::raw::cpuio::Port;
 use crate::kernel::sync::Spin;
 
-struct Pci {
-    addr: Port<u32>,
-    data: Port<u32>,
+mod epci;
+mod pci;
+
+pub trait PciAccess: Sync {
+    fn read(&self, seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, width: u32) -> u64;
+    fn write(&self, seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, val: u64, width: u32);
 }
 
-impl Pci {
-    fn new() -> Pci {
-        unsafe {
-            Pci {
-                addr: Port::new(0xCF8),
-                data: Port::new(0xCFC),
-            }
-        }
-    }
+static DRIVER: Spin<Option<&'static dyn PciAccess>> = Spin::new(None);
 
-    fn read_u32(&mut self, bus: u8, slot: u8, func: u8, offset: u8) -> u32 {
-        let addr = ((bus as u32) << 16)
-            | ((slot as u32) << 11)
-            | ((func as u32) << 8)
-            | ((offset as u32) & 0xfc)
-            | 0x80000000u32;
+pub fn register_pci_driver(driver: &'static dyn PciAccess) {
+    *DRIVER.lock() = Some(driver);
+}
 
-        self.addr.write(addr);
-
-        let res = self.data.read();
-
-        return res;
-    }
-
-    fn check(&mut self, bus: u8, device: u8, function: u8) {
-        let vid_did = self.read_u32(bus, device, function, 0);
-
-        if vid_did != 0xffffffff {
-            let vendor_id = vid_did & 0xffff;
-            let dev_id = vid_did >> 16;
-
-            let class = self.read_u32(bus, device, function, 8);
-
-            let ccode = class >> 24;
-            let subclass = (class >> 16) & 0xff;
-
-            let int = self.read_u32(bus, device, function, 0x3c);
-
-            let hdr = (self.read_u32(bus, device, function, 0xc) >> 16) & 0xff;
-
-            let line = int & 0xff;
-            let pin = (int >> 8) & 0xff;
-
-            println!(
-                "({}, {}, {})V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {} h: 0x{:x}",
-                bus, device, function, vendor_id, dev_id, ccode, subclass, pin, line, hdr
-            );
-
-            if hdr & 0b1 == 0b1 {
-                let map = self.read_u32(bus, device, function, 0x18) & 0xffff;
-
-                println!("{} -> {}", map & 0xff, map >> 8);
-            }
-        }
-    }
-
-    pub fn init(&mut self) {
-        for bus in 0..=255 {
-            for device in 0..32 {
-                self.check(bus, device, 0);
-                let header = (self.read_u32(bus, device, 0, 0xc) >> 16) & 0xff;
-
-                if header & 0x80 > 0 {
-                    for f in 1..8 {
-                        self.check(bus, device, f);
-                    }
-                }
-            }
-        }
+pub fn init() {
+    println!("Platform init pci:");
+    if !epci::init() {
+        println!("Platform init pci 2:");
+        pci::init();
     }
 }
 
-pub fn pci_init() {
-    let mut pci = PCI.lock();
-
-    *pci = Some(Pci::new());
-
-    pci.as_mut().unwrap().init();
+pub fn read(seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, width: u32) -> u64 {
+    DRIVER.lock().unwrap().read(seg, bus, dev, fun, reg, width)
 }
 
-static PCI: Spin<Option<Pci>> = Spin::new(None);
-
-pub fn read_u32(bus: u8, slot: u8, func: u8, offset: u8) -> u32 {
-    if let Some(ref mut pci) = *PCI.lock() {
-        pci.read_u32(bus, slot, func, offset)
-    } else {
-        panic!("PCI read failed");
-    }
+pub fn write(seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, val: u64, width: u32) {
+    DRIVER
+        .lock()
+        .unwrap()
+        .write(seg, bus, dev, fun, reg, val, width);
 }
 
-platform_init!(pci_init);
+platform_init!(init);

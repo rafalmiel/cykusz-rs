@@ -1,7 +1,34 @@
 use acpica::*;
 
-use crate::arch::x86_64::raw::cpuio::Port;
+use crate::arch::raw::cpuio::Port;
 use crate::kernel::timer::busy_sleep;
+
+struct GlobalLockGuard {
+    handle: u32,
+}
+
+impl GlobalLockGuard {
+    fn new() -> GlobalLockGuard {
+        let mut lock = GlobalLockGuard { handle: 0 };
+
+        assert_eq!(
+            unsafe {
+                acpica::AcpiAcquireGlobalLock(u16::max_value(), &mut lock.handle as *mut u32)
+            },
+            acpica::AE_OK
+        );
+
+        lock
+    }
+}
+
+impl Drop for GlobalLockGuard {
+    fn drop(&mut self) {
+        unsafe {
+            acpica::AcpiReleaseGlobalLock(self.handle);
+        }
+    }
+}
 
 #[allow(non_snake_case)]
 #[allow(unused_variables)]
@@ -30,11 +57,7 @@ pub unsafe extern "C" fn embedded_ctl(
         return false;
     };
 
-    let mut global_lock_handle = 0;
-    assert_eq!(
-        acpica::AcpiAcquireGlobalLock(u16::max_value(), &mut global_lock_handle as *mut u32),
-        acpica::AE_OK
-    );
+    let _lock = GlobalLockGuard::new();
 
     if BitWidth != 8 {
         panic!("Unsupported BitWidth {}", BitWidth);
@@ -44,42 +67,35 @@ pub unsafe extern "C" fn embedded_ctl(
         //Read
         if !wait_for(0b10, 0) {
             *Value = 0xFF;
-            acpica::AcpiReleaseGlobalLock(global_lock_handle);
             return AE_OK;
         }
         cmd.write(0x80);
         if !wait_for(0b10, 0) {
             *Value = 0xFF;
-            acpica::AcpiReleaseGlobalLock(global_lock_handle);
             return AE_OK;
         }
         data.write(Address as u8);
         if !wait_for(0b1, 0b1) {
             *Value = 0xFF;
-            acpica::AcpiReleaseGlobalLock(global_lock_handle);
             return AE_OK;
         }
         *Value = data.read() as u64;
     } else {
         //Write
         if !wait_for(0b10, 0) {
-            acpica::AcpiReleaseGlobalLock(global_lock_handle);
             return AE_OK;
         }
         cmd.write(0x81);
         if !wait_for(0b10, 0) {
-            acpica::AcpiReleaseGlobalLock(global_lock_handle);
             return AE_OK;
         }
         data.write(Address as u8);
         if !wait_for(0b10, 0) {
-            acpica::AcpiReleaseGlobalLock(global_lock_handle);
             return AE_OK;
         }
         data.write(*Value as u8);
     }
 
-    acpica::AcpiReleaseGlobalLock(global_lock_handle);
     acpica::AE_OK
 }
 

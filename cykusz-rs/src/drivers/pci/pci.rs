@@ -39,52 +39,6 @@ impl Pci {
         return res;
     }
 
-    fn check(&mut self, bus: u8, device: u8, function: u8) {
-        let vid_did = self.read_u32(bus, device, function, 0);
-
-        if vid_did != 0xffffffff {
-            let vendor_id = vid_did & 0xffff;
-            let dev_id = vid_did >> 16;
-
-            let class = self.read_u32(bus, device, function, 8);
-
-            let ccode = class >> 24;
-            let subclass = (class >> 16) & 0xff;
-
-            let int = self.read_u32(bus, device, function, 0x3c);
-
-            let hdr = (self.read_u32(bus, device, function, 0xc) >> 16) & 0xff;
-
-            let line = int & 0xff;
-            let pin = (int >> 8) & 0xff;
-
-            println!(
-                "({}, {}, {})V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {} h: 0x{:x}",
-                bus, device, function, vendor_id, dev_id, ccode, subclass, pin, line, hdr
-            );
-
-            if hdr & 0b1 == 0b1 {
-                let map = self.read_u32(bus, device, function, 0x18) & 0xffff;
-
-                println!("{} -> {}", map & 0xff, map >> 8);
-            }
-        }
-    }
-
-    pub fn init(&mut self) {
-        for bus in 0..=255 {
-            for device in 0..32 {
-                self.check(bus, device, 0);
-                let header = (self.read_u32(bus, device, 0, 0xc) >> 16) & 0xff;
-
-                if header & 0x80 > 0 {
-                    for f in 1..8 {
-                        self.check(bus, device, f);
-                    }
-                }
-            }
-        }
-    }
 }
 
 static DRIVER: Driver = Driver {};
@@ -133,8 +87,6 @@ pub fn pci_init() {
     let mut pci = PCI.lock();
 
     *pci = Some(Pci::new());
-
-    pci.as_mut().unwrap().init();
 }
 
 static PCI: Spin<Option<Pci>> = Spin::new(None);

@@ -110,6 +110,8 @@ pub fn init_pci(hdr: &'static acpica::acpi_table_mcfg) {
     let mut e = EXPCI.lock();
 
     e.init(hdr);
+
+    super::pci::pci_init();
 }
 
 #[allow(dead_code)]

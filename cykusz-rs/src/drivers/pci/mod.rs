@@ -1,4 +1,6 @@
 use crate::kernel::sync::Spin;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 mod epci;
 mod pci;
@@ -8,14 +10,29 @@ pub trait PciAccess: Sync {
     fn write(&self, seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, val: u64, width: u32);
 }
 
+pub trait PciDevice: Sync + Send {
+    fn handles(&self, pci_dev_id: u64) -> bool;
+    fn start(&self);
+}
+
 struct Pci {
-    driver: Option<&'static dyn PciAccess>
+    driver: Option<&'static dyn PciAccess>,
+    devices: Vec<Box<dyn PciDevice>>,
 }
 
 impl Pci {
     const fn new() -> Pci {
         Pci {
-            driver: None
+            driver: None,
+            devices: Vec::new(),
+        }
+    }
+
+    fn check_devices(&self, dev_id: u64) {
+        for dev in &self.devices {
+            if dev.handles(dev_id) {
+                dev.start();
+            }
         }
     }
 
@@ -42,6 +59,8 @@ impl Pci {
                 "({}, {}, {}) V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {} h: 0x{:x}",
                 bus, device, function, vendor_id, dev_id, ccode, subclass, pin, line, hdr
             );
+
+            self.check_devices(dev_id as u64);
 
             if hdr & 0b1 == 0b1 {
                 let map = self.read_u32(bus, device, function, 0x18) & 0xffff;
@@ -77,6 +96,12 @@ pub fn register_pci_driver(driver: &'static dyn PciAccess) {
     DRIVER.lock().driver = Some(driver);
 }
 
+pub fn register_pci_device(device: Box<dyn PciDevice>) {
+    let mut driver = DRIVER.lock();
+
+    driver.devices.push(device);
+}
+
 pub fn init() {
     if !epci::init() {
         pci::init();
@@ -84,7 +109,9 @@ pub fn init() {
     } else {
         println!("[ OK ] Express PCI Initialized");
     }
+}
 
+pub fn enumerate_pci() {
     let mut driver = DRIVER.lock();
 
     driver.init();

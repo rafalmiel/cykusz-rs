@@ -92,6 +92,8 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Modules Initialized");
 
+    drivers::post_module_init();
+
     // Start test tasks on this cpu
     task_test::start();
 

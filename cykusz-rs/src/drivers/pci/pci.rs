@@ -38,7 +38,6 @@ impl Pci {
 
         return res;
     }
-
 }
 
 static DRIVER: Driver = Driver {};

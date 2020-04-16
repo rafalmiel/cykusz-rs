@@ -1,9 +1,9 @@
-pub mod acpica;
-pub mod pci_map;
-
 use core::ptr::*;
 
 use ::acpica::*;
+
+pub mod acpica;
+pub mod pci_map;
 
 pub fn init() {
     unsafe {

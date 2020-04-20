@@ -13,18 +13,24 @@ pub trait PciAccess: Sync {
 
 pub trait PciDeviceHandle: Sync + Send {
     fn handles(&self, pci_dev_id: u64) -> bool;
-    fn start(&self, pci_data: &PciData);
+    fn start(&mut self, pci_data: &PciHeader) -> bool;
 }
 
 #[derive(Copy, Clone)]
-struct PciHeader0 {}
+pub struct PciHeader0 {
+    data: PciData,
+}
 #[derive(Copy, Clone)]
-struct PciHeader1 {}
+pub struct PciHeader1 {
+    data: PciData,
+}
 #[derive(Copy, Clone)]
-struct PciHeader2 {}
+pub struct PciHeader2 {
+    data: PciData,
+}
 
 #[derive(Copy, Clone)]
-enum PciHeader {
+pub enum PciHeader {
     Unknown,
     Type0(PciHeader0),
     Type1(PciHeader1),
@@ -37,39 +43,25 @@ pub struct PciData {
     pub bus: u16,
     pub dev: u16,
     pub fun: u16,
-    header: PciHeader,
 }
 
 #[allow(dead_code)]
-impl PciData {
-    pub fn new() -> PciData {
-        PciData {
-            seg: 0,
-            bus: 0,
-            dev: 0,
-            fun: 0,
-            header: PciHeader::Unknown,
-        }
-    }
-
-    pub fn is_valid(&self) -> bool {
-        self.header_type() != 0xff
+impl PciHeader {
+    pub fn new() -> PciHeader {
+        PciHeader::Unknown
     }
 
     pub fn init(&mut self, seg: u16, bus: u16, dev: u16, fun: u16) -> bool {
-        self.seg = seg;
-        self.bus = bus;
-        self.dev = dev;
-        self.fun = fun;
+        let data = PciData { seg, bus, dev, fun };
 
-        if !self.is_valid() {
+        if !data.is_valid() {
             return false;
         }
 
-        match self.header_type() & 0b01111111 {
-            0x0 => self.header = PciHeader::Type0(PciHeader0 {}),
-            0x1 => self.header = PciHeader::Type1(PciHeader1 {}),
-            0x2 => self.header = PciHeader::Type2(PciHeader2 {}),
+        match data.header_type() & 0b01111111 {
+            0x0 => *self = PciHeader::Type0(PciHeader0 { data }),
+            0x1 => *self = PciHeader::Type1(PciHeader1 { data }),
+            0x2 => *self = PciHeader::Type2(PciHeader2 { data }),
             _ => {
                 panic!("Invalid PCI Header");
             }
@@ -78,6 +70,30 @@ impl PciData {
         return true;
     }
 
+    pub fn debug(&self) {
+        self.hdr().debug();
+    }
+
+    pub fn hdr(&self) -> &PciData {
+        match self {
+            PciHeader::Type0(hdr) => {
+                return &hdr.data;
+            }
+            PciHeader::Type1(hdr) => {
+                return &hdr.data;
+            }
+            PciHeader::Type2(hdr) => {
+                return &hdr.data;
+            }
+            _ => {
+                panic!("Header not initialized");
+            }
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl PciData {
     pub fn debug(&self) {
         println!(
             "({}, {}, {}) V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {} h: 0x{:x}",
@@ -92,6 +108,10 @@ impl PciData {
             self.interrupt_line(),
             self.header_type()
         );
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.header_type() != 0xff
     }
 
     fn read(&self, offset: u32, width: u32) -> u64 {
@@ -147,10 +167,65 @@ impl PciData {
     }
 }
 
+#[allow(dead_code)]
+impl PciHeader0 {
+    pub fn base_address0(&self) -> u32 {
+        self.data.read(0x10, 32) as u32
+    }
+
+    pub fn base_address1(&self) -> u32 {
+        self.data.read(0x14, 32) as u32
+    }
+
+    pub fn base_address2(&self) -> u32 {
+        self.data.read(0x18, 32) as u32
+    }
+
+    pub fn base_address3(&self) -> u32 {
+        self.data.read(0x1C, 32) as u32
+    }
+
+    pub fn base_address4(&self) -> u32 {
+        self.data.read(0x20, 32) as u32
+    }
+
+    pub fn base_address5(&self) -> u32 {
+        self.data.read(0x24, 32) as u32
+    }
+
+    pub fn cardbus_cis_pointer(&self) -> u32 {
+        self.data.read(0x28, 32) as u32
+    }
+
+    pub fn subsystem_vendor_id(&self) -> u16 {
+        self.data.read(0x2C, 16) as u16
+    }
+
+    pub fn subsystem_id(&self) -> u16 {
+        self.data.read(0x2E, 16) as u16
+    }
+
+    pub fn expansion_rom_base(&self) -> u32 {
+        self.data.read(0x30, 32) as u32
+    }
+
+    pub fn capabilities_ptr(&self) -> u8 {
+        self.data.read(0x34, 8) as u8
+    }
+
+    pub fn min_grant(&self) -> u8 {
+        self.data.read(0x3E, 8) as u8
+    }
+
+    pub fn max_latency(&self) -> u8 {
+        self.data.read(0x3F, 8) as u8
+    }
+}
+
 struct PciDevice {
     handle: Box<dyn PciDeviceHandle>,
     found: bool,
-    data: PciData,
+    data: PciHeader,
 }
 
 struct Pci {
@@ -164,8 +239,8 @@ impl Pci {
         }
     }
 
-    fn check_devices(&mut self, pci_data: &PciData) {
-        let dev_id = pci_data.device_id();
+    fn check_devices(&mut self, pci_data: &PciHeader) {
+        let dev_id = pci_data.hdr().device_id();
 
         for dev in &mut self.devices {
             if dev.handle.handles(dev_id as u64) {
@@ -179,7 +254,7 @@ impl Pci {
     }
 
     fn check(&mut self, bus: u8, device: u8, function: u8) {
-        let mut pci_data = PciData::new();
+        let mut pci_data = PciHeader::new();
         let succeeded = pci_data.init(0, bus as u16, device as u16, function as u16);
 
         if succeeded {
@@ -225,7 +300,7 @@ pub fn register_pci_device(device: Box<dyn PciDeviceHandle>) {
     driver.devices.push(PciDevice {
         handle: device,
         found: false,
-        data: PciData::new(),
+        data: PciHeader::new(),
     });
 }
 

@@ -58,6 +58,10 @@ pub fn map_to(virt: VirtAddr, phys: PhysAddr) {
     flush(virt);
 }
 
+pub fn to_phys(addr: VirtAddr) -> Option<PhysAddr> {
+    current_p4_table().to_phys(addr)
+}
+
 pub unsafe fn activate_table(table: &P4Table) {
     ctrlregs::cr3_write(table.phys_addr().0 as u64);
 }

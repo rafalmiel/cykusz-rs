@@ -36,6 +36,10 @@ impl VirtAddr {
             PhysAddr(self.0)
         }
     }
+
+    pub fn to_phys_pagewalk(&self) -> Option<PhysAddr> {
+        crate::kernel::mm::to_phys(*self)
+    }
 }
 
 impl MappedAddr {

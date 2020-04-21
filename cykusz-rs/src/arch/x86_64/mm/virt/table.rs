@@ -281,6 +281,26 @@ impl Table<Level4> {
         }
     }
 
+    pub fn to_phys(&self, addr: VirtAddr) -> Option<PhysAddr> {
+        let _g = self.lock();
+
+        let page = page::Page::new(addr);
+
+        let l1 = self
+            .next_level(page.p4_index())?
+            .next_level(page.p3_index())?
+            .next_level(page.p2_index())?;
+
+        let entry = &l1.entries[page.p1_index()];
+
+        if entry.contains(Entry::PRESENT) {
+            println!("Found addr {}", entry.address());
+            Some(entry.address() + (addr.0 & 0xFFF))
+        } else {
+            None
+        }
+    }
+
     pub fn map_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) {
         let _g = self.lock();
 

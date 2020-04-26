@@ -106,6 +106,16 @@ impl Acpi {
         apic.find_irq_remap(irq)
     }
 
+    pub fn debug_redirection_entries(&mut self) {
+        let apic = self.get_apic_entry().expect("APIC Entry not found");
+
+        let red = apic.intsrc_entries();
+
+        for e in red {
+            println!("{} {} {} {}", e.irq_src(), e.global_sys_int(), e.active_low(), e.level_triggered());
+        }
+    }
+
     pub fn has_hpet(&self) -> bool {
         //      self.hpet.is_some()
         true

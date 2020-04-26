@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use core::sync::atomic::AtomicU64;
+use crate::kernel::syscall::sys::sys_sleep;
 
 //use core::sync::atomic::Ordering;
 
@@ -21,10 +22,11 @@ pub fn dummy_work() {
 #[thread_local]
 static COUNT: AtomicU64 = AtomicU64::new(0);
 
-fn task(val: usize) {
+fn task() {
     loop {
-        dummy_work();
-        println!("Got val: {}", val);
+        crate::drivers::net::e1000::test();
+
+        sys_sleep(2_000_000_000);
     }
 
     //COUNT.fetch_add(1, Ordering::SeqCst);

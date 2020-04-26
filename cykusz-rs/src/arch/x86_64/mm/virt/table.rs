@@ -294,7 +294,6 @@ impl Table<Level4> {
         let entry = &l1.entries[page.p1_index()];
 
         if entry.contains(Entry::PRESENT) {
-            println!("Found addr {}", entry.address());
             Some(entry.address() + (addr.0 & 0xFFF))
         } else {
             None

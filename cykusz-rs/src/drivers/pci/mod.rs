@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::kernel::sync::Spin;
@@ -12,8 +12,8 @@ pub trait PciAccess: Sync {
 }
 
 pub trait PciDeviceHandle: Sync + Send {
-    fn handles(&self, pci_dev_id: u64) -> bool;
-    fn start(&mut self, pci_data: &PciHeader) -> bool;
+    fn handles(&self, pci_vendor_id: u64, pci_dev_id: u64) -> bool;
+    fn start(&self, pci_data: &PciHeader) -> bool;
 }
 
 #[derive(Copy, Clone)]
@@ -96,7 +96,7 @@ impl PciHeader {
 impl PciData {
     pub fn debug(&self) {
         println!(
-            "({}, {}, {}) V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {} h: 0x{:x}",
+            "[ PCI ] ({}, {}, {}) V: 0x{:x} D: 0x{:x} C: 0x{:x} SC: 0x{:x} p: {}, l: {} h: 0x{:x}",
             self.bus,
             self.dev,
             self.fun,
@@ -118,12 +118,28 @@ impl PciData {
         read(self.seg, self.bus, self.dev, self.fun, offset, width)
     }
 
+    fn write(&self, offset: u32, val: u64, width: u32) {
+        write(self.seg, self.bus, self.dev, self.fun, offset, val, width as u32)
+    }
+
     pub fn vendor_id(&self) -> u16 {
         self.read(0x00, 16) as u16
     }
 
     pub fn device_id(&self) -> u16 {
         self.read(0x02, 16) as u16
+    }
+
+    pub fn command(&self) -> u16 {
+        self.read(0x04, 16) as u16
+    }
+
+    pub fn write_command(&self, val: u16) {
+        self.write(0x04, val as u64, 16)
+    }
+
+    pub fn status(&self) -> u16 {
+        self.read(0x06, 16) as u16
     }
 
     pub fn revision_id(&self) -> u8 {
@@ -164,6 +180,10 @@ impl PciData {
 
     pub fn interrupt_line(&self) -> u8 {
         self.read(0x3C, 8) as u8
+    }
+
+    pub fn write_interrupt_line(&self, val: u8) {
+        self.write(0x3C, val as u64, 8)
     }
 }
 
@@ -223,7 +243,7 @@ impl PciHeader0 {
 }
 
 struct PciDevice {
-    handle: Box<dyn PciDeviceHandle>,
+    handle: Arc<dyn PciDeviceHandle>,
     found: bool,
     data: PciHeader,
 }
@@ -240,15 +260,16 @@ impl Pci {
     }
 
     fn check_devices(&mut self, pci_data: &PciHeader) {
+        let vendor_id = pci_data.hdr().vendor_id();
         let dev_id = pci_data.hdr().device_id();
 
         for dev in &mut self.devices {
-            if dev.handle.handles(dev_id as u64) {
+            if dev.handle.handles(vendor_id as u64, dev_id as u64) {
                 dev.found = true;
 
                 dev.data = *pci_data;
 
-                dev.handle.start(&dev.data);
+               dev.handle.start(&dev.data);
             }
         }
     }
@@ -294,7 +315,7 @@ pub fn register_pci_driver(driver: &'static dyn PciAccess) {
     *DRIVER.lock() = Some(driver);
 }
 
-pub fn register_pci_device(device: Box<dyn PciDeviceHandle>) {
+pub fn register_pci_device(device: Arc<dyn PciDeviceHandle>) {
     let mut driver = PCI.lock();
 
     driver.devices.push(PciDevice {

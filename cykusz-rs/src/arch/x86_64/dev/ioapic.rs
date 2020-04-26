@@ -161,6 +161,12 @@ impl IOApic {
             }
         }
 
+        //TODO: Temp override of ethernet interrupt
+        if src == 20 {
+            l.0 |= 1 << 13;
+            //l.0 |= 1 << 15;
+        }
+
         self.write(reg_redtbl_low(src), l.0);
         self.write(reg_redtbl_high(src), h.0);
     }

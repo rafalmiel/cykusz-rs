@@ -27,6 +27,8 @@ pub fn init() {
         );
 
         assert_eq!(AcpiInitializeObjects(0), AE_OK);
+
+        assert_eq!(AcpiEnable(), AE_OK);
     }
 
     pci_map::init();

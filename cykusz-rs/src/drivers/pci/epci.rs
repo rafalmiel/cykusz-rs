@@ -57,7 +57,7 @@ impl Mcfg {
                 }
             }
         } else {
-            panic!("Failed pci write")
+            crate::drivers::pci::pci::write(seg, bus, dev, fun, reg, val, width);
         }
     }
 

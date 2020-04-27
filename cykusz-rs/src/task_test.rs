@@ -24,9 +24,9 @@ static COUNT: AtomicU64 = AtomicU64::new(0);
 
 fn task() {
     loop {
-        crate::drivers::net::e1000::test();
+        crate::drivers::net::e1000::test::test();
 
-        sys_sleep(2_000_000_000);
+        sys_sleep(2_000_000_000).expect("Sleep failed");
     }
 
     //COUNT.fetch_add(1, Ordering::SeqCst);

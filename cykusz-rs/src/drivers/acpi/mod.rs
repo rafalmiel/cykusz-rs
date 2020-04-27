@@ -21,7 +21,7 @@ pub fn init() {
                 3,
                 Some(self::acpica::ec::embedded_ctl),
                 Some(self::acpica::ec::embedded_ctl_setup),
-                null_mut()
+                null_mut(),
             ),
             AE_OK
         );

@@ -5,6 +5,8 @@ pub trait InterruptController: Send + Sync {
     fn end_of_int(&self);
     fn mask_int(&self, int: u8, masked: bool);
     fn set_irq_dest(&self, src: u8, dest: u8);
+    fn set_active_high(&self, src: u8, ah: bool);
+    fn set_level_triggered(&self, src: u8, ah: bool);
 }
 
 pub fn is_enabled() -> bool {
@@ -63,4 +65,12 @@ pub fn mask_int(int: u8, masked: bool) {
 
 pub fn set_irq_dest(src: u8, dst: u8) {
     CONTROLLER.set_irq_dest(src, dst);
+}
+
+pub fn set_active_high(src: u8, ah: bool) {
+    CONTROLLER.set_active_high(src, ah)
+}
+
+pub fn set_level_triggered(src: u8, ah: bool) {
+    CONTROLLER.set_level_triggered(src, ah)
 }

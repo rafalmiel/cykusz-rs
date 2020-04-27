@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
 use core::ptr::null_mut;
@@ -132,6 +134,7 @@ unsafe extern "C" fn add_pci_dev(
 struct AcpiHandle(ACPI_HANDLE);
 
 unsafe impl Sync for AcpiHandle {}
+
 unsafe impl Send for AcpiHandle {}
 
 static ROOT_BRIDGE: Once<Spin<PciBridge>> = Once::new();
@@ -181,6 +184,7 @@ struct PciBridge {
 }
 
 unsafe impl Sync for PciBridge {}
+
 unsafe impl Send for PciBridge {}
 
 struct ResData {
@@ -214,7 +218,7 @@ impl PciBridge {
             assert_eq!(
                 AcpiGetObjectInfo(
                     self.acpi_handle,
-                    &mut dev_info as *mut *mut ACPI_DEVICE_INFO
+                    &mut dev_info as *mut *mut ACPI_DEVICE_INFO,
                 ),
                 AE_OK
             );
@@ -256,7 +260,7 @@ impl PciBridge {
                         AcpiGetHandle(
                             self.acpi_handle,
                             tbl.Source.as_mut_ptr(),
-                            &mut src_handle as *mut ACPI_HANDLE
+                            &mut src_handle as *mut ACPI_HANDLE,
                         ),
                         AE_OK
                     );
@@ -273,7 +277,7 @@ impl PciBridge {
                             src_handle,
                             acpi_str(b"_CRS\0"),
                             Some(get_irq_resource),
-                            &mut data as *mut ResData as *mut core::ffi::c_void
+                            &mut data as *mut ResData as *mut core::ffi::c_void,
                         ),
                         AE_OK
                     );
@@ -294,17 +298,17 @@ impl PciBridge {
 
         self.init_irq_routing();
 
-        unsafe {
-            assert_eq!(
-                AcpiGetDevices(
-                    null_mut(),
-                    Some(add_pci_dev),
-                    self as *mut PciBridge as *mut core::ffi::c_void,
-                    null_mut()
-                ),
-                AE_OK
-            );
-        }
+        //unsafe {
+        //    assert_eq!(
+        //        AcpiGetDevices(
+        //            null_mut(),
+        //            Some(add_pci_dev),
+        //            self as *mut PciBridge as *mut core::ffi::c_void,
+        //            null_mut()
+        //        ),
+        //        AE_OK
+        //    );
+        //}
     }
 
     fn add_child(&mut self, dev: i32, fun: i32, bridge: PciBridge) {
@@ -339,7 +343,7 @@ pub fn pci_routing() {
                 acpi_str(b"PNP0A03\0"),
                 Some(pci_add_root_dev),
                 null_mut(),
-                null_mut()
+                null_mut(),
             ),
             AE_OK
         );

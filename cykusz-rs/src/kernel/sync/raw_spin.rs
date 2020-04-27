@@ -85,6 +85,7 @@ pub struct RawSpinGuard<'a, T: ?Sized + 'a> {
 
 // Same unsafe impls as `std::sync::Mutex`
 unsafe impl<T: ?Sized + Send> Sync for RawSpin<T> {}
+
 unsafe impl<T: ?Sized + Send> Send for RawSpin<T> {}
 
 impl<T> RawSpin<T> {

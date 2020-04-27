@@ -27,10 +27,13 @@ pub enum Regs {
     TxDescHead = 0x3810,
     TxDescTail = 0x3818,
 
-    Rdtr = 0x2820,    // RX Delay Timer Register
-    RxDCtrl = 0x3828, // RX Descriptor Control
-    Radv = 0x282C,    // RX Int. Absolute Delay Timer
-    Rsrpd = 0x2C00,   // RX Small Packet Detect Interrupt
+    Rdtr = 0x2820,
+    // RX Delay Timer Register
+    RxDCtrl = 0x3828,
+    // RX Descriptor Control
+    Radv = 0x282C,
+    // RX Int. Absolute Delay Timer
+    Rsrpd = 0x2C00, // RX Small Packet Detect Interrupt
 
     Tipg = 0x0410, // Transmit Inter Packet Gap
 
@@ -150,27 +153,25 @@ impl TCtl {
 
 impl Default for TCtl {
     fn default() -> Self {
-        TCtl {
-            bits: 1u32 << 28
-        }
+        TCtl { bits: 1u32 << 28 }
     }
 }
 
 impl Default for IntFlags {
     fn default() -> Self {
         IntFlags::TXDW
-        | IntFlags::TXQE
-        | IntFlags::LSC
-        | IntFlags::RXDMT0
-        | IntFlags::DSW
-        | IntFlags::RXO
-        | IntFlags::RXT0
-        | IntFlags::MDAC
-        | IntFlags::PHYINT
-        | IntFlags::LSECPN
-        | IntFlags::TXD_LOW
-        | IntFlags::SRPD
-        | IntFlags::ACK
-        | IntFlags::ECCER
+            | IntFlags::TXQE
+            | IntFlags::LSC
+            | IntFlags::RXDMT0
+            | IntFlags::DSW
+            | IntFlags::RXO
+            | IntFlags::RXT0
+            | IntFlags::MDAC
+            | IntFlags::PHYINT
+            | IntFlags::LSECPN
+            | IntFlags::TXD_LOW
+            | IntFlags::SRPD
+            | IntFlags::ACK
+            | IntFlags::ECCER
     }
 }

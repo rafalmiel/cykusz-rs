@@ -161,10 +161,28 @@ impl IOApic {
             }
         }
 
-        //TODO: Temp override of ethernet interrupt
-        if src == 20 {
-            l.0 |= 1 << 13;
-            //l.0 |= 1 << 15;
+        self.write(reg_redtbl_low(src), l.0);
+        self.write(reg_redtbl_high(src), h.0);
+    }
+
+    pub fn set_int_active_high(&mut self, src: u32, val: bool) {
+        let mut l = RegRedTblL(self.read(reg_redtbl_low(src)));
+        let h = RegRedTblH(self.read(reg_redtbl_high(src)));
+
+        if val {
+            l.0 |= 1 << 13; //active low
+        }
+
+        self.write(reg_redtbl_low(src), l.0);
+        self.write(reg_redtbl_high(src), h.0);
+    }
+
+    pub fn set_int_level_triggered(&mut self, src: u32, val: bool) {
+        let mut l = RegRedTblL(self.read(reg_redtbl_low(src)));
+        let h = RegRedTblH(self.read(reg_redtbl_high(src)));
+
+        if val {
+            l.0 |= 1 << 15; //level triggered
         }
 
         self.write(reg_redtbl_low(src), l.0);

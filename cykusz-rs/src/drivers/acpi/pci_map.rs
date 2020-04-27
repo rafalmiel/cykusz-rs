@@ -294,7 +294,6 @@ impl PciBridge {
 
         self.init_irq_routing();
 
-        return;
         unsafe {
             assert_eq!(
                 AcpiGetDevices(

@@ -14,6 +14,7 @@ fn get_uint(Args: &mut core::ffi::VaList, size: usize) -> u64 {
         }
     }
 }
+
 fn get_int(Args: &mut core::ffi::VaList, size: usize) -> i64 {
     // (uncheckable) SAFE: Could over-read from stack, returning junk
     unsafe {

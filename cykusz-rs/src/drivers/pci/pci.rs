@@ -67,12 +67,8 @@ impl PciAccess for Driver {
 
         let offset = (reg & 0b11) * 8;
         match width {
-            8 => {
-                val = (val >> offset) as u8 as u64
-            }
-            16 => {
-                val = (val >> offset) as u16 as u64
-            }
+            8 => val = (val >> offset) as u8 as u64,
+            16 => val = (val >> offset) as u16 as u64,
             32 => {}
             _ => {
                 panic!("Unsupported width");
@@ -95,16 +91,16 @@ impl PciAccess for Driver {
 
                 let val = (current & mask) | (((val as u32) & 0xff) << offset);
                 pci.write_u32(bus as u8, dev as u8, fun as u8, reg as u8, val as u32);
-            },
+            }
             16 => {
                 let mask = !(0xffffu32 << offset);
 
                 let val = (current & mask) | (((val as u32) & 0xffff) << offset);
                 pci.write_u32(bus as u8, dev as u8, fun as u8, reg as u8, val as u32);
-            },
+            }
             32 => {
                 pci.write_u32(bus as u8, dev as u8, fun as u8, reg as u8, val as u32);
-            },
+            }
             _ => {
                 panic!("Unsupported width");
             }

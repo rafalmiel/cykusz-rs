@@ -25,4 +25,12 @@ impl InterruptController for Controller {
             ACPI.lock().get_irq_mapping(src as u32),
         );
     }
+
+    fn set_active_high(&self, src: u8, ah: bool) {
+        IOAPIC.lock().set_int_active_high(src as u32, ah);
+    }
+
+    fn set_level_triggered(&self, src: u8, ah: bool) {
+        IOAPIC.lock().set_int_level_triggered(src as u32, ah);
+    }
 }

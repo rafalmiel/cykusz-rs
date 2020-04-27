@@ -16,4 +16,12 @@ impl InterruptController for Controller {
     }
 
     fn set_irq_dest(&self, _src: u8, _dst: u8) {}
+
+    fn set_active_high(&self, _src: u8, _ah: bool) {
+        unimplemented!()
+    }
+
+    fn set_level_triggered(&self, _src: u8, _ah: bool) {
+        unimplemented!()
+    }
 }

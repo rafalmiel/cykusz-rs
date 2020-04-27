@@ -20,10 +20,12 @@ pub trait PciDeviceHandle: Sync + Send {
 pub struct PciHeader0 {
     data: PciData,
 }
+
 #[derive(Copy, Clone)]
 pub struct PciHeader1 {
     data: PciData,
 }
+
 #[derive(Copy, Clone)]
 pub struct PciHeader2 {
     data: PciData,
@@ -119,7 +121,15 @@ impl PciData {
     }
 
     fn write(&self, offset: u32, val: u64, width: u32) {
-        write(self.seg, self.bus, self.dev, self.fun, offset, val, width as u32)
+        write(
+            self.seg,
+            self.bus,
+            self.dev,
+            self.fun,
+            offset,
+            val,
+            width as u32,
+        )
     }
 
     pub fn vendor_id(&self) -> u16 {
@@ -136,6 +146,10 @@ impl PciData {
 
     pub fn write_command(&self, val: u16) {
         self.write(0x04, val as u64, 16)
+    }
+
+    pub fn enable_bus_mastering(&self) {
+        self.write_command(0b111);
     }
 
     pub fn status(&self) -> u16 {
@@ -269,7 +283,7 @@ impl Pci {
 
                 dev.data = *pci_data;
 
-               dev.handle.start(&dev.data);
+                dev.handle.start(&dev.data);
             }
         }
     }

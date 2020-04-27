@@ -17,6 +17,7 @@ const MAIN_COUNTER_VALUE_OFFSET: usize = 0xF0;
 
 #[derive(Copy, Clone)]
 struct RegCapabilities(u64);
+
 #[derive(Copy, Clone)]
 struct RegConfig(u64);
 

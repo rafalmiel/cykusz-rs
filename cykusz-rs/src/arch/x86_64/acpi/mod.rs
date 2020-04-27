@@ -112,7 +112,13 @@ impl Acpi {
         let red = apic.intsrc_entries();
 
         for e in red {
-            println!("{} {} {} {}", e.irq_src(), e.global_sys_int(), e.active_low(), e.level_triggered());
+            println!(
+                "{} {} {} {}",
+                e.irq_src(),
+                e.global_sys_int(),
+                e.active_low(),
+                e.level_triggered()
+            );
         }
     }
 

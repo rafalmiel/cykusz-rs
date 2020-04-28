@@ -57,7 +57,6 @@ extern "C" fn AcpiOsInstallInterruptHandler(
 
         set_irq_dest(InterruptNumber as u8, InterruptNumber as u8 + 32);
         set_handler(InterruptNumber as usize + 32, acpi_irq);
-        mask_int(InterruptNumber as u8, false);
 
         AE_OK
     } else {

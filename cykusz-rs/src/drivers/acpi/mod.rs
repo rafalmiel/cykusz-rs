@@ -1,6 +1,7 @@
 use core::ptr::*;
 
 use ::acpica::*;
+pub use pci_map::get_irq_mapping;
 
 pub mod acpica;
 pub mod pci_map;

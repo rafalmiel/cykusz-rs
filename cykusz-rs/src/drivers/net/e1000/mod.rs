@@ -84,6 +84,7 @@ fn init() {
                 tx_ring: Vec::new(),
                 rx_cur: 0,
                 tx_cur: 0,
+                ring_buf: VirtAddr(0),
             }),
         })
     });

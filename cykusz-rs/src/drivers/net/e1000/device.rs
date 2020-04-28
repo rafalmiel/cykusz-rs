@@ -7,6 +7,7 @@ use crate::arch::raw::mm::{PhysAddr, VirtAddr};
 use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
 use crate::drivers::pci::{PciData, PciHeader, PciHeader0};
+use crate::kernel::mm::heap::allocate_align;
 use crate::kernel::timer::busy_sleep;
 
 use super::regs::*;
@@ -50,6 +51,7 @@ pub struct E1000Data {
     pub tx_ring: Vec<TxDesc>,
     pub rx_cur: u32,
     pub tx_cur: u32,
+    pub ring_buf: VirtAddr,
 }
 
 pub extern "x86-interrupt" fn e1000_handler(_frame: &mut ExceptionStackFrame) {
@@ -70,6 +72,12 @@ impl E1000Data {
         let bar1 = self.dev_hdr().base_address1();
 
         self.addr.init(bar0, bar1);
+
+        let ring_buf = allocate_align(0x1000, 0x1000).unwrap();
+        unsafe {
+            ring_buf.write_bytes(0, 0x1000);
+        }
+        self.ring_buf = VirtAddr(ring_buf as usize);
     }
 
     pub fn handle_irq(&mut self) {
@@ -92,6 +100,8 @@ impl E1000Data {
             let old_cur = self.rx_cur;
             self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESCS as u32;
             self.addr.write(Regs::RxDescTail, old_cur);
+
+            //print!(".");
 
             println!("Recv packet: 0x{:x} {}", buf, len);
 
@@ -212,11 +222,8 @@ impl E1000Data {
         let data = self.hdr();
         let pin = data.interrupt_pin();
 
-        let int = crate::drivers::acpi::pci_map::get_irq_mapping(
-            data.bus as u32,
-            data.dev as u32,
-            pin as u32 - 1,
-        );
+        let int =
+            crate::drivers::acpi::get_irq_mapping(data.bus as u32, data.dev as u32, pin as u32 - 1);
 
         if let Some(p) = int {
             println!("[ E1000 ] Using interrupt: {}", p);
@@ -231,15 +238,18 @@ impl E1000Data {
     }
 
     pub fn init_rx(&mut self) {
-        self.rx_ring.resize_with(E1000_NUM_RX_DESCS, || {
-            let mut desc = RxDesc::default();
-
+        self.rx_ring = unsafe {
+            Vec::from_raw_parts(
+                (self.ring_buf + 512).0 as *mut RxDesc,
+                E1000_NUM_RX_DESCS,
+                E1000_NUM_RX_DESCS,
+            )
+        };
+        for r in self.rx_ring.iter_mut() {
             let buf = crate::kernel::mm::heap::allocate_align(4096, 0x1000).unwrap();
 
-            desc.addr = VirtAddr(buf as usize).to_phys_pagewalk().unwrap().0 as u64;
-
-            desc
-        });
+            r.addr = VirtAddr(buf as usize).to_phys_pagewalk().unwrap().0 as u64;
+        }
 
         let rx_addr = VirtAddr(self.rx_ring.as_ptr() as usize)
             .to_phys_pagewalk()
@@ -271,15 +281,16 @@ impl E1000Data {
     }
 
     pub fn init_tx(&mut self) {
-        self.tx_ring.resize_with(E1000_NUM_TX_DESCS, || TxDesc {
-            addr: 0,
-            length: 0,
-            cso: 0,
-            cmd: 0,
-            status: TStatus::DD,
-            css: 0,
-            special: 0,
-        });
+        self.tx_ring = unsafe {
+            Vec::from_raw_parts(
+                self.ring_buf.0 as *mut TxDesc,
+                E1000_NUM_TX_DESCS,
+                E1000_NUM_TX_DESCS,
+            )
+        };
+        for t in self.tx_ring.iter_mut() {
+            t.status = TStatus::DD;
+        }
 
         unsafe {
             BUF = crate::kernel::mm::heap::allocate_align(4096, 0x1000).unwrap();

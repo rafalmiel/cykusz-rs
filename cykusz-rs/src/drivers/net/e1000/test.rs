@@ -20,8 +20,9 @@ impl E1000Data {
             a.as_ptr().copy_to(BUF, a.len());
         }
 
-        self.tx_ring[self.tx_cur as usize].addr =
-            unsafe { VirtAddr(BUF as usize).to_phys_pagewalk().unwrap().0 as u64 };
+        let phys = unsafe { VirtAddr(BUF as usize).to_phys_pagewalk().unwrap() };
+
+        self.tx_ring[self.tx_cur as usize].addr = phys.0 as u64;
         self.tx_ring[self.tx_cur as usize].length = 42;
         self.tx_ring[self.tx_cur as usize].cmd = 0b1011;
         self.tx_ring[self.tx_cur as usize].status = TStatus::default();
@@ -40,7 +41,13 @@ impl E1000Data {
         }
 
         unsafe {
-            println!("Send Status: 0x{:x}", status.read_volatile().bits());
+            println!(
+                "Send Status: {:p} {:p} {} 0x{:x}",
+                self.tx_ring.as_ptr(),
+                BUF,
+                phys,
+                status.read_volatile().bits()
+            );
         }
     }
 }

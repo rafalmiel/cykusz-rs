@@ -12,6 +12,7 @@ extern "C" fn AcpiOsReadPciConfiguration(
     Width: UINT32,
 ) -> ACPI_STATUS {
     unsafe {
+        //println!("PCI read: {:?} {} {}", *PciId, Reg, Width);
         *Value = crate::drivers::pci::read(
             (*PciId).Segment,
             (*PciId).Bus,
@@ -33,6 +34,7 @@ extern "C" fn AcpiOsWritePciConfiguration(
     Width: UINT32,
 ) -> ACPI_STATUS {
     unsafe {
+        //println!("PCI write: {:?} {} {} {}", *PciId, Reg, Value, Width);
         crate::drivers::pci::write(
             (*PciId).Segment,
             (*PciId).Bus,

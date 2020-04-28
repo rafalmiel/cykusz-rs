@@ -298,17 +298,17 @@ impl PciBridge {
 
         self.init_irq_routing();
 
-        //unsafe {
-        //    assert_eq!(
-        //        AcpiGetDevices(
-        //            null_mut(),
-        //            Some(add_pci_dev),
-        //            self as *mut PciBridge as *mut core::ffi::c_void,
-        //            null_mut()
-        //        ),
-        //        AE_OK
-        //    );
-        //}
+        unsafe {
+            assert_eq!(
+                AcpiGetDevices(
+                    null_mut(),
+                    Some(add_pci_dev),
+                    self as *mut PciBridge as *mut core::ffi::c_void,
+                    null_mut()
+                ),
+                AE_OK
+            );
+        }
     }
 
     fn add_child(&mut self, dev: i32, fun: i32, bridge: PciBridge) {

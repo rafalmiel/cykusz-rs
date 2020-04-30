@@ -88,6 +88,10 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Local Timer Started");
 
+    kernel::net::init();
+
+    println!("[ OK ] Network Stack Initialized");
+
     kernel::module::init_all();
 
     println!("[ OK ] Modules Initialized");

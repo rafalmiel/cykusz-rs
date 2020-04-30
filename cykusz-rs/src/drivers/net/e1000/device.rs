@@ -90,28 +90,59 @@ impl E1000Data {
     }
 
     pub fn handle_receive(&mut self) {
-        let mut desc = &mut self.rx_ring[self.rx_cur as usize];
+        let desc = &mut self.rx_ring[self.rx_cur as usize];
 
-        while desc.status & 0x1 == 0x1 {
-            let buf = desc.addr;
-            let len = desc.length;
+        if desc.status & 0x1 == 0x1 {
+            super::device().rx_wqueue.notify_one();
+        }
+    }
 
+    pub fn receive(&mut self) -> Option<Packet> {
+        let desc = &mut self.rx_ring[self.rx_cur as usize];
+
+        if desc.status & 0x1 == 0x1 {
+            return Some(Packet {
+                addr: PhysAddr(desc.addr as usize),
+                len: desc.length as usize,
+                id: self.rx_cur as usize,
+            });
+        }
+
+        None
+    }
+
+    pub fn receive_finished(&mut self, id: usize) {
+        let mut desc = &mut self.rx_ring[id];
+
+        if desc.status & 0x1 == 0x1 {
             desc.status = 0;
             let old_cur = self.rx_cur;
             self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESCS as u32;
             self.addr.write(Regs::RxDescTail, old_cur);
+        }
+    }
 
-            //print!(".");
+    pub fn send(&mut self, packet: &[u8]) {
+        let phys = VirtAddr(packet.as_ptr() as usize)
+            .to_phys_pagewalk()
+            .unwrap();
 
-            println!("Recv packet: 0x{:x} {}", buf, len);
+        self.tx_ring[self.tx_cur as usize].addr = phys.0 as u64;
+        self.tx_ring[self.tx_cur as usize].length = 42;
+        self.tx_ring[self.tx_cur as usize].cmd = 0b1011;
+        self.tx_ring[self.tx_cur as usize].status = TStatus::default();
 
-            let a = PhysAddr(buf as usize).to_mapped();
+        let old_cur = self.tx_cur;
+        self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESCS as u32;
 
-            for i in a..a + (len as usize) {
-                unsafe { print!("{:x}", i.read_volatile::<u8>()) }
+        self.addr.write(Regs::TxDescTail, self.tx_cur);
+
+        let status = &self.tx_ring[old_cur as usize].status as *const TStatus;
+
+        unsafe {
+            while status.read_volatile().bits() & 0xff == 0 {
+                println!("Status: 0b{:b}", status.read_volatile().bits());
             }
-
-            desc = &mut self.rx_ring[self.rx_cur as usize];
         }
     }
 

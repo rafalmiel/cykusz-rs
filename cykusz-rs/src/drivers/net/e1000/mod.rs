@@ -9,7 +9,10 @@ use addr::Addr;
 
 use crate::arch::raw::mm::VirtAddr;
 use crate::drivers::pci::{PciDeviceHandle, PciHeader};
+use crate::kernel::net::{NetDriver, Packet};
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
+use crate::kernel::utils::wait_queue::WaitQueue;
 
 mod addr;
 mod device;
@@ -20,6 +23,35 @@ pub mod test;
 #[allow(dead_code)]
 struct E1000 {
     data: Spin<device::E1000Data>,
+    rx_wqueue: WaitQueue,
+}
+
+impl NetDriver for E1000 {
+    fn send(&self, packet: &[u8]) -> bool {
+        self.data.lock_irq().send(packet);
+
+        true
+    }
+
+    fn receive(&self) -> Packet {
+        loop {
+            let mut data = self.data.lock_irq();
+
+            if let Some(p) = data.receive() {
+                return p;
+            } else {
+                core::mem::drop(data);
+
+                self.rx_wqueue.add_task(current_task());
+            }
+        }
+    }
+
+    fn receive_finished(&self, id: usize) {
+        let mut data = self.data.lock_irq();
+
+        data.receive_finished(id);
+    }
 }
 
 impl PciDeviceHandle for E1000 {
@@ -55,6 +87,8 @@ impl PciDeviceHandle for E1000 {
 
         data.wait_link_up();
 
+        crate::kernel::net::register_net_driver(device().clone());
+
         true
     }
 }
@@ -86,6 +120,7 @@ fn init() {
                 tx_cur: 0,
                 ring_buf: VirtAddr(0),
             }),
+            rx_wqueue: WaitQueue::new(),
         })
     });
 

@@ -2,6 +2,7 @@ pub mod device;
 pub mod fs;
 pub mod int;
 pub mod mm;
+pub mod net;
 pub mod smp;
 pub mod sync;
 pub mod syscall;

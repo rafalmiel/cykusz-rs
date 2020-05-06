@@ -41,18 +41,18 @@ impl SegmentSelector {
 
 pub fn cs() -> SegmentSelector {
     let segment: u16;
-    unsafe { asm!("mov %cs, $0" : "=r"(segment)) }
+    unsafe { llvm_asm!("mov %cs, $0" : "=r"(segment)) }
     SegmentSelector::from_raw(segment)
 }
 
 pub fn ds() -> SegmentSelector {
     let segment: u16;
-    unsafe { asm!("mov %ds, $0" : "=r"(segment)) }
+    unsafe { llvm_asm!("mov %ds, $0" : "=r"(segment)) }
     SegmentSelector::from_raw(segment)
 }
 
 pub unsafe fn set_cs(sel: SegmentSelector) {
-    asm!("pushq $0; \
+    llvm_asm!("pushq $0; \
           leaq  1f(%rip), %rax; \
           pushq %rax; \
           lretq; \
@@ -61,25 +61,25 @@ pub unsafe fn set_cs(sel: SegmentSelector) {
 
 /// Reload stack segment register.
 pub unsafe fn load_ss(sel: SegmentSelector) {
-    asm!("movw $0, %ss " :: "r" (sel.bits()) : "memory");
+    llvm_asm!("movw $0, %ss " :: "r" (sel.bits()) : "memory");
 }
 
 /// Reload data segment register.
 pub unsafe fn load_ds(sel: SegmentSelector) {
-    asm!("movw $0, %ds " :: "r" (sel.bits()) : "memory");
+    llvm_asm!("movw $0, %ds " :: "r" (sel.bits()) : "memory");
 }
 
 /// Reload es segment register.
 pub unsafe fn load_es(sel: SegmentSelector) {
-    asm!("movw $0, %es " :: "r" (sel.bits()) : "memory");
+    llvm_asm!("movw $0, %es " :: "r" (sel.bits()) : "memory");
 }
 
 /// Reload fs segment register.
 pub unsafe fn load_fs(sel: SegmentSelector) {
-    asm!("movw $0, %fs " :: "r" (sel.bits()) : "memory");
+    llvm_asm!("movw $0, %fs " :: "r" (sel.bits()) : "memory");
 }
 
 /// Reload gs segment register.
 pub unsafe fn load_gs(sel: SegmentSelector) {
-    asm!("movw $0, %gs " :: "r" (sel.bits()) : "memory");
+    llvm_asm!("movw $0, %gs " :: "r" (sel.bits()) : "memory");
 }

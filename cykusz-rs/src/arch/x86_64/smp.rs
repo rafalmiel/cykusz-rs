@@ -36,7 +36,7 @@ impl Trampoline {
 
         unsafe {
             while rdy.read_volatile() == 0 {
-                asm!("pause"::::"volatile");
+                llvm_asm!("pause"::::"volatile");
             }
         }
     }

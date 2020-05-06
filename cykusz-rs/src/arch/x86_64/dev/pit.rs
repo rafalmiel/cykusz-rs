@@ -97,7 +97,7 @@ pub fn early_busy_sleep(mut ms: u64) {
 
         while !pit.is_sleep_finished() {
             unsafe {
-                asm!("pause"::::"volatile");
+                llvm_asm!("pause"::::"volatile");
             }
         }
         ms -= 1;

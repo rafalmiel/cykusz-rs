@@ -1,8 +1,9 @@
 #![no_std]
 #![feature(lang_items)]
 #![feature(const_fn)]
+#![feature(const_if_match)]
 #![feature(ptr_internals)]
-#![feature(asm)]
+#![feature(llvm_asm)]
 #![feature(abi_x86_interrupt)]
 #![feature(concat_idents)]
 #![feature(step_trait)]
@@ -14,6 +15,7 @@
 #![feature(c_variadic)]
 #![feature(maybe_uninit_ref)]
 #![feature(negative_impls)]
+#![feature(slice_fill)]
 
 extern crate alloc;
 #[macro_use]
@@ -40,7 +42,7 @@ static mut CPU_ID: u8 = 0;
 
 pub fn bochs() {
     unsafe {
-        asm!("xchg %bx, %bx");
+        llvm_asm!("xchg %bx, %bx");
     }
 }
 

@@ -59,9 +59,9 @@ $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
 
 cargo:
 ifdef dev
-	RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads"  xargo build --workspace --target $(target) --verbose
+	RUST_TARGET_PATH=`pwd` xargo build --workspace --target $(target) --verbose
 else
-	RUST_TARGET_PATH=`pwd` RUSTFLAGS="-Z no-landing-pads"  xargo build --workspace --release --target $(target) --verbose
+	RUST_TARGET_PATH=`pwd` xargo build --workspace --release --target $(target) --verbose
 endif
 
 # compile assembly files

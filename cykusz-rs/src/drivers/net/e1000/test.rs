@@ -1,5 +1,4 @@
 use super::device::*;
-use super::regs::*;
 use super::*;
 
 pub fn test() {
@@ -10,44 +9,19 @@ pub fn test() {
 
 impl E1000Data {
     fn send_test(&mut self) {
+        // sample ARP broadcast packet
         let a = &[
             0xffu8, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x21, 0xcc, 0xc0, 0x6b, 0x9b, 0x08, 0x06,
             0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x21, 0xcc, 0xc0, 0x6b, 0x9b,
             0xc0, 0xa8, 0x01, 0x71, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0xa8, 0x01, 0x71,
         ];
 
-        unsafe {
-            a.as_ptr().copy_to(BUF, a.len());
-        }
-
-        let phys = unsafe { VirtAddr(BUF as usize).to_phys_pagewalk().unwrap() };
-
-        self.tx_ring[self.tx_cur as usize].addr = phys.0 as u64;
-        self.tx_ring[self.tx_cur as usize].length = 42;
-        self.tx_ring[self.tx_cur as usize].cmd = 0b1011;
-        self.tx_ring[self.tx_cur as usize].status = TStatus::default();
-
-        let old_cur = self.tx_cur;
-        self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESCS as u32;
-
-        self.addr.write(Regs::TxDescTail, self.tx_cur);
-
-        let status = &self.tx_ring[old_cur as usize].status as *const TStatus;
+        let p = self.alloc_packet(a.len());
 
         unsafe {
-            while status.read_volatile().bits() & 0xff == 0 {
-                println!("Status: 0b{:b}", status.read_volatile().bits());
-            }
+            a.as_ptr().copy_to(p.addr.0 as *mut u8, a.len());
         }
 
-        unsafe {
-            println!(
-                "Send Status: {:p} {:p} {} 0x{:x}",
-                self.tx_ring.as_ptr(),
-                BUF,
-                phys,
-                status.read_volatile().bits()
-            );
-        }
+        self.send(p);
     }
 }

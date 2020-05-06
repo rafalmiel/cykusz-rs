@@ -50,6 +50,10 @@ impl MappedAddr {
             PhysAddr(self.0)
         }
     }
+
+    pub fn as_virt(&self) -> VirtAddr {
+        VirtAddr(self.0)
+    }
 }
 
 pub fn init(mboot: &multiboot2::Info) {

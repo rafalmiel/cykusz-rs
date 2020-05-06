@@ -175,7 +175,7 @@ impl Default for Task {
 impl Task {
     pub const fn empty() -> Task {
         Task {
-            ctx: Unique::empty(),
+            ctx: Unique::dangling(),
             stack_top: 0,
             stack_size: 0,
             is_user: false,
@@ -189,7 +189,7 @@ impl Task {
         if self.stack_size != 0 {
             panic!("[ ERROR ] ArchTask corrupted on init");
         }
-        if self.ctx.as_ptr() != Unique::empty().as_ptr() {
+        if self.ctx.as_ptr() != Unique::dangling().as_ptr() {
             panic!("[ ERROR ] ArchTask corrupted on init");
         }
     }
@@ -365,7 +365,7 @@ impl Task {
         let p4 = p4_table(PhysAddr(cr3));
         p4.deallocate_user();
 
-        self.ctx = Unique::empty();
+        self.ctx = Unique::dangling();
         heap_deallocate_align(self.stack_top as *mut u8, self.stack_size, 4096);
         self.stack_top = 0;
     }

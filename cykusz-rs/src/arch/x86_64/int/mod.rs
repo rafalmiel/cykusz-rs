@@ -12,7 +12,7 @@ pub trait InterruptController: Send + Sync {
 pub fn is_enabled() -> bool {
     unsafe {
         let r: usize;
-        asm!("pushfq; popq $0" : "=r"(r) :: "memory");
+        llvm_asm!("pushfq; popq $0" : "=r"(r) :: "memory");
         return (r & (1usize << 9)) > 0;
     }
 }
@@ -27,7 +27,7 @@ pub fn enable() {
 
 pub fn disable() {
     unsafe {
-        asm!("cli");
+        llvm_asm!("cli");
     }
 }
 
@@ -37,7 +37,7 @@ pub fn disable() {
 #[inline(always)]
 pub fn enable_and_halt() {
     unsafe {
-        asm!("sti
+        llvm_asm!("sti
         hlt"
         : : : : "intel", "volatile");
     }
@@ -49,7 +49,7 @@ pub fn enable_and_halt() {
 #[inline(always)]
 pub fn enable_and_nop() {
     unsafe {
-        asm!("sti
+        llvm_asm!("sti
         nop"
         : : : : "intel", "volatile");
     }

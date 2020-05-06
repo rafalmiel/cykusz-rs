@@ -22,7 +22,7 @@ pub fn notify_ap_ready() {
     // Waiting for all CPUs to be ready
     while !is_smp_initialised() {
         unsafe {
-            asm!("pause"::::"volatile");
+            llvm_asm!("pause"::::"volatile");
         }
     }
 }

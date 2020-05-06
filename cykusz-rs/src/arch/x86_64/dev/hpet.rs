@@ -103,7 +103,7 @@ pub fn busy_sleep(ns: u64) {
 
     while c > current_ns() {
         unsafe {
-            asm!("pause"::::"volatile");
+            llvm_asm!("pause"::::"volatile");
         }
     }
 }

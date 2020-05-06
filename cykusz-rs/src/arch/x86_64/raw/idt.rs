@@ -44,7 +44,7 @@ impl ::core::fmt::Debug for ExceptionStackFrame {
 macro_rules! int {
     ( $x:expr) => {
         {
-            asm!("int $0" :: "N"($x));
+            llvm_asm!("int $0" :: "N"($x));
         }
     };
 }

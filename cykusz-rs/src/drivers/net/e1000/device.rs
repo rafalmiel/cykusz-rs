@@ -7,7 +7,7 @@ use crate::arch::raw::mm::{PhysAddr, VirtAddr};
 use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
 use crate::drivers::pci::{PciData, PciHeader, PciHeader0};
-use crate::kernel::mm::heap::allocate_align;
+use crate::kernel::mm::heap::{allocate_align, deallocate_align};
 use crate::kernel::timer::busy_sleep;
 
 use super::regs::*;
@@ -97,13 +97,15 @@ impl E1000Data {
         }
     }
 
-    pub fn receive(&mut self) -> Option<Packet> {
+    pub fn receive(&mut self) -> Option<RecvPacket> {
         let desc = &mut self.rx_ring[self.rx_cur as usize];
 
         if desc.status & 0x1 == 0x1 {
-            return Some(Packet {
-                addr: PhysAddr(desc.addr as usize),
-                len: desc.length as usize,
+            return Some(RecvPacket {
+                packet: Packet {
+                    addr: PhysAddr(desc.addr as usize).to_mapped().as_virt(),
+                    len: desc.length as usize,
+                },
                 id: self.rx_cur as usize,
             });
         }
@@ -122,13 +124,22 @@ impl E1000Data {
         }
     }
 
-    pub fn send(&mut self, packet: &[u8]) {
-        let phys = VirtAddr(packet.as_ptr() as usize)
-            .to_phys_pagewalk()
-            .unwrap();
+    pub fn alloc_packet(&self, size: usize) -> Packet {
+        Packet {
+            addr: VirtAddr(allocate_align(size, 0x1000).unwrap() as usize),
+            len: size,
+        }
+    }
+
+    pub fn get_mac(&self, mac: &mut [u8]) {
+        mac.copy_from_slice(&self.mac);
+    }
+
+    pub fn send(&mut self, packet: Packet) {
+        let phys = packet.addr.to_phys_pagewalk().unwrap();
 
         self.tx_ring[self.tx_cur as usize].addr = phys.0 as u64;
-        self.tx_ring[self.tx_cur as usize].length = 42;
+        self.tx_ring[self.tx_cur as usize].length = packet.len as u16;
         self.tx_ring[self.tx_cur as usize].cmd = 0b1011;
         self.tx_ring[self.tx_cur as usize].status = TStatus::default();
 
@@ -144,6 +155,8 @@ impl E1000Data {
                 println!("Status: 0b{:b}", status.read_volatile().bits());
             }
         }
+
+        deallocate_align(packet.addr.0 as *mut u8, packet.len, 0x1000);
     }
 
     pub fn reset(&self) {

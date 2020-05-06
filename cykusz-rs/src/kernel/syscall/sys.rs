@@ -101,7 +101,7 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
 }
 
 pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
-    crate::drivers::net::e1000::test::test();
+    crate::kernel::net::dhcp::send_discovery();
     let buf = make_buf_mut(buf, len);
 
     let pwd = current_task().get_pwd();

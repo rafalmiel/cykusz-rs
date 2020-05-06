@@ -29,7 +29,7 @@ impl PhysAddr {
 }
 
 pub unsafe fn flush(addr: usize) {
-    asm!("invlpg ($0)" :: "r" (addr) : "memory");
+    llvm_asm!("invlpg ($0)" :: "r" (addr) : "memory");
 }
 
 /// Invalidate the TLB completely by reloading the CR3 register.

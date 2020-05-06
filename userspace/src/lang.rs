@@ -5,7 +5,7 @@ use syscall_defs::OpenFlags;
 #[allow(unused)]
 pub fn bochs() {
     unsafe {
-        asm!("xchg %bx, %bx");
+        llvm_asm!("xchg %bx, %bx");
     }
 }
 

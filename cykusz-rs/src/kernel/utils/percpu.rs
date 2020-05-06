@@ -8,7 +8,7 @@ pub struct PerCpu<T> {
 impl<T> PerCpu<T> {
     pub const fn empty() -> PerCpu<T> {
         PerCpu::<T> {
-            data: UnsafeCell::new(::core::ptr::Unique::empty()),
+            data: UnsafeCell::new(::core::ptr::Unique::dangling()),
         }
     }
 

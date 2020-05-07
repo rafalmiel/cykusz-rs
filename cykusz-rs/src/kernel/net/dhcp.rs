@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use alloc::string::String;
 use core::marker::PhantomData;
 
 use crate::kernel::net::ip::Ip;
@@ -65,7 +66,7 @@ impl DhcpHeader {
 
     fn init_hw_addr(&mut self) {
         let d = default_driver();
-        d.get_mac(&mut self.client_hw_addr[0..6]);
+        d.driver.read_mac(&mut self.client_hw_addr[0..6]);
         self.client_hw_addr[6..].fill(0);
     }
 
@@ -118,8 +119,43 @@ impl DhcpHeader {
 
     fn opt_message_type(&self) -> Option<DhcpOptMsgType> {
         self.iter()
-            .find(|p| return (*p).0 == 53)
+            .find(|p| return p.0 == 53)
             .and_then(|p| unsafe { Some(*(p.1.as_ptr() as *const DhcpOptMsgType)) })
+    }
+
+    fn opt_subnet(&self) -> Option<Ip> {
+        self.iter().find(|p| return p.0 == 1).and_then(|p| {
+            let ptr = p.1;
+            Some(Ip {
+                v: [ptr[0], ptr[1], ptr[2], ptr[3]],
+            })
+        })
+    }
+
+    fn opt_router(&self) -> Option<Ip> {
+        self.iter().find(|p| return p.0 == 3).and_then(|p| {
+            let ptr = p.1;
+            Some(Ip {
+                v: [ptr[0], ptr[1], ptr[2], ptr[3]],
+            })
+        })
+    }
+
+    fn opt_dns(&self) -> Option<Ip> {
+        self.iter().find(|p| return p.0 == 6).and_then(|p| {
+            let ptr = p.1;
+            Some(Ip {
+                v: [ptr[0], ptr[1], ptr[2], ptr[3]],
+            })
+        })
+    }
+
+    fn opt_dns_name(&self) -> Option<String> {
+        self.iter().find(|p| return p.0 == 15).and_then(|p| {
+            let mut s = String::new();
+            s.push_str(unsafe { alloc::str::from_utf8_unchecked(p.1) });
+            Some(s)
+        })
     }
 }
 
@@ -171,7 +207,7 @@ impl OptionsBuilder {
 
             let sl = core::slice::from_raw_parts_mut(self.ptr.offset(3), 6);
 
-            drv.get_mac(sl);
+            drv.driver.read_mac(sl);
         }
 
         self.shift(9)
@@ -288,12 +324,12 @@ pub fn send_discovery() {
         .set_parameter_request_list()
         .finish();
 
+    println!("Sending DHCP Discovery");
+
     crate::kernel::net::udp::send_packet(packet);
 }
 
-fn send_request(requested_ip: Ip) {
-    println!("Requesting ip {:?} from router", requested_ip);
-
+fn process_offer(requested_ip: Ip) {
     let total_len = core::mem::size_of::<DhcpHeader>();
 
     let mut packet = crate::kernel::net::udp::create_packet(
@@ -326,15 +362,34 @@ fn send_request(requested_ip: Ip) {
     crate::kernel::net::udp::send_packet(packet);
 }
 
+fn process_ack(packet: Packet) {
+    let header = unsafe { packet.addr.read_ref::<DhcpHeader>() };
+
+    let my_ip = header.your_ip();
+    let default_gw = header.opt_router();
+    let subnet = header.opt_subnet();
+    let dns = header.opt_dns();
+
+    if let (Some(dg), Some(sb), Some(dns)) = (default_gw, subnet, dns) {
+        let drv = default_driver();
+
+        drv.configure(my_ip, dg, sb, dns);
+
+        println!("[ DHCP ] Interface configured:");
+        println!("[ DHCP ] IP:              {:?}", my_ip);
+        println!("[ DHCP ] Default Gateway: {:?}", dg);
+        println!("[ DHCP ] Subnet:          {:?}", sb);
+        println!("[ DHCP ] DNS:             {:?}", dns);
+    }
+}
+
 pub fn process_packet(packet: Packet) {
     let header = unsafe { packet.addr.read_ref::<DhcpHeader>() };
 
     if let Some(mtype) = header.opt_message_type() {
         match mtype {
-            DhcpOptMsgType::DhcpOffer => send_request(header.your_ip()),
-            DhcpOptMsgType::DhcpAck => {
-                println!("DHCP approved our request");
-            }
+            DhcpOptMsgType::DhcpOffer => process_offer(header.your_ip()),
+            DhcpOptMsgType::DhcpAck => process_ack(packet),
             _ => {
                 println!("Unexpected DHCP msg type: {:?}", mtype);
             }

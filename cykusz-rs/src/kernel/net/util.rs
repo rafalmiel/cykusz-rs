@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct NetU32(u32);
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct NetU16(u16);
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 pub struct NetU8(u8);
 
 macro_rules! impl_net (

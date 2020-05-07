@@ -31,12 +31,14 @@ impl UdpHeader {
 impl Packet {
     fn strip_udp_frame(mut self) -> Packet {
         self.addr += core::mem::size_of::<UdpHeader>();
+        self.len -= core::mem::size_of::<UdpHeader>();
 
         self
     }
 
     fn wrap_udp_frame(mut self) -> Packet {
         self.addr -= core::mem::size_of::<UdpHeader>();
+        self.len += core::mem::size_of::<UdpHeader>();
 
         self
     }
@@ -71,7 +73,7 @@ pub fn process_packet(packet: Packet) {
     match header.dst_port.value() {
         68 => crate::kernel::net::dhcp::process_packet(packet.strip_udp_frame()),
         _ => {
-            println!("Unknown UDP port {}", header.dst_port.value());
+            //println!("Unknown UDP port {}", header.dst_port.value());
         }
     }
 }

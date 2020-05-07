@@ -131,8 +131,12 @@ impl E1000Data {
         }
     }
 
-    pub fn get_mac(&self, mac: &mut [u8]) {
+    pub fn read_mac(&self, mac: &mut [u8]) {
         mac.copy_from_slice(&self.mac);
+    }
+
+    pub fn get_mac(&self) -> [u8; 6] {
+        self.mac
     }
 
     pub fn send(&mut self, packet: Packet) {
@@ -152,7 +156,7 @@ impl E1000Data {
 
         unsafe {
             while status.read_volatile().bits() & 0xff == 0 {
-                println!("Status: 0b{:b}", status.read_volatile().bits());
+                //println!("Status: 0b{:b}", status.read_volatile().bits());
             }
         }
 
@@ -237,7 +241,7 @@ impl E1000Data {
         return (tmp >> 16) & 0xffff;
     }
 
-    pub fn read_mac(&mut self) {
+    pub fn init_mac(&mut self) {
         if self.has_eeprom {
             for i in 0..3 {
                 let t = self.eeprom_read(i) as u16;

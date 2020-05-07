@@ -100,6 +100,8 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     drivers::post_module_init();
 
+    kernel::net::init();
+
     // Start test tasks on this cpu
     task_test::start();
 

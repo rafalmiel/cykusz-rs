@@ -59,10 +59,16 @@ impl NetDriver for E1000 {
         data.alloc_packet(size)
     }
 
-    fn get_mac(&self, mac: &mut [u8]) {
+    fn read_mac(&self, mac: &mut [u8]) {
         let data = self.data.lock_irq();
 
-        data.get_mac(mac)
+        data.read_mac(mac)
+    }
+
+    fn get_mac(&self) -> [u8; 6] {
+        let data = self.data.lock_irq();
+
+        data.get_mac()
     }
 }
 
@@ -87,7 +93,7 @@ impl PciDeviceHandle for E1000 {
 
         data.reset();
 
-        data.read_mac();
+        data.init_mac();
 
         data.detect_eeprom();
 

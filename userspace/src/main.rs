@@ -107,6 +107,8 @@ fn exec(cmd: &str) {
         if let Err(e) = syscall::reboot() {
             println!("Reboot failed.. {:?}", e);
         }
+    } else if cmd.is_empty() {
+        return;
     } else {
         println!(
             "shell: {}: command not found",

@@ -17,15 +17,23 @@ pub struct EthHeader {
     typ: EthType,
 }
 
+impl EthHeader {
+    pub fn src_mac(&self) -> [u8; 6] {
+        self.src_mac
+    }
+}
+
 impl Packet {
     fn strip_eth_frame(mut self) -> Packet {
         self.addr += core::mem::size_of::<EthHeader>();
+        self.len -= core::mem::size_of::<EthHeader>();
 
         self
     }
 
     fn wrap_eth_frame(mut self) -> Packet {
         self.addr -= core::mem::size_of::<EthHeader>();
+        self.len += core::mem::size_of::<EthHeader>();
 
         self
     }
@@ -36,15 +44,21 @@ pub fn create_packet(typ: EthType, size: usize, target: Ip) -> Packet {
 
     let drv = crate::kernel::net::default_driver();
 
-    let mut packet = drv.alloc_packet(size + core::mem::size_of::<EthHeader>());
+    let mut packet = drv
+        .driver
+        .alloc_packet(size + core::mem::size_of::<EthHeader>());
 
     let eth = unsafe { packet.addr.read_mut::<EthHeader>() };
 
-    drv.get_mac(&mut eth.src_mac);
-    get_dst_mac(&mut eth.dst_mac, target);
-    eth.typ = typ;
+    if let Some(mac) = crate::kernel::net::arp::cache_get(target) {
+        drv.driver.read_mac(&mut eth.src_mac);
+        eth.dst_mac.copy_from_slice(&mac);
+        eth.typ = typ;
 
-    packet.strip_eth_frame()
+        packet.strip_eth_frame()
+    } else {
+        panic!("MAC Addr not found in cache for ip: {:?}", target);
+    }
 }
 
 pub fn send_packet(packet: Packet) {
@@ -52,9 +66,7 @@ pub fn send_packet(packet: Packet) {
 
     let drv = crate::kernel::net::default_driver();
 
-    println!("Sending {} {}", packet.addr, packet.len);
-
-    drv.send(packet);
+    drv.driver.send(packet);
 }
 
 pub fn process_packet(packet: Packet) {

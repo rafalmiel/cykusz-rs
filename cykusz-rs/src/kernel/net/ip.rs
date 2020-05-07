@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
 use crate::arch::raw::mm::VirtAddr;
-use crate::kernel::net::eth::EthType;
+use crate::kernel::net::eth::{EthHeader, EthType};
 use crate::kernel::net::util::{NetU16, NetU32, NetU8};
-use crate::kernel::net::Packet;
+use crate::kernel::net::{default_driver, Packet};
 
 #[repr(u8)]
 pub enum IpType {
@@ -18,7 +18,7 @@ impl Default for IpType {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, Hash, Ord, Eq, PartialEq, PartialOrd)]
 #[repr(packed)]
 pub struct Ip {
     pub v: [u8; 4],
@@ -49,6 +49,16 @@ impl Ip {
     pub fn empty() -> Ip {
         Ip { v: [0, 0, 0, 0] }
     }
+
+    pub fn is_same_subnet(&self, ip: Ip, subnet: Ip) -> bool {
+        for i in 0..4 {
+            if !((ip.v[i] & subnet.v[i]) == (self.v[i] & subnet.v[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
 
 impl IpHeader {
@@ -67,6 +77,10 @@ impl IpHeader {
 
     fn set_protocol(&mut self, p: IpType) {
         self.protocol = p;
+    }
+
+    fn set_src_ip(&mut self, ip: Ip) {
+        self.src_ip = ip;
     }
 
     fn set_dest_ip(&mut self, ip: Ip) {
@@ -95,14 +109,20 @@ impl IpHeader {
 impl Packet {
     fn strip_ip_frame(mut self) -> Packet {
         self.addr += core::mem::size_of::<IpHeader>();
+        self.len -= core::mem::size_of::<IpHeader>();
 
         self
     }
 
     fn wrap_ip_frame(mut self) -> Packet {
         self.addr -= core::mem::size_of::<IpHeader>();
+        self.len += core::mem::size_of::<IpHeader>();
 
         self
+    }
+
+    fn eth_header(&self) -> &EthHeader {
+        unsafe { (self.addr - core::mem::size_of::<EthHeader>()).read_ref::<EthHeader>() }
     }
 }
 
@@ -118,6 +138,9 @@ pub fn create_packet(typ: IpType, size: usize, target: Ip) -> Packet {
     ip.set_protocol(typ);
     ip.set_dest_ip(target);
 
+    let drv = default_driver();
+    ip.set_src_ip(drv.ip());
+
     ip.calc_checksum();
 
     p.strip_ip_frame()
@@ -132,10 +155,13 @@ pub fn send_packet(packet: Packet) {
 pub fn process_packet(packet: Packet) {
     let ip = unsafe { packet.addr.read_ref::<IpHeader>() };
 
+    crate::kernel::net::arp::cache_insert(ip.src_ip, &packet.eth_header().src_mac());
+
     match ip.protocol {
         IpType::UDP => {
             crate::kernel::net::udp::process_packet(packet.strip_ip_frame());
         }
+        IpType::ICMP => crate::kernel::net::icmp::process_packet(packet.strip_ip_frame()),
         _ => {
             println!("Unsupported protocol");
         }

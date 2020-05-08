@@ -3,7 +3,7 @@ use crate::kernel::net::util::NetU16;
 use crate::kernel::net::Packet;
 
 #[repr(packed)]
-struct UdpHeader {
+pub struct UdpHeader {
     src_port: NetU16,
     dst_port: NetU16,
     len: NetU16,
@@ -73,6 +73,7 @@ pub fn process_packet(packet: Packet) {
     match header.dst_port.value() {
         68 => crate::kernel::net::dhcp::process_packet(packet.strip_udp_frame()),
         _ => {
+            crate::kernel::net::icmp::send_port_unreachable(packet.strip_udp_frame());
             //println!("Unknown UDP port {}", header.dst_port.value());
         }
     }

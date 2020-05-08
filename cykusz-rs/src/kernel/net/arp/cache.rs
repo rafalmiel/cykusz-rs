@@ -26,7 +26,7 @@ impl ArpCache {
 static CACHE: Once<RwSpin<ArpCache>> = Once::new();
 
 pub fn insert(ip: Ip, mac: &[u8; 6]) {
-    println!("[ ARP ] Cache {:?} -> {:?}", ip, mac);
+    //println!("[ ARP ] Cache {:?} -> {:?}", ip, mac);
 
     CACHE.r#try().as_ref().unwrap().write().insert(ip, mac);
 }

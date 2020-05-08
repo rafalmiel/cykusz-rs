@@ -3,12 +3,14 @@ use core::mem::size_of;
 use crate::kernel::net::ip::{IpHeader, IpType};
 use crate::kernel::net::util::NetU16;
 use crate::kernel::net::Packet;
+use crate::kernel::net::udp::UdpHeader;
 
 #[derive(Eq, PartialEq)]
 #[repr(u8)]
 enum IcmpType {
     EchoRequest = 8,
     EchoReply = 0,
+    DestUnreachable = 3,
 }
 
 #[repr(packed)]
@@ -39,6 +41,10 @@ impl Packet {
         }
     }
 
+    fn icmp_dest_unreachable_header(&self) -> &IcmpDestUnreachableHeader {
+        unsafe { (self.addr + size_of::<IcmpHeader>()).read_ref::<IcmpDestUnreachableHeader>() }
+    }
+
     fn icmp_header_mut(&mut self) -> &mut IcmpHeader {
         unsafe { self.addr.read_mut::<IcmpHeader>() }
     }
@@ -53,6 +59,10 @@ impl Packet {
         unsafe {
             core::slice::from_raw_parts_mut((self.addr + hdr_len).0 as *mut u8, self.len - hdr_len)
         }
+    }
+
+    fn icmp_dest_unreachable_header_mut(&self) -> &mut IcmpDestUnreachableHeader {
+        unsafe { (self.addr + size_of::<IcmpHeader>()).read_mut::<IcmpDestUnreachableHeader>() }
     }
 }
 
@@ -85,6 +95,13 @@ impl IcmpHeader {
 struct IcmpEchoHeader {
     echo_id: NetU16,
     echo_seq: NetU16,
+}
+
+struct IcmpDestUnreachableHeader {
+    empty: NetU16,
+    next_mtu: NetU16,
+    iphdr: IpHeader,
+    orig_payload: [u8; 8],
 }
 
 pub fn process_packet(packet: Packet) {
@@ -127,4 +144,43 @@ pub fn process_packet(packet: Packet) {
 
         crate::kernel::net::ip::send_packet(out_packet);
     }
+}
+
+pub fn send_port_unreachable(udp_packet: Packet) {
+    let orig_ip = unsafe {
+        (udp_packet.addr - size_of::<UdpHeader>() - size_of::<IpHeader>()).read_ref::<IpHeader>()
+    };
+
+    let payload_len = size_of::<IcmpHeader>() + size_of::<IcmpDestUnreachableHeader>();
+
+    let mut out_packet = crate::kernel::net::ip::create_packet(
+        IpType::ICMP,
+        payload_len,
+        orig_ip.src_ip,
+    );
+
+    {
+        let hdr = out_packet.icmp_header_mut();
+        hdr.typ = IcmpType::DestUnreachable;
+        hdr.code = 3;
+    }
+
+    {
+        let hdr = out_packet.icmp_dest_unreachable_header_mut();
+        hdr.empty = NetU16::new(0);
+        hdr.next_mtu = NetU16::new(0);
+        hdr.iphdr = *orig_ip;
+        hdr.orig_payload.copy_from_slice(
+            unsafe {
+                core::slice::from_raw_parts((udp_packet.addr - size_of::<UdpHeader>()).0 as *mut u8, 8)
+            }
+        );
+    }
+
+    {
+        let hdr = out_packet.icmp_header_mut();
+        hdr.calc_checksum(payload_len);
+    }
+
+    crate::kernel::net::ip::send_packet(out_packet);
 }

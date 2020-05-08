@@ -58,7 +58,7 @@ impl Packet {
 
 impl IcmpHeader {
     fn calc_checksum(&mut self, len: usize) {
-        self.crc.set(0);
+        self.crc = NetU16::new(0);
         let mut sum: u32 = 0;
 
         let ptr = self as *const _ as *const NetU16;

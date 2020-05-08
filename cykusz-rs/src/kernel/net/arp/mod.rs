@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub use cache::get as cache_get;
 pub use cache::insert as cache_insert;
 
@@ -7,12 +9,6 @@ use crate::kernel::net::util::{NetU16, NetU8};
 use crate::kernel::net::{default_driver, Packet};
 
 pub mod cache;
-
-pub fn get_dst_mac(mac: &mut [u8], ip: Ip) {
-    for v in mac {
-        *v = 0xff;
-    }
-}
 
 #[derive(Copy, Clone)]
 #[repr(u16)]
@@ -77,8 +73,8 @@ impl ArpHeader {
     fn init(&mut self) {
         self.htype = HType::Ethernet;
         self.ptype = PType::IPv4;
-        self.hlen.set(6);
-        self.plen.set(4);
+        self.hlen = NetU8::new(6);
+        self.plen = NetU8::new(4);
     }
 
     fn set_oper(&mut self, oper: Oper) {
@@ -139,7 +135,7 @@ pub fn process_packet(packet: Packet) {
                 header.src_ip,
             );
 
-            let mut ohdr = unsafe { packet.addr.read_mut::<ArpHeader>() };
+            let ohdr = unsafe { packet.addr.read_mut::<ArpHeader>() };
 
             ohdr.init();
             ohdr.set_oper(Oper::Reply);

@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 
-use crate::arch::raw::mm::VirtAddr;
 use crate::kernel::net::eth::{EthHeader, EthType};
-use crate::kernel::net::util::{NetU16, NetU32, NetU8};
+use crate::kernel::net::util::{NetU8, NetU16};
 use crate::kernel::net::{default_driver, Packet};
 
 #[repr(u8)]
@@ -92,7 +91,7 @@ impl IpHeader {
 
         let ptr = self as *const _ as *const NetU16;
 
-        for i in 0..unsafe { (core::mem::size_of::<IpHeader>() / 2) } {
+        for i in 0..core::mem::size_of::<IpHeader>() / 2 {
             sum += unsafe { (&*ptr.offset(i as isize)).value() as u32 }
         }
 
@@ -128,7 +127,7 @@ impl Packet {
 
 pub fn create_packet(typ: IpType, size: usize, target: Ip) -> Packet {
     let total_size = size + core::mem::size_of::<IpHeader>();
-    let mut p = crate::kernel::net::eth::create_packet(EthType::IP, total_size, target);
+    let p = crate::kernel::net::eth::create_packet(EthType::IP, total_size, target);
 
     let ip = unsafe { p.addr.read_mut::<IpHeader>() };
 
@@ -154,8 +153,6 @@ pub fn send_packet(packet: Packet) {
 
 pub fn process_packet(packet: Packet) {
     let ip = unsafe { packet.addr.read_ref::<IpHeader>() };
-
-    crate::kernel::net::arp::cache_insert(ip.src_ip, &packet.eth_header().src_mac());
 
     match ip.protocol {
         IpType::UDP => {

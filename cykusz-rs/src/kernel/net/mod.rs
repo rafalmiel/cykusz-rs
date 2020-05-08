@@ -1,11 +1,13 @@
+#![allow(dead_code)]
+
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use crate::kernel::mm::{MappedAddr, VirtAddr};
+use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip;
 use crate::kernel::sched::create_param_task;
-use crate::kernel::sync::{RwSpin, Spin};
+use crate::kernel::sync::RwSpin;
 
 pub mod arp;
 pub mod dhcp;

@@ -12,19 +12,19 @@ struct UdpHeader {
 
 impl UdpHeader {
     fn set_src_port(&mut self, src: u16) {
-        self.src_port.set(src);
+        self.src_port = NetU16::new(src);
     }
 
     fn set_dst_port(&mut self, dst: u16) {
-        self.dst_port.set(dst);
+        self.dst_port = NetU16::new(dst);
     }
 
     fn set_len(&mut self, len: u16) {
-        self.len.set(len);
+        self.len = NetU16::new(len);
     }
 
     fn compute_checksum(&mut self) {
-        self.crc.set(0);
+        self.crc = NetU16::new(0);
     }
 }
 

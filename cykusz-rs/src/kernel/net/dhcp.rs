@@ -54,10 +54,10 @@ struct DhcpHeader {
 impl DhcpHeader {
     fn init(&mut self) {
         self.htype = HType::Ethernet;
-        self.hlen.set(6);
-        self.hops.set(0);
-        self.xid.set(DHCP_XID);
-        self.seconds.set(0);
+        self.hlen = NetU8::new(6);
+        self.hops = NetU8::new(0);
+        self.xid = NetU32::new(DHCP_XID);
+        self.seconds = NetU16::new(0);
         self.init_hw_addr();
         self.server_name.fill(0);
         self.file.fill(0);
@@ -76,9 +76,9 @@ impl DhcpHeader {
 
     fn set_flags_broadcast(&mut self, broadcast: bool) {
         if broadcast {
-            self.flags.set(0x8000);
+            self.flags = NetU16::new(0x8000);
         } else {
-            self.flags.set(0);
+            self.flags = NetU16::new(0);
         }
     }
 
@@ -180,7 +180,7 @@ impl OptionsBuilder {
         self
     }
 
-    fn set_magic_cookie(mut self) -> OptionsBuilder {
+    fn set_magic_cookie(self) -> OptionsBuilder {
         unsafe {
             (self.ptr as *mut u32).write(NetU32::new(0x63825363).net_value());
         }
@@ -188,7 +188,7 @@ impl OptionsBuilder {
         self.shift(4)
     }
 
-    fn set_message_type(mut self, typ: DhcpOptMsgType) -> OptionsBuilder {
+    fn set_message_type(self, typ: DhcpOptMsgType) -> OptionsBuilder {
         unsafe {
             self.ptr.offset(0).write(53);
             self.ptr.offset(1).write(1);
@@ -198,7 +198,7 @@ impl OptionsBuilder {
         self.shift(3)
     }
 
-    fn set_client_identifier(mut self) -> OptionsBuilder {
+    fn set_client_identifier(self) -> OptionsBuilder {
         let drv = default_driver();
         unsafe {
             self.ptr.offset(0).write(61);
@@ -213,7 +213,7 @@ impl OptionsBuilder {
         self.shift(9)
     }
 
-    fn set_requested_ip(mut self, ip: Ip) -> OptionsBuilder {
+    fn set_requested_ip(self, ip: Ip) -> OptionsBuilder {
         unsafe {
             self.ptr.offset(0).write(50);
             self.ptr.offset(1).write(4);
@@ -223,7 +223,7 @@ impl OptionsBuilder {
         self.shift(6)
     }
 
-    fn set_host_name(mut self, name: &str) -> OptionsBuilder {
+    fn set_host_name(self, name: &str) -> OptionsBuilder {
         let len = name.len();
 
         unsafe {
@@ -236,7 +236,7 @@ impl OptionsBuilder {
         self.shift(len as isize + 3)
     }
 
-    fn set_parameter_request_list(mut self) -> OptionsBuilder {
+    fn set_parameter_request_list(self) -> OptionsBuilder {
         unsafe {
             self.ptr.offset(0).write(55);
             self.ptr.offset(1).write(4);
@@ -249,7 +249,7 @@ impl OptionsBuilder {
         self.shift(6)
     }
 
-    fn finish(mut self) {
+    fn finish(self) {
         unsafe {
             self.ptr.offset(0).write(0xff);
             self.ptr.offset(1).write_bytes(0, self.len - 1);
@@ -298,7 +298,7 @@ impl<'a> Iterator for OptionsIter<'a> {
 pub fn send_discovery() {
     let total_len = core::mem::size_of::<DhcpHeader>();
 
-    let mut packet = crate::kernel::net::udp::create_packet(
+    let packet = crate::kernel::net::udp::create_packet(
         68,
         67,
         total_len,
@@ -332,7 +332,7 @@ pub fn send_discovery() {
 fn process_offer(requested_ip: Ip) {
     let total_len = core::mem::size_of::<DhcpHeader>();
 
-    let mut packet = crate::kernel::net::udp::create_packet(
+    let packet = crate::kernel::net::udp::create_packet(
         68,
         67,
         total_len,

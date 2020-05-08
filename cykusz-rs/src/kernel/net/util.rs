@@ -18,15 +18,7 @@ macro_rules! impl_net (
                 }
             }
 
-            pub fn set(&mut self, val: $src) {
-                if cfg!(target_endian = "little") {
-                    self.0 = val.swap_bytes();
-                } else {
-                    self.0 = val;
-                }
-            }
-
-            pub const fn value(&self) -> $src {
+            pub const fn value(self) -> $src {
                 if cfg!(target_endian = "little") {
                     self.0.swap_bytes()
                 } else {
@@ -34,7 +26,7 @@ macro_rules! impl_net (
                 }
             }
 
-            pub const fn net_value(&self) -> $src {
+            pub const fn net_value(self) -> $src {
                 self.0
             }
         }

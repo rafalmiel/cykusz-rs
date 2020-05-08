@@ -2,7 +2,7 @@
 
 use crate::kernel::net::ip::Ip;
 use crate::kernel::net::util::NetU16;
-use crate::kernel::net::{Packet, RecvPacket};
+use crate::kernel::net::Packet;
 
 #[repr(u16)]
 pub enum EthType {
@@ -40,11 +40,9 @@ impl Packet {
 }
 
 pub fn create_packet(typ: EthType, size: usize, target: Ip) -> Packet {
-    use crate::kernel::net::arp::get_dst_mac;
-
     let drv = crate::kernel::net::default_driver();
 
-    let mut packet = drv
+    let packet = drv
         .driver
         .alloc_packet(size + core::mem::size_of::<EthHeader>());
 

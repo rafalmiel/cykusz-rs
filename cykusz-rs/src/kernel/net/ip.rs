@@ -4,6 +4,7 @@ use crate::kernel::net::eth::{EthHeader, EthType};
 use crate::kernel::net::util::{NetU8, NetU16};
 use crate::kernel::net::{default_driver, Packet};
 
+#[derive(Debug, Copy, Clone)]
 #[repr(u8)]
 pub enum IpType {
     ICMP = NetU8::new(1).net_value(),
@@ -23,7 +24,7 @@ pub struct Ip {
     pub v: [u8; 4],
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, Copy, Clone)]
 #[repr(packed)]
 pub struct IpHeader {
     pub v: NetU8,
@@ -86,7 +87,7 @@ impl IpHeader {
         self.dest_ip = ip;
     }
 
-    fn calc_checksum(&mut self) {
+    pub fn calc_checksum(&mut self) {
         let mut sum: u32 = 0;
 
         let ptr = self as *const _ as *const NetU16;
@@ -153,6 +154,8 @@ pub fn send_packet(packet: Packet) {
 
 pub fn process_packet(packet: Packet) {
     let ip = unsafe { packet.addr.read_ref::<IpHeader>() };
+
+    crate::kernel::net::arp::cache_insert(ip.src_ip, &packet.eth_header().src_mac());
 
     match ip.protocol {
         IpType::UDP => {

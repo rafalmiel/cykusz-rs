@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::kernel::net::eth::{EthHeader, EthType};
-use crate::kernel::net::util::{NetU8, NetU16};
+use crate::kernel::net::util::{NetU16, NetU8};
 use crate::kernel::net::{default_driver, Packet};
 
 #[derive(Debug, Copy, Clone)]
@@ -128,7 +128,7 @@ impl Packet {
 
 pub fn create_packet(typ: IpType, size: usize, target: Ip) -> Packet {
     let total_size = size + core::mem::size_of::<IpHeader>();
-    let p = crate::kernel::net::eth::create_packet(EthType::IP, total_size, target);
+    let p = crate::kernel::net::eth::create_packet(EthType::IP, total_size);
 
     let ip = unsafe { p.addr.read_mut::<IpHeader>() };
 
@@ -146,16 +146,14 @@ pub fn create_packet(typ: IpType, size: usize, target: Ip) -> Packet {
     p.strip_ip_frame()
 }
 
-pub fn send_packet(packet: Packet) {
+pub fn send_packet(packet: Packet, target: Ip) {
     let packet = packet.wrap_ip_frame();
 
-    crate::kernel::net::eth::send_packet(packet);
+    crate::kernel::net::eth::send_packet(packet, target);
 }
 
 pub fn process_packet(packet: Packet) {
     let ip = unsafe { packet.addr.read_ref::<IpHeader>() };
-
-    crate::kernel::net::arp::cache_insert(ip.src_ip, &packet.eth_header().src_mac());
 
     match ip.protocol {
         IpType::UDP => {

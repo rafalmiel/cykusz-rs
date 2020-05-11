@@ -326,7 +326,7 @@ pub fn send_discovery() {
 
     println!("Sending DHCP Discovery");
 
-    crate::kernel::net::udp::send_packet(packet);
+    crate::kernel::net::udp::send_packet(packet, Ip::limited_broadcast());
 }
 
 fn process_offer(requested_ip: Ip) {
@@ -359,7 +359,7 @@ fn process_offer(requested_ip: Ip) {
         .set_parameter_request_list()
         .finish();
 
-    crate::kernel::net::udp::send_packet(packet);
+    crate::kernel::net::udp::send_packet(packet, Ip::limited_broadcast());
 }
 
 fn process_ack(packet: Packet) {

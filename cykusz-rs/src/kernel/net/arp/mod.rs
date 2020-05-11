@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use core::mem::size_of;
+
 pub use cache::get as cache_get;
 pub use cache::insert as cache_insert;
 
@@ -132,7 +134,6 @@ pub fn process_packet(packet: Packet) {
             let packet = crate::kernel::net::eth::create_packet(
                 EthType::ARP,
                 core::mem::size_of::<ArpHeader>(),
-                header.src_ip,
             );
 
             let ohdr = unsafe { packet.addr.read_mut::<ArpHeader>() };
@@ -146,9 +147,28 @@ pub fn process_packet(packet: Packet) {
 
             println!("ARP Send reply to {:?}", header.src_ip());
 
-            crate::kernel::net::eth::send_packet(packet);
+            crate::kernel::net::eth::send_packet(packet, header.src_ip);
         }
     }
+}
+
+pub fn request_ip(target: Ip) {
+    let packet = crate::kernel::net::eth::create_packet(EthType::ARP, size_of::<ArpHeader>());
+
+    let drv = default_driver();
+
+    let ohdr = unsafe { packet.addr.read_mut::<ArpHeader>() };
+
+    ohdr.init();
+    ohdr.set_oper(Oper::Request);
+    ohdr.set_src_ip(drv.ip());
+    ohdr.set_src_mac(&drv.driver.get_mac());
+    ohdr.set_dst_ip(target);
+    ohdr.set_dst_mac(&[0, 0, 0, 0, 0, 0]);
+
+    println!("ARP Send request to {:?}", target);
+
+    crate::kernel::net::eth::send_packet(packet, Ip::limited_broadcast());
 }
 
 pub fn init() {

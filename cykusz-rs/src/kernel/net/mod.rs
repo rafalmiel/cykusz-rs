@@ -24,6 +24,7 @@ pub trait NetDriver: Sync + Send {
     fn alloc_packet(&self, size: usize) -> Packet;
     fn read_mac(&self, mac: &mut [u8]);
     fn get_mac(&self) -> [u8; 6];
+    fn link_up(&self);
 }
 
 struct NetDeviceData {
@@ -139,8 +140,13 @@ pub fn register_net_driver(driver: Arc<dyn NetDriver>) {
 }
 
 pub fn init() {
-    if DEFAULT_DRIVER.read().is_some() {
+    let def = DEFAULT_DRIVER.write();
+    if def.is_some() {
         arp::init();
+
+        def.as_ref().unwrap().driver.link_up();
+
+        core::mem::drop(def);
 
         crate::kernel::net::dhcp::send_discovery();
     }

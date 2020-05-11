@@ -70,6 +70,14 @@ impl NetDriver for E1000 {
 
         data.get_mac()
     }
+
+    fn link_up(&self) {
+        let mut data = self.data.lock_irq();
+
+        data.enable_interrupt();
+
+        data.wait_link_up();
+    }
 }
 
 impl PciDeviceHandle for E1000 {
@@ -99,11 +107,8 @@ impl PciDeviceHandle for E1000 {
 
         data.clear_filters();
 
-        data.enable_interrupt();
         data.init_tx();
         data.init_rx();
-
-        data.wait_link_up();
 
         crate::kernel::net::register_net_driver(device().clone());
 

@@ -58,13 +58,13 @@ pub fn create_packet(src_port: u16, dst_port: u16, size: usize, target: Ip) -> P
     packet.strip_udp_frame()
 }
 
-pub fn send_packet(packet: Packet) {
+pub fn send_packet(packet: Packet, target: Ip) {
     let packet = packet.wrap_udp_frame();
 
     let header = unsafe { packet.addr.read_mut::<UdpHeader>() };
     header.compute_checksum();
 
-    crate::kernel::net::ip::send_packet(packet);
+    crate::kernel::net::ip::send_packet(packet, target);
 }
 
 pub fn process_packet(packet: Packet) {

@@ -145,14 +145,14 @@ pub fn process_packet(packet: Packet) {
             ohdr.set_dst_ip(header.src_ip());
             ohdr.set_dst_mac(header.src_mac());
 
-            println!("ARP Send reply to {:?}", header.src_ip());
+            println!("[ ARP ] Send reply to {:?}", header.src_ip());
 
             crate::kernel::net::eth::send_packet(packet, header.src_ip);
         }
     }
 }
 
-pub fn request_ip(target: Ip) {
+pub fn request_ip(target: Ip, to_cache: Packet) {
     let packet = crate::kernel::net::eth::create_packet(EthType::ARP, size_of::<ArpHeader>());
 
     let drv = default_driver();
@@ -166,7 +166,9 @@ pub fn request_ip(target: Ip) {
     ohdr.set_dst_ip(target);
     ohdr.set_dst_mac(&[0, 0, 0, 0, 0, 0]);
 
-    println!("ARP Send request to {:?}", target);
+    println!("[ ARP ] Send request to {:?}", target);
+
+    cache::request_ip(target, to_cache);
 
     crate::kernel::net::eth::send_packet(packet, Ip::limited_broadcast());
 }

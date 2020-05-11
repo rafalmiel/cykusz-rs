@@ -39,7 +39,7 @@ impl Packet {
     }
 }
 
-pub fn create_packet(typ: EthType, size: usize, target: Ip) -> Packet {
+pub fn create_packet(typ: EthType, size: usize) -> Packet {
     let drv = crate::kernel::net::default_driver();
 
     let packet = drv
@@ -48,22 +48,32 @@ pub fn create_packet(typ: EthType, size: usize, target: Ip) -> Packet {
 
     let eth = unsafe { packet.addr.read_mut::<EthHeader>() };
 
-    if let Some(mac) = crate::kernel::net::arp::cache_get(target) {
-        drv.driver.read_mac(&mut eth.src_mac);
-        eth.dst_mac.copy_from_slice(&mac);
-        eth.typ = typ;
-
-        packet.strip_eth_frame()
-    } else {
-        panic!("MAC Addr not found in cache for ip: {:?}", target);
-    }
+    drv.driver.read_mac(&mut eth.src_mac);
+    eth.typ = typ;
+    packet.strip_eth_frame()
 }
 
-pub fn send_packet(packet: Packet) {
+pub fn send_packet(packet: Packet, target: Ip) {
     let packet = packet.wrap_eth_frame();
+
+    let eth = unsafe { packet.addr.read_mut::<EthHeader>() };
 
     let drv = crate::kernel::net::default_driver();
 
+    if let Some(mac) = crate::kernel::net::arp::cache_get(target) {
+        eth.dst_mac.copy_from_slice(&mac);
+        drv.driver.send(packet);
+    } else {
+        crate::kernel::net::arp::request_ip(target);
+    }
+}
+
+pub fn send_packet_to_mac(packet: Packet, mac: &[u8; 6]) {
+    let drv = crate::kernel::net::default_driver();
+
+    let eth = unsafe { packet.addr.read_mut::<EthHeader>() };
+
+    eth.dst_mac.copy_from_slice(mac);
     drv.driver.send(packet);
 }
 

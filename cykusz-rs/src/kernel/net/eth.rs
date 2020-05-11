@@ -64,7 +64,7 @@ pub fn send_packet(packet: Packet, target: Ip) {
         eth.dst_mac.copy_from_slice(&mac);
         drv.driver.send(packet);
     } else {
-        crate::kernel::net::arp::request_ip(target);
+        crate::kernel::net::arp::request_ip(target, packet);
     }
 }
 

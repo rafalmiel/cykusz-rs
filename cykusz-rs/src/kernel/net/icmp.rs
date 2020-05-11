@@ -1,9 +1,9 @@
 use core::mem::size_of;
 
 use crate::kernel::net::ip::{IpHeader, IpType};
+use crate::kernel::net::udp::UdpHeader;
 use crate::kernel::net::util::NetU16;
 use crate::kernel::net::Packet;
-use crate::kernel::net::udp::UdpHeader;
 
 #[derive(Eq, PartialEq)]
 #[repr(u8)]
@@ -142,7 +142,7 @@ pub fn process_packet(packet: Packet) {
 
         println!("[ ICMP ] Sending Echo Reply");
 
-        crate::kernel::net::ip::send_packet(out_packet);
+        crate::kernel::net::ip::send_packet(out_packet, packet.ip_header().src_ip);
     }
 }
 
@@ -153,11 +153,8 @@ pub fn send_port_unreachable(udp_packet: Packet) {
 
     let payload_len = size_of::<IcmpHeader>() + size_of::<IcmpDestUnreachableHeader>();
 
-    let mut out_packet = crate::kernel::net::ip::create_packet(
-        IpType::ICMP,
-        payload_len,
-        orig_ip.src_ip,
-    );
+    let mut out_packet =
+        crate::kernel::net::ip::create_packet(IpType::ICMP, payload_len, orig_ip.src_ip);
 
     {
         let hdr = out_packet.icmp_header_mut();
@@ -170,11 +167,9 @@ pub fn send_port_unreachable(udp_packet: Packet) {
         hdr.empty = NetU16::new(0);
         hdr.next_mtu = NetU16::new(0);
         hdr.iphdr = *orig_ip;
-        hdr.orig_payload.copy_from_slice(
-            unsafe {
-                core::slice::from_raw_parts((udp_packet.addr - size_of::<UdpHeader>()).0 as *mut u8, 8)
-            }
-        );
+        hdr.orig_payload.copy_from_slice(unsafe {
+            core::slice::from_raw_parts((udp_packet.addr - size_of::<UdpHeader>()).0 as *mut u8, 8)
+        });
     }
 
     {
@@ -182,5 +177,5 @@ pub fn send_port_unreachable(udp_packet: Packet) {
         hdr.calc_checksum(payload_len);
     }
 
-    crate::kernel::net::ip::send_packet(out_packet);
+    crate::kernel::net::ip::send_packet(out_packet, orig_ip.src_ip);
 }

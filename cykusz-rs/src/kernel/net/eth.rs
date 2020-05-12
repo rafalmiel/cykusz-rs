@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
-use crate::kernel::net::ip::Ip;
+use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::util::NetU16;
-use crate::kernel::net::Packet;
+use crate::kernel::net::{ConstPacketKind, Packet};
+use crate::kernel::net::{PacketHeader, PacketUpHierarchy};
 
 #[repr(u16)]
 pub enum EthType {
@@ -23,40 +24,31 @@ impl EthHeader {
     }
 }
 
-impl Packet {
-    fn strip_eth_frame(mut self) -> Packet {
-        self.addr += core::mem::size_of::<EthHeader>();
-        self.len -= core::mem::size_of::<EthHeader>();
+#[derive(Debug, Copy, Clone)]
+pub struct Eth {}
 
-        self
-    }
-
-    fn wrap_eth_frame(mut self) -> Packet {
-        self.addr -= core::mem::size_of::<EthHeader>();
-        self.len += core::mem::size_of::<EthHeader>();
-
-        self
-    }
+impl ConstPacketKind for Eth {
+    const HSIZE: usize = core::mem::size_of::<EthHeader>();
 }
 
-pub fn create_packet(typ: EthType, size: usize) -> Packet {
+impl PacketHeader<EthHeader> for Packet<Eth> {}
+
+pub fn create_packet(typ: EthType, size: usize) -> Packet<Eth> {
     let drv = crate::kernel::net::default_driver();
 
-    let packet = drv
+    let mut packet = drv
         .driver
         .alloc_packet(size + core::mem::size_of::<EthHeader>());
 
-    let eth = unsafe { packet.addr.read_mut::<EthHeader>() };
+    let eth = packet.header_mut();
 
     drv.driver.read_mac(&mut eth.src_mac);
     eth.typ = typ;
-    packet.strip_eth_frame()
+    packet
 }
 
-pub fn send_packet(packet: Packet, target: Ip) {
-    let packet = packet.wrap_eth_frame();
-
-    let eth = unsafe { packet.addr.read_mut::<EthHeader>() };
+pub fn send_packet(mut packet: Packet<Eth>, target: Ip4) {
+    let eth = packet.header_mut();
 
     let drv = crate::kernel::net::default_driver();
 
@@ -68,20 +60,20 @@ pub fn send_packet(packet: Packet, target: Ip) {
     }
 }
 
-pub fn send_packet_to_mac(packet: Packet, mac: &[u8; 6]) {
+pub fn send_packet_to_mac(mut packet: Packet<Eth>, mac: &[u8; 6]) {
     let drv = crate::kernel::net::default_driver();
 
-    let eth = unsafe { packet.addr.read_mut::<EthHeader>() };
+    let eth = packet.header_mut();
 
     eth.dst_mac.copy_from_slice(mac);
     drv.driver.send(packet);
 }
 
-pub fn process_packet(packet: Packet) {
-    let eth = unsafe { packet.addr.read_ref::<EthHeader>() };
+pub fn process_packet(packet: Packet<Eth>) {
+    let eth = packet.header();
 
     match eth.typ {
-        EthType::IP => crate::kernel::net::ip::process_packet(packet.strip_eth_frame()),
-        EthType::ARP => crate::kernel::net::arp::process_packet(packet.strip_eth_frame()),
+        EthType::IP => crate::kernel::net::ip::process_packet(packet.upgrade()),
+        EthType::ARP => crate::kernel::net::arp::process_packet(packet.upgrade()),
     }
 }

@@ -3,11 +3,23 @@
 use alloc::string::String;
 use core::marker::PhantomData;
 
-use crate::kernel::net::ip::Ip;
+use crate::kernel::net::ip::Ip4;
+use crate::kernel::net::udp::Udp;
 use crate::kernel::net::util::{NetU16, NetU32, NetU8};
-use crate::kernel::net::{default_driver, Packet};
+use crate::kernel::net::{
+    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
+};
 
 const DHCP_XID: u32 = 0x43424140;
+
+#[derive(Debug, Copy, Clone)]
+pub struct Dhcp {}
+
+impl PacketKind for Dhcp {}
+
+impl PacketUpHierarchy<Dhcp> for Packet<Udp> {}
+
+impl PacketHeader<DhcpHeader> for Packet<Dhcp> {}
 
 #[repr(u8)]
 enum DhcpType {
@@ -41,10 +53,10 @@ struct DhcpHeader {
     xid: NetU32,
     seconds: NetU16,
     flags: NetU16,
-    client_ip: Ip,
-    your_ip: Ip,
-    server_ip: Ip,
-    gateway_ip: Ip,
+    client_ip: Ip4,
+    your_ip: Ip4,
+    server_ip: Ip4,
+    gateway_ip: Ip4,
     client_hw_addr: [u8; 16],
     server_name: [u8; 64],
     file: [u8; 128],
@@ -82,23 +94,23 @@ impl DhcpHeader {
         }
     }
 
-    fn set_client_ip(&mut self, ip: Ip) {
+    fn set_client_ip(&mut self, ip: Ip4) {
         self.client_ip = ip;
     }
 
-    fn set_your_ip(&mut self, ip: Ip) {
+    fn set_your_ip(&mut self, ip: Ip4) {
         self.your_ip = ip;
     }
 
-    fn your_ip(&self) -> Ip {
+    fn your_ip(&self) -> Ip4 {
         self.your_ip
     }
 
-    fn set_server_ip(&mut self, ip: Ip) {
+    fn set_server_ip(&mut self, ip: Ip4) {
         self.server_ip = ip;
     }
 
-    fn set_gateway_ip(&mut self, ip: Ip) {
+    fn set_gateway_ip(&mut self, ip: Ip4) {
         self.gateway_ip = ip
     }
 
@@ -123,28 +135,28 @@ impl DhcpHeader {
             .and_then(|p| unsafe { Some(*(p.1.as_ptr() as *const DhcpOptMsgType)) })
     }
 
-    fn opt_subnet(&self) -> Option<Ip> {
+    fn opt_subnet(&self) -> Option<Ip4> {
         self.iter().find(|p| return p.0 == 1).and_then(|p| {
             let ptr = p.1;
-            Some(Ip {
+            Some(Ip4 {
                 v: [ptr[0], ptr[1], ptr[2], ptr[3]],
             })
         })
     }
 
-    fn opt_router(&self) -> Option<Ip> {
+    fn opt_router(&self) -> Option<Ip4> {
         self.iter().find(|p| return p.0 == 3).and_then(|p| {
             let ptr = p.1;
-            Some(Ip {
+            Some(Ip4 {
                 v: [ptr[0], ptr[1], ptr[2], ptr[3]],
             })
         })
     }
 
-    fn opt_dns(&self) -> Option<Ip> {
+    fn opt_dns(&self) -> Option<Ip4> {
         self.iter().find(|p| return p.0 == 6).and_then(|p| {
             let ptr = p.1;
-            Some(Ip {
+            Some(Ip4 {
                 v: [ptr[0], ptr[1], ptr[2], ptr[3]],
             })
         })
@@ -213,7 +225,7 @@ impl OptionsBuilder {
         self.shift(9)
     }
 
-    fn set_requested_ip(self, ip: Ip) -> OptionsBuilder {
+    fn set_requested_ip(self, ip: Ip4) -> OptionsBuilder {
         unsafe {
             self.ptr.offset(0).write(50);
             self.ptr.offset(1).write(4);
@@ -298,22 +310,23 @@ impl<'a> Iterator for OptionsIter<'a> {
 pub fn send_discovery() {
     let total_len = core::mem::size_of::<DhcpHeader>();
 
-    let packet = crate::kernel::net::udp::create_packet(
+    let mut packet = crate::kernel::net::udp::create_packet(
         68,
         67,
         total_len,
-        Ip::limited_broadcast(), // 255.255.255.255
-    );
+        Ip4::limited_broadcast(), // 255.255.255.255
+    )
+    .upgrade();
 
-    let header = unsafe { packet.addr.read_mut::<DhcpHeader>() };
+    let header = packet.header_mut();
 
     header.init();
     header.set_op(DhcpType::BootRequest);
     header.set_flags_broadcast(true);
-    header.set_client_ip(Ip::empty());
-    header.set_your_ip(Ip::empty());
-    header.set_server_ip(Ip::empty());
-    header.set_gateway_ip(Ip::empty());
+    header.set_client_ip(Ip4::empty());
+    header.set_your_ip(Ip4::empty());
+    header.set_server_ip(Ip4::empty());
+    header.set_gateway_ip(Ip4::empty());
 
     header
         .options_builder()
@@ -326,28 +339,29 @@ pub fn send_discovery() {
 
     println!("Sending DHCP Discovery");
 
-    crate::kernel::net::udp::send_packet(packet, Ip::limited_broadcast());
+    crate::kernel::net::udp::send_packet(packet.downgrade());
 }
 
-fn process_offer(requested_ip: Ip) {
+fn process_offer(requested_ip: Ip4) {
     let total_len = core::mem::size_of::<DhcpHeader>();
 
-    let packet = crate::kernel::net::udp::create_packet(
+    let mut packet = crate::kernel::net::udp::create_packet(
         68,
         67,
         total_len,
-        Ip::limited_broadcast(), // 255.255.255.255
-    );
+        Ip4::limited_broadcast(), // 255.255.255.255
+    )
+    .upgrade();
 
-    let header = unsafe { packet.addr.read_mut::<DhcpHeader>() };
+    let header = packet.header_mut();
 
     header.init();
     header.set_op(DhcpType::BootRequest);
     header.set_flags_broadcast(true);
-    header.set_client_ip(Ip::empty());
-    header.set_your_ip(Ip::empty());
-    header.set_server_ip(Ip::empty());
-    header.set_gateway_ip(Ip::empty());
+    header.set_client_ip(Ip4::empty());
+    header.set_your_ip(Ip4::empty());
+    header.set_server_ip(Ip4::empty());
+    header.set_gateway_ip(Ip4::empty());
 
     header
         .options_builder()
@@ -359,11 +373,11 @@ fn process_offer(requested_ip: Ip) {
         .set_parameter_request_list()
         .finish();
 
-    crate::kernel::net::udp::send_packet(packet, Ip::limited_broadcast());
+    crate::kernel::net::udp::send_packet(packet.downgrade());
 }
 
-fn process_ack(packet: Packet) {
-    let header = unsafe { packet.addr.read_ref::<DhcpHeader>() };
+fn process_ack(packet: Packet<Dhcp>) {
+    let header = packet.header();
 
     let my_ip = header.your_ip();
     let default_gw = header.opt_router();
@@ -383,8 +397,8 @@ fn process_ack(packet: Packet) {
     }
 }
 
-pub fn process_packet(packet: Packet) {
-    let header = unsafe { packet.addr.read_ref::<DhcpHeader>() };
+pub fn process_packet(packet: Packet<Dhcp>) {
+    let header = packet.header();
 
     if let Some(mtype) = header.opt_message_type() {
         match mtype {

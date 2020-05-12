@@ -1,6 +1,19 @@
-use crate::kernel::net::ip::{Ip, IpType};
+use crate::kernel::net::ip::{Ip, Ip4, IpType};
 use crate::kernel::net::util::NetU16;
-use crate::kernel::net::Packet;
+use crate::kernel::net::{
+    ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
+};
+
+#[derive(Debug, Copy, Clone)]
+pub struct Udp {}
+
+impl ConstPacketKind for Udp {
+    const HSIZE: usize = core::mem::size_of::<UdpHeader>();
+}
+
+impl PacketUpHierarchy<Udp> for Packet<Ip> {}
+
+impl PacketHeader<UdpHeader> for Packet<Udp> {}
 
 #[repr(packed)]
 pub struct UdpHeader {
@@ -28,52 +41,35 @@ impl UdpHeader {
     }
 }
 
-impl Packet {
-    fn strip_udp_frame(mut self) -> Packet {
-        self.addr += core::mem::size_of::<UdpHeader>();
-        self.len -= core::mem::size_of::<UdpHeader>();
-
-        self
-    }
-
-    fn wrap_udp_frame(mut self) -> Packet {
-        self.addr -= core::mem::size_of::<UdpHeader>();
-        self.len += core::mem::size_of::<UdpHeader>();
-
-        self
-    }
-}
-
-pub fn create_packet(src_port: u16, dst_port: u16, size: usize, target: Ip) -> Packet {
+pub fn create_packet(src_port: u16, dst_port: u16, size: usize, target: Ip4) -> Packet<Udp> {
     let total_len = size + core::mem::size_of::<UdpHeader>();
 
-    let packet = crate::kernel::net::ip::create_packet(IpType::UDP, total_len, target);
+    let mut packet: Packet<Udp> =
+        crate::kernel::net::ip::create_packet(IpType::UDP, total_len, target).upgrade();
 
-    let header = unsafe { packet.addr.read_mut::<UdpHeader>() };
+    let header = packet.header_mut();
 
     header.set_dst_port(dst_port);
     header.set_src_port(src_port);
     header.set_len(total_len as u16);
 
-    packet.strip_udp_frame()
+    packet
 }
 
-pub fn send_packet(packet: Packet, target: Ip) {
-    let packet = packet.wrap_udp_frame();
-
-    let header = unsafe { packet.addr.read_mut::<UdpHeader>() };
+pub fn send_packet(mut packet: Packet<Udp>) {
+    let header = packet.header_mut();
     header.compute_checksum();
 
-    crate::kernel::net::ip::send_packet(packet, target);
+    crate::kernel::net::ip::send_packet(packet.downgrade());
 }
 
-pub fn process_packet(packet: Packet) {
-    let header = unsafe { packet.addr.read_ref::<UdpHeader>() };
+pub fn process_packet(packet: Packet<Udp>) {
+    let header = packet.header();
 
     match header.dst_port.value() {
-        68 => crate::kernel::net::dhcp::process_packet(packet.strip_udp_frame()),
+        68 => crate::kernel::net::dhcp::process_packet(packet.upgrade()),
         _ => {
-            crate::kernel::net::icmp::send_port_unreachable(packet.strip_udp_frame());
+            crate::kernel::net::icmp::send_port_unreachable(packet);
             //println!("Unknown UDP port {}", header.dst_port.value());
         }
     }

@@ -9,6 +9,7 @@ use addr::Addr;
 
 use crate::arch::raw::mm::VirtAddr;
 use crate::drivers::pci::{PciDeviceHandle, PciHeader};
+use crate::kernel::net::eth::Eth;
 use crate::kernel::net::{NetDriver, Packet, RecvPacket};
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
@@ -27,7 +28,7 @@ struct E1000 {
 }
 
 impl NetDriver for E1000 {
-    fn send(&self, packet: Packet) -> bool {
+    fn send(&self, packet: Packet<Eth>) -> bool {
         self.data.lock_irq().send(packet);
 
         true
@@ -53,7 +54,7 @@ impl NetDriver for E1000 {
         data.receive_finished(id);
     }
 
-    fn alloc_packet(&self, size: usize) -> Packet {
+    fn alloc_packet(&self, size: usize) -> Packet<Eth> {
         let data = self.data.lock_irq();
 
         data.alloc_packet(size)

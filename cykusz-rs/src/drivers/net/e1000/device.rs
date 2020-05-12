@@ -8,6 +8,7 @@ use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
 use crate::drivers::pci::{PciData, PciHeader, PciHeader0};
 use crate::kernel::mm::heap::{allocate_align, deallocate_align};
+use crate::kernel::net::PacketBaseTrait;
 use crate::kernel::timer::busy_sleep;
 
 use super::regs::*;
@@ -102,10 +103,10 @@ impl E1000Data {
 
         if desc.status & 0x1 == 0x1 {
             return Some(RecvPacket {
-                packet: Packet {
-                    addr: PhysAddr(desc.addr as usize).to_mapped().as_virt(),
-                    len: desc.length as usize,
-                },
+                packet: Packet::<Eth>::new(
+                    PhysAddr(desc.addr as usize).to_mapped().as_virt(),
+                    desc.length as usize,
+                ),
                 id: self.rx_cur as usize,
             });
         }
@@ -124,11 +125,11 @@ impl E1000Data {
         }
     }
 
-    pub fn alloc_packet(&self, size: usize) -> Packet {
-        Packet {
-            addr: VirtAddr(allocate_align(size, 0x1000).unwrap() as usize),
-            len: size,
-        }
+    pub fn alloc_packet(&self, size: usize) -> Packet<Eth> {
+        Packet::<Eth>::new(
+            VirtAddr(allocate_align(size, 0x1000).unwrap() as usize),
+            size,
+        )
     }
 
     pub fn read_mac(&self, mac: &mut [u8]) {
@@ -139,11 +140,11 @@ impl E1000Data {
         self.mac
     }
 
-    pub fn send(&mut self, packet: Packet) {
+    pub fn send(&mut self, packet: Packet<Eth>) {
         let phys = packet.addr.to_phys_pagewalk().unwrap();
 
         self.tx_ring[self.tx_cur as usize].addr = phys.0 as u64;
-        self.tx_ring[self.tx_cur as usize].length = packet.len as u16;
+        self.tx_ring[self.tx_cur as usize].length = packet.len() as u16;
         self.tx_ring[self.tx_cur as usize].cmd = 0b1011;
         self.tx_ring[self.tx_cur as usize].status = TStatus::default();
 
@@ -160,7 +161,7 @@ impl E1000Data {
             }
         }
 
-        deallocate_align(packet.addr.0 as *mut u8, packet.len, 0x1000);
+        deallocate_align(packet.addr().0 as *mut u8, packet.len(), 0x1000);
     }
 
     pub fn reset(&self) {

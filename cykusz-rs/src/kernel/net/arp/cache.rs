@@ -3,7 +3,8 @@ use alloc::vec::Vec;
 
 use spin::Once;
 
-use crate::kernel::net::ip::Ip;
+use crate::kernel::net::eth::Eth;
+use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::Packet;
 use crate::kernel::sync::RwSpin;
 
@@ -16,15 +17,15 @@ enum EntryStatus {
 struct Entry {
     mac: [u8; 6],
     status: EntryStatus,
-    packets: Vec<Packet>,
+    packets: Vec<Packet<Eth>>,
 }
 
 struct ArpCache {
-    cache: BTreeMap<Ip, Entry>,
+    cache: BTreeMap<Ip4, Entry>,
 }
 
 impl ArpCache {
-    fn insert(&mut self, ip: Ip, mac: &[u8; 6]) {
+    fn insert(&mut self, ip: Ip4, mac: &[u8; 6]) {
         if let Some(v) = self.cache.get_mut(&ip) {
             if v.status == EntryStatus::Pending {
                 v.mac = *mac;
@@ -49,7 +50,7 @@ impl ArpCache {
         }
     }
 
-    fn get(&self, ip: Ip) -> Option<[u8; 6]> {
+    fn get(&self, ip: Ip4) -> Option<[u8; 6]> {
         if let Some(v) = self.cache.get(&ip) {
             if v.status == EntryStatus::Allocated {
                 return Some(v.mac);
@@ -59,7 +60,7 @@ impl ArpCache {
         return None;
     }
 
-    fn request(&mut self, ip: Ip, packet: Packet) {
+    fn request(&mut self, ip: Ip4, packet: Packet<Eth>) {
         if let Some(v) = self.cache.get_mut(&ip) {
             if v.status == EntryStatus::Pending {
                 println!("[ ARP ] Enqueuing packet");
@@ -86,17 +87,17 @@ impl ArpCache {
 
 static CACHE: Once<RwSpin<ArpCache>> = Once::new();
 
-pub fn insert(ip: Ip, mac: &[u8; 6]) {
+pub fn insert(ip: Ip4, mac: &[u8; 6]) {
     //println!("[ ARP ] Cache {:?} -> {:?}", ip, mac);
 
     CACHE.r#try().as_ref().unwrap().write().insert(ip, mac);
 }
 
-pub fn get(ip: Ip) -> Option<[u8; 6]> {
+pub fn get(ip: Ip4) -> Option<[u8; 6]> {
     CACHE.r#try().as_ref().unwrap().read().get(ip)
 }
 
-pub fn request_ip(ip: Ip, packet: Packet) {
+pub fn request_ip(ip: Ip4, packet: Packet<Eth>) {
     let mut cache = CACHE.r#try().as_ref().unwrap().write();
 
     cache.request(ip, packet);
@@ -109,7 +110,7 @@ pub fn init() {
         };
 
         c.insert(
-            Ip::limited_broadcast(),
+            Ip4::limited_broadcast(),
             &[0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
         );
 

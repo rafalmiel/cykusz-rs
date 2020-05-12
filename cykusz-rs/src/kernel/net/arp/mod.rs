@@ -5,10 +5,12 @@ use core::mem::size_of;
 pub use cache::get as cache_get;
 pub use cache::insert as cache_insert;
 
-use crate::kernel::net::eth::EthType;
-use crate::kernel::net::ip::Ip;
+use crate::kernel::net::eth::{Eth, EthType};
+use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::util::{NetU16, NetU8};
-use crate::kernel::net::{default_driver, Packet};
+use crate::kernel::net::{
+    default_driver, ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
+};
 
 pub mod cache;
 
@@ -43,33 +45,28 @@ enum Oper {
 }
 
 #[repr(packed)]
-struct ArpHeader {
+pub struct ArpHeader {
     htype: HType,
     ptype: PType,
     hlen: NetU8,
     plen: NetU8,
     oper: Oper,
     src_mac: [u8; 6],
-    src_ip: Ip,
+    src_ip: Ip4,
     dst_mac: [u8; 6],
-    dst_ip: Ip,
+    dst_ip: Ip4,
 }
 
-impl Packet {
-    fn strip_arp_frame(mut self) -> Packet {
-        self.addr += core::mem::size_of::<ArpHeader>();
-        self.len -= core::mem::size_of::<ArpHeader>();
+#[derive(Debug, Copy, Clone)]
+pub struct Arp {}
 
-        self
-    }
-
-    fn wrap_arp_frame(mut self) -> Packet {
-        self.addr -= core::mem::size_of::<ArpHeader>();
-        self.len += core::mem::size_of::<ArpHeader>();
-
-        self
-    }
+impl ConstPacketKind for Arp {
+    const HSIZE: usize = core::mem::size_of::<ArpHeader>();
 }
+
+impl PacketUpHierarchy<Arp> for Packet<Eth> {}
+
+impl PacketHeader<ArpHeader> for Packet<Arp> {}
 
 impl ArpHeader {
     fn init(&mut self) {
@@ -83,11 +80,11 @@ impl ArpHeader {
         self.oper = oper;
     }
 
-    fn set_src_ip(&mut self, ip: Ip) {
+    fn set_src_ip(&mut self, ip: Ip4) {
         self.src_ip = ip;
     }
 
-    fn set_dst_ip(&mut self, ip: Ip) {
+    fn set_dst_ip(&mut self, ip: Ip4) {
         self.dst_ip = ip;
     }
 
@@ -103,11 +100,11 @@ impl ArpHeader {
         self.oper
     }
 
-    fn src_ip(&self) -> Ip {
+    fn src_ip(&self) -> Ip4 {
         self.src_ip
     }
 
-    fn dst_ip(&self) -> Ip {
+    fn dst_ip(&self) -> Ip4 {
         self.dst_ip
     }
 
@@ -120,10 +117,10 @@ impl ArpHeader {
     }
 }
 
-pub fn process_packet(packet: Packet) {
+pub fn process_packet(packet: Packet<Arp>) {
     let drv = default_driver();
 
-    let header = unsafe { packet.addr.read_ref::<ArpHeader>() };
+    let header = packet.header();
 
     if header.src_ip.is_same_subnet(drv.ip(), drv.subnet()) {
         cache_insert(header.src_ip, &header.src_mac);
@@ -131,12 +128,13 @@ pub fn process_packet(packet: Packet) {
 
     if header.oper() == Oper::Request {
         if header.dst_ip() == drv.ip() {
-            let packet = crate::kernel::net::eth::create_packet(
+            let mut packet: Packet<Arp> = crate::kernel::net::eth::create_packet(
                 EthType::ARP,
                 core::mem::size_of::<ArpHeader>(),
-            );
+            )
+            .upgrade();
 
-            let ohdr = unsafe { packet.addr.read_mut::<ArpHeader>() };
+            let ohdr = packet.header_mut();
 
             ohdr.init();
             ohdr.set_oper(Oper::Reply);
@@ -147,17 +145,18 @@ pub fn process_packet(packet: Packet) {
 
             println!("[ ARP ] Send reply to {:?}", header.src_ip());
 
-            crate::kernel::net::eth::send_packet(packet, header.src_ip);
+            crate::kernel::net::eth::send_packet(packet.downgrade(), header.src_ip);
         }
     }
 }
 
-pub fn request_ip(target: Ip, to_cache: Packet) {
-    let packet = crate::kernel::net::eth::create_packet(EthType::ARP, size_of::<ArpHeader>());
+pub fn request_ip(target: Ip4, to_cache: Packet<Eth>) {
+    let mut packet: Packet<Arp> =
+        crate::kernel::net::eth::create_packet(EthType::ARP, size_of::<ArpHeader>()).upgrade();
 
     let drv = default_driver();
 
-    let ohdr = unsafe { packet.addr.read_mut::<ArpHeader>() };
+    let ohdr = packet.header_mut();
 
     ohdr.init();
     ohdr.set_oper(Oper::Request);
@@ -170,7 +169,7 @@ pub fn request_ip(target: Ip, to_cache: Packet) {
 
     cache::request_ip(target, to_cache);
 
-    crate::kernel::net::eth::send_packet(packet, Ip::limited_broadcast());
+    crate::kernel::net::eth::send_packet(packet.downgrade(), Ip4::limited_broadcast());
 }
 
 pub fn init() {

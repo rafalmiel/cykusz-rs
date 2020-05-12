@@ -158,7 +158,7 @@ macro_rules! enable_unsigned_ops {
                 return &*(self.0 as *mut T);
             }
 
-            pub unsafe fn read_mut<'a, T>(&self) -> &'a mut T {
+            pub unsafe fn read_mut<'a, T>(&mut self) -> &'a mut T {
                 return &mut *(self.0 as *mut T);
             }
 

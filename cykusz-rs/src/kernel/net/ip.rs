@@ -1,8 +1,12 @@
 #![allow(dead_code)]
 
-use crate::kernel::net::eth::{EthHeader, EthType};
+use core::mem::size_of;
+
+use crate::kernel::net::eth::{Eth, EthHeader, EthType};
 use crate::kernel::net::util::{NetU16, NetU8};
-use crate::kernel::net::{default_driver, Packet};
+use crate::kernel::net::{
+    default_driver, ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
+};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(u8)]
@@ -20,8 +24,47 @@ impl Default for IpType {
 
 #[derive(Debug, Default, Copy, Clone, Hash, Ord, Eq, PartialEq, PartialOrd)]
 #[repr(packed)]
-pub struct Ip {
+pub struct Ip4 {
     pub v: [u8; 4],
+}
+
+impl Ip4 {
+    pub fn limited_broadcast() -> Ip4 {
+        Ip4 {
+            v: [255, 255, 255, 255],
+        }
+    }
+
+    pub fn empty() -> Ip4 {
+        Ip4 { v: [0, 0, 0, 0] }
+    }
+
+    pub fn is_same_subnet(&self, ip: Ip4, subnet: Ip4) -> bool {
+        for i in 0..4 {
+            if !((ip.v[i] & subnet.v[i]) == (self.v[i] & subnet.v[i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Ip {}
+
+impl ConstPacketKind for Ip {
+    const HSIZE: usize = core::mem::size_of::<IpHeader>();
+}
+
+impl PacketUpHierarchy<Ip> for Packet<Eth> {}
+
+impl PacketHeader<IpHeader> for Packet<Ip> {}
+
+impl Packet<Ip> {
+    fn eth_header(&self) -> &EthHeader {
+        unsafe { (self.addr - size_of::<EthHeader>()).read_ref::<EthHeader>() }
+    }
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -35,30 +78,8 @@ pub struct IpHeader {
     pub ttl: NetU8,
     pub protocol: IpType,
     pub hcrc: NetU16,
-    pub src_ip: Ip,
-    pub dest_ip: Ip,
-}
-
-impl Ip {
-    pub fn limited_broadcast() -> Ip {
-        Ip {
-            v: [255, 255, 255, 255],
-        }
-    }
-
-    pub fn empty() -> Ip {
-        Ip { v: [0, 0, 0, 0] }
-    }
-
-    pub fn is_same_subnet(&self, ip: Ip, subnet: Ip) -> bool {
-        for i in 0..4 {
-            if !((ip.v[i] & subnet.v[i]) == (self.v[i] & subnet.v[i])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    pub src_ip: Ip4,
+    pub dest_ip: Ip4,
 }
 
 impl IpHeader {
@@ -79,11 +100,11 @@ impl IpHeader {
         self.protocol = p;
     }
 
-    fn set_src_ip(&mut self, ip: Ip) {
+    fn set_src_ip(&mut self, ip: Ip4) {
         self.src_ip = ip;
     }
 
-    fn set_dest_ip(&mut self, ip: Ip) {
+    fn set_dest_ip(&mut self, ip: Ip4) {
         self.dest_ip = ip;
     }
 
@@ -106,31 +127,13 @@ impl IpHeader {
     }
 }
 
-impl Packet {
-    fn strip_ip_frame(mut self) -> Packet {
-        self.addr += core::mem::size_of::<IpHeader>();
-        self.len -= core::mem::size_of::<IpHeader>();
-
-        self
-    }
-
-    fn wrap_ip_frame(mut self) -> Packet {
-        self.addr -= core::mem::size_of::<IpHeader>();
-        self.len += core::mem::size_of::<IpHeader>();
-
-        self
-    }
-
-    fn eth_header(&self) -> &EthHeader {
-        unsafe { (self.addr - core::mem::size_of::<EthHeader>()).read_ref::<EthHeader>() }
-    }
-}
-
-pub fn create_packet(typ: IpType, size: usize, target: Ip) -> Packet {
+pub fn create_packet(typ: IpType, size: usize, target: Ip4) -> Packet<Ip> {
     let total_size = size + core::mem::size_of::<IpHeader>();
-    let p = crate::kernel::net::eth::create_packet(EthType::IP, total_size);
 
-    let ip = unsafe { p.addr.read_mut::<IpHeader>() };
+    let mut p: Packet<Ip> =
+        crate::kernel::net::eth::create_packet(EthType::IP, total_size).upgrade();
+
+    let ip = p.header_mut();
 
     ip.init();
 
@@ -143,36 +146,23 @@ pub fn create_packet(typ: IpType, size: usize, target: Ip) -> Packet {
 
     ip.calc_checksum();
 
-    p.strip_ip_frame()
+    p
 }
 
-pub fn send_packet(packet: Packet, target: Ip) {
-    let packet = packet.wrap_ip_frame();
+pub fn send_packet(packet: Packet<Ip>) {
+    let ip = packet.header();
 
-    crate::kernel::net::eth::send_packet(packet, target);
+    crate::kernel::net::eth::send_packet(packet.downgrade(), ip.dest_ip);
 }
 
-pub fn process_packet(packet: Packet) {
-    let ip = unsafe { packet.addr.read_ref::<IpHeader>() };
+pub fn process_packet(packet: Packet<Ip>) {
+    let ip = packet.header();
 
     match ip.protocol {
-        IpType::UDP => {
-            crate::kernel::net::udp::process_packet(packet.strip_ip_frame());
-        }
-        IpType::ICMP => crate::kernel::net::icmp::process_packet(packet.strip_ip_frame()),
+        IpType::UDP => crate::kernel::net::udp::process_packet(packet.upgrade()),
+        IpType::ICMP => crate::kernel::net::icmp::process_packet(packet.upgrade()),
         _ => {
             println!("Unsupported protocol");
         }
-    }
-}
-
-pub fn test() {
-    let mut ip = IpHeader::default();
-    ip.init();
-
-    let v = &ip as *const _ as *const u8;
-
-    for i in 0..16 {
-        print!("0x{:x} ", unsafe { v.offset(i).read() });
     }
 }

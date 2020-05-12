@@ -4,39 +4,42 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use crate::kernel::mm::VirtAddr;
-use crate::kernel::net::ip::Ip;
+use crate::kernel::net::eth::Eth;
+use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::create_param_task;
 use crate::kernel::sync::RwSpin;
+
+pub use self::packet::*;
 
 pub mod arp;
 pub mod dhcp;
 pub mod eth;
 pub mod icmp;
 pub mod ip;
+pub mod packet;
 pub mod udp;
 pub mod util;
 
 pub trait NetDriver: Sync + Send {
-    fn send(&self, packet: Packet) -> bool;
+    fn send(&self, packet: Packet<Eth>) -> bool;
     fn receive(&self) -> RecvPacket;
     fn receive_finished(&self, id: usize);
-    fn alloc_packet(&self, size: usize) -> Packet;
+    fn alloc_packet(&self, size: usize) -> Packet<Eth>;
     fn read_mac(&self, mac: &mut [u8]);
     fn get_mac(&self) -> [u8; 6];
     fn link_up(&self);
 }
 
 struct NetDeviceData {
-    pub ip: Ip,
-    pub default_gateway: Ip,
-    pub subnet: Ip,
-    pub dns: Ip,
+    pub ip: Ip4,
+    pub default_gateway: Ip4,
+    pub subnet: Ip4,
+    pub dns: Ip4,
     pub dns_name: String,
 }
 
 impl NetDeviceData {
-    fn configure(&mut self, ip: Ip, default_gw: Ip, subnet: Ip, dns: Ip) {
+    fn configure(&mut self, ip: Ip4, default_gw: Ip4, subnet: Ip4, dns: Ip4) {
         self.ip = ip;
         self.default_gateway = default_gw;
         self.subnet = subnet;
@@ -54,50 +57,38 @@ impl NetDevice {
         NetDevice {
             driver,
             data: RwSpin::new(NetDeviceData {
-                ip: Ip::empty(),
-                default_gateway: Ip::empty(),
-                subnet: Ip::empty(),
-                dns: Ip::empty(),
+                ip: Ip4::empty(),
+                default_gateway: Ip4::empty(),
+                subnet: Ip4::empty(),
+                dns: Ip4::empty(),
                 dns_name: String::new(),
             }),
         }
     }
 
-    pub fn configure(&self, ip: Ip, default_gw: Ip, subnet: Ip, dns: Ip) {
+    pub fn configure(&self, ip: Ip4, default_gw: Ip4, subnet: Ip4, dns: Ip4) {
         self.data.write().configure(ip, default_gw, subnet, dns);
     }
 
-    pub fn ip(&self) -> Ip {
+    pub fn ip(&self) -> Ip4 {
         self.data.read().ip
     }
 
-    pub fn default_gateway(&self) -> Ip {
+    pub fn default_gateway(&self) -> Ip4 {
         self.data.read().default_gateway
     }
 
-    pub fn subnet(&self) -> Ip {
+    pub fn subnet(&self) -> Ip4 {
         self.data.read().subnet
     }
 
-    pub fn dns(&self) -> Ip {
+    pub fn dns(&self) -> Ip4 {
         self.data.read().dns
     }
 
     pub fn dns_name(&self) -> String {
         self.data.read().dns_name.clone()
     }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct RecvPacket {
-    pub packet: Packet,
-    pub id: usize,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct Packet {
-    pub addr: VirtAddr,
-    pub len: usize,
 }
 
 static DRIVERS: RwSpin<Vec<Arc<NetDevice>>> = RwSpin::new(Vec::new());
@@ -141,10 +132,10 @@ pub fn register_net_driver(driver: Arc<dyn NetDriver>) {
 
 pub fn init() {
     let def = DEFAULT_DRIVER.write();
-    if def.is_some() {
+    if let Some(dev) = &*def {
         arp::init();
 
-        def.as_ref().unwrap().driver.link_up();
+        dev.driver.link_up();
 
         core::mem::drop(def);
 

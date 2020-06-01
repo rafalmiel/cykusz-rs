@@ -1,7 +1,7 @@
 use core::mem::size_of;
 
 use crate::kernel::net::ip::{Ip, IpHeader, IpType};
-use crate::kernel::net::udp::Udp;
+use crate::kernel::net::udp::{Udp, UdpHeader};
 use crate::kernel::net::util::NetU16;
 use crate::kernel::net::{
     Packet, PacketBaseTrait, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
@@ -110,46 +110,76 @@ struct IcmpDestUnreachableHeader {
     orig_payload: [u8; 8],
 }
 
+fn process_echo(packet: Packet<Icmp>) {
+    let mut out_packet: Packet<Icmp> = crate::kernel::net::ip::create_packet(
+        IpType::ICMP,
+        packet.len(),
+        packet.ip_header().src_ip,
+    )
+        .upgrade();
+
+    {
+        let icmp_hdr = out_packet.header_mut();
+        icmp_hdr.typ = IcmpType::EchoReply;
+        icmp_hdr.code = 0;
+    }
+
+    {
+        let icmp_echo_hdr = out_packet.icmp_echo_header_mut();
+        let src_echo_hdr = packet.icmp_echo_header();
+
+        icmp_echo_hdr.echo_id = src_echo_hdr.echo_id;
+        icmp_echo_hdr.echo_seq = src_echo_hdr.echo_seq;
+    }
+
+    {
+        let data = out_packet.icmp_echo_data_mut();
+        let src_data = packet.icmp_echo_data();
+
+        data.copy_from_slice(src_data);
+    }
+
+    {
+        let icmp_hdr = out_packet.header_mut();
+        icmp_hdr.calc_checksum(packet.len());
+    }
+
+    println!("[ ICMP ] Sending Echo Reply");
+
+    crate::kernel::net::ip::send_packet(out_packet.downgrade());
+}
+
+pub fn process_dest_unreachable(packet: Packet<Icmp>) {
+    let hdr = packet.icmp_dest_unreachable_header();
+
+    match hdr.iphdr.protocol {
+        IpType::UDP => {
+            let udp = unsafe {
+                &*(hdr.orig_payload.as_ptr() as *const UdpHeader)
+            };
+
+            println!("[ ICMP ] Dest unreachable {} {}", udp.src_port.value(), udp.dst_port.value());
+            crate::kernel::net::udp::port_unreachable(udp.src_port.value() as u32);
+        },
+        _ => {
+
+        }
+    }
+}
+
 pub fn process_packet(packet: Packet<Icmp>) {
     let hdr = packet.header();
 
-    if hdr.typ == IcmpType::EchoRequest {
-        let mut out_packet: Packet<Icmp> = crate::kernel::net::ip::create_packet(
-            IpType::ICMP,
-            packet.len(),
-            packet.ip_header().src_ip,
-        )
-        .upgrade();
+    match hdr.typ {
+        IcmpType::EchoRequest => {
+            process_echo(packet);
+        },
+        IcmpType::DestUnreachable => {
+            process_dest_unreachable(packet);
+        },
+        IcmpType::EchoReply => {
 
-        {
-            let icmp_hdr = out_packet.header_mut();
-            icmp_hdr.typ = IcmpType::EchoReply;
-            icmp_hdr.code = 0;
-        }
-
-        {
-            let icmp_echo_hdr = out_packet.icmp_echo_header_mut();
-            let src_echo_hdr = packet.icmp_echo_header();
-
-            icmp_echo_hdr.echo_id = src_echo_hdr.echo_id;
-            icmp_echo_hdr.echo_seq = src_echo_hdr.echo_seq;
-        }
-
-        {
-            let data = out_packet.icmp_echo_data_mut();
-            let src_data = packet.icmp_echo_data();
-
-            data.copy_from_slice(src_data);
-        }
-
-        {
-            let icmp_hdr = out_packet.header_mut();
-            icmp_hdr.calc_checksum(packet.len());
-        }
-
-        println!("[ ICMP ] Sending Echo Reply");
-
-        crate::kernel::net::ip::send_packet(out_packet.downgrade());
+        },
     }
 }
 

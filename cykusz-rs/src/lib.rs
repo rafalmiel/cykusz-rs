@@ -16,6 +16,7 @@
 #![feature(maybe_uninit_ref)]
 #![feature(negative_impls)]
 #![feature(slice_fill)]
+#![feature(const_btree_new)]
 
 extern crate alloc;
 #[macro_use]

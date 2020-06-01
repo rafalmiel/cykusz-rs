@@ -139,6 +139,8 @@ pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
 }
 
 pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
+    crate::kernel::net::dns::test();
+
     let fd = fd as usize;
 
     let task = current_task();

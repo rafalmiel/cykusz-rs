@@ -3,6 +3,9 @@ use crate::kernel::net::util::NetU16;
 use crate::kernel::net::{
     ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
 };
+use alloc::collections::btree_map::BTreeMap;
+use crate::kernel::sync::RwSpin;
+use alloc::sync::Arc;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Udp {}
@@ -17,9 +20,9 @@ impl PacketHeader<UdpHeader> for Packet<Udp> {}
 
 #[repr(packed)]
 pub struct UdpHeader {
-    src_port: NetU16,
-    dst_port: NetU16,
-    len: NetU16,
+    pub src_port: NetU16,
+    pub dst_port: NetU16,
+    pub len: NetU16,
     crc: NetU16,
 }
 
@@ -66,11 +69,72 @@ pub fn send_packet(mut packet: Packet<Udp>) {
 pub fn process_packet(packet: Packet<Udp>) {
     let header = packet.header();
 
-    match header.dst_port.value() {
-        68 => crate::kernel::net::dhcp::process_packet(packet.upgrade()),
-        _ => {
-            crate::kernel::net::icmp::send_port_unreachable(packet);
-            //println!("Unknown UDP port {}", header.dst_port.value());
+    let tree = HANDLERS.read();
+
+    let dst_port = header.dst_port.value() as u32;
+
+    if let Some(f) = tree.get(&dst_port) {
+        let f2 = f.clone();
+
+        core::mem::drop(tree);
+
+        f2.process_packet(packet)
+    } else {
+        crate::kernel::net::icmp::send_port_unreachable(packet);
+    }
+}
+
+pub fn port_unreachable(port: u32) {
+    let tree = HANDLERS.read();
+
+    if let Some(f) = tree.get(&port) {
+        let f2 = f.clone();
+
+        core::mem::drop(tree);
+
+        f2.port_unreachable(port)
+    }
+}
+
+pub trait UdpService: Sync + Send {
+    fn process_packet(&self, packet: Packet<Udp>);
+    fn port_unreachable(&self, port: u32);
+}
+
+static HANDLERS: RwSpin<BTreeMap<u32, Arc<dyn UdpService>>> = RwSpin::new(BTreeMap::new());
+
+pub fn register_handler(port: u32, handler: Arc<dyn UdpService>) -> bool {
+    let mut handlers = HANDLERS.write();
+
+    if !handlers.contains_key(&port) {
+        handlers.insert(port, handler);
+
+        return true;
+    }
+
+    false
+}
+
+pub fn register_ephemeral_handler(handler: Arc<dyn UdpService>) -> Option<u32> {
+    let mut handlers = HANDLERS.write();
+
+    for p in 49152..=65535 {
+        if !handlers.contains_key(&p) {
+            handlers.insert(p, handler);
+
+            return Some(p);
         }
+    }
+
+    None
+}
+
+pub fn release_handler(port: u32) {
+    let mut handlers = HANDLERS.write();
+
+    if handlers.contains_key(&port) {
+        handlers.remove(&port);
+    } else {
+        panic!("UDP port is not registered")
     }
 }

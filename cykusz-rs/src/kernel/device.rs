@@ -16,10 +16,8 @@ pub trait Device: Send + Sync {
 
 static FREE_DEV_ID: AtomicUsize = AtomicUsize::new(1);
 
-lazy_static! {
-    static ref DEVICES: RwSpin<BTreeMap<usize, Arc<dyn Device>>> = RwSpin::new(BTreeMap::new());
-    static ref DEVICE_LISTEMERS: RwSpin<Vec<Arc<dyn DeviceListener>>> = RwSpin::new(Vec::new());
-}
+static DEVICES: RwSpin<BTreeMap<usize, Arc<dyn Device>>> = RwSpin::new(BTreeMap::new());
+static DEVICE_LISTEMERS: RwSpin<Vec<Arc<dyn DeviceListener>>> = RwSpin::new(Vec::new());
 
 #[derive(Debug)]
 pub enum DevError {

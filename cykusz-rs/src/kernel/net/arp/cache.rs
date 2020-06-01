@@ -66,7 +66,7 @@ impl ArpCache {
                 println!("[ ARP ] Enqueuing packet");
                 v.packets.push(packet)
             } else {
-                panic!("How did we get here");
+                //panic!("How did we get here");
             }
         } else {
             let mut vec = Vec::new();

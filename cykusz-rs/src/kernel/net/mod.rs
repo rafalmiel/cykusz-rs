@@ -13,6 +13,7 @@ pub use self::packet::*;
 
 pub mod arp;
 pub mod dhcp;
+pub mod dns;
 pub mod eth;
 pub mod icmp;
 pub mod ip;
@@ -139,6 +140,6 @@ pub fn init() {
 
         core::mem::drop(def);
 
-        crate::kernel::net::dhcp::send_discovery();
+        dhcp::init();
     }
 }

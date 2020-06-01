@@ -4,11 +4,12 @@ use alloc::string::String;
 use core::marker::PhantomData;
 
 use crate::kernel::net::ip::Ip4;
-use crate::kernel::net::udp::Udp;
+use crate::kernel::net::udp::{Udp, UdpService};
 use crate::kernel::net::util::{NetU16, NetU32, NetU8};
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
+use alloc::sync::Arc;
 
 const DHCP_XID: u32 = 0x43424140;
 
@@ -318,7 +319,7 @@ pub fn send_discovery() {
     )
     .upgrade();
 
-    let header = packet.header_mut();
+    let header: &mut DhcpHeader = packet.header_mut();
 
     header.init();
     header.set_op(DhcpType::BootRequest);
@@ -353,7 +354,7 @@ fn process_offer(requested_ip: Ip4) {
     )
     .upgrade();
 
-    let header = packet.header_mut();
+    let header: &mut DhcpHeader = packet.header_mut();
 
     header.init();
     header.set_op(DhcpType::BootRequest);
@@ -409,4 +410,26 @@ pub fn process_packet(packet: Packet<Dhcp>) {
             }
         }
     }
+}
+
+fn process_packet_udp(packet: Packet<Udp>) {
+    process_packet(packet.upgrade())
+}
+
+struct DhcpService {}
+
+impl UdpService for DhcpService {
+    fn process_packet(&self, packet: Packet<Udp>) {
+        process_packet_udp(packet);
+    }
+
+    fn port_unreachable(&self, _port: u32) {
+        unimplemented!()
+    }
+}
+
+pub fn init() {
+    crate::kernel::net::udp::register_handler(68, Arc::new(DhcpService{}));
+
+    send_discovery();
 }

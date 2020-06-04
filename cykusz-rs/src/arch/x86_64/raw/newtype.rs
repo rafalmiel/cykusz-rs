@@ -167,7 +167,7 @@ macro_rules! enable_unsigned_ops {
             }
         }
 
-        impl ::core::iter::Step for $type_ {
+        unsafe impl ::core::iter::Step for $type_ {
             /// Returns the number of steps between two step objects. The count is
             /// inclusive of `start` and exclusive of `end`.
             ///
@@ -181,6 +181,14 @@ macro_rules! enable_unsigned_ops {
                 }
             }
 
+            fn forward_checked(start: Self, count: usize) -> Option<Self> {
+                Some($type_(start.0 + count))
+            }
+
+            fn backward_checked(start: Self, count: usize) -> Option<Self> {
+                Some($type_(start.0 - count))
+            }
+/*
             /// Replaces this step with `1`, returning itself
             fn replace_one(&mut self) -> Self {
                 ::core::mem::replace(self, $type_(1))
@@ -205,6 +213,7 @@ macro_rules! enable_unsigned_ops {
             fn add_usize(&self, n: usize) -> Option<Self> {
                 Some($type_(self.0 + n))
             }
+            */
         }
     }
 }

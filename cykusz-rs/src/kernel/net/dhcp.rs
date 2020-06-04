@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use alloc::string::String;
+use alloc::sync::Arc;
 use core::marker::PhantomData;
 
 use crate::kernel::net::ip::Ip4;
@@ -9,7 +10,6 @@ use crate::kernel::net::util::{NetU16, NetU32, NetU8};
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
-use alloc::sync::Arc;
 
 const DHCP_XID: u32 = 0x43424140;
 
@@ -429,7 +429,7 @@ impl UdpService for DhcpService {
 }
 
 pub fn init() {
-    crate::kernel::net::udp::register_handler(68, Arc::new(DhcpService{}));
+    crate::kernel::net::udp::register_handler(68, Arc::new(DhcpService {}));
 
     send_discovery();
 }

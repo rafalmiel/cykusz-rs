@@ -1,10 +1,12 @@
+use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU16, Ordering};
 
-use crate::kernel::net::{PacketKind, PacketUpHierarchy, Packet, PacketHeader, default_driver, PacketDownHierarchy};
+use crate::arch::raw::mm::VirtAddr;
 use crate::kernel::net::udp::{Udp, UdpService};
 use crate::kernel::net::util::NetU16;
-use alloc::sync::Arc;
-use crate::arch::raw::mm::VirtAddr;
+use crate::kernel::net::{
+    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
+};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Dns {}
@@ -76,7 +78,7 @@ impl DnsHeader {
 
     fn payload(&mut self) -> PostHeader {
         PostHeader {
-            addr: VirtAddr(self as *const _ as usize + core::mem::size_of::<DnsHeader>())
+            addr: VirtAddr(self as *const _ as usize + core::mem::size_of::<DnsHeader>()),
         }
     }
 }
@@ -87,17 +89,13 @@ struct QName {
 
 impl QName {
     const fn new(a: VirtAddr) -> QName {
-        QName {
-            addr: a
-        }
+        QName { addr: a }
     }
 
     fn skip(&self) -> VirtAddr {
         let mut a = self.addr;
 
-        while unsafe {
-            a.read::<u8>() != 0
-        } {
+        while unsafe { a.read::<u8>() != 0 } {
             a += 1;
         }
 
@@ -112,19 +110,15 @@ impl QName {
 
         for e in name {
             match *e as char {
-                '.' => {
-                    unsafe {
-                        label.store(len as u8);
-                        label = ptr;
-                        len = 0;
-                    }
+                '.' => unsafe {
+                    label.store(len as u8);
+                    label = ptr;
+                    len = 0;
                 },
-                a => {
-                    unsafe {
-                        ptr.store(a as u8);
-                        len += 1;
-                    }
-                }
+                a => unsafe {
+                    ptr.store(a as u8);
+                    len += 1;
+                },
             }
 
             ptr += 1;
@@ -146,15 +140,11 @@ struct PostHeader {
 
 impl PostHeader {
     fn question(&mut self) -> Question {
-        Question {
-            addr: self.addr
-        }
+        Question { addr: self.addr }
     }
 
     fn answer(&mut self) -> Answer {
-        Answer {
-            addr: self.addr
-        }
+        Answer { addr: self.addr }
     }
 }
 
@@ -164,20 +154,18 @@ struct Question {
 
 impl Question {
     fn as_postheader(&self) -> PostHeader {
-        PostHeader {
-            addr: self.addr
-        }
+        PostHeader { addr: self.addr }
     }
 
     fn skip(&self) -> Question {
         Question {
-            addr: QName::new(self.addr).skip() + 2 + 2
+            addr: QName::new(self.addr).skip() + 2 + 2,
         }
     }
 
     fn encode_name(&mut self, name: &[u8]) -> Question {
         Question {
-            addr: QName::new(self.addr).encode(name)
+            addr: QName::new(self.addr).encode(name),
         }
     }
 
@@ -187,7 +175,7 @@ impl Question {
         }
 
         Question {
-            addr: self.addr + 2
+            addr: self.addr + 2,
         }
     }
 
@@ -197,7 +185,7 @@ impl Question {
         }
 
         Question {
-            addr: self.addr + 2
+            addr: self.addr + 2,
         }
     }
 }
@@ -208,13 +196,9 @@ struct Answer {
 
 impl Answer {
     fn skip_name(&self) -> VirtAddr {
-        println!("name: 0x{:x}", unsafe {
-            self.addr.read::<u16>()
-        });
+        println!("name: 0x{:x}", unsafe { self.addr.read::<u16>() });
 
-        let f = unsafe  {
-            self.addr.read::<NetU16>()
-        };
+        let f = unsafe { self.addr.read::<NetU16>() };
 
         if f.value() & 0xC000 > 0 {
             self.addr + 2
@@ -226,15 +210,11 @@ impl Answer {
     fn rdata(&self) -> &[u8] {
         let mut a = self.skip_name() + 8;
 
-        let len = unsafe {
-            a.read::<NetU16>().value()
-        };
+        let len = unsafe { a.read::<NetU16>().value() };
 
         a += 2;
 
-        unsafe {
-            core::slice::from_raw_parts(a.0 as *const u8, len as usize)
-        }
+        unsafe { core::slice::from_raw_parts(a.0 as *const u8, len as usize) }
     }
 }
 
@@ -303,7 +283,8 @@ impl UdpService for DnsService {
 pub fn test() {
     let h = "google.com".as_bytes();
 
-    if let Some(port) = crate::kernel::net::udp::register_ephemeral_handler(Arc::new(DnsService{})) {
+    if let Some(port) = crate::kernel::net::udp::register_ephemeral_handler(Arc::new(DnsService {}))
+    {
         query_host(h, port);
     }
 }

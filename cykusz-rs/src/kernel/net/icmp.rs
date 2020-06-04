@@ -116,7 +116,7 @@ fn process_echo(packet: Packet<Icmp>) {
         packet.len(),
         packet.ip_header().src_ip,
     )
-        .upgrade();
+    .upgrade();
 
     {
         let icmp_hdr = out_packet.header_mut();
@@ -154,16 +154,16 @@ pub fn process_dest_unreachable(packet: Packet<Icmp>) {
 
     match hdr.iphdr.protocol {
         IpType::UDP => {
-            let udp = unsafe {
-                &*(hdr.orig_payload.as_ptr() as *const UdpHeader)
-            };
+            let udp = unsafe { &*(hdr.orig_payload.as_ptr() as *const UdpHeader) };
 
-            println!("[ ICMP ] Dest unreachable {} {}", udp.src_port.value(), udp.dst_port.value());
+            println!(
+                "[ ICMP ] Dest unreachable {} {}",
+                udp.src_port.value(),
+                udp.dst_port.value()
+            );
             crate::kernel::net::udp::port_unreachable(udp.src_port.value() as u32);
-        },
-        _ => {
-
         }
+        _ => {}
     }
 }
 
@@ -173,13 +173,11 @@ pub fn process_packet(packet: Packet<Icmp>) {
     match hdr.typ {
         IcmpType::EchoRequest => {
             process_echo(packet);
-        },
+        }
         IcmpType::DestUnreachable => {
             process_dest_unreachable(packet);
-        },
-        IcmpType::EchoReply => {
-
-        },
+        }
+        IcmpType::EchoReply => {}
     }
 }
 

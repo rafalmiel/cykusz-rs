@@ -7,6 +7,7 @@
 #![feature(abi_x86_interrupt)]
 #![feature(concat_idents)]
 #![feature(step_trait)]
+#![feature(step_trait_ext)]
 #![feature(allocator_api)]
 #![feature(thread_local)]
 #![feature(optin_builtin_traits)]
@@ -34,7 +35,7 @@ pub mod arch;
 #[macro_use]
 pub mod kernel;
 mod drivers;
-mod externs;
+//mod externs;
 pub mod lang_items;
 pub mod task_test;
 

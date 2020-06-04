@@ -1,11 +1,12 @@
+use alloc::collections::btree_map::BTreeMap;
+use alloc::sync::Arc;
+
 use crate::kernel::net::ip::{Ip, Ip4, IpType};
 use crate::kernel::net::util::NetU16;
 use crate::kernel::net::{
     ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
 };
-use alloc::collections::btree_map::BTreeMap;
 use crate::kernel::sync::RwSpin;
-use alloc::sync::Arc;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Udp {}

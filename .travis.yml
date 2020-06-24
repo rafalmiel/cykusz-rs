@@ -1,7 +1,7 @@
 language: rust
 
 rust:
-  - nightly-2020-06-01
+  - nightly
 
 before_script:
   - rustup component add rust-src

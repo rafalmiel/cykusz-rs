@@ -3,6 +3,7 @@ use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
 
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
@@ -139,8 +140,6 @@ pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
 }
 
 pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
-    crate::kernel::net::dns::test();
-
     let fd = fd as usize;
 
     let task = current_task();
@@ -149,6 +148,26 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
     } else {
         Err(SyscallError::BadFD)
     };
+}
+
+pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResult {
+    if let Ok(name) = core::str::from_utf8(make_buf(name, nlen)) {
+        let res = crate::kernel::net::dns::get_ip_by_host(name.as_bytes());
+
+        if let Some(ip) = res {
+            if blen >= 4 {
+                let buf = make_buf_mut(buf, blen);
+
+                buf.copy_from_slice(&ip.v);
+
+                return Ok(core::mem::size_of::<Ip4>());
+            } else {
+                return Err(SyscallError::Fault);
+            }
+        }
+    }
+
+    Err(SyscallError::Inval)
 }
 
 pub fn sys_exit() -> ! {

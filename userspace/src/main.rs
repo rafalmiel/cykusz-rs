@@ -77,6 +77,16 @@ fn exec(cmd: &str) {
                 println!("Failed to mkdir: {:?}", e);
             }
         }
+    } else if cmd.starts_with("host ") {
+        let name = &cmd[5..];
+
+        let mut res = [0u8; 4];
+
+        if let Ok(_) = syscall::getaddrinfo(name, res.as_mut_ptr(), 4) {
+            println!("{:?}", res);
+        } else {
+            println!("getaddrinfo failed");
+        }
     } else if cmd.starts_with("ls ") {
         let path = &cmd[3..];
         let p = path.split_whitespace();

@@ -48,4 +48,26 @@ impl WaitQueue {
 
         false
     }
+
+    pub fn notify_all(&self) -> bool {
+        let mut tasks = self.tasks.lock_irq();
+        let len = tasks.len();
+
+        if len == 0 {
+            return false;
+        }
+
+        let mut res = false;
+
+        for i in (0..len).rev() {
+            if let Some(t) = tasks[i].upgrade() {
+                t.set_state(TaskState::Runnable);
+                res = true;
+            }
+        }
+
+        tasks.clear();
+
+        res
+    }
 }

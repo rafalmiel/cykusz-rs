@@ -117,6 +117,18 @@ pub fn getdents(fd: usize, buf: *mut u8, len: usize) -> SyscallResult {
     unsafe { syscall3(SYS_GETDENTS, fd as usize, buf as usize, len) }
 }
 
+pub fn getaddrinfo(name: &str, buf: *mut u8, len: usize) -> SyscallResult {
+    unsafe {
+        syscall4(
+            SYS_GETADDRINFO,
+            name.as_ptr() as usize,
+            name.len(),
+            buf as usize,
+            len,
+        )
+    }
+}
+
 pub fn exit() -> ! {
     unsafe {
         syscall0(SYS_EXIT).expect("Failed to exit");

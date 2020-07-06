@@ -4,12 +4,15 @@ use crate::arch::x86_64::mm::phys::PhysPage;
 use crate::arch::x86_64::mm::PAGE_SIZE;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
+#[repr(transparent)]
 pub struct VirtAddr(pub usize);
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
+#[repr(transparent)]
 pub struct PhysAddr(pub usize);
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default)]
+#[repr(transparent)]
 pub struct MappedAddr(pub usize);
 
 enable_unsigned_ops!(VirtAddr);

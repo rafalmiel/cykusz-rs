@@ -1,12 +1,17 @@
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU16, Ordering};
 
 use crate::arch::raw::mm::VirtAddr;
+use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::udp::{Udp, UdpService};
 use crate::kernel::net::util::NetU16;
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
+use crate::kernel::sched::current_task;
+use crate::kernel::sync::Spin;
+use crate::kernel::utils::wait_queue::WaitQueue;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Dns {}
@@ -196,8 +201,6 @@ struct Answer {
 
 impl Answer {
     fn skip_name(&self) -> VirtAddr {
-        println!("name: 0x{:x}", unsafe { self.addr.read::<u16>() });
-
         let f = unsafe { self.addr.read::<NetU16>() };
 
         if f.value() & 0xC000 > 0 {
@@ -220,7 +223,10 @@ impl Answer {
 
 static QUERY_ID: AtomicU16 = AtomicU16::new(0);
 
-pub fn query_host(host: &[u8], src_port: u32) {
+static QUEUE: WaitQueue = WaitQueue::new();
+static RESULTS: Spin<BTreeMap<u16, Ip4>> = Spin::new(BTreeMap::new());
+
+pub fn query_host(host: &[u8], src_port: u32) -> Option<Ip4> {
     let drv = default_driver();
 
     let mut packet: Packet<Dns> =
@@ -242,12 +248,30 @@ pub fn query_host(host: &[u8], src_port: u32) {
     enc.encode_name(host).encode_type(1).encode_class(1);
 
     crate::kernel::net::udp::send_packet(packet.downgrade());
+
+    let mut res = RESULTS.lock();
+
+    while !res.contains_key(&id) {
+        drop(res);
+
+        QUEUE.add_task(current_task());
+
+        res = RESULTS.lock();
+    }
+
+    let ans = res.get(&id).unwrap();
+
+    let ret = Some(*ans);
+
+    res.remove(&id);
+
+    ret
 }
 
 pub fn process_packet(mut packet: Packet<Dns>) {
-    println!("Received DNS reply");
-
     let hdr = packet.header_mut();
+
+    let id = hdr.id();
 
     let mut phdr = hdr.payload();
 
@@ -255,9 +279,26 @@ pub fn process_packet(mut packet: Packet<Dns>) {
         phdr = phdr.question().skip().as_postheader();
     }
 
-    let ans = phdr.answer();
+    let mut res = RESULTS.lock();
 
-    println!("Got answer: {:?}", ans.rdata());
+    if hdr.answer_count() > 0 {
+        let ans = phdr.answer();
+
+        let rdata = ans.rdata();
+
+        res.insert(
+            id,
+            Ip4 {
+                v: [rdata[0], rdata[1], rdata[2], rdata[3]],
+            },
+        );
+    } else {
+        res.insert(id, Ip4::empty());
+    }
+
+    drop(res);
+
+    QUEUE.notify_all();
 }
 
 fn process_packet_udp(packet: Packet<Udp>) {
@@ -285,6 +326,21 @@ pub fn test() {
 
     if let Some(port) = crate::kernel::net::udp::register_ephemeral_handler(Arc::new(DnsService {}))
     {
-        query_host(h, port);
+        let r = query_host(h, port);
+
+        if let Some(ip) = r {
+            println!("Got: {:?}", ip);
+        } else {
+            println!("Query failed");
+        }
+    }
+}
+
+pub fn get_ip_by_host(host: &[u8]) -> Option<Ip4> {
+    if let Some(port) = crate::kernel::net::udp::register_ephemeral_handler(Arc::new(DnsService {}))
+    {
+        query_host(host, port)
+    } else {
+        None
     }
 }

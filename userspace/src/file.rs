@@ -10,11 +10,11 @@ impl File {
     }
 
     pub fn read(&self, buf: &mut [u8]) -> usize {
-        syscall::read(self.fd, buf.as_mut_ptr(), buf.len()).expect("Failed to read a file")
+        syscall::read(self.fd, buf).expect("Failed to read a file")
     }
 
     pub fn write(&self, buf: &[u8]) -> usize {
-        syscall::write(self.fd, buf.as_ptr(), buf.len()).expect("Failed to write to file")
+        syscall::write(self.fd, buf).expect("Failed to write to file")
     }
 }
 

@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(lang_items)]
 #![feature(const_fn)]
-#![feature(const_if_match)]
 #![feature(ptr_internals)]
 #![feature(llvm_asm)]
 #![feature(abi_x86_interrupt)]

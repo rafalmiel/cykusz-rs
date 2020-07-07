@@ -155,14 +155,14 @@ pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResu
         let res = crate::kernel::net::dns::get_ip_by_host(name.as_bytes());
 
         if let Some(ip) = res {
-            if blen >= 4 {
+            return if blen as usize >= core::mem::size_of::<Ip4>() {
                 let buf = make_buf_mut(buf, blen);
 
                 buf.copy_from_slice(&ip.v);
 
-                return Ok(core::mem::size_of::<Ip4>());
+                Ok(core::mem::size_of::<Ip4>())
             } else {
-                return Err(SyscallError::Fault);
+                Err(SyscallError::Fault)
             }
         }
     }

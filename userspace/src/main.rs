@@ -24,7 +24,7 @@ fn ls(path: &str) {
         let mut buf = [0u8; 1024];
 
         loop {
-            if let Ok(datalen) = syscall::getdents(fd, buf.as_mut_ptr(), buf.len()) {
+            if let Ok(datalen) = syscall::getdents(fd, &mut buf) {
                 if datalen == 0 {
                     break;
                 }
@@ -82,7 +82,7 @@ fn exec(cmd: &str) {
 
         let mut res = [0u8; 4];
 
-        if let Ok(_) = syscall::getaddrinfo(name, res.as_mut_ptr(), 4) {
+        if let Ok(_) = syscall::getaddrinfo(name, &mut res) {
             println!("{:?}", res);
         } else {
             println!("getaddrinfo failed");
@@ -132,7 +132,7 @@ fn main_cd() -> ! {
     loop {
         let mut buf = [0u8; 256];
         let mut pwd = [0u8; 1024];
-        let pwd_r = syscall::getcwd(pwd.as_mut_ptr(), pwd.len()).expect("Failed to get cwd");
+        let pwd_r = syscall::getcwd(&mut pwd).expect("Failed to get cwd");
         let pwd_str = make_str(&pwd[0..pwd_r]);
 
         let mut to_p = pwd_str.split("/").last().unwrap();
@@ -140,7 +140,7 @@ fn main_cd() -> ! {
 
         print!("[root {}]# ", to_p);
 
-        let r = syscall::read(1, buf.as_mut_ptr(), buf.len()).unwrap();
+        let r = syscall::read(1, &mut buf).unwrap();
 
         let cmd = make_str(&buf[..r]).trim();
 
@@ -163,12 +163,12 @@ fn main() -> ! {
         let mut buf = [0u8; 256];
 
         let mut pwd = [0u8; 16];
-        let pwd_r = syscall::getcwd(pwd.as_mut_ptr(), pwd.len()).expect("Failed to get cwd");
+        let pwd_r = syscall::getcwd(&mut pwd).expect("Failed to get cwd");
 
         print!("[root {}]# ", make_str(&pwd[0..pwd_r]));
 
         // Read some data from stdin
-        let r = syscall::read(1, buf.as_mut_ptr(), buf.len()).unwrap();
+        let r = syscall::read(1, &mut buf).unwrap();
 
         {
             // Write data from stdin into the file

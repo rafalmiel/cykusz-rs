@@ -85,12 +85,12 @@ pub unsafe fn syscall6(
     SyscallResult::syscall_from(a as isize)
 }
 
-pub fn read(fd: usize, buf: *mut u8, len: usize) -> SyscallResult {
-    unsafe { syscall3(SYS_READ, fd, buf as usize, len) }
+pub fn read(fd: usize, buf: &mut [u8]) -> SyscallResult {
+    unsafe { syscall3(SYS_READ, fd, buf.as_mut_ptr() as usize, buf.len()) }
 }
 
-pub fn write(fd: usize, buf: *const u8, len: usize) -> SyscallResult {
-    unsafe { syscall3(SYS_WRITE, fd, buf as usize, len) }
+pub fn write(fd: usize, buf: &[u8]) -> SyscallResult {
+    unsafe { syscall3(SYS_WRITE, fd, buf.as_ptr() as usize, buf.len()) }
 }
 
 pub fn open(path: &str, flags: syscall_defs::OpenFlags) -> SyscallResult {
@@ -105,26 +105,26 @@ pub fn chdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_CHDIR, path.as_ptr() as usize, path.len()) }
 }
 
-pub fn getcwd(buf: *mut u8, len: usize) -> SyscallResult {
-    unsafe { syscall2(SYS_GETCWD, buf as usize, len) }
+pub fn getcwd(buf: &mut [u8]) -> SyscallResult {
+    unsafe { syscall2(SYS_GETCWD, buf.as_mut_ptr() as usize, buf.len()) }
 }
 
 pub fn mkdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_MKDIR, path.as_ptr() as usize, path.len()) }
 }
 
-pub fn getdents(fd: usize, buf: *mut u8, len: usize) -> SyscallResult {
-    unsafe { syscall3(SYS_GETDENTS, fd as usize, buf as usize, len) }
+pub fn getdents(fd: usize, buf: &mut [u8]) -> SyscallResult {
+    unsafe { syscall3(SYS_GETDENTS, fd as usize, buf.as_mut_ptr() as usize as usize, buf.len()) }
 }
 
-pub fn getaddrinfo(name: &str, buf: *mut u8, len: usize) -> SyscallResult {
+pub fn getaddrinfo(name: &str, buf: &mut [u8]) -> SyscallResult {
     unsafe {
         syscall4(
             SYS_GETADDRINFO,
             name.as_ptr() as usize,
             name.len(),
-            buf as usize,
-            len,
+            buf.as_mut_ptr() as usize,
+            buf.len(),
         )
     }
 }
@@ -156,5 +156,5 @@ pub fn reboot() -> SyscallResult {
 }
 
 pub fn print(v: &str) {
-    write(0, v.as_ptr(), v.len()).unwrap();
+    write(0, v.as_bytes()).unwrap();
 }

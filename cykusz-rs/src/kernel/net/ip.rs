@@ -35,6 +35,16 @@ impl Ip4 {
         }
     }
 
+    pub fn new(d: &[u8]) -> Ip4 {
+        if d.len() < 4 {
+            panic!("Invalid Ip4 array")
+        } else {
+            Ip4 {
+                v: [d[0], d[1], d[2], d[3]]
+            }
+        }
+    }
+
     pub fn empty() -> Ip4 {
         Ip4 { v: [0, 0, 0, 0] }
     }

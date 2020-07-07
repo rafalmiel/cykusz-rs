@@ -279,24 +279,22 @@ pub fn process_packet(mut packet: Packet<Dns>) {
         phdr = phdr.question().skip().as_postheader();
     }
 
-    let mut res = RESULTS.lock();
+    {
+        let mut res = RESULTS.lock();
 
-    if hdr.answer_count() > 0 {
-        let ans = phdr.answer();
+        if hdr.answer_count() > 0 {
+            let ans = phdr.answer();
 
-        let rdata = ans.rdata();
+            let rdata = ans.rdata();
 
-        res.insert(
-            id,
-            Ip4 {
-                v: [rdata[0], rdata[1], rdata[2], rdata[3]],
-            },
-        );
-    } else {
-        res.insert(id, Ip4::empty());
+            res.insert(
+                id,
+                Ip4::new(rdata),
+            );
+        } else {
+            res.insert(id, Ip4::empty());
+        }
     }
-
-    drop(res);
 
     QUEUE.notify_all();
 }

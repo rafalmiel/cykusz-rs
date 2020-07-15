@@ -130,10 +130,37 @@ impl FileTable {
         None
     }
 
+    pub fn bind_udp(&self, port: u32) -> Option<usize> {
+        let mut files = self.files.write();
+
+        let mk_handle = |fd: usize, inode: Arc<dyn INode>| {
+            Some(Arc::new(FileHandle {
+                fd,
+                inode,
+                offset: AtomicUsize::new(0),
+                flags: OpenFlags::RDONLY,
+            }))
+        };
+
+        if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
+            *f = mk_handle(idx, crate::kernel::net::socket::udp_bind(port)?);
+
+            return Some(idx);
+        } else if files.len() < FILE_NUM {
+            let len = files.len();
+            files.push(mk_handle(len, crate::kernel::net::socket::udp_bind(port)?));
+
+            return Some(len);
+        }
+
+        None
+    }
+
     pub fn close_file(&self, fd: usize) -> bool {
         let mut files = self.files.write();
 
         if files[fd].is_some() {
+            files[fd].as_ref().unwrap().inode.close();
             files[fd] = None;
             return true;
         }

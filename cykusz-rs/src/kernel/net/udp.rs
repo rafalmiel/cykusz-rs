@@ -43,6 +43,17 @@ impl UdpHeader {
     fn compute_checksum(&mut self) {
         self.crc = NetU16::new(0);
     }
+
+    pub fn data(&self) -> &[u8] {
+        let slice = unsafe {
+            core::slice::from_raw_parts(
+                (self as *const UdpHeader as *const u8).offset(8),
+                self.len.value() as usize - 8,
+            )
+        };
+
+        slice
+    }
 }
 
 pub fn create_packet(src_port: u16, dst_port: u16, size: usize, target: Ip4) -> Packet<Udp> {

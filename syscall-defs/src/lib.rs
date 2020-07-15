@@ -16,6 +16,7 @@ pub const SYS_SLEEP: usize = 9;
 pub const SYS_POWEROFF: usize = 10;
 pub const SYS_REBOOT: usize = 11;
 pub const SYS_GETADDRINFO: usize = 12;
+pub const SYS_BIND: usize = 13;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

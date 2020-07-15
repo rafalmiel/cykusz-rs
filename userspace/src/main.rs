@@ -117,6 +117,42 @@ fn exec(cmd: &str) {
         if let Err(e) = syscall::reboot() {
             println!("Reboot failed.. {:?}", e);
         }
+    } else if cmd.starts_with("bind") {
+        if cmd.len() < 6 {
+            println!("Format: bind <port>");
+            return;
+        }
+
+        if let Ok(port) = cmd[5..].parse::<u32>() {
+            if let Ok(fd) = syscall::bind(port) {
+                let mut buf = [0u8; 64];
+
+                loop {
+                    let res = syscall::read(fd, &mut buf);
+
+                    match res {
+                        Ok(len) if len > 1 => {
+                            let s = unsafe { core::str::from_utf8_unchecked(&buf[..len]) };
+
+                            print!("{}", s);
+                        }
+                        Err(e) => {
+                            println!("Read error {:?}", e);
+                            break;
+                        }
+                        _ => {
+                            break;
+                        }
+                    }
+                }
+
+                if let Err(err) = syscall::close(fd) {
+                    println!("Socket fd {} close failed {:?}", fd, err);
+                }
+            } else {
+                println!("Bind failed");
+            }
+        }
     } else if cmd.is_empty() {
         return;
     } else {

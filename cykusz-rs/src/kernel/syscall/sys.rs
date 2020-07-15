@@ -163,11 +163,21 @@ pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResu
                 Ok(core::mem::size_of::<Ip4>())
             } else {
                 Err(SyscallError::Fault)
-            }
+            };
         }
     }
 
     Err(SyscallError::Inval)
+}
+
+pub fn sys_bind(port: u64) -> SyscallResult {
+    let task = current_task();
+
+    if let Some(fd) = task.bind(port as u32) {
+        Ok(fd)
+    } else {
+        Err(SyscallError::Busy)
+    }
 }
 
 pub fn sys_exit() -> ! {

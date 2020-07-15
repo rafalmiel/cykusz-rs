@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::task::{Task, TaskState};
 
@@ -16,7 +17,13 @@ impl WaitQueue {
         }
     }
 
-    pub fn add_task(&self, task: Arc<Task>) {
+    pub fn wait(&self) {
+        let task = current_task();
+
+        self.add_task(task);
+    }
+
+    fn add_task(&self, task: Arc<Task>) {
         debug_assert_eq!(task.locks(), 0, "AwaitintIo while holding a lock");
 
         {

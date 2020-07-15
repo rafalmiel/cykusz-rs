@@ -18,6 +18,7 @@ pub mod eth;
 pub mod icmp;
 pub mod ip;
 pub mod packet;
+pub mod socket;
 pub mod udp;
 pub mod util;
 

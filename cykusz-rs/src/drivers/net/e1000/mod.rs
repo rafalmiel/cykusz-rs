@@ -11,7 +11,6 @@ use crate::arch::raw::mm::VirtAddr;
 use crate::drivers::pci::{PciDeviceHandle, PciHeader};
 use crate::kernel::net::eth::Eth;
 use crate::kernel::net::{NetDriver, Packet, RecvPacket};
-use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -43,7 +42,7 @@ impl NetDriver for E1000 {
             } else {
                 core::mem::drop(data);
 
-                self.rx_wqueue.add_task(current_task());
+                self.rx_wqueue.wait();
             }
         }
     }

@@ -112,6 +112,7 @@ impl CpuQueue {
                 let t = self.tasks[c].sleep_until.load(Ordering::SeqCst);
                 if t != 0 {
                     if current_ns() as usize > t {
+                        self.tasks[c].sleep_until.store(0, Ordering::SeqCst);
                         self.tasks[c].set_state(TaskState::Runnable);
                         break Some(c);
                     }

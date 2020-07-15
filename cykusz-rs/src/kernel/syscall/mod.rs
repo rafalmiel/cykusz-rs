@@ -25,6 +25,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_SLEEP => sys::sys_sleep(a),
         SYS_POWEROFF => sys::sys_poweroff(),
         SYS_REBOOT => sys::sys_reboot(),
+        SYS_BIND => sys::sys_bind(a),
 
         _ => Err(SyscallError::Inval),
     }

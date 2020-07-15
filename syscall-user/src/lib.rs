@@ -113,8 +113,19 @@ pub fn mkdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_MKDIR, path.as_ptr() as usize, path.len()) }
 }
 
+pub fn bind(port: u32) -> SyscallResult {
+    unsafe { syscall1(SYS_BIND, port as usize) }
+}
+
 pub fn getdents(fd: usize, buf: &mut [u8]) -> SyscallResult {
-    unsafe { syscall3(SYS_GETDENTS, fd as usize, buf.as_mut_ptr() as usize as usize, buf.len()) }
+    unsafe {
+        syscall3(
+            SYS_GETDENTS,
+            fd as usize,
+            buf.as_mut_ptr() as usize as usize,
+            buf.len(),
+        )
+    }
 }
 
 pub fn getaddrinfo(name: &str, buf: &mut [u8]) -> SyscallResult {

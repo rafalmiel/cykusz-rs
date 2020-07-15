@@ -185,9 +185,7 @@ impl Tty {
     fn read(&self, buf: *mut u8, len: usize) -> usize {
         // Lock shared with irq handler, we don't want to be interrupted while holding it
         while !self.buffer.lock_irq().has_data() {
-            use crate::kernel::sched::current_task;
-
-            self.wait_queue.add_task(current_task().clone());
+            self.wait_queue.wait();
         }
         self.buffer.lock_irq().read(buf, len)
     }

@@ -42,6 +42,8 @@ pub trait INode: Send + Sync {
         Err(FsError::NotSupported)
     }
 
+    fn close(&self) {}
+
     fn mknode(&self, _name: &str, _devid: usize) -> Result<Arc<dyn INode>> {
         return Err(FsError::NotSupported);
     }

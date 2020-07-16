@@ -171,10 +171,14 @@ pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResu
 }
 
 pub fn sys_bind(port: u64) -> SyscallResult {
-    let task = current_task();
+    if let Some(socket) = crate::kernel::net::socket::udp_bind(port as u32) {
+        let task = current_task();
 
-    if let Some(fd) = task.bind(port as u32) {
-        Ok(fd)
+        if let Some(fd) = task.open_file(socket, OpenFlags::RDONLY) {
+            Ok(fd)
+        } else {
+            Err(SyscallError::Fault)
+        }
     } else {
         Err(SyscallError::Busy)
     }

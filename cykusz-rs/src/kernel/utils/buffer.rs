@@ -8,11 +8,11 @@ pub struct BufferQueue {
     wait_queue: WaitQueue,
 }
 
-pub struct Buffer {
+struct Buffer {
     data: Vec<u8>,
     r: usize,
     w: usize,
-    full: bool,
+    full: bool, // r == w may indicate both empty and full buffer, full boolean disambiguate that
 }
 
 impl BufferQueue {
@@ -51,7 +51,7 @@ impl BufferQueue {
 }
 
 impl Buffer {
-    pub fn new(init_size: usize) -> Buffer {
+    fn new(init_size: usize) -> Buffer {
         let mut buf = Buffer {
             data: Vec::with_capacity(init_size),
             r: 0,
@@ -63,7 +63,7 @@ impl Buffer {
         buf
     }
 
-    pub fn append_data(&mut self, data: &[u8]) -> usize {
+    fn append_data(&mut self, data: &[u8]) -> usize {
         if self.full {
             return 0;
         }
@@ -90,11 +90,11 @@ impl Buffer {
         }
     }
 
-    pub fn has_data(&self) -> bool {
+    fn has_data(&self) -> bool {
         self.r != self.w || self.full
     }
 
-    pub fn read_data(&mut self, buf: &mut [u8]) -> usize {
+    fn read_data(&mut self, buf: &mut [u8]) -> usize {
         if (self.r == self.w && !self.full) || buf.is_empty() {
             return 0;
         }

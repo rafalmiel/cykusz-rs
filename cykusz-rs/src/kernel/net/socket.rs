@@ -14,7 +14,7 @@ pub struct Socket {
 impl Socket {
     pub fn new(port: u32) -> Socket {
         Socket {
-            buffer: BufferQueue::new(4 * 1024),
+            buffer: BufferQueue::new(4096),
             port,
         }
     }

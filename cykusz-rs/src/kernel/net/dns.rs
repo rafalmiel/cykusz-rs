@@ -9,6 +9,7 @@ use crate::kernel::net::util::NetU16;
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -250,13 +251,17 @@ pub fn query_host(host: &[u8], src_port: u32) -> Option<Ip4> {
 
     let mut res = RESULTS.lock();
 
-    while !res.contains_key(&id) {
-        drop(res);
+    let task = current_task();
 
-        QUEUE.wait();
+    QUEUE.add_task(task.clone());
+
+    while !res.contains_key(&id) {
+        QUEUE.wait_lock(res);
 
         res = RESULTS.lock();
     }
+
+    QUEUE.remove_task(task);
 
     let ans = res.get(&id).unwrap();
 

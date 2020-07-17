@@ -117,11 +117,15 @@ impl Scheduler {
     fn current_task(&self) -> Arc<Task> {
         let _g = IrqGuard::new();
 
-        if crate::kernel::tls::is_ready() {
-            self.tasks.get_task(current_id())
-        } else {
-            self.cpu_queues.current_task()
-        }
+        self.cpu_queues.current_task()
+    }
+
+    fn register_task(&self, task: Arc<Task>) {
+        self.tasks.register_task(task)
+    }
+
+    fn init_tasks(&self) {
+        self.cpu_queues.init_tasks();
     }
 }
 
@@ -135,6 +139,10 @@ fn scheduler_main() {
     loop {
         scheduler().schedule_next();
     }
+}
+
+pub(in crate::kernel::sched) fn register_task(task: Arc<Task>) {
+    scheduler().register_task(task)
 }
 
 pub fn reschedule() -> bool {
@@ -189,6 +197,8 @@ pub fn enable_lock_protection() {
 
 pub fn init() {
     SCHEDULER.call_once(|| Scheduler::default());
+
+    scheduler().init_tasks();
 
     enable_lock_protection();
 }

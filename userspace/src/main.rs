@@ -107,8 +107,17 @@ fn exec(cmd: &str) {
         // do nothing for now, TODO: move to home?
     } else if cmd == "exit" {
         syscall::exit();
-    } else if cmd == "sleep" {
-        if let Err(e) = syscall::sleep(3000) {
+    } else if cmd.starts_with("sleep") {
+        let ms = if cmd.len() < 7 {
+            3000
+        } else {
+            if let Ok(ms) = cmd[6..].parse::<usize>() {
+                ms
+            } else {
+                3000
+            }
+        };
+        if let Err(e) = syscall::sleep(ms) {
             println!("Sleep failed.. {:?}", e);
         }
     } else if cmd == "poweroff" {

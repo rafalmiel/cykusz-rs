@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -23,6 +24,14 @@ impl BufferQueue {
         }
     }
 
+    pub fn listen(&self) {
+        self.wait_queue.add_task(current_task());
+    }
+
+    pub fn unlisten(&self) {
+        self.wait_queue.remove_task(current_task());
+    }
+
     pub fn append_data(&self, data: &[u8]) -> usize {
         let mut buf = self.buffer.lock();
 
@@ -38,13 +47,17 @@ impl BufferQueue {
     pub fn read_data(&self, buf: &mut [u8]) -> usize {
         let mut buffer = self.buffer.lock();
 
-        while !buffer.has_data() {
-            drop(buffer);
+        let task = current_task();
 
-            self.wait_queue.wait();
+        self.wait_queue.add_task(task.clone());
+
+        while !buffer.has_data() {
+            self.wait_queue.wait_lock(buffer);
 
             buffer = self.buffer.lock();
         }
+
+        self.wait_queue.remove_task(task);
 
         buffer.read_data(buf)
     }

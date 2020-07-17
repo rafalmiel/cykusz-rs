@@ -108,15 +108,17 @@ fn exec(cmd: &str) {
     } else if cmd == "exit" {
         syscall::exit();
     } else if cmd.starts_with("sleep") {
-        let ms = if cmd.len() < 7 {
-            3000
-        } else {
-            if let Ok(ms) = cmd[6..].parse::<usize>() {
+        let mut args = cmd.split_ascii_whitespace();
+        let ms = if let Some(arg) = args.nth(1) {
+            if let Ok(ms) = arg.parse::<usize>() {
                 ms
             } else {
                 3000
             }
+        } else {
+            3000
         };
+
         if let Err(e) = syscall::sleep(ms) {
             println!("Sleep failed.. {:?}", e);
         }
@@ -160,6 +162,46 @@ fn exec(cmd: &str) {
                 }
             } else {
                 println!("Bind failed");
+            }
+        }
+    } else if cmd.starts_with("connect") {
+        let args = cmd.split_ascii_whitespace();
+
+        if args.count() >= 3 {
+            let mut args = cmd.split_ascii_whitespace();
+
+            let addr = args.nth(1).unwrap();
+            let port = args.next().unwrap();
+
+            let mut ip = [0u8; 4];
+            for (i, s) in addr.split(".").enumerate() {
+                if let Ok(v) = s.parse::<u8>() {
+                    ip[i] = v;
+                } else {
+                    println!("Failed to parse ip");
+                    break;
+                }
+            }
+            if let Ok(port) = port.parse::<u32>() {
+                if let Ok(fd) = syscall::connect(&ip, port) {
+                    loop {
+                        let mut buf = [0u8; 64];
+
+                        if let Ok(read) = syscall::read(1, &mut buf) {
+                            if let Err(err) = syscall::write(fd, &buf[..read]) {
+                                println!("Send failed {:?}", err);
+                                break;
+                            }
+                        } else {
+                            println!("Read failed");
+                            break;
+                        }
+                    }
+                } else {
+                    println!("Connect failed");
+                }
+            } else {
+                println!("Failed to parse port");
             }
         }
     } else if cmd.is_empty() {

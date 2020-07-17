@@ -83,7 +83,7 @@ fn prepare_p4<'a>() -> &'a mut P4Table {
     new_p4
 }
 
-fn map_user<'a>(new_p4: &'a mut P4Table, elf_module: MappedAddr) -> (PhysAddr, VirtAddr, VirtAddr) {
+fn map_user(new_p4: &mut P4Table, elf_module: MappedAddr) -> (PhysAddr, VirtAddr, VirtAddr) {
     use crate::arch::mm::phys::allocate;
     use crate::drivers::elf::types::ProgramType;
     use crate::drivers::elf::ElfHeader;

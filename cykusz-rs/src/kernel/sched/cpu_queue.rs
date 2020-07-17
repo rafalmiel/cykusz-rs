@@ -89,6 +89,8 @@ impl CpuQueue {
 
             if self.current != 0 {
                 self.current -= 1;
+            } else {
+                panic!("Removing main task?")
             }
 
             self.schedule_next(sched_lock);

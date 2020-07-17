@@ -6,10 +6,12 @@ use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
 
+//TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
     unsafe { core::slice::from_raw_parts_mut(b as *mut u8, len as usize) }
 }
 
+//TODO: Check if the pointer from user is actually valid
 fn make_buf(b: u64, len: u64) -> &'static [u8] {
     unsafe { core::slice::from_raw_parts(b as *const u8, len as usize) }
 }
@@ -174,7 +176,23 @@ pub fn sys_bind(port: u64) -> SyscallResult {
     if let Some(socket) = crate::kernel::net::socket::udp_bind(port as u32) {
         let task = current_task();
 
-        if let Some(fd) = task.open_file(socket, OpenFlags::RDONLY) {
+        if let Some(fd) = task.open_file(socket, OpenFlags::RDWR) {
+            Ok(fd)
+        } else {
+            Err(SyscallError::Fault)
+        }
+    } else {
+        Err(SyscallError::Busy)
+    }
+}
+
+pub fn sys_connect(host: u64, host_len: u64, port: u64) -> SyscallResult {
+    if let Some(socket) =
+        crate::kernel::net::socket::udp_connect(Ip4::new(make_buf(host, host_len)), port as u32)
+    {
+        let task = current_task();
+
+        if let Some(fd) = task.open_file(socket, OpenFlags::RDWR) {
             Ok(fd)
         } else {
             Err(SyscallError::Fault)

@@ -22,7 +22,8 @@ impl Socket {
 
 impl INode for Socket {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        Ok(self.buffer.read_data(buf))
+        let res = Ok(self.buffer.read_data(buf));
+        res
     }
 
     fn close(&self) {

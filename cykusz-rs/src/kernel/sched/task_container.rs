@@ -46,7 +46,7 @@ impl TaskContainer {
         self.tasks.lock().remove(&id);
     }
 
-    pub fn get_task(&self, id: usize) -> Arc<Task> {
-        self.tasks.lock().get(&id).expect("Task not found").clone()
+    pub fn register_task(&self, task: Arc<Task>) {
+        self.tasks.lock().insert(task.id(), task);
     }
 }

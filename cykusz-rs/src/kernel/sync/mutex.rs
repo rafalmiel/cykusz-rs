@@ -1,5 +1,6 @@
 use core::ops::{Deref, DerefMut};
 
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::spin_lock::{Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -22,8 +23,13 @@ impl<T> Mutex<T> {
     }
 
     pub fn lock(&self) -> MutexGuard<T> {
+        let task = current_task();
+
+        self.wait_queue.add_task(task.clone());
+
         loop {
             if let Some(g) = self.mutex.try_lock() {
+                self.wait_queue.remove_task(task);
                 return MutexGuard {
                     g: Some(g),
                     m: &self,
@@ -35,8 +41,13 @@ impl<T> Mutex<T> {
     }
 
     pub fn lock_irq(&self) -> MutexGuard<T> {
+        let task = current_task();
+
+        self.wait_queue.add_task(task.clone());
+
         loop {
             if let Some(g) = self.mutex.try_lock_irq() {
+                self.wait_queue.remove_task(task);
                 return MutexGuard {
                     g: Some(g),
                     m: &self,

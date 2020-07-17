@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use syscall_defs::OpenFlags;
 
@@ -49,6 +49,7 @@ pub struct Task {
     prev_state: AtomicUsize,
     state: AtomicUsize,
     locks: AtomicUsize,
+    pending_io: AtomicBool,
     filetable: filetable::FileTable,
     pub sleep_until: AtomicUsize,
     cwd: RwSpin<Cwd>,
@@ -62,6 +63,7 @@ impl Default for Task {
             prev_state: AtomicUsize::new(TaskState::Unused as usize),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
+            pending_io: AtomicBool::new(false),
             filetable: filetable::FileTable::new(),
             sleep_until: AtomicUsize::new(0),
             cwd: RwSpin::new(Cwd::new("/", root_inode().self_inode())),
@@ -166,6 +168,23 @@ impl Task {
 
     pub fn id(&self) -> usize {
         self.id
+    }
+
+    pub fn has_pending_io(&self) -> bool {
+        self.pending_io.load(Ordering::SeqCst)
+    }
+
+    pub fn set_has_pending_io(&self, has: bool) {
+        self.pending_io.store(has, Ordering::SeqCst)
+    }
+
+    pub fn await_io(&self) {
+        if self.has_pending_io() {
+            self.set_has_pending_io(false);
+        } else {
+            self.set_state(TaskState::AwaitingIo);
+            crate::kernel::sched::reschedule();
+        }
     }
 
     pub unsafe fn arch_task_mut(&self) -> &mut ArchTask {

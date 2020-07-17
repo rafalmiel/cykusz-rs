@@ -28,6 +28,10 @@ impl CpuQueues {
         &mut *(self.cpu_queues.this_cpu_mut().get())
     }
 
+    unsafe fn cpu_queue(&self, cpu: isize) -> &mut CpuQueue {
+        &mut *(self.cpu_queues.cpu_mut(cpu).get())
+    }
+
     pub fn schedule_next(&self) {
         let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
 
@@ -76,5 +80,11 @@ impl CpuQueues {
         let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
 
         unsafe { self.this_cpu_queue().current_task(mutex).clone() }
+    }
+
+    pub fn init_tasks(&self) {
+        for i in 0..crate::kernel::smp::cpu_count() {
+            unsafe { self.cpu_queue(i as isize).register_main_task() }
+        }
     }
 }

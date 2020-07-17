@@ -10,6 +10,7 @@ use crate::drivers::input::KeyListener;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -183,11 +184,17 @@ impl Tty {
     }
 
     fn read(&self, buf: *mut u8, len: usize) -> usize {
+        let task = current_task();
         // Lock shared with irq handler, we don't want to be interrupted while holding it
-        while !self.buffer.lock_irq().has_data() {
-            self.wait_queue.wait();
+        let mut buffer = self.buffer.lock_irq();
+        self.wait_queue.add_task(task.clone());
+        while !buffer.has_data() {
+            self.wait_queue.wait_lock(buffer);
+
+            buffer = self.buffer.lock_irq();
         }
-        self.buffer.lock_irq().read(buf, len)
+        self.wait_queue.remove_task(task);
+        buffer.read(buf, len)
     }
 }
 

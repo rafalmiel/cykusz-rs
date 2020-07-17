@@ -40,13 +40,21 @@ impl Default for CpuQueue {
             previous: 0,
         };
 
-        this.tasks.push(Arc::new(Task::this()));
+        let task = Arc::new(Task::this());
+
+        this.tasks.push(task.clone());
+
+        CURRENT_TASK_ID.store(task.id(), Ordering::SeqCst);
 
         this
     }
 }
 
 impl CpuQueue {
+    pub fn register_main_task(&self) {
+        crate::kernel::sched::register_task(self.tasks[0].clone());
+    }
+
     fn switch(&self, to: &Task, lock: SpinGuard<()>) {
         drop(lock);
 
@@ -184,6 +192,10 @@ impl CpuQueue {
 
     pub fn remove_task(&mut self, idx: usize) {
         let _lock_protect = RecursiveLockProtection::new();
+
+        if Arc::strong_count(&self.tasks[idx]) != 1 {
+            panic!("Deallocating task with alive references");
+        }
 
         self.tasks.remove(idx);
         self.tasks.shrink_to_fit();

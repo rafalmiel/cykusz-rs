@@ -1,13 +1,12 @@
 use alloc::sync::Arc;
-use alloc::sync::Weak;
 use alloc::vec::Vec;
 
 use crate::kernel::sched::current_task;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::task::{Task, TaskState};
 
 pub struct WaitQueue {
-    tasks: Spin<Vec<Weak<Task>>>,
+    tasks: Spin<Vec<Arc<Task>>>,
 }
 
 impl WaitQueue {
@@ -17,26 +16,44 @@ impl WaitQueue {
         }
     }
 
+    pub fn wait_lock<T>(&self, lock: SpinGuard<T>) {
+        let task = current_task();
+
+        core::mem::drop(lock);
+
+        task.await_io();
+    }
+
     pub fn wait(&self) {
         let task = current_task();
 
-        self.add_task(task);
+        task.await_io();
     }
 
-    fn add_task(&self, task: Arc<Task>) {
-        debug_assert_eq!(task.locks(), 0, "AwaitintIo while holding a lock");
+    pub fn add_task(&self, task: Arc<Task>) {
+        let mut tasks = self.tasks.lock_irq();
 
-        {
-            let mut l = self.tasks.lock_irq();
-            l.push(Arc::<Task>::downgrade(&task));
-            task.set_state(TaskState::AwaitingIo);
+        tasks.push(task);
+    }
+
+    pub fn remove_task(&self, task: Arc<Task>) {
+        let mut tasks = self.tasks.lock_irq();
+
+        if let Some(idx) = tasks.iter().enumerate().find_map(|e| {
+            let t = e.1;
+
+            if t.id() == task.id() {
+                return Some(e.0);
+            }
+
+            None
+        }) {
+            tasks.remove(idx);
         }
-
-        crate::kernel::sched::reschedule();
     }
 
     pub fn notify_one(&self) -> bool {
-        let mut tasks = self.tasks.lock_irq();
+        let tasks = self.tasks.lock_irq();
         let len = tasks.len();
 
         if len == 0 {
@@ -44,20 +61,21 @@ impl WaitQueue {
         }
 
         for i in (0..len).rev() {
-            if let Some(t) = tasks[i].upgrade() {
-                t.set_state(TaskState::Runnable);
-                tasks.remove(i);
-                return true;
-            }
+            let t = tasks[i].clone();
 
-            tasks.remove(i);
+            if t.state() == TaskState::AwaitingIo {
+                t.set_state(TaskState::Runnable);
+            } else {
+                t.set_has_pending_io(true);
+            }
+            return true;
         }
 
         false
     }
 
     pub fn notify_all(&self) -> bool {
-        let mut tasks = self.tasks.lock_irq();
+        let tasks = self.tasks.lock_irq();
         let len = tasks.len();
 
         if len == 0 {
@@ -67,13 +85,15 @@ impl WaitQueue {
         let mut res = false;
 
         for i in (0..len).rev() {
-            if let Some(t) = tasks[i].upgrade() {
-                t.set_state(TaskState::Runnable);
-                res = true;
-            }
-        }
+            let t = tasks[i].clone();
 
-        tasks.clear();
+            if t.state() == TaskState::AwaitingIo {
+                t.set_state(TaskState::Runnable);
+            } else {
+                t.set_has_pending_io(true);
+            }
+            res = true;
+        }
 
         res
     }

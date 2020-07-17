@@ -1,3 +1,4 @@
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -22,12 +23,23 @@ impl Semaphore {
 
     pub fn acquire(&self) {
         let mut lh = self.internals.lock();
-        if lh.value < 1 {
-            core::mem::drop(lh);
-            self.wait_queue.wait();
-        } else {
-            lh.value -= 1;
+
+        let task = current_task();
+
+        self.wait_queue.add_task(task.clone());
+
+        loop {
+            if lh.value < 1 {
+                self.wait_queue.wait_lock(lh);
+
+                lh = self.internals.lock();
+            } else {
+                lh.value -= 1;
+                break;
+            }
         }
+
+        self.wait_queue.remove_task(task);
     }
 
     pub fn release(&self) {

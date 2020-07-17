@@ -117,6 +117,17 @@ pub fn bind(port: u32) -> SyscallResult {
     unsafe { syscall1(SYS_BIND, port as usize) }
 }
 
+pub fn connect(host: &[u8], port: u32) -> SyscallResult {
+    unsafe {
+        syscall3(
+            SYS_CONNECT,
+            host.as_ptr() as usize,
+            host.len(),
+            port as usize,
+        )
+    }
+}
+
 pub fn getdents(fd: usize, buf: &mut [u8]) -> SyscallResult {
     unsafe {
         syscall3(

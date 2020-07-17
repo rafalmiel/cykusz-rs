@@ -54,6 +54,17 @@ impl UdpHeader {
 
         slice
     }
+
+    pub fn data_mut(&mut self) -> &mut [u8] {
+        let slice = unsafe {
+            core::slice::from_raw_parts_mut(
+                (self as *mut UdpHeader as *mut u8).offset(8),
+                self.len.value() as usize - 8,
+            )
+        };
+
+        slice
+    }
 }
 
 pub fn create_packet(src_port: u16, dst_port: u16, size: usize, target: Ip4) -> Packet<Udp> {
@@ -96,7 +107,7 @@ pub fn process_packet(packet: Packet<Udp>) {
     }
 }
 
-pub fn port_unreachable(port: u32) {
+pub fn port_unreachable(port: u32, dst_port: u32) {
     let tree = HANDLERS.read();
 
     if let Some(f) = tree.get(&port) {
@@ -104,13 +115,13 @@ pub fn port_unreachable(port: u32) {
 
         core::mem::drop(tree);
 
-        f2.port_unreachable(port)
+        f2.port_unreachable(port, dst_port)
     }
 }
 
 pub trait UdpService: Sync + Send {
     fn process_packet(&self, packet: Packet<Udp>);
-    fn port_unreachable(&self, port: u32);
+    fn port_unreachable(&self, port: u32, dst_port: u32);
 }
 
 static HANDLERS: RwSpin<BTreeMap<u32, Arc<dyn UdpService>>> = RwSpin::new(BTreeMap::new());

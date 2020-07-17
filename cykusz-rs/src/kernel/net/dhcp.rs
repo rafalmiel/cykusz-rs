@@ -423,7 +423,7 @@ impl UdpService for DhcpService {
         process_packet_udp(packet);
     }
 
-    fn port_unreachable(&self, _port: u32) {
+    fn port_unreachable(&self, _port: u32, _dst_port: u32) {
         unimplemented!()
     }
 }

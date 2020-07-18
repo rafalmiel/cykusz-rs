@@ -29,6 +29,14 @@ impl INode for StdIn {
             buf.len(),
         ))
     }
+
+    fn poll_listen(&self, listen: bool) -> Result<bool> {
+        crate::drivers::input::tty::poll_listen(listen)
+    }
+
+    fn poll_unlisten(&self) -> Result<()> {
+        crate::drivers::input::tty::poll_unlisten()
+    }
 }
 
 static STDOUT: Once<Arc<StdOut>> = Once::new();

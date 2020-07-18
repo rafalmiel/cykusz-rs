@@ -82,6 +82,21 @@ impl INode for Socket {
         }
     }
 
+    fn poll_listen(&self, listen: bool) -> Result<bool> {
+        let has_data = self.buffer.has_data();
+
+        if listen {
+            self.buffer.listen();
+        }
+
+        Ok(has_data)
+    }
+
+    fn poll_unlisten(&self) -> Result<()> {
+        self.buffer.unlisten();
+        Ok(())
+    }
+
     fn close(&self) {
         crate::kernel::net::udp::release_handler(self.src_port());
     }

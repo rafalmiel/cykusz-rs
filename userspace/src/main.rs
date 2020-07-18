@@ -12,6 +12,7 @@ use syscall_defs::{OpenFlags, SysDirEntry};
 
 pub mod file;
 pub mod lang;
+pub mod nc;
 
 fn make_str(buf: &[u8]) -> &str {
     core::str::from_utf8(&buf)
@@ -135,41 +136,12 @@ fn exec(cmd: &str) {
         }
 
         if let Ok(port) = cmd[5..].parse::<u32>() {
-            if let Ok(fd) = syscall::bind(port) {
-                let mut buf = [0u8; 64];
-
-                loop {
-                    let res = syscall::read(fd, &mut buf);
-
-                    match res {
-                        Ok(len) if len > 1 => {
-                            let s = unsafe { core::str::from_utf8_unchecked(&buf[..len]) };
-
-                            print!("{}", s);
-                        }
-                        Err(e) => {
-                            println!("Read error {:?}", e);
-                            break;
-                        }
-                        _ => {
-                            break;
-                        }
-                    }
-                }
-
-                if let Err(err) = syscall::close(fd) {
-                    println!("Socket fd {} close failed {:?}", fd, err);
-                }
-            } else {
-                println!("Bind failed");
-            }
+            nc::bind(port);
         }
     } else if cmd.starts_with("connect") {
-        let args = cmd.split_ascii_whitespace();
+        let mut args = cmd.split_ascii_whitespace();
 
-        if args.count() >= 3 {
-            let mut args = cmd.split_ascii_whitespace();
-
+        if args.clone().count() >= 3 {
             let addr = args.nth(1).unwrap();
             let port = args.next().unwrap();
 
@@ -182,24 +154,9 @@ fn exec(cmd: &str) {
                     break;
                 }
             }
-            if let Ok(port) = port.parse::<u32>() {
-                if let Ok(fd) = syscall::connect(&ip, port) {
-                    loop {
-                        let mut buf = [0u8; 64];
 
-                        if let Ok(read) = syscall::read(1, &mut buf) {
-                            if let Err(err) = syscall::write(fd, &buf[..read]) {
-                                println!("Send failed {:?}", err);
-                                break;
-                            }
-                        } else {
-                            println!("Read failed");
-                            break;
-                        }
-                    }
-                } else {
-                    println!("Connect failed");
-                }
+            if let Ok(port) = port.parse::<u32>() {
+                nc::connect(port, &ip);
             } else {
                 println!("Failed to parse port");
             }

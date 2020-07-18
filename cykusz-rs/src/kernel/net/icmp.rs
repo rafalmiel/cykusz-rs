@@ -161,7 +161,10 @@ pub fn process_dest_unreachable(packet: Packet<Icmp>) {
                 udp.src_port.value(),
                 udp.dst_port.value()
             );
-            crate::kernel::net::udp::port_unreachable(udp.src_port.value() as u32, udp.dst_port.value() as u32);
+            crate::kernel::net::udp::port_unreachable(
+                udp.src_port.value() as u32,
+                udp.dst_port.value() as u32,
+            );
         }
         _ => {}
     }

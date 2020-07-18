@@ -202,6 +202,53 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64) -> SyscallResult {
     }
 }
 
+pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
+    let buf = make_buf(fds, fds_len);
+
+    let task = current_task();
+
+    let mut fd_found: Option<usize> = None;
+    let mut first = true;
+
+    'search: loop {
+        for fd in buf {
+            if let Some(handle) = task.get_handle(*fd as usize) {
+                if let Ok(f) = handle.inode.poll_listen(first) {
+                    if f {
+                        fd_found = Some(*fd as usize);
+                        break 'search;
+                    }
+                } else {
+                    println!("poll listen failed");
+                    break 'search;
+                }
+            } else {
+                println!("fd {} not found", fd);
+            }
+        }
+
+        if fd_found.is_none() {
+            task.await_io();
+        }
+
+        first = false;
+    }
+
+    for fd in buf {
+        if let Some(handle) = task.get_handle(*fd as usize) {
+            if let Err(e) = handle.inode.poll_unlisten() {
+                println!("Poll unlisten failed {:?}", e);
+            }
+        }
+    }
+
+    if let Some(fd) = fd_found {
+        Ok(fd)
+    } else {
+        Err(SyscallError::Fault)
+    }
+}
+
 pub fn sys_exit() -> ! {
     crate::task_test::start();
     crate::kernel::sched::task_finished()

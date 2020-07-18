@@ -34,6 +34,14 @@ pub trait INode: Send + Sync {
         Err(FsError::NotSupported)
     }
 
+    fn poll_listen(&self, _listen: bool) -> Result<bool> {
+        Err(FsError::NotSupported)
+    }
+
+    fn poll_unlisten(&self) -> Result<()> {
+        Err(FsError::NotSupported)
+    }
+
     fn fs(&self) -> Arc<dyn Filesystem> {
         unimplemented!()
     }

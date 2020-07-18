@@ -195,6 +195,14 @@ impl INode for MNode {
         self.inode.mknode(name, devid)
     }
 
+    fn poll_listen(&self, listen: bool) -> Result<bool> {
+        self.inode.poll_listen(listen)
+    }
+
+    fn poll_unlisten(&self) -> Result<()> {
+        self.inode.poll_unlisten()
+    }
+
     fn create(&self, name: &str) -> Result<Arc<dyn INode>> {
         self.inode.create(name)
     }

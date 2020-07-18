@@ -167,6 +167,34 @@ impl INode for LockedRamINode {
         }
     }
 
+    fn poll_listen(&self, listen: bool) -> Result<bool> {
+        let i = self.0.read();
+
+        match &i.content {
+            Content::DevNode(Some(n)) => {
+                let n = n.clone();
+                drop(i);
+
+                n.poll_listen(listen)
+            }
+            _ => Err(FsError::NotSupported),
+        }
+    }
+
+    fn poll_unlisten(&self) -> Result<()> {
+        let i = self.0.read();
+
+        match &i.content {
+            Content::DevNode(Some(n)) => {
+                let n = n.clone();
+                drop(i);
+
+                n.poll_unlisten()
+            }
+            _ => Err(FsError::NotSupported),
+        }
+    }
+
     fn dirent(&self, idx: usize) -> Result<Option<DirEntry>> {
         let d = self.0.read();
 

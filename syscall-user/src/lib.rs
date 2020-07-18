@@ -128,6 +128,10 @@ pub fn connect(host: &[u8], port: u32) -> SyscallResult {
     }
 }
 
+pub fn select(fds: &[u8]) -> SyscallResult {
+    unsafe { syscall2(SYS_SELECT, fds.as_ptr() as usize, fds.len()) }
+}
+
 pub fn getdents(fd: usize, buf: &mut [u8]) -> SyscallResult {
     unsafe {
         syscall3(

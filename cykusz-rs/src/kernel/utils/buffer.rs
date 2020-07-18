@@ -32,6 +32,10 @@ impl BufferQueue {
         self.wait_queue.remove_task(current_task());
     }
 
+    pub fn has_data(&self) -> bool {
+        self.buffer.lock().has_data()
+    }
+
     pub fn append_data(&self, data: &[u8]) -> usize {
         let mut buf = self.buffer.lock();
 

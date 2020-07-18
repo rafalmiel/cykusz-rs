@@ -29,4 +29,12 @@ impl INode for DevNode {
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
         self.dev.inode().write_at(offset, buf)
     }
+
+    fn poll_listen(&self, listen: bool) -> Result<bool> {
+        self.dev.inode().poll_listen(listen)
+    }
+
+    fn poll_unlisten(&self) -> Result<()> {
+        self.dev.inode().poll_unlisten()
+    }
 }

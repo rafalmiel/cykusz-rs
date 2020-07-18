@@ -289,6 +289,21 @@ impl INode for Tty {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
         Ok(self.read(buf.as_mut_ptr(), buf.len()))
     }
+
+    fn poll_listen(&self, listen: bool) -> Result<bool, FsError> {
+        let has_data = self.buffer.lock().has_data();
+
+        if listen {
+            self.wait_queue.add_task(current_task());
+        }
+
+        Ok(has_data)
+    }
+
+    fn poll_unlisten(&self) -> Result<(), FsError> {
+        self.wait_queue.remove_task(current_task());
+        Ok(())
+    }
 }
 
 lazy_static! {
@@ -299,6 +314,14 @@ pub fn read(buf: *mut u8, len: usize) -> usize {
     let l = &LISTENER;
 
     l.read(buf, len)
+}
+
+pub fn poll_listen(listen: bool) -> Result<bool, FsError> {
+    LISTENER.poll_listen(listen)
+}
+
+pub fn poll_unlisten() -> Result<(), FsError> {
+    LISTENER.poll_unlisten()
 }
 
 fn init() {

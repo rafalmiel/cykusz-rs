@@ -47,21 +47,20 @@ pub fn create_packet(typ: EthType, size: usize) -> Packet<Eth> {
     packet
 }
 
-pub fn send_packet(mut packet: Packet<Eth>, target: Ip4) {
+pub fn send_packet(mut packet: Packet<Eth>, mut target: Ip4) {
     let eth = packet.header_mut();
 
     let drv = crate::kernel::net::default_driver();
 
-    if target == Ip4::limited_broadcast() || drv.ip().is_same_subnet(target, drv.subnet()) {
-        if let Some(mac) = crate::kernel::net::arp::cache_get(target) {
-            eth.dst_mac.copy_from_slice(&mac);
-            drv.driver.send(packet);
-        } else {
-            crate::kernel::net::arp::request_ip(target, packet);
-        }
-    } else {
-        eth.dst_mac.copy_from_slice(&drv.driver.get_mac());
+    if target != Ip4::limited_broadcast() && !drv.ip().is_same_subnet(target, drv.subnet()) {
+        target = drv.default_gateway();
+    }
+
+    if let Some(mac) = crate::kernel::net::arp::cache_get(target) {
+        eth.dst_mac.copy_from_slice(&mac);
         drv.driver.send(packet);
+    } else {
+        crate::kernel::net::arp::request_ip(target, packet);
     }
 }
 

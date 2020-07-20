@@ -19,6 +19,7 @@ pub mod icmp;
 pub mod ip;
 pub mod packet;
 pub mod socket;
+pub mod tcp;
 pub mod udp;
 pub mod util;
 

@@ -10,6 +10,7 @@ use crate::kernel::net::{
 
 #[derive(Debug, Copy, Clone)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum IpType {
     ICMP = NetU8::new(1).net_value(),
     TCP = NetU8::new(6).net_value(),
@@ -168,8 +169,10 @@ pub fn send_packet(packet: Packet<Ip>) {
 pub fn process_packet(packet: Packet<Ip>) {
     let ip = packet.header();
 
+    #[allow(unreachable_patterns)]
     match ip.protocol {
         IpType::UDP => crate::kernel::net::udp::process_packet(packet.upgrade()),
+        IpType::TCP => crate::kernel::net::tcp::process_packet(packet.upgrade()),
         IpType::ICMP => crate::kernel::net::icmp::process_packet(packet.upgrade()),
         _ => {
             println!("Unsupported protocol");

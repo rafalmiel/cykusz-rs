@@ -1,8 +1,14 @@
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+
 use bit_field::BitField;
 
 use crate::kernel::net::ip::Ip;
 use crate::kernel::net::util::{NetU16, NetU32};
-use crate::kernel::net::{Packet, PacketHeader, PacketKind, PacketUpHierarchy};
+use crate::kernel::net::{
+    Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
+};
+use crate::kernel::sync::RwSpin;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Tcp {}
@@ -155,7 +161,30 @@ impl TcpHeader {
     }
 }
 
-pub fn process_packet(_packet: Packet<Tcp>) {}
+pub fn process_packet(packet: Packet<Tcp>) {
+    println!(
+        "Received TCP packet: hdrlen: {} port: {} SYN {}",
+        packet.header().header_len(),
+        packet.header().dst_port(),
+        packet.header().flag_syn()
+    );
+
+    let header = packet.header();
+
+    let mut tree = HANDLERS.write();
+
+    let dst_port = header.dst_port.value() as u32;
+
+    if let Some(f) = tree.get_mut(&dst_port) {
+        let f = f.clone();
+
+        drop(tree);
+
+        f.process_packet(packet);
+    } else {
+        crate::kernel::net::icmp::send_port_unreachable(packet.downgrade());
+    }
+}
 
 pub fn test() {
     let header = unsafe { &mut *(HEADER.as_mut_ptr() as *mut TcpHeader) };
@@ -175,3 +204,46 @@ static mut HEADER: [u8; 20] = [
     0x01, 0xbb, 0xae, 0xca, 0xee, 0xc7, 0x72, 0xf6, 0x4d, 0xc7, 0x51, 0xf5, 0x50, 0x10, 0x00, 0x54,
     0x15, 0xe7, 0x00, 00,
 ];
+
+pub trait TcpService: Sync + Send {
+    fn process_packet(&self, packet: Packet<Tcp>);
+    fn port_unreachable(&self, port: u32, dst_port: u32);
+}
+
+static HANDLERS: RwSpin<BTreeMap<u32, Arc<dyn TcpService>>> = RwSpin::new(BTreeMap::new());
+
+pub fn register_handler(port: u32, handler: Arc<dyn TcpService>) -> bool {
+    let mut handlers = HANDLERS.write();
+
+    if !handlers.contains_key(&port) {
+        handlers.insert(port, handler);
+
+        return true;
+    }
+
+    false
+}
+
+pub fn register_ephemeral_handler(handler: Arc<dyn TcpService>) -> Option<u32> {
+    let mut handlers = HANDLERS.write();
+
+    for p in 49152..=65535 {
+        if !handlers.contains_key(&p) {
+            handlers.insert(p, handler);
+
+            return Some(p);
+        }
+    }
+
+    None
+}
+
+pub fn release_handler(port: u32) {
+    let mut handlers = HANDLERS.write();
+
+    if handlers.contains_key(&port) {
+        handlers.remove(&port);
+    } else {
+        panic!("TCP port is not registered")
+    }
+}

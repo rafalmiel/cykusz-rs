@@ -1,10 +1,11 @@
 use core::mem::size_of;
 
 use crate::kernel::net::ip::{Ip, IpHeader, IpType};
-use crate::kernel::net::udp::{Udp, UdpHeader};
+use crate::kernel::net::udp::UdpHeader;
 use crate::kernel::net::util::NetU16;
 use crate::kernel::net::{
-    Packet, PacketBaseTrait, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
+    Packet, PacketBaseTrait, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
+    PacketUpHierarchy,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -184,8 +185,8 @@ pub fn process_packet(packet: Packet<Icmp>) {
     }
 }
 
-pub fn send_port_unreachable(udp_packet: Packet<Udp>) {
-    let orig_ip = unsafe { (udp_packet.addr - size_of::<IpHeader>()).read_ref::<IpHeader>() };
+pub fn send_port_unreachable(ip_packet: Packet<Ip>) {
+    let orig_ip = ip_packet.header();
 
     let payload_len = size_of::<IcmpHeader>() + size_of::<IcmpDestUnreachableHeader>();
 
@@ -203,9 +204,7 @@ pub fn send_port_unreachable(udp_packet: Packet<Udp>) {
         hdr.empty = NetU16::new(0);
         hdr.next_mtu = NetU16::new(0);
         hdr.iphdr = *orig_ip;
-        hdr.orig_payload.copy_from_slice(unsafe {
-            core::slice::from_raw_parts((udp_packet.addr).0 as *mut u8, 8)
-        });
+        hdr.orig_payload.copy_from_slice(&ip_packet.data()[..8]);
     }
 
     {

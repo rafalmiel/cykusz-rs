@@ -8,6 +8,8 @@ use crate::kernel::net::{
 };
 use crate::kernel::sync::RwSpin;
 
+pub mod socket;
+
 #[derive(Debug, Copy, Clone)]
 pub struct Udp {}
 
@@ -42,28 +44,6 @@ impl UdpHeader {
 
     fn compute_checksum(&mut self) {
         self.crc = NetU16::new(0);
-    }
-
-    pub fn data(&self) -> &[u8] {
-        let slice = unsafe {
-            core::slice::from_raw_parts(
-                (self as *const UdpHeader as *const u8).offset(8),
-                self.len.value() as usize - 8,
-            )
-        };
-
-        slice
-    }
-
-    pub fn data_mut(&mut self) -> &mut [u8] {
-        let slice = unsafe {
-            core::slice::from_raw_parts_mut(
-                (self as *mut UdpHeader as *mut u8).offset(8),
-                self.len.value() as usize - 8,
-            )
-        };
-
-        slice
     }
 }
 
@@ -103,7 +83,7 @@ pub fn process_packet(packet: Packet<Udp>) {
 
         f2.process_packet(packet)
     } else {
-        crate::kernel::net::icmp::send_port_unreachable(packet);
+        crate::kernel::net::icmp::send_port_unreachable(packet.downgrade());
     }
 }
 

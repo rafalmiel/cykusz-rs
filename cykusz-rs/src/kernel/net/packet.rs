@@ -26,6 +26,20 @@ pub trait PacketBaseTrait {
 
 pub trait PacketTrait: PacketBaseTrait {
     fn header_size(&self) -> usize;
+
+    fn data(&self) -> &[u8] {
+        let hsize = self.header_size();
+        unsafe {
+            core::slice::from_raw_parts((self.addr() + hsize).0 as *const u8, self.len() - hsize)
+        }
+    }
+
+    fn data_mut(&mut self) -> &mut [u8] {
+        let hsize = self.header_size();
+        unsafe {
+            core::slice::from_raw_parts_mut((self.addr() + hsize).0 as *mut u8, self.len() - hsize)
+        }
+    }
 }
 
 impl<T: ConstPacketKind> PacketTrait for Packet<T> {

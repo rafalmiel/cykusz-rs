@@ -1,4 +1,3 @@
-use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU16, Ordering};
 
@@ -223,10 +222,7 @@ impl Answer {
 
 static QUERY_ID: AtomicU16 = AtomicU16::new(0);
 
-static QUEUE: WaitQueue = WaitQueue::new();
-static RESULTS: Spin<BTreeMap<u16, Ip4>> = Spin::new(BTreeMap::new());
-
-pub fn query_host(host: &[u8], src_port: u32) -> Option<Ip4> {
+fn query_host(dns: Arc<DnsService>, host: &[u8], src_port: u32) -> Option<Ip4> {
     let drv = default_driver();
 
     let mut packet: Packet<Dns> =
@@ -249,68 +245,64 @@ pub fn query_host(host: &[u8], src_port: u32) -> Option<Ip4> {
 
     crate::kernel::net::udp::send_packet(packet.downgrade());
 
-    let mut res = RESULTS.lock();
-
-    let task = current_task();
-
-    QUEUE.add_task(task.clone());
-
-    while !res.contains_key(&id) {
-        QUEUE.wait_lock(res);
-
-        res = RESULTS.lock();
-    }
-
-    QUEUE.remove_task(task);
-
-    let ans = res.get(&id).unwrap();
-
-    let ret = Some(*ans);
-
-    res.remove(&id);
-
-    ret
+    Some(dns.await_result())
 }
 
-pub fn process_packet(mut packet: Packet<Dns>) {
-    let hdr = packet.header_mut();
+struct DnsService {
+    ip_result: Spin<Option<Ip4>>,
+    wait_queue: WaitQueue,
+}
 
-    let id = hdr.id();
-
-    let mut phdr = hdr.payload();
-
-    for _ in 0..hdr.question_count() {
-        phdr = phdr.question().skip().as_postheader();
-    }
-
-    {
-        let mut res = RESULTS.lock();
-
-        if hdr.answer_count() > 0 {
-            let ans = phdr.answer();
-
-            let rdata = ans.rdata();
-
-            res.insert(id, Ip4::new(rdata));
-        } else {
-            res.insert(id, Ip4::empty());
+impl DnsService {
+    fn new() -> DnsService {
+        DnsService {
+            ip_result: Spin::new(None),
+            wait_queue: WaitQueue::new(),
         }
     }
 
-    QUEUE.notify_all();
-}
+    fn await_result(&self) -> Ip4 {
+        let mut res = self.ip_result.lock();
 
-fn process_packet_udp(packet: Packet<Udp>) {
-    process_packet(packet.upgrade());
-}
+        self.wait_queue.add_task(current_task());
 
-struct DnsService {}
+        while res.is_none() {
+            self.wait_queue.wait_lock(res);
+
+            res = self.ip_result.lock();
+        }
+
+        self.wait_queue.remove_task(current_task());
+
+        res.unwrap()
+    }
+}
 
 impl UdpService for DnsService {
     fn process_packet(&self, packet: Packet<Udp>) {
-        process_packet_udp(packet);
+        let mut packet: Packet<Dns> = packet.upgrade();
 
-        crate::kernel::net::udp::release_handler(packet.header().dst_port.value() as u32);
+        let hdr = packet.header_mut();
+
+        let mut phdr = hdr.payload();
+
+        for _ in 0..hdr.question_count() {
+            phdr = phdr.question().skip().as_postheader();
+        }
+
+        {
+            if hdr.answer_count() > 0 {
+                let ans = phdr.answer();
+
+                let rdata = ans.rdata();
+
+                *self.ip_result.lock() = Some(Ip4::new(rdata));
+            } else {
+                *self.ip_result.lock() = Some(Ip4::empty());
+            }
+        }
+
+        self.wait_queue.notify_one();
     }
 
     fn port_unreachable(&self, port: u32, _dst_port: u32) {
@@ -320,25 +312,15 @@ impl UdpService for DnsService {
     }
 }
 
-pub fn test() {
-    let h = "google.com".as_bytes();
-
-    if let Some(port) = crate::kernel::net::udp::register_ephemeral_handler(Arc::new(DnsService {}))
-    {
-        let r = query_host(h, port);
-
-        if let Some(ip) = r {
-            println!("Got: {:?}", ip);
-        } else {
-            println!("Query failed");
-        }
-    }
-}
-
 pub fn get_ip_by_host(host: &[u8]) -> Option<Ip4> {
-    if let Some(port) = crate::kernel::net::udp::register_ephemeral_handler(Arc::new(DnsService {}))
-    {
-        query_host(host, port)
+    let dns = Arc::new(DnsService::new());
+
+    if let Some(port) = crate::kernel::net::udp::register_ephemeral_handler(dns.clone()) {
+        let res = query_host(dns, host, port);
+
+        crate::kernel::net::udp::release_handler(port);
+
+        res
     } else {
         None
     }

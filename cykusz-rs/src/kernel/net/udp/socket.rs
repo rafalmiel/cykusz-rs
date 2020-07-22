@@ -118,7 +118,7 @@ impl UdpService for Socket {
     }
 }
 
-pub fn bind(port: u32) -> Option<Arc<Socket>> {
+pub fn bind(port: u32) -> Option<Arc<dyn INode>> {
     let socket = Arc::new(Socket::new(port));
 
     if crate::kernel::net::udp::register_handler(port, socket.clone()) {
@@ -128,7 +128,7 @@ pub fn bind(port: u32) -> Option<Arc<Socket>> {
     }
 }
 
-pub fn connect(host: Ip4, port: u32) -> Option<Arc<Socket>> {
+pub fn connect(host: Ip4, port: u32) -> Option<Arc<dyn INode>> {
     let socket = Arc::new(Socket::new(0));
 
     if let Some(p) = crate::kernel::net::udp::register_ephemeral_handler(socket.clone()) {

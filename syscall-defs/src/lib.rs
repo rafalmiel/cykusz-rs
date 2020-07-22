@@ -49,6 +49,13 @@ bitflags! {
     }
 }
 
+bitflags! {
+    pub struct ConnectionFlags: usize {
+        const UDP   = (1usize << 0);
+        const TCP   = (1usize << 1);
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u8)]
 pub enum FileType {

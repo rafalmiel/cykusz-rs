@@ -3,12 +3,14 @@ use alloc::sync::Arc;
 
 use bit_field::BitField;
 
-use crate::kernel::net::ip::{Ip, IpHeader};
+use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
 use crate::kernel::net::util::{checksum, NetU16, NetU32};
 use crate::kernel::net::{
     Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
 use crate::kernel::sync::RwSpin;
+
+pub mod socket;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Tcp {}
@@ -171,6 +173,21 @@ impl TcpHeader {
             ),
         ]);
     }
+}
+
+pub fn create_packet(src_port: u16, dst_port: u16, size: usize, target: Ip4) -> Packet<Tcp> {
+    let total_len = size + core::mem::size_of::<TcpHeader>();
+
+    let mut packet: Packet<Tcp> =
+        crate::kernel::net::ip::create_packet(IpType::TCP, total_len, target).upgrade();
+
+    let header = packet.header_mut();
+
+    header.set_dst_port(dst_port);
+    header.set_src_port(src_port);
+    header.set_header_len(core::mem::size_of::<TcpHeader>() as u8);
+
+    packet
 }
 
 pub fn send_packet(mut packet: Packet<Tcp>) {

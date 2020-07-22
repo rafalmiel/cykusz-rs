@@ -3,7 +3,7 @@
 use core::mem::size_of;
 
 use crate::kernel::net::eth::{Eth, EthHeader, EthType};
-use crate::kernel::net::util::{NetU16, NetU8};
+use crate::kernel::net::util::{checksum, NetU16, NetU8};
 use crate::kernel::net::{
     default_driver, ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
 };
@@ -120,21 +120,8 @@ impl IpHeader {
     }
 
     pub fn calc_checksum(&mut self) {
-        let mut sum: u32 = 0;
-
-        let ptr = self as *const _ as *const NetU16;
-
-        for i in 0..core::mem::size_of::<IpHeader>() / 2 {
-            sum += unsafe { (&*ptr.offset(i as isize)).value() as u32 }
-        }
-
-        let mut carry = sum >> 16;
-        while carry > 0 {
-            sum &= 0x0000_ffff;
-            sum += carry;
-            carry = sum >> 16;
-        }
-        self.hcrc = NetU16::new(!(sum as u16));
+        self.hcrc = NetU16::new(0);
+        self.hcrc = checksum::make(checksum::calc_ref(self));
     }
 }
 

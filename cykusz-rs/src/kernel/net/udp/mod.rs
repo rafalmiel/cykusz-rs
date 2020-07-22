@@ -1,8 +1,8 @@
 use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
 
-use crate::kernel::net::ip::{Ip, Ip4, IpType};
-use crate::kernel::net::util::NetU16;
+use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
+use crate::kernel::net::util::{checksum, NetU16};
 use crate::kernel::net::{
     ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
 };
@@ -42,8 +42,13 @@ impl UdpHeader {
         self.len = NetU16::new(len);
     }
 
-    fn compute_checksum(&mut self) {
+    fn compute_checksum(&mut self, ip: &IpHeader) {
         self.crc = NetU16::new(0);
+
+        self.crc = checksum::make_combine(&[
+            checksum::calc_ref(&checksum::PseudoHeader::new(ip)),
+            checksum::calc_ref_len(self, self.len.value() as usize),
+        ]);
     }
 }
 
@@ -63,10 +68,12 @@ pub fn create_packet(src_port: u16, dst_port: u16, size: usize, target: Ip4) -> 
 }
 
 pub fn send_packet(mut packet: Packet<Udp>) {
-    let header = packet.header_mut();
-    header.compute_checksum();
+    let ip_packet = packet.downgrade();
 
-    crate::kernel::net::ip::send_packet(packet.downgrade());
+    let header = packet.header_mut();
+    header.compute_checksum(ip_packet.header());
+
+    crate::kernel::net::ip::send_packet(ip_packet);
 }
 
 pub fn process_packet(packet: Packet<Udp>) {

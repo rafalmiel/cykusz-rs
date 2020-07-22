@@ -2,7 +2,7 @@ use core::mem::size_of;
 
 use crate::kernel::net::ip::{Ip, IpHeader, IpType};
 use crate::kernel::net::udp::UdpHeader;
-use crate::kernel::net::util::NetU16;
+use crate::kernel::net::util::{checksum, NetU16};
 use crate::kernel::net::{
     Packet, PacketBaseTrait, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
     PacketUpHierarchy,
@@ -76,25 +76,8 @@ impl Packet<Icmp> {
 impl IcmpHeader {
     fn calc_checksum(&mut self, len: usize) {
         self.crc = NetU16::new(0);
-        let mut sum: u32 = 0;
 
-        let ptr = self as *const _ as *const NetU16;
-
-        if len % 2 == 1 {
-            panic!("FIX CHECKSUM");
-        }
-
-        for i in 0..(len / 2) {
-            sum += unsafe { (&*ptr.offset(i as isize)).value() as u32 }
-        }
-
-        let mut carry = sum >> 16;
-        while carry > 0 {
-            sum &= 0x0000_ffff;
-            sum += carry;
-            carry = sum >> 16;
-        }
-        self.crc = NetU16::new(!(sum as u16));
+        self.crc = checksum::make(checksum::calc_ref_len(self, len));
     }
 }
 

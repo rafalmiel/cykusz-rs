@@ -1,12 +1,11 @@
 use alloc::sync::Arc;
 use core::sync::atomic::AtomicU32;
-
 use core::sync::atomic::Ordering;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::Ip4;
-use crate::kernel::net::udp::{Udp, UdpService};
+use crate::kernel::net::udp::{Udp, UdpHeader, UdpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::buffer::BufferQueue;
@@ -109,7 +108,9 @@ impl UdpService for Socket {
         self.set_dst_port(header.src_port.value() as u32);
         self.set_dst_ip(packet.downgrade().header().src_ip);
 
-        self.buffer.append_data(packet.data());
+        let data_len = header.len.value() as usize - core::mem::size_of::<UdpHeader>();
+
+        self.buffer.append_data(&packet.data()[..data_len]);
     }
 
     fn port_unreachable(&self, _port: u32, dst_port: u32) {

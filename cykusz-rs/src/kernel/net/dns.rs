@@ -306,9 +306,7 @@ impl UdpService for DnsService {
     }
 
     fn port_unreachable(&self, port: u32, _dst_port: u32) {
-        println!("DNS port unreachable");
-
-        crate::kernel::net::udp::release_handler(port);
+        println!("[ DNS ] Port {} unreachable", port);
     }
 }
 

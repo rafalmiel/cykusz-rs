@@ -113,17 +113,18 @@ pub fn mkdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_MKDIR, path.as_ptr() as usize, path.len()) }
 }
 
-pub fn bind(port: u32) -> SyscallResult {
-    unsafe { syscall1(SYS_BIND, port as usize) }
+pub fn bind(port: u32, flags: syscall_defs::ConnectionFlags) -> SyscallResult {
+    unsafe { syscall2(SYS_BIND, port as usize, flags.bits()) }
 }
 
-pub fn connect(host: &[u8], port: u32) -> SyscallResult {
+pub fn connect(host: &[u8], port: u32, flags: syscall_defs::ConnectionFlags) -> SyscallResult {
     unsafe {
-        syscall3(
+        syscall4(
             SYS_CONNECT,
             host.as_ptr() as usize,
             host.len(),
             port as usize,
+            flags.bits(),
         )
     }
 }

@@ -1,3 +1,5 @@
+use syscall_defs::ConnectionFlags;
+
 fn send(fd: usize) -> bool {
     let mut buf = [0u8; 64];
 
@@ -69,7 +71,7 @@ fn start(fd: usize) {
 }
 
 pub fn connect(port: u32, ip: &[u8]) {
-    if let Ok(fd) = syscall::connect(&ip, port) {
+    if let Ok(fd) = syscall::connect(&ip, port, ConnectionFlags::UDP) {
         start(fd);
     } else {
         println!("Connect failed");
@@ -77,7 +79,7 @@ pub fn connect(port: u32, ip: &[u8]) {
 }
 
 pub fn bind(src_port: u32) {
-    if let Ok(fd) = syscall::bind(src_port) {
+    if let Ok(fd) = syscall::bind(src_port, ConnectionFlags::TCP) {
         start(fd);
     } else {
         println!("Bind failed");

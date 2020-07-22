@@ -1,4 +1,4 @@
-use syscall_defs::{FileType, SyscallResult};
+use syscall_defs::{ConnectionFlags, FileType, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::path::Path;
@@ -172,8 +172,17 @@ pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResu
     Err(SyscallError::Inval)
 }
 
-pub fn sys_bind(port: u64) -> SyscallResult {
-    if let Some(socket) = crate::kernel::net::socket::udp_bind(port as u32) {
+pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
+    let flags =
+        syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::Inval)?;
+
+    let socket = if flags.contains(ConnectionFlags::UDP) {
+        crate::kernel::net::socket::udp_bind(port as u32)
+    } else {
+        crate::kernel::net::socket::tcp_bind(port as u32)
+    };
+
+    if let Some(socket) = socket {
         let task = current_task();
 
         if let Some(fd) = task.open_file(socket, OpenFlags::RDWR) {
@@ -186,7 +195,14 @@ pub fn sys_bind(port: u64) -> SyscallResult {
     }
 }
 
-pub fn sys_connect(host: u64, host_len: u64, port: u64) -> SyscallResult {
+pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallResult {
+    let flags =
+        syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::Inval)?;
+
+    if flags.contains(ConnectionFlags::TCP) {
+        return Err(SyscallError::Inval);
+    }
+
     if let Some(socket) =
         crate::kernel::net::socket::udp_connect(Ip4::new(make_buf(host, host_len)), port as u32)
     {

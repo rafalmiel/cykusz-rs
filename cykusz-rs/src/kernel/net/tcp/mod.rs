@@ -3,8 +3,8 @@ use alloc::sync::Arc;
 
 use bit_field::BitField;
 
-use crate::kernel::net::ip::Ip;
-use crate::kernel::net::util::{NetU16, NetU32};
+use crate::kernel::net::ip::{Ip, IpHeader};
+use crate::kernel::net::util::{checksum, NetU16, NetU32};
 use crate::kernel::net::{
     Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
@@ -159,16 +159,30 @@ impl TcpHeader {
     pub fn set_urgent_ptr(&mut self, val: u16) {
         self.urgent_ptr = NetU16::new(val)
     }
+
+    pub fn calc_checksum(&mut self, ip: &IpHeader) {
+        self.checksum = NetU16::new(0);
+
+        self.checksum = checksum::make_combine(&[
+            checksum::calc_ref(&checksum::PseudoHeader::new(ip)),
+            checksum::calc_ref_len(
+                self,
+                ip.len.value() as usize - core::mem::size_of::<IpHeader>(),
+            ),
+        ]);
+    }
+}
+
+pub fn send_packet(mut packet: Packet<Tcp>) {
+    let ip_packet = packet.downgrade();
+
+    let header = packet.header_mut();
+    header.calc_checksum(ip_packet.header());
+
+    crate::kernel::net::ip::send_packet(ip_packet);
 }
 
 pub fn process_packet(packet: Packet<Tcp>) {
-    println!(
-        "Received TCP packet: hdrlen: {} port: {} SYN {}",
-        packet.header().header_len(),
-        packet.header().dst_port(),
-        packet.header().flag_syn()
-    );
-
     let header = packet.header();
 
     let mut tree = HANDLERS.write();
@@ -185,25 +199,6 @@ pub fn process_packet(packet: Packet<Tcp>) {
         crate::kernel::net::icmp::send_port_unreachable(packet.downgrade());
     }
 }
-
-pub fn test() {
-    let header = unsafe { &mut *(HEADER.as_mut_ptr() as *mut TcpHeader) };
-
-    header.set_header_len(32);
-    header.set_flag_fin(true);
-
-    println!(
-        "VAL: 0x{:x} 0x{:x} {}",
-        header.flags(),
-        header.flags().get_bits(12..=15),
-        header.header_len()
-    );
-}
-
-static mut HEADER: [u8; 20] = [
-    0x01, 0xbb, 0xae, 0xca, 0xee, 0xc7, 0x72, 0xf6, 0x4d, 0xc7, 0x51, 0xf5, 0x50, 0x10, 0x00, 0x54,
-    0x15, 0xe7, 0x00, 00,
-];
 
 pub trait TcpService: Sync + Send {
     fn process_packet(&self, packet: Packet<Tcp>);

@@ -126,10 +126,18 @@ impl E1000Data {
     }
 
     pub fn alloc_packet(&self, size: usize) -> Packet<Eth> {
-        Packet::<Eth>::new(
+        let packet = Packet::<Eth>::new(
             VirtAddr(allocate_align(size, 0x1000).unwrap() as usize),
             size,
-        )
+        );
+
+        for a in packet.addr..packet.addr + size {
+            unsafe {
+                a.store(0u8);
+            }
+        }
+
+        packet
     }
 
     pub fn read_mac(&self, mac: &mut [u8]) {

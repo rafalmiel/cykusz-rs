@@ -63,7 +63,8 @@ impl TcpHeader {
     }
 
     pub fn set_ack_nr(&mut self, val: u32) {
-        self.ack_nr = NetU32::new(val)
+        self.ack_nr = NetU32::new(val);
+        self.set_flag_ack(true);
     }
 
     pub fn flags(&self) -> u16 {

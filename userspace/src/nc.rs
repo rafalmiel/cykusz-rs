@@ -62,6 +62,9 @@ fn start(fd: usize) {
                     println!("Unexpected fd found");
                 }
             }
+        } else {
+            println!("Select fault, closing");
+            break;
         }
     }
 
@@ -71,7 +74,7 @@ fn start(fd: usize) {
 }
 
 pub fn connect(port: u32, ip: &[u8]) {
-    if let Ok(fd) = syscall::connect(&ip, port, ConnectionFlags::UDP) {
+    if let Ok(fd) = syscall::connect(&ip, port, ConnectionFlags::TCP) {
         start(fd);
     } else {
         println!("Connect failed");

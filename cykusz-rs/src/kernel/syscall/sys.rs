@@ -199,13 +199,15 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
     let flags =
         syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::Inval)?;
 
-    if flags.contains(ConnectionFlags::TCP) {
-        return Err(SyscallError::Inval);
-    }
+    let host = Ip4::new(make_buf(host, host_len));
 
-    if let Some(socket) =
-        crate::kernel::net::socket::udp_connect(Ip4::new(make_buf(host, host_len)), port as u32)
-    {
+    let socket = if flags.contains(ConnectionFlags::UDP) {
+        crate::kernel::net::socket::udp_connect(host, port as u32)
+    } else {
+        crate::kernel::net::socket::tcp_connect(host, port as u32)
+    };
+
+    if let Some(socket) = socket {
         let task = current_task();
 
         if let Some(fd) = task.open_file(socket, OpenFlags::RDWR) {

@@ -362,8 +362,10 @@ impl Task {
     pub fn deallocate(&mut self) {
         let cr3 = unsafe { self.ctx.as_ref().cr3 };
 
-        let p4 = p4_table(PhysAddr(cr3));
-        p4.deallocate_user();
+        if self.is_user {
+            let p4 = p4_table(PhysAddr(cr3));
+            p4.deallocate_user();
+        }
 
         self.ctx = Unique::dangling();
         heap_deallocate_align(self.stack_top as *mut u8, self.stack_size, 4096);

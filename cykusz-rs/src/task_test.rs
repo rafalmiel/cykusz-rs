@@ -1,8 +1,11 @@
 #![allow(dead_code)]
 
+use alloc::boxed::Box;
+use alloc::sync::Arc;
 use core::sync::atomic::AtomicU64;
 
 use crate::kernel::syscall::sys::sys_sleep;
+use crate::kernel::timer::{create_timer, Timer, TimerObject};
 
 //use core::sync::atomic::Ordering;
 
@@ -45,6 +48,16 @@ fn task() {
     //crate::kernel::sched::create_task(task);
 }
 
+struct TimerTest {}
+
+impl TimerObject for TimerTest {
+    fn call(&self) {
+        println!("Timer called");
+    }
+}
+
+static mut TIMER: Option<Arc<Timer>> = None;
+
 pub fn start() {
     //crate::kernel::sched::create_task(task2);
     //crate::kernel::sched::create_task(task);
@@ -53,5 +66,18 @@ pub fn start() {
         crate::kernel::user::get_user_program(),
         crate::kernel::user::get_user_program_size(),
     );
+
+    if cfg!(disabled) {
+        unsafe {
+            if let Some(t) = &TIMER {
+                t.set_terminate();
+                TIMER = None;
+            } else {
+                let timer = create_timer(Arc::new(TimerTest {}), 1000);
+                TIMER = Some(timer);
+                TIMER.as_ref().unwrap().resume();
+            }
+        }
+    }
     //crate::kernel::sched::create_param_task(task as usize, 42);
 }

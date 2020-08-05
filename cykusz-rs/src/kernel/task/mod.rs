@@ -22,9 +22,8 @@ pub enum TaskState {
     Unused = 0,
     Running = 1,
     Runnable = 2,
-    ToReschedule = 3,
     AwaitingIo = 4,
-    ToDelete = 5,
+    Halted = 5,
 }
 
 impl From<usize> for TaskState {
@@ -35,9 +34,8 @@ impl From<usize> for TaskState {
             0 => Unused,
             1 => Running,
             2 => Runnable,
-            3 => ToReschedule,
             4 => AwaitingIo,
-            5 => ToDelete,
+            5 => Halted,
             _ => unreachable!(),
         }
     }
@@ -50,6 +48,9 @@ pub struct Task {
     state: AtomicUsize,
     locks: AtomicUsize,
     pending_io: AtomicBool,
+    to_resched: AtomicBool,
+    to_delete: AtomicBool,
+    halted: AtomicBool,
     filetable: filetable::FileTable,
     pub sleep_until: AtomicUsize,
     cwd: RwSpin<Cwd>,
@@ -64,6 +65,9 @@ impl Default for Task {
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
             pending_io: AtomicBool::new(false),
+            to_resched: AtomicBool::new(false),
+            to_delete: AtomicBool::new(false),
+            halted: AtomicBool::new(false),
             filetable: filetable::FileTable::new(),
             sleep_until: AtomicUsize::new(0),
             cwd: RwSpin::new(Cwd::new("/", root_inode().self_inode())),
@@ -134,24 +138,36 @@ impl Task {
         self.state.store(state as usize, Ordering::SeqCst);
     }
 
-    pub fn mark_to_reschedule(&self) {
-        if self.state.load(Ordering::SeqCst) != TaskState::ToReschedule as usize {
-            self.prev_state
-                .store(self.state.load(Ordering::SeqCst), Ordering::SeqCst);
-            self.state
-                .store(TaskState::ToReschedule as usize, Ordering::SeqCst);
-        }
+    pub fn to_reschedule(&self) -> bool {
+        self.to_resched.load(Ordering::SeqCst)
     }
 
-    pub fn unmark_to_reschedule(&self) {
-        self.state
-            .store(self.prev_state.load(Ordering::SeqCst), Ordering::SeqCst);
-        self.prev_state
-            .store(TaskState::Unused as usize, Ordering::SeqCst);
+    pub fn set_to_reschedule(&self, s: bool) {
+        self.to_resched.store(s, Ordering::SeqCst);
+    }
+
+    pub fn to_delete(&self) -> bool {
+        self.to_delete.load(Ordering::SeqCst)
+    }
+
+    pub fn set_to_delete(&self, d: bool) {
+        self.to_delete.store(d, Ordering::SeqCst);
+    }
+
+    pub fn halted(&self) -> bool {
+        self.halted.load(Ordering::SeqCst)
+    }
+
+    pub fn set_halted(&self, h: bool) {
+        self.halted.store(h, Ordering::SeqCst);
     }
 
     pub fn state(&self) -> TaskState {
-        self.state.load(Ordering::SeqCst).into()
+        if self.halted() {
+            TaskState::Halted
+        } else {
+            self.state.load(Ordering::SeqCst).into()
+        }
     }
 
     pub fn locks_inc(&self) {
@@ -183,8 +199,18 @@ impl Task {
             self.set_has_pending_io(false);
         } else {
             self.set_state(TaskState::AwaitingIo);
+            self.sleep_until.store(0, Ordering::SeqCst);
             crate::kernel::sched::reschedule();
         }
+    }
+
+    pub fn wake_up(&self) {
+        self.state.compare_and_swap(
+            TaskState::AwaitingIo as usize,
+            TaskState::Runnable as usize,
+            Ordering::SeqCst,
+        );
+        self.set_halted(false);
     }
 
     pub unsafe fn arch_task_mut(&self) -> &mut ArchTask {
@@ -207,6 +233,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
+        println!("Deallocate task!");
         unsafe {
             self.arch_task_mut().deallocate();
         }

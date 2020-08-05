@@ -162,7 +162,7 @@ pub fn process_packet(packet: Packet<Ip>) {
         IpType::TCP => crate::kernel::net::tcp::process_packet(packet.upgrade()),
         IpType::ICMP => crate::kernel::net::icmp::process_packet(packet.upgrade()),
         _ => {
-            println!("Unsupported protocol");
+            //println!("Unsupported protocol");
         }
     }
 }

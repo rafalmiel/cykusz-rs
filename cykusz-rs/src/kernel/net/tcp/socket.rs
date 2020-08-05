@@ -1,12 +1,16 @@
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::Result;
+use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::tcp::{Tcp, TcpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader};
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
+use crate::kernel::timer::{create_timer, Timer, TimerObject};
+use crate::kernel::utils::wait_queue::WaitQueue;
 
+#[derive(PartialEq)]
 enum State {
     Closed,
     Listen,
@@ -18,6 +22,17 @@ enum State {
     CloseWait,
     LastAck,
     Closing,
+}
+
+bitflags! {
+    pub struct TcpFlags: u16 {
+        const FIN   = 1 << 0;
+        const SYN   = 1 << 1;
+        const RST   = 1 << 2;
+        const PSH   = 1 << 3;
+        const ACK   = 1 << 4;
+        const URG   = 1 << 5;
+    }
 }
 
 impl Default for State {
@@ -34,6 +49,7 @@ struct SocketData {
     dst_port: u16,
     target: Ip4,
     state: State,
+    timer: Option<Arc<Timer>>,
 }
 
 impl SocketData {
@@ -42,6 +58,14 @@ impl SocketData {
             src_port: port,
             ..Default::default()
         }
+    }
+
+    fn init_timers(&mut self, obj: Arc<dyn TimerObject>) {
+        self.timer = Some(create_timer(obj, 1000));
+    }
+
+    fn timeout(&mut self) {
+        println!("[ TCP ] Timeout");
     }
 
     pub fn src_port(&self) -> u16 {
@@ -68,7 +92,7 @@ impl SocketData {
         self.target = val;
     }
 
-    fn make_packet(&self, len: usize) -> Packet<Tcp> {
+    fn make_packet(&self, len: usize, flags: TcpFlags) -> Packet<Tcp> {
         let mut out_packet =
             crate::kernel::net::tcp::create_packet(self.src_port, self.dst_port, len, self.target);
 
@@ -78,11 +102,13 @@ impl SocketData {
         out_hdr.set_urgent_ptr(0);
         out_hdr.set_window(4096);
 
+        out_hdr.set_flags(flags);
+
         out_packet
     }
 
-    fn make_ack_packet(&self, len: usize) -> Packet<Tcp> {
-        let mut packet = self.make_packet(len);
+    fn make_ack_packet(&self, len: usize, flags: TcpFlags) -> Packet<Tcp> {
+        let mut packet = self.make_packet(len, flags);
 
         let hdr = packet.header_mut();
 
@@ -91,26 +117,25 @@ impl SocketData {
         packet
     }
 
+    fn setup_connection(&mut self, packet: Packet<Tcp>) {
+        let ip = packet.downgrade();
+        let hdr = packet.header();
+        let iphdr = ip.header();
+
+        self.dst_port = hdr.src_port();
+        self.target = iphdr.src_ip;
+
+        self.our_seq = 12345;
+    }
+
     fn handle_listen(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
         let hdr = packet.header();
 
         match (hdr.flag_syn(), hdr.flag_ack()) {
             (true, false) => {
-                let ip = packet.downgrade();
-                let iphdr = ip.header();
+                self.setup_connection(packet);
 
-                self.dst_port = hdr.src_port();
-                self.target = iphdr.src_ip;
-
-                self.our_seq = 12345;
-                self.their_seq = hdr.seq_nr().wrapping_add(1);
-
-                let mut out = self.make_ack_packet(0);
-
-                let outhdr = out.header_mut();
-
-                outhdr.set_flag_syn(true);
-                outhdr.set_flag_ack(true);
+                let out = self.make_ack_packet(0, TcpFlags::SYN);
 
                 println!("[ TCP ] Syn Received");
 
@@ -127,9 +152,6 @@ impl SocketData {
 
         match (hdr.flag_ack(), hdr.flag_rst()) {
             (true, false) => {
-                self.our_seq = hdr.ack_nr();
-                self.their_seq = hdr.seq_nr();
-
                 println!("[ TCP ] Connection established");
                 self.state = State::Established;
 
@@ -152,12 +174,10 @@ impl SocketData {
 
         match (hdr.flag_syn(), hdr.flag_ack()) {
             (true, true) => {
-                self.our_seq = hdr.ack_nr();
-                self.their_seq = hdr.seq_nr().wrapping_add(1);
-
-                let out = self.make_ack_packet(0);
+                let out = self.make_ack_packet(0, TcpFlags::empty());
 
                 println!("[ TCP ] Connection Established");
+
                 self.state = State::Established;
 
                 Some(out)
@@ -169,18 +189,8 @@ impl SocketData {
     fn handle_established(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
         let hdr = packet.header();
 
-        if hdr.flag_ack() {
-            self.our_seq = hdr.ack_nr();
-        }
-
         if hdr.flag_fin() {
-            self.their_seq = hdr.seq_nr().wrapping_add(1);
-
-            let mut out = self.make_ack_packet(0);
-
-            let outhdr = out.header_mut();
-
-            outhdr.set_flag_fin(true);
+            let out = self.make_ack_packet(0, TcpFlags::FIN);
 
             self.state = State::LastAck;
 
@@ -195,18 +205,13 @@ impl SocketData {
 
         match (hdr.flag_fin(), hdr.flag_ack()) {
             (false, true) => {
-                self.our_seq = hdr.ack_nr();
                 self.state = State::FinWait2;
                 None
             }
             (true, true) => {
-                self.our_seq = hdr.ack_nr();
-                self.their_seq = hdr.seq_nr().wrapping_add(1);
+                let out = self.make_ack_packet(0, TcpFlags::empty());
 
-                let out = self.make_ack_packet(0);
-
-                self.state = State::Closed;
-                crate::kernel::net::tcp::release_handler(self.src_port as u32);
+                self.finalize();
 
                 Some(out)
             }
@@ -221,18 +226,15 @@ impl SocketData {
         let hdr = packet.header();
 
         match (hdr.flag_fin(), hdr.flag_ack()) {
-            (true, false) => {
-                self.their_seq = hdr.seq_nr().wrapping_add(1);
+            (true, true) => {
+                let out = self.make_ack_packet(0, TcpFlags::empty());
 
-                let out = self.make_ack_packet(0);
-
-                self.state = State::Closed;
-                crate::kernel::net::tcp::release_handler(self.src_port as u32);
+                self.finalize();
 
                 Some(out)
             }
             _ => {
-                println!("[ TCP ] Unexpected FinWait1 packet");
+                println!("[ TCP ] Unexpected FinWait2 packet");
                 None
             }
         }
@@ -242,15 +244,30 @@ impl SocketData {
         let hdr = packet.header();
 
         if hdr.flag_ack() {
-            self.state = State::Closed;
-
-            crate::kernel::net::tcp::release_handler(self.src_port as u32);
+            self.finalize();
         }
 
         None
     }
 
     fn process(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+        let hdr = packet.header();
+
+        if hdr.flag_rst() {
+            self.finalize();
+            return None;
+        }
+
+        if hdr.flag_ack() {
+            self.our_seq = hdr.ack_nr();
+        }
+
+        self.their_seq = if hdr.flag_syn() || hdr.flag_fin() {
+            hdr.seq_nr().wrapping_add(1)
+        } else {
+            hdr.seq_nr()
+        };
+
         return match self.state {
             State::Listen => self.handle_listen(packet),
             State::SynReceived => self.handle_syn_received(packet),
@@ -266,32 +283,40 @@ impl SocketData {
         };
     }
 
+    fn finalize(&mut self) {
+        self.state = State::Closed;
+
+        println!("[ TCP ] Connection closed by RST");
+
+        self.timer.as_ref().unwrap().set_terminate();
+        self.timer = None;
+
+        crate::kernel::net::tcp::release_handler(self.src_port as u32);
+    }
+
     fn close(&mut self) {
-        println!("[ TCP ] Closing");
-        let mut out_packet = self.make_ack_packet(0);
+        if self.state != State::Closed {
+            println!("[ TCP ] Closing");
+            let out_packet = self.make_ack_packet(0, TcpFlags::FIN);
 
-        let hdr = out_packet.header_mut();
+            self.state = State::FinWait1;
 
-        hdr.set_flag_fin(true);
-
-        self.state = State::FinWait1;
-
-        crate::kernel::net::tcp::send_packet(out_packet);
+            crate::kernel::net::tcp::send_packet(out_packet);
+        }
     }
 
     pub fn connect(&mut self) {
         self.our_seq = 12345;
 
-        let mut packet = self.make_packet(0);
-
-        let hdr = packet.header_mut();
-
-        hdr.set_flag_syn(true);
+        let packet = self.make_packet(0, TcpFlags::SYN);
 
         println!("[ TCP ] Connection Syn Sent");
+
         self.state = State::SynSent;
 
         crate::kernel::net::tcp::send_packet(packet);
+
+        //self.timer.as_ref().unwrap().resume();
     }
 
     pub fn listen(&mut self) {
@@ -302,15 +327,41 @@ impl SocketData {
 
 pub struct Socket {
     data: Spin<SocketData>,
+    wait_queue: WaitQueue,
+
+    self_ref: Weak<Socket>,
+}
+
+impl TimerObject for Socket {
+    fn call(&self) {
+        self.data.lock().timeout();
+    }
 }
 
 impl Socket {
-    pub fn new(port: u32) -> Socket {
+    pub fn new(port: u32) -> Arc<Socket> {
         use core::convert::TryInto;
-        Socket {
+        let sock = Socket {
             data: Spin::new(SocketData::new(
                 port.try_into().expect("Invalid port number"),
             )),
+            wait_queue: WaitQueue::new(),
+            self_ref: Weak::default(),
+        }
+        .wrap();
+
+        sock.data.lock().init_timers(sock.clone());
+
+        sock
+    }
+
+    fn wrap(self) -> Arc<Socket> {
+        let fs = Arc::new(self);
+        let weak = Arc::downgrade(&fs);
+        let ptr = Arc::into_raw(fs) as *mut Self;
+        unsafe {
+            (*ptr).self_ref = weak;
+            Arc::from_raw(ptr)
         }
     }
 
@@ -356,11 +407,21 @@ impl INode for Socket {
         Ok(0)
     }
 
-    fn poll_listen(&self, _listen: bool) -> Result<bool> {
-        Ok(false)
+    fn poll_listen(&self, listen: bool) -> Result<bool> {
+        if listen {
+            self.wait_queue.add_task(current_task());
+        }
+
+        if self.data.lock().state == State::Closed {
+            Err(FsError::NotSupported)
+        } else {
+            Ok(false)
+        }
     }
 
     fn poll_unlisten(&self) -> Result<()> {
+        self.wait_queue.remove_task(current_task());
+
         Ok(())
     }
 
@@ -370,8 +431,13 @@ impl INode for Socket {
 }
 impl TcpService for Socket {
     fn process_packet(&self, packet: Packet<Tcp>) {
-        if let Some(packet) = self.data.lock().process(packet) {
+        let mut data = self.data.lock();
+        if let Some(packet) = data.process(packet) {
             crate::kernel::net::tcp::send_packet(packet);
+        }
+
+        if data.state == State::Closed {
+            self.wait_queue.notify_one();
         }
     }
 
@@ -381,7 +447,7 @@ impl TcpService for Socket {
 }
 
 pub fn bind(port: u32) -> Option<Arc<dyn INode>> {
-    let socket = Arc::new(Socket::new(port));
+    let socket = Socket::new(port);
 
     if crate::kernel::net::tcp::register_handler(port, socket.clone()) {
         socket.listen();
@@ -393,7 +459,7 @@ pub fn bind(port: u32) -> Option<Arc<dyn INode>> {
 }
 
 pub fn connect(host: Ip4, port: u32) -> Option<Arc<dyn INode>> {
-    let socket = Arc::new(Socket::new(0));
+    let socket = Socket::new(0);
 
     if let Some(p) = crate::kernel::net::tcp::register_ephemeral_handler(socket.clone()) {
         socket.set_src_port(p as u16);

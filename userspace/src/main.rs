@@ -146,12 +146,21 @@ fn exec(cmd: &str) {
             let port = args.next().unwrap();
 
             let mut ip = [0u8; 4];
+            let mut cnt = 0;
             for (i, s) in addr.split(".").enumerate() {
                 if let Ok(v) = s.parse::<u8>() {
                     ip[i] = v;
                 } else {
                     println!("Failed to parse ip");
                     break;
+                }
+                cnt += 1;
+            }
+
+            if cnt < 4 {
+                if let Err(e) = syscall::getaddrinfo(addr, &mut ip) {
+                    println!("Failed to get host address {:?}", e);
+                    return;
                 }
             }
 

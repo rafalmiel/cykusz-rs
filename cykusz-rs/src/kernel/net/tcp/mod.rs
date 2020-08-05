@@ -4,6 +4,7 @@ use alloc::sync::Arc;
 use bit_field::BitField;
 
 use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
+use crate::kernel::net::tcp::socket::TcpFlags;
 use crate::kernel::net::util::{checksum, NetU16, NetU32};
 use crate::kernel::net::{
     Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
@@ -87,6 +88,14 @@ impl TcpHeader {
         let mut f = self.flags.value();
 
         f.set_bit(idx, flag);
+
+        self.flags = NetU16::new(f);
+    }
+
+    pub fn set_flags(&mut self, flags: TcpFlags) {
+        let mut f = self.flags.value();
+
+        f.set_bits(0..=5, flags.bits());
 
         self.flags = NetU16::new(f);
     }
@@ -255,6 +264,11 @@ pub fn release_handler(port: u32) {
     let mut handlers = HANDLERS.write();
 
     if handlers.contains_key(&port) {
+        let s = handlers.get(&port).unwrap();
+        println!(
+            "Removing socket with strong count: {}",
+            Arc::strong_count(s)
+        );
         handlers.remove(&port);
     } else {
         panic!("TCP port is not registered")

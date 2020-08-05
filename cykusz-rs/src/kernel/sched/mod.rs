@@ -61,28 +61,34 @@ struct Scheduler {
 }
 
 impl Scheduler {
-    fn add_task(&self, fun: fn()) {
+    fn add_task(&self, fun: fn()) -> Arc<Task> {
         let _g = IrqGuard::new();
 
         let task = self.tasks.add_task(fun);
 
-        self.cpu_queues.add_task(task);
+        self.cpu_queues.add_task(task.clone());
+
+        task
     }
 
-    fn add_param_task(&self, fun: usize, val: usize) {
+    fn add_param_task(&self, fun: usize, val: usize) -> Arc<Task> {
         let _g = IrqGuard::new();
 
         let task = self.tasks.add_param_task(fun, val);
 
-        self.cpu_queues.add_task(task);
+        self.cpu_queues.add_task(task.clone());
+
+        task
     }
 
-    fn add_user_task(&self, fun: MappedAddr, code_size: usize) {
+    fn add_user_task(&self, fun: MappedAddr, code_size: usize) -> Arc<Task> {
         let _g = IrqGuard::new();
 
         let task = self.tasks.add_user_task(fun, code_size);
 
-        self.cpu_queues.add_task(task);
+        self.cpu_queues.add_task(task.clone());
+
+        task
     }
 
     fn schedule_next(&self) {
@@ -150,19 +156,20 @@ pub fn reschedule() -> bool {
 }
 
 pub fn task_finished() -> ! {
+    println!("Task FINISHED");
     scheduler().current_task_finished()
 }
 
-pub fn create_task(fun: fn()) {
-    scheduler().add_task(fun);
+pub fn create_task(fun: fn()) -> Arc<Task> {
+    scheduler().add_task(fun)
 }
 
-pub fn create_param_task(fun: usize, val: usize) {
-    scheduler().add_param_task(fun, val);
+pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
+    scheduler().add_param_task(fun, val)
 }
 
-pub fn create_user_task(fun: MappedAddr, code_size: u64) {
-    scheduler().add_user_task(fun, code_size as usize);
+pub fn create_user_task(fun: MappedAddr, code_size: u64) -> Arc<Task> {
+    scheduler().add_user_task(fun, code_size as usize)
 }
 
 pub fn current_task() -> Arc<Task> {

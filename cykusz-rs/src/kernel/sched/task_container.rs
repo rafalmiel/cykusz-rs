@@ -21,7 +21,7 @@ impl TaskContainer {
     pub fn add_task(&self, fun: fn()) -> Arc<Task> {
         let task = Arc::new(Task::new_kern(fun));
 
-        self.tasks.lock().insert(task.id(), task.clone());
+        self.register_task(task.clone());
 
         task
     }
@@ -29,7 +29,7 @@ impl TaskContainer {
     pub fn add_param_task(&self, fun: usize, val: usize) -> Arc<Task> {
         let task = Arc::new(Task::new_param_kern(fun, val));
 
-        self.tasks.lock().insert(task.id(), task.clone());
+        self.register_task(task.clone());
 
         task
     }
@@ -37,7 +37,7 @@ impl TaskContainer {
     pub fn add_user_task(&self, fun: MappedAddr, code_size: usize) -> Arc<Task> {
         let task = Arc::new(Task::new_user(fun, code_size));
 
-        self.tasks.lock().insert(task.id(), task.clone());
+        self.register_task(task.clone());
 
         task
     }

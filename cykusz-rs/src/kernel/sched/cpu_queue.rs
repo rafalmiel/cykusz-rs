@@ -84,7 +84,7 @@ impl CpuQueue {
     }
 
     pub unsafe fn schedule_next(&mut self, sched_lock: SpinGuard<()>) {
-        if self.tasks[self.current].state() == TaskState::ToDelete {
+        if self.tasks[self.current].to_delete() {
             self.remove_task(self.current);
 
             if self.current != 0 {
@@ -96,7 +96,7 @@ impl CpuQueue {
             self.schedule_next(sched_lock);
             return;
         } else if self.tasks[self.current].locks() > 0 {
-            self.tasks[self.current].mark_to_reschedule();
+            self.tasks[self.current].set_to_reschedule(true);
 
             self.switch(&self.tasks[self.current], sched_lock);
 
@@ -113,25 +113,24 @@ impl CpuQueue {
         let mut c = (self.current % (len - 1)) + 1;
         let mut loops = 0;
 
+        let current_ns = crate::kernel::timer::current_ns() as usize;
+
         let found = loop {
-            let state = self.tasks[c].state();
+            let task = &self.tasks[c];
+
+            let state = task.state();
 
             if state == TaskState::AwaitingIo {
-                use crate::kernel::timer::current_ns;
-
-                let t = self.tasks[c].sleep_until.load(Ordering::SeqCst);
-                if t != 0 {
-                    if current_ns() as usize > t {
-                        self.tasks[c].sleep_until.store(0, Ordering::SeqCst);
-                        self.tasks[c].set_state(TaskState::Runnable);
-                        break Some(c);
-                    }
+                let t = task.sleep_until.load(Ordering::SeqCst);
+                if t != 0 && current_ns > t {
+                    task.sleep_until.store(0, Ordering::SeqCst);
+                    task.set_state(TaskState::Runnable);
+                    break Some(c);
                 }
             }
-            if state == TaskState::Runnable {
+
+            if state == TaskState::Runnable || (state == TaskState::Running && c == self.current) {
                 break Some(c);
-            } else if c == self.current && self.tasks[self.current].state() == TaskState::Running {
-                break Some(self.current);
             } else if loops == len - 1 {
                 break Some(0);
             }
@@ -170,8 +169,8 @@ impl CpuQueue {
 
         t.locks_dec();
 
-        if t.locks() == 0 && t.state() == TaskState::ToReschedule {
-            t.unmark_to_reschedule();
+        if t.locks() == 0 && t.to_reschedule() {
+            t.set_to_reschedule(false);
 
             self.reschedule(mutex);
         }
@@ -180,7 +179,7 @@ impl CpuQueue {
     pub fn current_task_finished(&mut self, lock: SpinGuard<()>) -> ! {
         let task = &self.tasks[self.current];
 
-        task.set_state(TaskState::ToDelete);
+        task.set_to_delete(true);
         self.switch_to_sched(task, lock);
 
         unreachable!()

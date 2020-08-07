@@ -8,6 +8,7 @@ use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::udp::{Udp, UdpHeader, UdpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sync::Spin;
+use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::utils::buffer::BufferQueue;
 
 pub struct Socket {
@@ -81,19 +82,14 @@ impl INode for Socket {
         }
     }
 
-    fn poll_listen(&self, listen: bool) -> Result<bool> {
+    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
         let has_data = self.buffer.has_data();
 
-        if listen {
-            self.buffer.listen();
+        if let Some(p) = listen {
+            p.listen(self.buffer.wait_queue());
         }
 
         Ok(has_data)
-    }
-
-    fn poll_unlisten(&self) -> Result<()> {
-        self.buffer.unlisten();
-        Ok(())
     }
 
     fn close(&self) {

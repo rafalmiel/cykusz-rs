@@ -156,7 +156,6 @@ pub fn reschedule() -> bool {
 }
 
 pub fn task_finished() -> ! {
-    println!("Task FINISHED");
     scheduler().current_task_finished()
 }
 

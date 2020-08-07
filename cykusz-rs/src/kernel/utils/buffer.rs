@@ -65,6 +65,10 @@ impl BufferQueue {
 
         buffer.read_data(buf)
     }
+
+    pub fn wait_queue(&self) -> &WaitQueue {
+        &self.wait_queue
+    }
 }
 
 impl Buffer {

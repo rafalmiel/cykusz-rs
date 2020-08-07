@@ -6,6 +6,7 @@ use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Metadata, Result};
 use crate::kernel::sync::RwSpin;
+use crate::kernel::syscall::sys::PollTable;
 
 #[allow(dead_code)]
 pub struct MountFS {
@@ -195,12 +196,8 @@ impl INode for MNode {
         self.inode.mknode(name, devid)
     }
 
-    fn poll_listen(&self, listen: bool) -> Result<bool> {
-        self.inode.poll_listen(listen)
-    }
-
-    fn poll_unlisten(&self) -> Result<()> {
-        self.inode.poll_unlisten()
+    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
+        self.inode.poll(listen)
     }
 
     fn create(&self, name: &str) -> Result<Arc<dyn INode>> {

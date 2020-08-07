@@ -1,4 +1,3 @@
-use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::{Arc, Weak};
 use core::sync::atomic::AtomicBool;
@@ -17,7 +16,6 @@ pub trait TimerObject: Sync + Send {
 pub struct Timer {
     obj: Arc<dyn TimerObject>,
     task: Weak<Task>,
-    id: usize,
     timeout: AtomicUsize, //in ms
     terminate: AtomicBool,
 }
@@ -102,7 +100,6 @@ pub fn create_timer(timer: Arc<dyn TimerObject>, timeout: usize) -> Arc<Timer> {
     let t = Arc::new(Timer {
         obj: timer,
         task: Arc::downgrade(&task),
-        id,
         timeout: AtomicUsize::new(timeout),
         terminate: AtomicBool::new(false),
     });

@@ -264,11 +264,6 @@ pub fn release_handler(port: u32) {
     let mut handlers = HANDLERS.write();
 
     if handlers.contains_key(&port) {
-        let s = handlers.get(&port).unwrap();
-        println!(
-            "Removing socket with strong count: {}",
-            Arc::strong_count(s)
-        );
         handlers.remove(&port);
     } else {
         panic!("TCP port is not registered")

@@ -6,6 +6,7 @@ use spin::Once;
 use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
+use crate::kernel::syscall::sys::PollTable;
 
 pub struct StdOut {
     id: usize,
@@ -30,12 +31,8 @@ impl INode for StdIn {
         ))
     }
 
-    fn poll_listen(&self, listen: bool) -> Result<bool> {
+    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
         crate::drivers::input::tty::poll_listen(listen)
-    }
-
-    fn poll_unlisten(&self) -> Result<()> {
-        crate::drivers::input::tty::poll_unlisten()
     }
 }
 

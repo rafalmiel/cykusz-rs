@@ -44,7 +44,6 @@ impl From<usize> for TaskState {
 pub struct Task {
     pub arch_task: UnsafeCell<ArchTask>,
     id: usize,
-    prev_state: AtomicUsize,
     state: AtomicUsize,
     locks: AtomicUsize,
     pending_io: AtomicBool,
@@ -61,7 +60,6 @@ impl Default for Task {
         Task {
             arch_task: UnsafeCell::new(ArchTask::empty()),
             id: new_task_id(),
-            prev_state: AtomicUsize::new(TaskState::Unused as usize),
             state: AtomicUsize::new(TaskState::Runnable as usize),
             locks: AtomicUsize::new(0),
             pending_io: AtomicBool::new(false),
@@ -233,7 +231,6 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        println!("Deallocate task!");
         unsafe {
             self.arch_task_mut().deallocate();
         }

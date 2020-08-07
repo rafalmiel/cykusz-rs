@@ -12,6 +12,7 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
+use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 struct State {
@@ -290,19 +291,14 @@ impl INode for Tty {
         Ok(self.read(buf.as_mut_ptr(), buf.len()))
     }
 
-    fn poll_listen(&self, listen: bool) -> Result<bool, FsError> {
+    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool, FsError> {
         let has_data = self.buffer.lock().has_data();
 
-        if listen {
-            self.wait_queue.add_task(current_task());
+        if let Some(p) = listen {
+            p.listen(&self.wait_queue);
         }
 
         Ok(has_data)
-    }
-
-    fn poll_unlisten(&self) -> Result<(), FsError> {
-        self.wait_queue.remove_task(current_task());
-        Ok(())
     }
 }
 
@@ -316,12 +312,8 @@ pub fn read(buf: *mut u8, len: usize) -> usize {
     l.read(buf, len)
 }
 
-pub fn poll_listen(listen: bool) -> Result<bool, FsError> {
-    LISTENER.poll_listen(listen)
-}
-
-pub fn poll_unlisten() -> Result<(), FsError> {
-    LISTENER.poll_unlisten()
+pub fn poll_listen(listen: Option<&mut PollTable>) -> Result<bool, FsError> {
+    LISTENER.poll(listen)
 }
 
 fn init() {

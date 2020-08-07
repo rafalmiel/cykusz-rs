@@ -4,6 +4,7 @@ use crate::kernel::device::Result as DevResult;
 use crate::kernel::device::{DevError, Device};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
+use crate::kernel::syscall::sys::PollTable;
 
 pub struct DevNode {
     dev: Arc<dyn Device>,
@@ -30,11 +31,7 @@ impl INode for DevNode {
         self.dev.inode().write_at(offset, buf)
     }
 
-    fn poll_listen(&self, listen: bool) -> Result<bool> {
-        self.dev.inode().poll_listen(listen)
-    }
-
-    fn poll_unlisten(&self) -> Result<()> {
-        self.dev.inode().poll_unlisten()
+    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
+        self.dev.inode().poll(listen)
     }
 }

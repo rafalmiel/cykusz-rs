@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
-use alloc::boxed::Box;
 use alloc::sync::Arc;
 use core::sync::atomic::AtomicU64;
+
+use intrusive_collections::LinkedListLink;
 
 use crate::kernel::syscall::sys::sys_sleep;
 use crate::kernel::timer::{create_timer, Timer, TimerObject};
@@ -58,6 +59,22 @@ impl TimerObject for TimerTest {
 
 static mut TIMER: Option<Arc<Timer>> = None;
 
+struct Element {
+    link: LinkedListLink,
+    val: u8,
+}
+
+impl Element {
+    pub fn new(val: u8) -> Arc<Element> {
+        Arc::new(Element {
+            link: LinkedListLink::new(),
+            val,
+        })
+    }
+}
+
+intrusive_adapter!(ElementAdapter = Arc<Element>: Element {link: LinkedListLink});
+
 pub fn start() {
     //crate::kernel::sched::create_task(task2);
     //crate::kernel::sched::create_task(task);
@@ -79,5 +96,4 @@ pub fn start() {
             }
         }
     }
-    //crate::kernel::sched::create_param_task(task as usize, 42);
 }

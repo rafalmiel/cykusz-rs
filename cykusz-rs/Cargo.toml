@@ -12,6 +12,7 @@ bitflags = "*"
 raw-cpuid = "*"
 spin = "*"
 bit_field = "*"
+intrusive-collections = "*"
 
 [dependencies.linked_list_allocator]
 version = "*"

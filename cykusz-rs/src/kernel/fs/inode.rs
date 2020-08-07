@@ -4,6 +4,7 @@ use syscall_defs::FileType;
 
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::vfs::{DirEntry, FsError, Metadata, Result};
+use crate::kernel::syscall::sys::PollTable;
 
 pub trait INode: Send + Sync {
     fn id(&self) -> Result<usize> {
@@ -34,11 +35,7 @@ pub trait INode: Send + Sync {
         Err(FsError::NotSupported)
     }
 
-    fn poll_listen(&self, _listen: bool) -> Result<bool> {
-        Err(FsError::NotSupported)
-    }
-
-    fn poll_unlisten(&self) -> Result<()> {
+    fn poll(&self, _poll_table: Option<&mut PollTable>) -> Result<bool> {
         Err(FsError::NotSupported)
     }
 

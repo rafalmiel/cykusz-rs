@@ -15,6 +15,7 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Result};
 use crate::kernel::fs::vfs::{FsError, Metadata};
 use crate::kernel::sync::{RwSpin, Spin};
+use crate::kernel::syscall::sys::PollTable;
 
 struct LockedRamINode(RwSpin<RamINode>);
 
@@ -167,7 +168,7 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn poll_listen(&self, listen: bool) -> Result<bool> {
+    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
         let i = self.0.read();
 
         match &i.content {
@@ -175,21 +176,7 @@ impl INode for LockedRamINode {
                 let n = n.clone();
                 drop(i);
 
-                n.poll_listen(listen)
-            }
-            _ => Err(FsError::NotSupported),
-        }
-    }
-
-    fn poll_unlisten(&self) -> Result<()> {
-        let i = self.0.read();
-
-        match &i.content {
-            Content::DevNode(Some(n)) => {
-                let n = n.clone();
-                drop(i);
-
-                n.poll_unlisten()
+                n.poll(listen)
             }
             _ => Err(FsError::NotSupported),
         }

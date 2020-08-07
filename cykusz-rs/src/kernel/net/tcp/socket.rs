@@ -5,8 +5,8 @@ use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::tcp::{Tcp, TcpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader};
-use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
+use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::timer::{create_timer, Timer, TimerObject};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -407,9 +407,13 @@ impl INode for Socket {
         Ok(0)
     }
 
-    fn poll_listen(&self, listen: bool) -> Result<bool> {
-        if listen {
-            self.wait_queue.add_task(current_task());
+    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
+        //if listen.is_some() {
+        //    self.wait_queue.add_task(current_task());
+        //}
+
+        if let Some(pt) = listen {
+            pt.listen(&self.wait_queue);
         }
 
         if self.data.lock().state == State::Closed {
@@ -417,12 +421,6 @@ impl INode for Socket {
         } else {
             Ok(false)
         }
-    }
-
-    fn poll_unlisten(&self) -> Result<()> {
-        self.wait_queue.remove_task(current_task());
-
-        Ok(())
     }
 
     fn close(&self) {
@@ -443,6 +441,12 @@ impl TcpService for Socket {
 
     fn port_unreachable(&self, _port: u32, dst_port: u32) {
         println!("Failed to send to port {}", dst_port);
+    }
+}
+
+impl Drop for Socket {
+    fn drop(&mut self) {
+        println!("[ TCP ] Socket Removed");
     }
 }
 

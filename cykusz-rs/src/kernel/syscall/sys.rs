@@ -1,3 +1,7 @@
+use alloc::vec::Vec;
+
+use intrusive_collections::UnsafeRef;
+
 use syscall_defs::{ConnectionFlags, FileType, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
@@ -5,6 +9,7 @@ use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
+use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
@@ -220,6 +225,27 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
     }
 }
 
+pub struct PollTable {
+    queues: Vec<UnsafeRef<WaitQueue>>,
+}
+
+impl PollTable {
+    pub fn listen(&mut self, queue: &WaitQueue) {
+        queue.add_task(current_task());
+        self.queues
+            .push(unsafe { UnsafeRef::from_raw(queue as *const _) });
+    }
+}
+
+impl Drop for PollTable {
+    fn drop(&mut self) {
+        let task = current_task();
+        for q in &self.queues {
+            q.remove_task(task.clone());
+        }
+    }
+}
+
 pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
     let buf = make_buf(fds, fds_len);
 
@@ -227,17 +253,20 @@ pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
 
     let mut fd_found: Option<usize> = None;
     let mut first = true;
+    let mut poll_table = PollTable { queues: Vec::new() };
 
     'search: loop {
         for fd in buf {
             if let Some(handle) = task.get_handle(*fd as usize) {
-                if let Ok(f) = handle.inode.poll_listen(first) {
+                if let Ok(f) = handle
+                    .inode
+                    .poll(if first { Some(&mut poll_table) } else { None })
+                {
                     if f {
                         fd_found = Some(*fd as usize);
                         break 'search;
                     }
                 } else {
-                    println!("poll listen failed");
                     break 'search;
                 }
             } else {
@@ -250,14 +279,6 @@ pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
         }
 
         first = false;
-    }
-
-    for fd in buf {
-        if let Some(handle) = task.get_handle(*fd as usize) {
-            if let Err(e) = handle.inode.poll_unlisten() {
-                println!("Poll unlisten failed {:?}", e);
-            }
-        }
     }
 
     if let Some(fd) = fd_found {

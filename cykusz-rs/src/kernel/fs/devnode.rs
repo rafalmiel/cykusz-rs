@@ -31,7 +31,7 @@ impl INode for DevNode {
         self.dev.inode().write_at(offset, buf)
     }
 
-    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
-        self.dev.inode().poll(listen)
+    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
+        self.dev.inode().poll(ptable)
     }
 }

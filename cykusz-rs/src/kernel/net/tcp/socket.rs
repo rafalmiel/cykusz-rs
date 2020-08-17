@@ -2,12 +2,13 @@ use alloc::sync::{Arc, Weak};
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::net::ip::Ip4;
+use crate::kernel::net::ip::{Ip4, IpHeader};
 use crate::kernel::net::tcp::{Tcp, TcpService};
-use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader};
+use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sync::Spin;
 use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::timer::{create_timer, Timer, TimerObject};
+use crate::kernel::utils::buffer::BufferQueue;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 #[derive(PartialEq)]
@@ -41,15 +42,22 @@ impl Default for State {
     }
 }
 
+#[derive(Default, Debug)]
+struct TransmissionCtl {
+    snd_nxt: u32,
+    snd_una: u32,
+    rcv_nxt: u32,
+}
+
 #[derive(Default)]
 struct SocketData {
-    their_seq: u32,
-    our_seq: u32,
     src_port: u16,
     dst_port: u16,
     target: Ip4,
     state: State,
     timer: Option<Arc<Timer>>,
+    ctl: TransmissionCtl,
+    buffer: BufferQueue,
 }
 
 impl SocketData {
@@ -62,6 +70,10 @@ impl SocketData {
 
     fn init_timers(&mut self, obj: Arc<dyn TimerObject>) {
         self.timer = Some(create_timer(obj, 1000));
+    }
+
+    fn timer(&self) -> &Arc<Timer> {
+        self.timer.as_ref().unwrap()
     }
 
     fn timeout(&mut self) {
@@ -92,27 +104,37 @@ impl SocketData {
         self.target = val;
     }
 
-    fn make_packet(&self, len: usize, flags: TcpFlags) -> Packet<Tcp> {
+    fn make_packet(&mut self, len: usize, flags: TcpFlags) -> Packet<Tcp> {
         let mut out_packet =
             crate::kernel::net::tcp::create_packet(self.src_port, self.dst_port, len, self.target);
 
         let out_hdr = out_packet.header_mut();
 
-        out_hdr.set_seq_nr(self.our_seq);
+        out_hdr.set_seq_nr(self.ctl.snd_nxt);
         out_hdr.set_urgent_ptr(0);
         out_hdr.set_window(4096);
 
         out_hdr.set_flags(flags);
 
+        let una = if len > 0 {
+            len as u32
+        } else if (flags & (TcpFlags::FIN | TcpFlags::SYN)).bits > 0 {
+            1
+        } else {
+            0
+        };
+
+        self.ctl.snd_una += una;
+
         out_packet
     }
 
-    fn make_ack_packet(&self, len: usize, flags: TcpFlags) -> Packet<Tcp> {
+    fn make_ack_packet(&mut self, len: usize, flags: TcpFlags) -> Packet<Tcp> {
         let mut packet = self.make_packet(len, flags);
 
         let hdr = packet.header_mut();
 
-        hdr.set_ack_nr(self.their_seq);
+        hdr.set_ack_nr(self.ctl.rcv_nxt);
 
         packet
     }
@@ -125,7 +147,8 @@ impl SocketData {
         self.dst_port = hdr.src_port();
         self.target = iphdr.src_ip;
 
-        self.our_seq = 12345;
+        self.ctl.snd_nxt = 12345;
+        self.ctl.snd_una = 12345;
     }
 
     fn handle_listen(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
@@ -196,7 +219,31 @@ impl SocketData {
 
             Some(out)
         } else {
-            None
+            use core::mem::size_of;
+
+            let ip = packet.downgrade();
+
+            let data_len = ip.header().len.value() as usize
+                - size_of::<IpHeader>() as usize
+                - hdr.header_len() as usize;
+
+            let data = &packet.data()[..data_len];
+
+            if hdr.flag_ack() {
+                self.ctl.snd_nxt = hdr.ack_nr();
+            }
+
+            if !data.is_empty() {
+                self.ctl.rcv_nxt = hdr.seq_nr().wrapping_add(data_len as u32);
+
+                let out = self.make_ack_packet(0, TcpFlags::empty());
+
+                self.buffer.append_data(data);
+
+                Some(out)
+            } else {
+                None
+            }
         }
     }
 
@@ -259,10 +306,10 @@ impl SocketData {
         }
 
         if hdr.flag_ack() {
-            self.our_seq = hdr.ack_nr();
+            self.ctl.snd_nxt = hdr.ack_nr();
         }
 
-        self.their_seq = if hdr.flag_syn() || hdr.flag_fin() {
+        self.ctl.rcv_nxt = if hdr.flag_syn() || hdr.flag_fin() {
             hdr.seq_nr().wrapping_add(1)
         } else {
             hdr.seq_nr()
@@ -288,8 +335,7 @@ impl SocketData {
 
         println!("[ TCP ] Connection closed by RST");
 
-        self.timer.as_ref().unwrap().set_terminate();
-        self.timer = None;
+        self.timer().terminate();
 
         crate::kernel::net::tcp::release_handler(self.src_port as u32);
     }
@@ -306,7 +352,8 @@ impl SocketData {
     }
 
     pub fn connect(&mut self) {
-        self.our_seq = 12345;
+        self.ctl.snd_nxt = 12345;
+        self.ctl.snd_una = 12345;
 
         let packet = self.make_packet(0, TcpFlags::SYN);
 
@@ -315,8 +362,6 @@ impl SocketData {
         self.state = State::SynSent;
 
         crate::kernel::net::tcp::send_packet(packet);
-
-        //self.timer.as_ref().unwrap().resume();
     }
 
     pub fn listen(&mut self) {
@@ -399,27 +444,35 @@ impl Socket {
 }
 
 impl INode for Socket {
-    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
-        Ok(0)
+    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
+        let data = self.data.lock();
+
+        Ok(data.buffer.read_data(buf))
     }
 
-    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
-        Ok(0)
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
+        let mut data = self.data.lock();
+
+        let mut packet = data.make_ack_packet(buf.len(), TcpFlags::PSH);
+
+        packet.data_mut().copy_from_slice(buf);
+
+        crate::kernel::net::tcp::send_packet(packet);
+
+        Ok(buf.len())
     }
 
     fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
-        //if listen.is_some() {
-        //    self.wait_queue.add_task(current_task());
-        //}
+        let data = self.data.lock();
 
         if let Some(pt) = listen {
-            pt.listen(&self.wait_queue);
+            pt.listen(&data.buffer.wait_queue());
         }
 
-        if self.data.lock().state == State::Closed {
+        if data.state == State::Closed && !data.buffer.has_data() {
             Err(FsError::NotSupported)
         } else {
-            Ok(false)
+            Ok(data.buffer.has_data())
         }
     }
 
@@ -435,7 +488,7 @@ impl TcpService for Socket {
         }
 
         if data.state == State::Closed {
-            self.wait_queue.notify_one();
+            data.buffer.wait_queue().notify_all();
         }
     }
 

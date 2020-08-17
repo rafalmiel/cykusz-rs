@@ -52,10 +52,11 @@ pub fn init() {
         let root = mount_fs.root_inode();
 
         root.mkdir("dev").expect("Failed to create /dev directory");
-        root.mkdir("etc").expect("Failed to create /dev directory");
-        root.mkdir("home").expect("Failed to create /dev directory");
-        root.mkdir("var").expect("Failed to create /dev directory");
-        root.mkdir("tmp").expect("Failed to create /dev directory");
+        root.mkdir("etc").expect("Failed to create /etc directory");
+        root.mkdir("home")
+            .expect("Failed to create /home directory");
+        root.mkdir("var").expect("Failed to create /var directory");
+        root.mkdir("tmp").expect("Failed to create /tmp directory");
 
         root
     });

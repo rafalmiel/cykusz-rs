@@ -291,10 +291,10 @@ impl INode for Tty {
         Ok(self.read(buf.as_mut_ptr(), buf.len()))
     }
 
-    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool, FsError> {
+    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool, FsError> {
         let has_data = self.buffer.lock().has_data();
 
-        if let Some(p) = listen {
+        if let Some(p) = ptable {
             p.listen(&self.wait_queue);
         }
 
@@ -312,8 +312,8 @@ pub fn read(buf: *mut u8, len: usize) -> usize {
     l.read(buf, len)
 }
 
-pub fn poll_listen(listen: Option<&mut PollTable>) -> Result<bool, FsError> {
-    LISTENER.poll(listen)
+pub fn poll_listen(ptable: Option<&mut PollTable>) -> Result<bool, FsError> {
+    LISTENER.poll(ptable)
 }
 
 fn init() {

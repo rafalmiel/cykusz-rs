@@ -196,8 +196,8 @@ impl INode for MNode {
         self.inode.mknode(name, devid)
     }
 
-    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
-        self.inode.poll(listen)
+    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
+        self.inode.poll(ptable)
     }
 
     fn create(&self, name: &str) -> Result<Arc<dyn INode>> {

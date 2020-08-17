@@ -14,7 +14,7 @@ pub trait TimerObject: Sync + Send {
 }
 
 pub struct Timer {
-    obj: Arc<dyn TimerObject>,
+    obj: Weak<dyn TimerObject>,
     task: Weak<Task>,
     timeout: AtomicUsize, //in ms
     terminate: AtomicBool,
@@ -37,7 +37,7 @@ impl Timer {
         self.terminate.load(Ordering::SeqCst)
     }
 
-    pub fn set_terminate(&self) {
+    pub fn terminate(&self) {
         self.terminate.store(true, Ordering::SeqCst);
         if let Some(t) = &self.task.upgrade() {
             t.wake_up();
@@ -55,7 +55,7 @@ impl Timer {
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        self.set_terminate();
+        self.terminate();
     }
 }
 
@@ -78,7 +78,11 @@ fn timer_fun(id: usize) {
         if timer.is_terminating() {
             break;
         } else {
-            timer.obj.call()
+            if let Some(t) = timer.obj.upgrade() {
+                t.call()
+            } else {
+                break;
+            }
         }
     }
 
@@ -98,7 +102,7 @@ pub fn create_timer(timer: Arc<dyn TimerObject>, timeout: usize) -> Arc<Timer> {
     };
 
     let t = Arc::new(Timer {
-        obj: timer,
+        obj: Arc::downgrade(&timer),
         task: Arc::downgrade(&task),
         timeout: AtomicUsize::new(timeout),
         terminate: AtomicBool::new(false),
@@ -122,7 +126,6 @@ pub fn reset_counter() {
 }
 
 fn timer_handler() {
-    //println!("Timer handler");
     crate::kernel::sched::reschedule();
 }
 

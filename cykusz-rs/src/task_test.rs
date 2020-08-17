@@ -87,7 +87,7 @@ pub fn start() {
     if cfg!(disabled) {
         unsafe {
             if let Some(t) = &TIMER {
-                t.set_terminate();
+                t.terminate();
                 TIMER = None;
             } else {
                 let timer = create_timer(Arc::new(TimerTest {}), 1000);

@@ -168,7 +168,7 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
+    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
         let i = self.0.read();
 
         match &i.content {
@@ -176,7 +176,7 @@ impl INode for LockedRamINode {
                 let n = n.clone();
                 drop(i);
 
-                n.poll(listen)
+                n.poll(ptable)
             }
             _ => Err(FsError::NotSupported),
         }

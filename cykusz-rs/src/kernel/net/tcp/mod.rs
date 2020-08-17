@@ -7,7 +7,7 @@ use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
 use crate::kernel::net::tcp::socket::TcpFlags;
 use crate::kernel::net::util::{checksum, NetU16, NetU32};
 use crate::kernel::net::{
-    Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
+    Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait, PacketUpHierarchy,
 };
 use crate::kernel::sync::RwSpin;
 
@@ -21,6 +21,12 @@ impl PacketKind for Tcp {}
 impl PacketUpHierarchy<Tcp> for Packet<Ip> {}
 
 impl PacketHeader<TcpHeader> for Packet<Tcp> {}
+
+impl PacketTrait for Packet<Tcp> {
+    fn header_size(&self) -> usize {
+        self.header().header_len() as usize
+    }
+}
 
 #[repr(packed)]
 pub struct TcpHeader {

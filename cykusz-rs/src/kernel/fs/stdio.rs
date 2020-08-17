@@ -31,8 +31,8 @@ impl INode for StdIn {
         ))
     }
 
-    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
-        crate::drivers::input::tty::poll_listen(listen)
+    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
+        crate::drivers::input::tty::poll_listen(ptable)
     }
 }
 

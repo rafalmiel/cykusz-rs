@@ -9,6 +9,12 @@ pub struct BufferQueue {
     wait_queue: WaitQueue,
 }
 
+impl Default for BufferQueue {
+    fn default() -> Self {
+        BufferQueue::new(4096)
+    }
+}
+
 struct Buffer {
     data: Vec<u8>,
     r: usize,
@@ -62,6 +68,12 @@ impl BufferQueue {
         }
 
         self.wait_queue.remove_task(task);
+
+        buffer.read_data(buf)
+    }
+
+    pub fn try_read_data(&self, buf: &mut [u8]) -> usize {
+        let mut buffer = self.buffer.lock();
 
         buffer.read_data(buf)
     }

@@ -253,7 +253,9 @@ pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
 
     let mut fd_found: Option<usize> = None;
     let mut first = true;
-    let mut poll_table = PollTable { queues: Vec::new() };
+    let mut poll_table = PollTable {
+        queues: Vec::with_capacity(fds_len as usize),
+    };
 
     'search: loop {
         for fd in buf {

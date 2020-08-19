@@ -2,7 +2,7 @@ use alloc::sync::{Arc, Weak};
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::net::ip::Ip4;
+use crate::kernel::net::ip::{Ip4, IpHeader};
 use crate::kernel::net::tcp::{Tcp, TcpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sync::Spin;
@@ -142,7 +142,7 @@ impl SocketData {
     fn setup_connection(&mut self, packet: Packet<Tcp>) {
         let ip = packet.downgrade();
         let hdr = packet.header();
-        let iphdr = ip.header();
+        let iphdr: &IpHeader = ip.header();
 
         self.dst_port = hdr.src_port();
         self.target = iphdr.src_ip;

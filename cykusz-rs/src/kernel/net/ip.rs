@@ -153,11 +153,17 @@ pub fn send_packet(packet: Packet<Ip>) {
     crate::kernel::net::eth::send_packet(packet.downgrade(), ip.dest_ip);
 }
 
-pub fn process_packet(packet: Packet<Ip>) {
-    let ip = packet.header();
+pub fn process_packet(mut packet: Packet<Ip>) {
+    let (len, typ) = {
+        let ip = packet.header();
+
+        (ip.len.value() as usize, ip.protocol)
+    };
+
+    packet.len = len;
 
     #[allow(unreachable_patterns)]
-    match ip.protocol {
+    match typ {
         IpType::UDP => crate::kernel::net::udp::process_packet(packet.upgrade()),
         IpType::TCP => crate::kernel::net::tcp::process_packet(packet.upgrade()),
         IpType::ICMP => crate::kernel::net::icmp::process_packet(packet.upgrade()),

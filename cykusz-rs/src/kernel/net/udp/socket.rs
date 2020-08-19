@@ -4,7 +4,7 @@ use core::sync::atomic::Ordering;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::net::ip::Ip4;
+use crate::kernel::net::ip::{Ip4, IpHeader};
 use crate::kernel::net::udp::{Udp, UdpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sync::Spin;
@@ -100,9 +100,11 @@ impl INode for Socket {
 impl UdpService for Socket {
     fn process_packet(&self, packet: Packet<Udp>) {
         let header = packet.header();
+        let ip = packet.downgrade();
+        let ip_header: &IpHeader = ip.header();
 
         self.set_dst_port(header.src_port.value() as u32);
-        self.set_dst_ip(packet.downgrade().header().src_ip);
+        self.set_dst_ip(ip_header.src_ip);
 
         self.buffer.append_data(packet.data());
     }

@@ -151,7 +151,6 @@ fn exec(cmd: &str) {
                 if let Ok(v) = s.parse::<u8>() {
                     ip[i] = v;
                 } else {
-                    println!("Failed to parse ip");
                     break;
                 }
                 cnt += 1;

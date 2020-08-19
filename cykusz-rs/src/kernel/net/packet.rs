@@ -17,9 +17,13 @@ where
     D: ConstPacketKind,
     Packet<D>: PacketUpHierarchy<U>,
 {
+    fn downgrade(&self) -> Packet<D> {
+        self.downgrade_by(D::HSIZE)
+    }
 }
 
 pub trait PacketBaseTrait {
+    fn base_addr(&self) -> VirtAddr;
     fn addr(&self) -> VirtAddr;
     fn len(&self) -> usize;
 }
@@ -50,12 +54,17 @@ impl<T: ConstPacketKind> PacketTrait for Packet<T> {
 
 #[derive(Debug, Copy, Clone)]
 pub struct Packet<T: PacketKind> {
+    pub base_addr: VirtAddr,
     pub addr: VirtAddr,
     pub len: usize,
     _p: PhantomData<T>,
 }
 
 impl<T: PacketKind> PacketBaseTrait for Packet<T> {
+    fn base_addr(&self) -> VirtAddr {
+        self.base_addr
+    }
+
     fn addr(&self) -> VirtAddr {
         self.addr
     }
@@ -68,6 +77,16 @@ impl<T: PacketKind> PacketBaseTrait for Packet<T> {
 impl<T: PacketKind> Packet<T> {
     pub fn new(addr: VirtAddr, len: usize) -> Packet<T> {
         Packet::<T> {
+            base_addr: addr,
+            addr,
+            len,
+            _p: PhantomData::default(),
+        }
+    }
+
+    pub fn new_base(base_addr: VirtAddr, addr: VirtAddr, len: usize) -> Packet<T> {
+        Packet::<T> {
+            base_addr,
             addr,
             len,
             _p: PhantomData::default(),
@@ -78,14 +97,15 @@ impl<T: PacketKind> Packet<T> {
 pub trait PacketUpHierarchy<B: PacketKind>: PacketTrait {
     fn upgrade(&self) -> Packet<B> {
         let hs = self.header_size();
-        Packet::<B>::new(self.addr() + hs, self.len() - hs)
+        Packet::<B>::new_base(self.base_addr(), self.addr() + hs, self.len() - hs)
     }
 }
 
-pub trait PacketDownHierarchy<B: ConstPacketKind>: PacketBaseTrait {
-    fn downgrade(&self) -> Packet<B> {
-        let hs = B::HSIZE;
-        Packet::<B>::new(self.addr() - hs, self.len() + hs)
+pub trait PacketDownHierarchy<B: PacketKind>: PacketBaseTrait {
+    fn downgrade(&self) -> Packet<B>;
+
+    fn downgrade_by(&self, amount: usize) -> Packet<B> {
+        Packet::<B>::new_base(self.base_addr(), self.addr() - amount, self.len() + amount)
     }
 }
 

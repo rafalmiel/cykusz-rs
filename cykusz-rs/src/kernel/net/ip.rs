@@ -1,11 +1,11 @@
-#![allow(dead_code)]
-
-use core::mem::size_of;
-
 use crate::kernel::net::eth::{Eth, EthHeader, EthType};
+use crate::kernel::net::icmp::Icmp;
+use crate::kernel::net::tcp::Tcp;
+use crate::kernel::net::udp::Udp;
 use crate::kernel::net::util::{checksum, NetU16, NetU8};
 use crate::kernel::net::{
-    default_driver, ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
+    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
+    PacketUpHierarchy,
 };
 
 #[derive(Debug, Copy, Clone)]
@@ -64,17 +64,30 @@ impl Ip4 {
 #[derive(Debug, Copy, Clone)]
 pub struct Ip {}
 
-impl ConstPacketKind for Ip {
-    const HSIZE: usize = core::mem::size_of::<IpHeader>();
-}
+impl PacketKind for Ip {}
 
 impl PacketUpHierarchy<Ip> for Packet<Eth> {}
 
 impl PacketHeader<IpHeader> for Packet<Ip> {}
 
-impl Packet<Ip> {
-    fn eth_header(&self) -> &EthHeader {
-        unsafe { (self.addr - size_of::<EthHeader>()).read_ref::<EthHeader>() }
+impl PacketTrait for Packet<Ip> {
+    fn header_size(&self) -> usize {
+        self.header().header_size()
+    }
+}
+
+pub trait IpBase: PacketKind {}
+
+impl IpBase for Icmp {}
+impl IpBase for Tcp {}
+impl IpBase for Udp {}
+
+impl<P: IpBase> PacketDownHierarchy<Ip> for Packet<P> {
+    fn downgrade(&self) -> Packet<Ip> {
+        let h =
+            unsafe { (self.base_addr + core::mem::size_of::<EthHeader>()).read_ref::<IpHeader>() };
+
+        self.downgrade_by(h.header_size())
     }
 }
 
@@ -101,6 +114,10 @@ impl IpHeader {
         self.frag_offset = NetU16::new(0);
         self.ttl = NetU8::new(64);
         self.hcrc = NetU16::new(0);
+    }
+
+    fn header_size(&self) -> usize {
+        ((self.v.value() & 0xf) as usize) * 4
     }
 
     fn set_length(&mut self, len: u16) {

@@ -51,7 +51,7 @@ impl<T: ConstPacketKind> PacketTrait for Packet<T> {
 #[derive(Debug, Copy, Clone)]
 pub struct Packet<T: PacketKind> {
     pub addr: VirtAddr,
-    len: usize,
+    pub len: usize,
     _p: PhantomData<T>,
 }
 

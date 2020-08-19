@@ -2,7 +2,7 @@ use alloc::sync::{Arc, Weak};
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::net::ip::{Ip4, IpHeader};
+use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::tcp::{Tcp, TcpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sync::Spin;
@@ -219,22 +219,10 @@ impl SocketData {
 
             Some(out)
         } else {
-            use core::mem::size_of;
-
-            let ip = packet.downgrade();
-
-            let data_len = ip.header().len.value() as usize
-                - size_of::<IpHeader>() as usize
-                - hdr.header_len() as usize;
-
-            let data = &packet.data()[..data_len];
-
-            if hdr.flag_ack() {
-                self.ctl.snd_nxt = hdr.ack_nr();
-            }
+            let data = packet.data();
 
             if !data.is_empty() {
-                self.ctl.rcv_nxt = hdr.seq_nr().wrapping_add(data_len as u32);
+                self.ctl.rcv_nxt = hdr.seq_nr().wrapping_add(data.len() as u32);
 
                 let out = self.make_ack_packet(0, TcpFlags::empty());
 

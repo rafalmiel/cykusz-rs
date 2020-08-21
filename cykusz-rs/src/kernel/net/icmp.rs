@@ -1,6 +1,7 @@
 use core::mem::size_of;
 
 use crate::kernel::net::ip::{Ip, IpHeader, IpType};
+use crate::kernel::net::tcp::TcpHeader;
 use crate::kernel::net::udp::UdpHeader;
 use crate::kernel::net::util::{checksum, NetU16};
 use crate::kernel::net::{
@@ -141,7 +142,7 @@ pub fn process_dest_unreachable(packet: Packet<Icmp>) {
             let udp = unsafe { &*(hdr.orig_payload.as_ptr() as *const UdpHeader) };
 
             println!(
-                "[ ICMP ] Dest unreachable {} {}",
+                "[ ICMP ] UDP Dest unreachable {} {}",
                 udp.src_port.value(),
                 udp.dst_port.value()
             );
@@ -149,6 +150,16 @@ pub fn process_dest_unreachable(packet: Packet<Icmp>) {
                 udp.src_port.value() as u32,
                 udp.dst_port.value() as u32,
             );
+        }
+        IpType::TCP => {
+            let tcp = unsafe { &*(hdr.orig_payload.as_ptr() as *const TcpHeader) };
+
+            println!(
+                "[ ICMP ] TCP Dest unreachable {} {}",
+                tcp.src_port(),
+                tcp.dst_port()
+            );
+            crate::kernel::net::tcp::port_unreachable(tcp.src_port() as u32, tcp.dst_port() as u32);
         }
         _ => {}
     }

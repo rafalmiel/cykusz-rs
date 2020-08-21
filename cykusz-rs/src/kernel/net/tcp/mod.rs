@@ -233,6 +233,18 @@ pub fn process_packet(packet: Packet<Tcp>) {
     }
 }
 
+pub fn port_unreachable(port: u32, dst_port: u32) {
+    let tree = HANDLERS.read();
+
+    if let Some(f) = tree.get(&port) {
+        let f2 = f.clone();
+
+        core::mem::drop(tree);
+
+        f2.port_unreachable(port, dst_port)
+    }
+}
+
 pub trait TcpService: Sync + Send {
     fn process_packet(&self, packet: Packet<Tcp>);
     fn port_unreachable(&self, port: u32, dst_port: u32);

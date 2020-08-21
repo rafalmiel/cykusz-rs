@@ -84,7 +84,7 @@ impl<T: PacketKind> Packet<T> {
         }
     }
 
-    pub fn new_base(base_addr: VirtAddr, addr: VirtAddr, len: usize) -> Packet<T> {
+    fn new_base(base_addr: VirtAddr, addr: VirtAddr, len: usize) -> Packet<T> {
         Packet::<T> {
             base_addr,
             addr,

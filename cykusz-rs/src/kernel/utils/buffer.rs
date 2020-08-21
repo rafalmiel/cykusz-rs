@@ -43,6 +43,10 @@ impl BufferQueue {
     }
 
     pub fn append_data(&self, data: &[u8]) -> usize {
+        if data.is_empty() {
+            return 0;
+        }
+
         let mut buf = self.buffer.lock();
 
         let written = buf.append_data(data);

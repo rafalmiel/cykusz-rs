@@ -7,7 +7,7 @@ use crate::kernel::net::tcp::{Tcp, TcpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sync::Spin;
 use crate::kernel::syscall::sys::PollTable;
-use crate::kernel::timer::{create_timer, Timer, TimerObject};
+use crate::kernel::timer::{create_timer, current_ns, Timer, TimerObject};
 use crate::kernel::utils::buffer::BufferQueue;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -161,6 +161,13 @@ impl SocketData {
         packet
     }
 
+    fn init_seq(&mut self) {
+        let v = current_ns() as u32;
+
+        self.ctl.snd_nxt = v;
+        self.ctl.snd_una = v;
+    }
+
     fn setup_connection(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
         let ip = packet.downgrade();
@@ -169,8 +176,7 @@ impl SocketData {
         self.dst_port = hdr.src_port();
         self.target = ip_header.src_ip;
 
-        self.ctl.snd_nxt = 12345;
-        self.ctl.snd_una = 12345;
+        self.init_seq();
     }
 
     fn handle_listen(&mut self, packet: Packet<Tcp>) {
@@ -233,24 +239,27 @@ impl SocketData {
     fn handle_established(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
-        if hdr.flag_fin() {
-            let out = self.make_ack_packet(0, TcpFlags::FIN);
+        let data = packet.data();
 
+        if hdr.flag_fin() {
             self.state = State::LastAck;
+        }
+
+        if !data.is_empty() || hdr.flag_fin() {
+            self.ctl.rcv_nxt = self.ctl.rcv_nxt.wrapping_add(data.len() as u32);
+
+            let out = self.make_ack_packet(
+                0,
+                if hdr.flag_fin() {
+                    TcpFlags::FIN
+                } else {
+                    TcpFlags::empty()
+                },
+            );
+
+            self.buffer.append_data(data);
 
             self.send_packet(out)
-        } else {
-            let data = packet.data();
-
-            if !data.is_empty() {
-                self.ctl.rcv_nxt = hdr.seq_nr().wrapping_add(data.len() as u32);
-
-                let out = self.make_ack_packet(0, TcpFlags::empty());
-
-                self.buffer.append_data(data);
-
-                self.send_packet(out)
-            }
         }
     }
 
@@ -371,8 +380,7 @@ impl SocketData {
     }
 
     pub fn connect(&mut self) {
-        self.ctl.snd_nxt = 12345;
-        self.ctl.snd_una = 12345;
+        self.init_seq();
 
         self.timeout = 1000;
 
@@ -471,13 +479,18 @@ impl INode for Socket {
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         let mut data = self.data.lock();
 
-        let mut packet = data.make_ack_packet(buf.len(), TcpFlags::PSH);
+        if data.state == State::Established {
+            let mut packet = data.make_ack_packet(buf.len(), TcpFlags::PSH);
 
-        packet.data_mut().copy_from_slice(buf);
+            packet.data_mut().copy_from_slice(buf);
 
-        crate::kernel::net::tcp::send_packet(packet);
+            crate::kernel::net::tcp::send_packet(packet);
 
-        Ok(buf.len())
+            Ok(buf.len())
+        } else {
+            // Buffer data for when connection is ready?
+            Err(FsError::NotSupported)
+        }
     }
 
     fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {

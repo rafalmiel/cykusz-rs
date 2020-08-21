@@ -73,11 +73,11 @@ fn timer_fun(id: usize) {
             }
         };
 
-        task.sleep(timer.timeout() * 1_000_000);
-
         if timer.is_terminating() {
             break;
         } else {
+            task.sleep(timer.timeout() * 1_000_000);
+
             if let Some(t) = timer.obj.upgrade() {
                 t.call()
             } else {

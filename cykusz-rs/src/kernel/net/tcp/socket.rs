@@ -55,6 +55,8 @@ struct SocketData {
     dst_port: u16,
     target: Ip4,
     state: State,
+    timeout: usize,
+    timeout_count: usize,
     timer: Option<Arc<Timer>>,
     ctl: TransmissionCtl,
     buffer: BufferQueue,
@@ -78,6 +80,22 @@ impl SocketData {
 
     fn timeout(&mut self) {
         println!("[ TCP ] Timeout");
+
+        match self.state {
+            State::SynSent => {
+                self.timeout_count += 1;
+                self.timeout *= 2;
+
+                if self.timeout_count < 5 {
+                    self.send_sync();
+
+                    self.timer().set_timeout(self.timeout);
+                } else {
+                    self.finalize();
+                }
+            }
+            _ => {}
+        }
     }
 
     pub fn src_port(&self) -> u16 {
@@ -104,6 +122,10 @@ impl SocketData {
         self.target = val;
     }
 
+    fn send_packet(&self, packet: Packet<Tcp>) {
+        crate::kernel::net::tcp::send_packet(packet);
+    }
+
     fn make_packet(&mut self, len: usize, flags: TcpFlags) -> Packet<Tcp> {
         let mut out_packet =
             crate::kernel::net::tcp::create_packet(self.src_port, self.dst_port, len, self.target);
@@ -118,7 +140,7 @@ impl SocketData {
 
         let una = if len > 0 {
             len as u32
-        } else if (flags & (TcpFlags::FIN | TcpFlags::SYN)).bits > 0 {
+        } else if flags.intersects(TcpFlags::SYN | TcpFlags::FIN) {
             1
         } else {
             0
@@ -140,18 +162,18 @@ impl SocketData {
     }
 
     fn setup_connection(&mut self, packet: Packet<Tcp>) {
-        let ip = packet.downgrade();
         let hdr = packet.header();
-        let iphdr: &IpHeader = ip.header();
+        let ip = packet.downgrade();
+        let ip_header: &IpHeader = ip.header();
 
         self.dst_port = hdr.src_port();
-        self.target = iphdr.src_ip;
+        self.target = ip_header.src_ip;
 
         self.ctl.snd_nxt = 12345;
         self.ctl.snd_una = 12345;
     }
 
-    fn handle_listen(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+    fn handle_listen(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         match (hdr.flag_syn(), hdr.flag_ack()) {
@@ -164,35 +186,32 @@ impl SocketData {
 
                 self.state = State::SynReceived;
 
-                Some(out)
+                self.send_packet(out)
             }
-            _ => None,
+            _ => {}
         }
     }
 
-    fn handle_syn_received(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+    fn handle_syn_received(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         match (hdr.flag_ack(), hdr.flag_rst()) {
             (true, false) => {
+                self.timer().halt();
                 println!("[ TCP ] Connection established");
                 self.state = State::Established;
-
-                None
             }
             (_, true) => {
                 println!("[ TCP ] RST Received, Listening");
                 self.state = State::Listen;
-                None
             }
             _ => {
                 println!("[ TCP ] Unknown state reached");
-                None
             }
         }
     }
 
-    fn handle_syn_sent(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+    fn handle_syn_sent(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         match (hdr.flag_syn(), hdr.flag_ack()) {
@@ -201,15 +220,17 @@ impl SocketData {
 
                 println!("[ TCP ] Connection Established");
 
+                self.timer().halt();
+
                 self.state = State::Established;
 
-                Some(out)
+                self.send_packet(out)
             }
-            _ => None,
+            _ => {}
         }
     }
 
-    fn handle_established(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+    fn handle_established(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         if hdr.flag_fin() {
@@ -217,7 +238,7 @@ impl SocketData {
 
             self.state = State::LastAck;
 
-            Some(out)
+            self.send_packet(out)
         } else {
             let data = packet.data();
 
@@ -228,36 +249,32 @@ impl SocketData {
 
                 self.buffer.append_data(data);
 
-                Some(out)
-            } else {
-                None
+                self.send_packet(out)
             }
         }
     }
 
-    fn handle_finwait1(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+    fn handle_finwait1(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         match (hdr.flag_fin(), hdr.flag_ack()) {
             (false, true) => {
                 self.state = State::FinWait2;
-                None
             }
             (true, true) => {
                 let out = self.make_ack_packet(0, TcpFlags::empty());
 
                 self.finalize();
 
-                Some(out)
+                self.send_packet(out)
             }
             _ => {
                 println!("[ TCP ] Unexpected FinWait1 packet");
-                None
             }
         }
     }
 
-    fn handle_finwait2(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+    fn handle_finwait2(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         match (hdr.flag_fin(), hdr.flag_ack()) {
@@ -266,31 +283,28 @@ impl SocketData {
 
                 self.finalize();
 
-                Some(out)
+                self.send_packet(out)
             }
             _ => {
                 println!("[ TCP ] Unexpected FinWait2 packet");
-                None
             }
         }
     }
 
-    fn handle_lastack(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+    fn handle_lastack(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         if hdr.flag_ack() {
             self.finalize();
         }
-
-        None
     }
 
-    fn process(&mut self, packet: Packet<Tcp>) -> Option<Packet<Tcp>> {
+    fn process(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         if hdr.flag_rst() {
             self.finalize();
-            return None;
+            return;
         }
 
         if hdr.flag_ack() {
@@ -303,7 +317,7 @@ impl SocketData {
             hdr.seq_nr()
         };
 
-        return match self.state {
+        match self.state {
             State::Listen => self.handle_listen(packet),
             State::SynReceived => self.handle_syn_received(packet),
             State::SynSent => self.handle_syn_sent(packet),
@@ -313,7 +327,6 @@ impl SocketData {
             State::LastAck => self.handle_lastack(packet),
             _ => {
                 println!("State not yet supported");
-                None
             }
         };
     }
@@ -326,30 +339,47 @@ impl SocketData {
         self.timer().terminate();
 
         crate::kernel::net::tcp::release_handler(self.src_port as u32);
+
+        self.buffer.wait_queue().notify_all();
     }
 
     fn close(&mut self) {
-        if self.state != State::Closed {
-            println!("[ TCP ] Closing");
-            let out_packet = self.make_ack_packet(0, TcpFlags::FIN);
+        match self.state {
+            State::Established => {
+                println!("[ TCP ] Closing");
+                let out_packet = self.make_ack_packet(0, TcpFlags::FIN);
 
-            self.state = State::FinWait1;
+                self.state = State::FinWait1;
 
-            crate::kernel::net::tcp::send_packet(out_packet);
+                crate::kernel::net::tcp::send_packet(out_packet);
+            }
+            _ if self.state != State::Closed => {
+                self.finalize();
+            }
+            _ => {}
         }
     }
 
-    pub fn connect(&mut self) {
-        self.ctl.snd_nxt = 12345;
-        self.ctl.snd_una = 12345;
-
+    fn send_sync(&mut self) {
         let packet = self.make_packet(0, TcpFlags::SYN);
 
         println!("[ TCP ] Connection Syn Sent");
 
         self.state = State::SynSent;
 
-        crate::kernel::net::tcp::send_packet(packet);
+        self.send_packet(packet);
+    }
+
+    pub fn connect(&mut self) {
+        self.ctl.snd_nxt = 12345;
+        self.ctl.snd_una = 12345;
+
+        self.timeout = 1000;
+
+        self.send_sync();
+
+        self.timer().set_timeout(self.timeout);
+        self.timer().resume();
     }
 
     pub fn listen(&mut self) {
@@ -471,9 +501,8 @@ impl INode for Socket {
 impl TcpService for Socket {
     fn process_packet(&self, packet: Packet<Tcp>) {
         let mut data = self.data.lock();
-        if let Some(packet) = data.process(packet) {
-            crate::kernel::net::tcp::send_packet(packet);
-        }
+
+        data.process(packet);
 
         if data.state == State::Closed {
             data.buffer.wait_queue().notify_all();

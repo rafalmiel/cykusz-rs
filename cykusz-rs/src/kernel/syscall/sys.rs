@@ -67,7 +67,7 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task();
     return if let Some(f) = task.get_handle(fd) {
-        if f.flags.contains(OpenFlags::WRONLY) || f.flags.contains(OpenFlags::RDWR) {
+        if f.flags.intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
             Ok(f.write(make_buf(buf, len))?)
         } else {
             Err(SyscallError::Access)
@@ -82,7 +82,7 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task();
     return if let Some(f) = task.get_handle(fd) {
-        if f.flags.contains(OpenFlags::RDONLY) || f.flags.contains(OpenFlags::RDWR) {
+        if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
             Ok(f.read(make_buf_mut(buf, len))?)
         } else {
             Err(SyscallError::Access)

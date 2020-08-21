@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicU32;
 use core::sync::atomic::Ordering;
 
@@ -16,6 +17,7 @@ pub struct Socket {
     src_port: AtomicU32,
     dst_port: Spin<Option<u32>>,
     dst_ip: Spin<Option<Ip4>>,
+    error: AtomicBool,
 }
 
 impl Socket {
@@ -25,6 +27,7 @@ impl Socket {
             src_port: AtomicU32::new(port),
             dst_port: Spin::new(None),
             dst_ip: Spin::new(None),
+            error: AtomicBool::new(false),
         }
     }
 
@@ -50,6 +53,14 @@ impl Socket {
 
     pub fn dst_ip(&self) -> Option<Ip4> {
         *self.dst_ip.lock()
+    }
+
+    pub fn error(&self) -> bool {
+        self.error.load(Ordering::SeqCst)
+    }
+
+    pub fn set_error(&self, e: bool) {
+        self.error.store(e, Ordering::SeqCst);
     }
 }
 
@@ -83,6 +94,10 @@ impl INode for Socket {
     }
 
     fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
+        if self.error() {
+            return Err(FsError::NotSupported);
+        }
+
         let has_data = self.buffer.has_data();
 
         if let Some(p) = listen {
@@ -111,6 +126,9 @@ impl UdpService for Socket {
 
     fn port_unreachable(&self, _port: u32, dst_port: u32) {
         println!("Failed to send to port {}", dst_port);
+
+        self.set_error(true);
+        self.buffer.wait_queue().notify_all();
     }
 }
 

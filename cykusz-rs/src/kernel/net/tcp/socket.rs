@@ -511,6 +511,8 @@ impl TcpService for Socket {
 
     fn port_unreachable(&self, _port: u32, dst_port: u32) {
         println!("Failed to send to port {}", dst_port);
+
+        self.data.lock().finalize();
     }
 }
 

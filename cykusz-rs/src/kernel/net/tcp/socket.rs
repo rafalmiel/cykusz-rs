@@ -138,15 +138,13 @@ impl SocketData {
 
         out_hdr.set_flags(flags);
 
-        let una = if len > 0 {
-            len as u32
-        } else if flags.intersects(TcpFlags::SYN | TcpFlags::FIN) {
+        let una = if flags.intersects(TcpFlags::SYN | TcpFlags::FIN) {
             1
         } else {
             0
-        };
+        } + len;
 
-        self.ctl.snd_una += una;
+        self.ctl.snd_una = self.ctl.snd_una.wrapping_add(una as u32);
 
         out_packet
     }
@@ -246,8 +244,6 @@ impl SocketData {
         }
 
         if !data.is_empty() || hdr.flag_fin() {
-            self.ctl.rcv_nxt = self.ctl.rcv_nxt.wrapping_add(data.len() as u32);
-
             let out = self.make_ack_packet(
                 0,
                 if hdr.flag_fin() {
@@ -320,11 +316,18 @@ impl SocketData {
             self.ctl.snd_nxt = hdr.ack_nr();
         }
 
+        if self.state != State::Listen && self.state != State::SynSent {
+            if self.ctl.rcv_nxt != hdr.seq_nr() {
+                return;
+            }
+        }
+
         self.ctl.rcv_nxt = if hdr.flag_syn() || hdr.flag_fin() {
             hdr.seq_nr().wrapping_add(1)
         } else {
             hdr.seq_nr()
-        };
+        }
+        .wrapping_add(packet.data().len() as u32);
 
         match self.state {
             State::Listen => self.handle_listen(packet),

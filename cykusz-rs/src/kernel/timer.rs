@@ -29,7 +29,10 @@ impl Timer {
 
     pub fn resume(&self) {
         if let Some(t) = &self.task.upgrade() {
-            t.set_halted(false);
+            if t.halted() {
+                t.set_halted(false);
+                t.wake_up();
+            }
         }
     }
 
@@ -46,6 +49,11 @@ impl Timer {
 
     pub fn timeout(&self) -> usize {
         self.timeout.load(Ordering::SeqCst)
+    }
+
+    pub fn resume_with_timeout(&self, val: usize) {
+        self.set_timeout(val);
+        self.resume();
     }
 
     pub fn set_timeout(&self, val: usize) {
@@ -76,12 +84,16 @@ fn timer_fun(id: usize) {
         if timer.is_terminating() {
             break;
         } else {
-            task.sleep(timer.timeout() * 1_000_000);
+            let timeout = timer.timeout();
+            timer.set_timeout(0);
+            task.sleep(timeout * 1_000_000);
 
-            if let Some(t) = timer.obj.upgrade() {
-                t.call()
-            } else {
-                break;
+            if timer.timeout() == 0 {
+                if let Some(t) = timer.obj.upgrade() {
+                    t.call()
+                } else {
+                    break;
+                }
             }
         }
     }

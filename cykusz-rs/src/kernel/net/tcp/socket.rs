@@ -11,7 +11,7 @@ use crate::kernel::timer::{create_timer, current_ns, Timer, TimerObject};
 use crate::kernel::utils::buffer::BufferQueue;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 enum State {
     Closed,
     Listen,
@@ -47,6 +47,7 @@ struct TransmissionCtl {
     snd_nxt: u32,
     snd_una: u32,
     rcv_nxt: u32,
+    iss: u32,
 }
 
 #[derive(Default)]
@@ -79,10 +80,9 @@ impl SocketData {
     }
 
     fn timeout(&mut self) {
-        println!("[ TCP ] Timeout");
-
         match self.state {
             State::SynSent => {
+                println!("[ TCP ] SyncSent Timeout");
                 self.timeout_count += 1;
                 self.timeout *= 2;
 
@@ -93,6 +93,10 @@ impl SocketData {
                 } else {
                     self.finalize();
                 }
+            }
+            State::Closing | State::LastAck => {
+                println!("[ TCP ] LastAck Timeout");
+                self.finalize();
             }
             _ => {}
         }
@@ -182,15 +186,17 @@ impl SocketData {
 
         match (hdr.flag_syn(), hdr.flag_ack()) {
             (true, false) => {
+                self.ctl.iss = hdr.seq_nr();
+
                 self.setup_connection(packet);
 
                 let out = self.make_ack_packet(0, TcpFlags::SYN);
 
                 println!("[ TCP ] Syn Received");
 
-                self.state = State::SynReceived;
+                self.send_packet(out);
 
-                self.send_packet(out)
+                self.state = State::SynReceived;
             }
             _ => {}
         }
@@ -220,17 +226,41 @@ impl SocketData {
 
         match (hdr.flag_syn(), hdr.flag_ack()) {
             (true, true) => {
+                self.ctl.iss = hdr.seq_nr();
+
                 let out = self.make_ack_packet(0, TcpFlags::empty());
 
                 println!("[ TCP ] Connection Established");
 
                 self.timer().halt();
 
-                self.state = State::Established;
+                self.send_packet(out);
 
-                self.send_packet(out)
+                self.state = State::Established;
             }
             _ => {}
+        }
+    }
+
+    fn handle_established_close_wait(&mut self, packet: Packet<Tcp>) {
+        let hdr = packet.header();
+
+        let data = packet.data();
+
+        if hdr.flag_fin() {
+            self.state = State::CloseWait;
+        }
+
+        if !data.is_empty() || hdr.flag_fin() {
+            let out = self.make_ack_packet(0, TcpFlags::empty());
+
+            self.buffer.append_data(data);
+
+            self.send_packet(out);
+
+            if hdr.flag_fin() && data.is_empty() {
+                self.buffer.wait_queue().notify_all();
+            }
         }
     }
 
@@ -238,10 +268,6 @@ impl SocketData {
         let hdr = packet.header();
 
         let data = packet.data();
-
-        if hdr.flag_fin() {
-            self.state = State::LastAck;
-        }
 
         if !data.is_empty() || hdr.flag_fin() {
             let out = self.make_ack_packet(
@@ -255,7 +281,12 @@ impl SocketData {
 
             self.buffer.append_data(data);
 
-            self.send_packet(out)
+            self.send_packet(out);
+
+            if hdr.flag_fin() {
+                self.state = State::LastAck;
+                self.timer().resume_with_timeout(1000);
+            }
         }
     }
 
@@ -272,6 +303,15 @@ impl SocketData {
                 self.finalize();
 
                 self.send_packet(out)
+            }
+            (true, false) => {
+                let out = self.make_ack_packet(0, TcpFlags::empty());
+
+                self.send_packet(out);
+
+                self.state = State::Closing;
+
+                self.timer().resume_with_timeout(500);
             }
             _ => {
                 println!("[ TCP ] Unexpected FinWait1 packet");
@@ -296,6 +336,14 @@ impl SocketData {
         }
     }
 
+    fn handle_closing(&mut self, packet: Packet<Tcp>) {
+        let hdr = packet.header();
+
+        if hdr.flag_ack() {
+            self.finalize();
+        }
+    }
+
     fn handle_lastack(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
@@ -307,17 +355,15 @@ impl SocketData {
     fn process(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
-        if hdr.flag_rst() {
-            self.finalize();
-            return;
-        }
-
         if hdr.flag_ack() {
             self.ctl.snd_nxt = hdr.ack_nr();
         }
 
         if self.state != State::Listen && self.state != State::SynSent {
             if self.ctl.rcv_nxt != hdr.seq_nr() {
+                println!("[ TCP ] Out of Order Packet Received");
+                let out = self.make_ack_packet(0, TcpFlags::empty());
+                self.send_packet(out);
                 return;
             }
         }
@@ -329,6 +375,12 @@ impl SocketData {
         }
         .wrapping_add(packet.data().len() as u32);
 
+        //println!(
+        //    "[ TCP ] Recv next: {:?} {}",
+        //    self.state,
+        //    (self.ctl.rcv_nxt - self.ctl.iss)
+        //);
+
         match self.state {
             State::Listen => self.handle_listen(packet),
             State::SynReceived => self.handle_syn_received(packet),
@@ -337,10 +389,15 @@ impl SocketData {
             State::FinWait1 => self.handle_finwait1(packet),
             State::FinWait2 => self.handle_finwait2(packet),
             State::LastAck => self.handle_lastack(packet),
+            State::Closing => self.handle_closing(packet),
             _ => {
                 println!("State not yet supported");
             }
         };
+
+        if hdr.flag_rst() && self.state != State::Listen {
+            self.finalize();
+        }
     }
 
     fn finalize(&mut self) {
@@ -356,14 +413,24 @@ impl SocketData {
     }
 
     fn close(&mut self) {
+        println!("[ TCP ] Closing");
         match self.state {
-            State::Established => {
-                println!("[ TCP ] Closing");
+            State::Established | State::SynReceived => {
                 let out_packet = self.make_ack_packet(0, TcpFlags::FIN);
 
+                crate::kernel::net::tcp::send_packet(out_packet);
+
                 self.state = State::FinWait1;
+            }
+            State::CloseWait => {
+                println!("[ TCP ] Close wait sent fin");
+                let out_packet = self.make_packet(0, TcpFlags::FIN);
 
                 crate::kernel::net::tcp::send_packet(out_packet);
+
+                self.state = State::LastAck;
+
+                self.timer().resume_with_timeout(500);
             }
             _ if self.state != State::Closed => {
                 self.finalize();
@@ -389,8 +456,7 @@ impl SocketData {
 
         self.send_sync();
 
-        self.timer().set_timeout(self.timeout);
-        self.timer().resume();
+        self.timer().resume_with_timeout(self.timeout);
     }
 
     pub fn listen(&mut self) {
@@ -503,7 +569,9 @@ impl INode for Socket {
             pt.listen(&data.buffer.wait_queue());
         }
 
-        if data.state == State::Closed && !data.buffer.has_data() {
+        if (data.state == State::Closed || data.state == State::CloseWait)
+            && !data.buffer.has_data()
+        {
             Err(FsError::NotSupported)
         } else {
             Ok(data.buffer.has_data())

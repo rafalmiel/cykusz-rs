@@ -169,7 +169,7 @@ impl E1000Data {
             }
         }
 
-        deallocate_align(packet.addr().0 as *mut u8, packet.len(), 0x1000);
+        deallocate_align(packet.base_addr().0 as *mut u8, packet.len(), 0x1000);
     }
 
     pub fn reset(&self) {

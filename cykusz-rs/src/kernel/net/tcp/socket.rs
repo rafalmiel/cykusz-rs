@@ -395,12 +395,18 @@ impl SocketData {
             }
         };
 
-        if hdr.flag_rst() && self.state != State::Listen {
+        if hdr.flag_rst() && self.state != State::Closed && self.state != State::Listen {
             self.finalize();
         }
     }
 
     fn finalize(&mut self) {
+        assert_ne!(
+            self.state,
+            State::Closed,
+            "[ TCP ] Finalize called on closed socket"
+        );
+
         self.state = State::Closed;
 
         println!("[ TCP ] Connection closed by RST");

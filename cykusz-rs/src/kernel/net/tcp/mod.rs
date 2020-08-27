@@ -213,6 +213,8 @@ pub fn send_packet(mut packet: Packet<Tcp>) {
     header.calc_checksum(ip_packet.header());
 
     crate::kernel::net::ip::send_packet(ip_packet);
+
+    ip_packet.deallocate();
 }
 
 pub fn process_packet(packet: Packet<Tcp>) {

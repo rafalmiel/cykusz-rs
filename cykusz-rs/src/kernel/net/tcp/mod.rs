@@ -40,6 +40,19 @@ pub struct TcpHeader {
     urgent_ptr: NetU16,
 }
 
+impl Packet<Tcp> {
+    pub fn ack_len(&self) -> u32 {
+        let hdr = self.header();
+
+        self.data().len() as u32
+            + if hdr.flag_fin() || hdr.flag_syn() {
+                1
+            } else {
+                0
+            }
+    }
+}
+
 impl TcpHeader {
     pub fn src_port(&self) -> u16 {
         self.src_port.value()
@@ -213,8 +226,6 @@ pub fn send_packet(mut packet: Packet<Tcp>) {
     header.calc_checksum(ip_packet.header());
 
     crate::kernel::net::ip::send_packet(ip_packet);
-
-    ip_packet.deallocate();
 }
 
 pub fn process_packet(packet: Packet<Tcp>) {

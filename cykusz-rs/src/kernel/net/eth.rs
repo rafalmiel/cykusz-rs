@@ -33,15 +33,25 @@ impl ConstPacketKind for Eth {
 
 impl PacketHeader<EthHeader> for Packet<Eth> {}
 
-pub fn create_packet(typ: EthType, size: usize) -> Packet<Eth> {
+pub fn alloc_packet(size: usize) -> Packet<Eth> {
     let drv = crate::kernel::net::default_driver();
 
-    let mut packet = drv
-        .driver
-        .alloc_packet(size + core::mem::size_of::<EthHeader>());
+    drv.driver
+        .alloc_packet(size + core::mem::size_of::<EthHeader>())
+}
+
+pub fn dealloc_packet(packet: Packet<Eth>) {
+    let drv = crate::kernel::net::default_driver();
+
+    drv.driver.dealloc_patket(packet);
+}
+
+pub fn create_packet(typ: EthType, size: usize) -> Packet<Eth> {
+    let mut packet = alloc_packet(size);
 
     let eth = packet.header_mut();
 
+    let drv = crate::kernel::net::default_driver();
     drv.driver.read_mac(&mut eth.src_mac);
     eth.typ = typ;
     packet

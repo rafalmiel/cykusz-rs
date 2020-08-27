@@ -140,6 +140,10 @@ impl E1000Data {
         packet
     }
 
+    pub fn dealloc_packet(&self, packet: Packet<Eth>) {
+        deallocate_align(packet.base_addr().0 as *mut u8, packet.base_len(), 0x1000);
+    }
+
     pub fn read_mac(&self, mac: &mut [u8]) {
         mac.copy_from_slice(&self.mac);
     }
@@ -168,8 +172,6 @@ impl E1000Data {
                 //println!("Status: 0b{:b}", status.read_volatile().bits());
             }
         }
-
-        deallocate_align(packet.base_addr().0 as *mut u8, packet.len(), 0x1000);
     }
 
     pub fn reset(&self) {

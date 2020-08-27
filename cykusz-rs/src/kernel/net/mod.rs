@@ -28,6 +28,7 @@ pub trait NetDriver: Sync + Send {
     fn receive(&self) -> RecvPacket;
     fn receive_finished(&self, id: usize);
     fn alloc_packet(&self, size: usize) -> Packet<Eth>;
+    fn dealloc_patket(&self, packet: Packet<Eth>);
     fn read_mac(&self, mac: &mut [u8]);
     fn get_mac(&self) -> [u8; 6];
     fn link_up(&self);

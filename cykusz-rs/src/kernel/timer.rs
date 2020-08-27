@@ -31,8 +31,8 @@ impl Timer {
         if let Some(t) = &self.task.upgrade() {
             if t.halted() {
                 t.set_halted(false);
-                t.wake_up();
             }
+            t.wake_up();
         }
     }
 

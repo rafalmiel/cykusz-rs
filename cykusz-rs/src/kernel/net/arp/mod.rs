@@ -146,6 +146,8 @@ pub fn process_packet(packet: Packet<Arp>) {
             println!("[ ARP ] Send reply to {:?}", header.src_ip());
 
             crate::kernel::net::eth::send_packet(packet.downgrade(), header.src_ip);
+
+            packet.deallocate();
         }
     }
 }
@@ -170,6 +172,8 @@ pub fn request_ip(target: Ip4, to_cache: Packet<Eth>) {
     cache::request_ip(target, to_cache);
 
     crate::kernel::net::eth::send_packet(packet.downgrade(), Ip4::limited_broadcast());
+
+    packet.deallocate();
 }
 
 pub fn init() {

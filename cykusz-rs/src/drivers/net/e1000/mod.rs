@@ -63,6 +63,12 @@ impl NetDriver for E1000 {
         data.alloc_packet(size)
     }
 
+    fn dealloc_patket(&self, packet: Packet<Eth>) {
+        let data = self.data.lock_irq();
+
+        data.dealloc_packet(packet);
+    }
+
     fn read_mac(&self, mac: &mut [u8]) {
         let data = self.data.lock_irq();
 

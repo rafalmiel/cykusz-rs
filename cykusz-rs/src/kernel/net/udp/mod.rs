@@ -74,6 +74,8 @@ pub fn send_packet(mut packet: Packet<Udp>) {
     header.compute_checksum(ip_packet.header());
 
     crate::kernel::net::ip::send_packet(ip_packet);
+
+    ip_packet.deallocate();
 }
 
 pub fn process_packet(packet: Packet<Udp>) {

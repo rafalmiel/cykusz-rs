@@ -1,4 +1,4 @@
-use crate::kernel::net::eth::{Eth, EthHeader, EthType};
+use crate::kernel::net::eth::{Eth, EthType};
 use crate::kernel::net::icmp::Icmp;
 use crate::kernel::net::tcp::Tcp;
 use crate::kernel::net::udp::Udp;
@@ -84,8 +84,8 @@ impl IpBase for Udp {}
 
 impl<P: IpBase> PacketDownHierarchy<Ip> for Packet<P> {
     fn downgrade(&self) -> Packet<Ip> {
-        let h =
-            unsafe { (self.base_addr + core::mem::size_of::<EthHeader>()).read_ref::<IpHeader>() };
+        let p: Packet<Ip> = self.eth().upgrade();
+        let h = p.header();
 
         self.downgrade_by(h.header_size())
     }

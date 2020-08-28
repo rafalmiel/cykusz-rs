@@ -47,8 +47,11 @@ impl Default for State {
 struct TransmissionCtl {
     snd_nxt: u32,
     snd_una: u32,
-    rcv_nxt: u32,
+    snd_wnd: u32,
     iss: u32,
+    rcv_nxt: u32,
+    rcv_wnd: u32,
+    irs: u32,
 }
 
 #[derive(Default)]
@@ -57,7 +60,7 @@ struct SocketData {
     dst_port: u16,
     target: Ip4,
     state: State,
-    timeout: usize,
+    timeout: u64,
     timeout_count: usize,
     timer: Option<Arc<Timer>>,
     ctl: TransmissionCtl,
@@ -95,7 +98,19 @@ impl SocketData {
     }
 
     fn init_timers(&mut self, obj: Arc<dyn TimerObject>) {
-        self.timer = Some(create_timer(obj, 1000));
+        self.timer = Some(create_timer(obj));
+    }
+
+    fn start_timer(&mut self, timeout: u64) {
+        if let Some(t) = &self.timer {
+            t.start_with_timeout(timeout);
+        }
+    }
+
+    fn stop_timer(&mut self) {
+        if let Some(t) = &self.timer {
+            t.disable();
+        }
     }
 
     fn timer(&self) -> &Arc<Timer> {
@@ -112,7 +127,7 @@ impl SocketData {
                 if self.timeout_count < 5 {
                     self.send_sync();
 
-                    self.timer().set_timeout(self.timeout);
+                    self.start_timer(self.timeout);
                 } else {
                     self.finalize();
                 }
@@ -131,9 +146,9 @@ impl SocketData {
                 if let Some(p) = out {
                     self.resend_packet(p);
 
-                    self.timer().resume_with_timeout(1000);
+                    self.start_timer(1000);
                 } else {
-                    self.timer().halt();
+                    self.stop_timer();
                 }
             }
             _ => {}
@@ -184,7 +199,7 @@ impl SocketData {
             self.out.queue.push(queued);
 
             if start_timer {
-                self.timer().resume_with_timeout(1000);
+                self.start_timer(1000);
             }
         }
     }
@@ -204,7 +219,7 @@ impl SocketData {
                 self.out.queue.remove(0);
             }
 
-            self.timer().resume_with_timeout(1000);
+            self.start_timer(1000);
         }
     }
 
@@ -216,7 +231,7 @@ impl SocketData {
 
         out_hdr.set_seq_nr(self.ctl.snd_nxt);
         out_hdr.set_urgent_ptr(0);
-        out_hdr.set_window(4096);
+        out_hdr.set_window(63784);
 
         out_hdr.set_flags(flags);
 
@@ -277,7 +292,7 @@ impl SocketData {
 
         match (hdr.flag_ack(), hdr.flag_rst()) {
             (true, false) => {
-                self.timer().halt();
+                self.stop_timer();
                 println!("[ TCP ] Connection established");
                 self.state = State::Established;
             }
@@ -302,7 +317,7 @@ impl SocketData {
 
                 println!("[ TCP ] Connection Established");
 
-                self.timer().halt();
+                self.stop_timer();
 
                 self.send_packet(out, false);
 
@@ -349,13 +364,13 @@ impl SocketData {
                 },
             );
 
-            self.buffer.append_data(data);
-
-            self.send_packet(out, false);
+            if self.buffer.append_data(data) == data.len() {
+                self.send_packet(out, false);
+            }
 
             if hdr.flag_fin() {
                 self.state = State::LastAck;
-                self.timer().resume_with_timeout(1000);
+                self.start_timer(1000);
             }
         }
     }
@@ -381,7 +396,7 @@ impl SocketData {
 
                 self.state = State::Closing;
 
-                self.timer().resume_with_timeout(500);
+                self.start_timer(500);
             }
             _ => {
                 println!("[ TCP ] Unexpected FinWait1 packet");
@@ -475,7 +490,7 @@ impl SocketData {
 
         println!("[ TCP ] Connection closed by RST");
 
-        self.timer().terminate();
+        self.stop_timer();
 
         crate::kernel::net::tcp::release_handler(self.src_port as u32);
 
@@ -500,7 +515,7 @@ impl SocketData {
 
                 self.state = State::LastAck;
 
-                self.timer().resume_with_timeout(500);
+                self.start_timer(500);
             }
             _ if self.state != State::Closed => {
                 self.finalize();
@@ -526,7 +541,7 @@ impl SocketData {
 
         self.send_sync();
 
-        self.timer().resume_with_timeout(self.timeout);
+        self.start_timer(self.timeout);
     }
 
     pub fn listen(&mut self) {
@@ -652,6 +667,7 @@ impl INode for Socket {
         self.data.lock().close();
     }
 }
+
 impl TcpService for Socket {
     fn process_packet(&self, packet: Packet<Tcp>) {
         let mut data = self.data.lock();

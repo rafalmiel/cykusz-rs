@@ -15,6 +15,7 @@ pub unsafe fn syscall0(mut a: usize) -> SyscallResult {
 
     SyscallResult::syscall_from(a as isize)
 }
+
 pub unsafe fn syscall1(mut a: usize, b: usize) -> SyscallResult {
     llvm_asm!("syscall"
         : "={rax}"(a)
@@ -24,6 +25,7 @@ pub unsafe fn syscall1(mut a: usize, b: usize) -> SyscallResult {
 
     SyscallResult::syscall_from(a as isize)
 }
+
 pub unsafe fn syscall2(mut a: usize, b: usize, c: usize) -> SyscallResult {
     llvm_asm!("syscall"
         : "={rax}"(a)
@@ -33,6 +35,7 @@ pub unsafe fn syscall2(mut a: usize, b: usize, c: usize) -> SyscallResult {
 
     SyscallResult::syscall_from(a as isize)
 }
+
 pub unsafe fn syscall3(mut a: usize, b: usize, c: usize, d: usize) -> SyscallResult {
     llvm_asm!("syscall"
         : "={rax}"(a)
@@ -42,6 +45,7 @@ pub unsafe fn syscall3(mut a: usize, b: usize, c: usize, d: usize) -> SyscallRes
 
     SyscallResult::syscall_from(a as isize)
 }
+
 pub unsafe fn syscall4(mut a: usize, b: usize, c: usize, d: usize, e: usize) -> SyscallResult {
     llvm_asm!("syscall"
         : "={rax}"(a)
@@ -51,6 +55,7 @@ pub unsafe fn syscall4(mut a: usize, b: usize, c: usize, d: usize, e: usize) -> 
 
     SyscallResult::syscall_from(a as isize)
 }
+
 pub unsafe fn syscall5(
     mut a: usize,
     b: usize,
@@ -67,6 +72,7 @@ pub unsafe fn syscall5(
 
     SyscallResult::syscall_from(a as isize)
 }
+
 pub unsafe fn syscall6(
     mut a: usize,
     b: usize,

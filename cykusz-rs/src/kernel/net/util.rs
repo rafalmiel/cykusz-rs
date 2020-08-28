@@ -2,8 +2,10 @@
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct NetU32(u32);
+
 #[derive(Debug, Default, Copy, Clone)]
 pub struct NetU16(u16);
+
 #[derive(Debug, Default, Copy, Clone)]
 pub struct NetU8(u8);
 

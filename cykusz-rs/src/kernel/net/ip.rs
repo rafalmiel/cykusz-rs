@@ -79,7 +79,9 @@ impl PacketTrait for Packet<Ip> {
 pub trait IpBase: PacketKind {}
 
 impl IpBase for Icmp {}
+
 impl IpBase for Tcp {}
+
 impl IpBase for Udp {}
 
 impl<P: IpBase> PacketDownHierarchy<Ip> for Packet<P> {

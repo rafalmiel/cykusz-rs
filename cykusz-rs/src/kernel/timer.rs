@@ -1,131 +1,160 @@
-use alloc::collections::BTreeMap;
 use alloc::sync::{Arc, Weak};
-use core::sync::atomic::AtomicBool;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::AtomicU64;
+use core::sync::atomic::Ordering;
+
+use intrusive_collections::{LinkedList, LinkedListLink};
 
 use crate::kernel::sched::current_task;
-use crate::kernel::sync::{IrqGuard, RwSpin};
-use crate::kernel::task::Task;
+use crate::kernel::sync::{Spin, SpinGuard};
 
-static TIMER_ID: AtomicUsize = AtomicUsize::new(0);
-
-pub trait TimerObject: Sync + Send {
+pub trait TimerObject: Send + Sync {
     fn call(&self);
 }
 
 pub struct Timer {
+    timeout: AtomicU64,
     obj: Weak<dyn TimerObject>,
-    task: Weak<Task>,
-    timeout: AtomicUsize, //in ms
-    terminate: AtomicBool,
-}
-
-impl Timer {
-    pub fn halt(&self) {
-        if let Some(t) = &self.task.upgrade() {
-            t.set_halted(true);
-        }
-    }
-
-    pub fn resume(&self) {
-        if let Some(t) = &self.task.upgrade() {
-            if t.halted() {
-                t.set_halted(false);
-            }
-            t.wake_up();
-        }
-    }
-
-    pub fn is_terminating(&self) -> bool {
-        self.terminate.load(Ordering::SeqCst)
-    }
-
-    pub fn terminate(&self) {
-        self.terminate.store(true, Ordering::SeqCst);
-        if let Some(t) = &self.task.upgrade() {
-            t.wake_up();
-        }
-    }
-
-    pub fn timeout(&self) -> usize {
-        self.timeout.load(Ordering::SeqCst)
-    }
-
-    pub fn resume_with_timeout(&self, val: usize) {
-        self.set_timeout(val);
-        self.resume();
-    }
-
-    pub fn set_timeout(&self, val: usize) {
-        self.timeout.store(val, Ordering::SeqCst);
-    }
+    self_ref: Weak<Timer>,
+    link: LinkedListLink,
 }
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        self.terminate();
+        println!("[ TCP ] Timer dropped");
     }
 }
 
-static TIMERS: RwSpin<BTreeMap<usize, Arc<Timer>>> = RwSpin::new(BTreeMap::new());
+unsafe impl Sync for Timer {}
 
-fn timer_fun(id: usize) {
-    loop {
-        let task = current_task();
+unsafe impl Send for Timer {}
 
-        let timer = {
-            if let Some(timer) = TIMERS.read().get(&id) {
-                timer.clone()
-            } else {
-                break;
-            }
-        };
+impl Timer {
+    fn new(obj: Arc<dyn TimerObject>) -> Arc<Timer> {
+        Timer {
+            timeout: AtomicU64::new(0),
+            obj: Arc::downgrade(&obj),
+            self_ref: Weak::new(),
+            link: LinkedListLink::new(),
+        }
+        .wrap()
+    }
 
-        if timer.is_terminating() {
-            break;
-        } else {
-            let timeout = timer.timeout();
-            timer.set_timeout(0);
-            task.sleep(timeout * 1_000_000);
+    fn wrap(self) -> Arc<Timer> {
+        let fs = Arc::new(self);
+        let weak = Arc::downgrade(&fs);
+        let ptr = Arc::into_raw(fs) as *mut Self;
+        unsafe {
+            (*ptr).self_ref = weak;
+            Arc::from_raw(ptr)
+        }
+    }
 
-            if timer.timeout() == 0 {
-                if let Some(t) = timer.obj.upgrade() {
-                    t.call()
+    fn call(&self) {
+        if let Some(o) = self.obj.upgrade() {
+            o.call();
+        }
+    }
+
+    fn unlink_locked(&self, timers: &mut SpinGuard<LinkedList<TimerAdapter>>) {
+        if self.link.is_linked() {
+            let mut c = unsafe { timers.cursor_mut_from_ptr(self as *const Timer) };
+
+            c.remove();
+        }
+    }
+
+    fn link_locked(&self, timers: &mut SpinGuard<LinkedList<TimerAdapter>>, timeout: u64) {
+        if let Some(timer) = self.self_ref.upgrade() {
+            timer.set_timeout(timeout);
+
+            if let Some(ptr) = timers.iter().find_map(|e| {
+                if e.timeout() > timer.timeout() {
+                    Some(e as *const Timer)
                 } else {
-                    break;
+                    None
                 }
+            }) {
+                let mut c = unsafe { timers.cursor_mut_from_ptr(ptr as *const _) };
+
+                c.insert_before(timer);
+            } else {
+                timers.push_back(timer);
             }
         }
     }
 
-    TIMERS.write().remove(&id);
+    pub fn disable(&self) {
+        let mut timers = TIMERS.lock();
+
+        self.unlink_locked(&mut timers);
+    }
+
+    fn timeout(&self) -> u64 {
+        self.timeout.load(Ordering::SeqCst)
+    }
+
+    fn set_timeout(&self, val: u64) {
+        self.timeout
+            .store(current_ns() + val * 1_000_000, Ordering::SeqCst);
+    }
+
+    pub fn start_with_timeout(&self, timeout: u64) {
+        let mut timers = TIMERS.lock();
+
+        self.unlink_locked(&mut timers);
+        self.link_locked(&mut timers, timeout);
+    }
 }
 
-pub fn create_timer(timer: Arc<dyn TimerObject>, timeout: usize) -> Arc<Timer> {
-    let id = TIMER_ID.fetch_add(1, Ordering::SeqCst);
+intrusive_adapter!(TimerAdapter = Arc<Timer>: Timer {link: LinkedListLink});
 
-    let mut timers = TIMERS.write();
+lazy_static! {
+    static ref TIMERS: Spin<LinkedList<TimerAdapter>> =
+        Spin::new(LinkedList::new(TimerAdapter::new()));
+}
 
-    let task = {
-        let _irq = IrqGuard::new();
-        let task = crate::kernel::sched::create_param_task(timer_fun as usize, id);
-        task.set_halted(true);
-        task
-    };
+fn check_timers() {
+    let time = current_ns();
 
-    let t = Arc::new(Timer {
-        obj: Arc::downgrade(&timer),
-        task: Arc::downgrade(&task),
-        timeout: AtomicUsize::new(timeout),
-        terminate: AtomicBool::new(false),
-    });
+    loop {
+        let mut timers = TIMERS.lock();
+        if let Some(timer) = timers.front().get() {
+            if timer.timeout() <= time {
+                let t = timer.self_ref.upgrade().unwrap();
 
-    timers.insert(id, t.clone());
+                timers.pop_front();
 
-    t
+                drop(timers);
+
+                t.call();
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+}
+
+fn timer_fun() {
+    let task = current_task();
+    loop {
+        check_timers();
+
+        // check timers every 100 ms
+        task.sleep(100_000_000);
+    }
+}
+
+pub fn create_timer(obj: Arc<dyn TimerObject>) -> Arc<Timer> {
+    let timer = Timer::new(obj);
+
+    return timer;
 }
 
 pub fn setup() {
+    crate::kernel::sched::create_task(timer_fun);
+
     crate::arch::timer::setup(timer_handler);
 }
 

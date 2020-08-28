@@ -304,7 +304,7 @@ impl PciBridge {
                     null_mut(),
                     Some(add_pci_dev),
                     self as *mut PciBridge as *mut core::ffi::c_void,
-                    null_mut()
+                    null_mut(),
                 ),
                 AE_OK
             );

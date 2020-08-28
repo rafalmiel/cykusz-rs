@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
 
 use alloc::sync::Arc;
 use core::sync::atomic::AtomicU64;
@@ -49,31 +49,31 @@ fn task() {
     //crate::kernel::sched::create_task(task);
 }
 
-struct TimerTest {}
-
-impl TimerObject for TimerTest {
-    fn call(&self) {
-        println!("Timer called");
-    }
-}
-
-static mut TIMER: Option<Arc<Timer>> = None;
-
-struct Element {
-    link: LinkedListLink,
-    val: u8,
-}
-
-impl Element {
-    pub fn new(val: u8) -> Arc<Element> {
-        Arc::new(Element {
-            link: LinkedListLink::new(),
-            val,
-        })
-    }
-}
-
-intrusive_adapter!(ElementAdapter = Arc<Element>: Element {link: LinkedListLink});
+//struct TimerTest {}
+//
+//impl TimerObject for TimerTest {
+//    fn call(&self) {
+//        println!("Timer called");
+//    }
+//}
+//
+//static mut TIMER: Option<Arc<Timer>> = None;
+//
+//struct Element {
+//    link: LinkedListLink,
+//    val: u8,
+//}
+//
+//impl Element {
+//    pub fn new(val: u8) -> Arc<Element> {
+//        Arc::new(Element {
+//            link: LinkedListLink::new(),
+//            val,
+//        })
+//    }
+//}
+//
+//intrusive_adapter!(ElementAdapter = Arc<Element>: Element {link: LinkedListLink});
 
 pub fn start() {
     //crate::kernel::sched::create_task(task2);
@@ -84,16 +84,16 @@ pub fn start() {
         crate::kernel::user::get_user_program_size(),
     );
 
-    if cfg!(disabled) {
-        unsafe {
-            if let Some(t) = &TIMER {
-                t.terminate();
-                TIMER = None;
-            } else {
-                let timer = create_timer(Arc::new(TimerTest {}), 1000);
-                TIMER = Some(timer);
-                TIMER.as_ref().unwrap().resume();
-            }
-        }
-    }
+    //if cfg!(disabled) {
+    //    unsafe {
+    //        if let Some(t) = &TIMER {
+    //            t.terminate();
+    //            TIMER = None;
+    //        } else {
+    //            let timer = create_timer(Arc::new(TimerTest {}), 1000);
+    //            TIMER = Some(timer);
+    //            TIMER.as_ref().unwrap().resume();
+    //        }
+    //    }
+    //}
 }

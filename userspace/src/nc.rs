@@ -23,7 +23,7 @@ fn send(fd: usize) -> bool {
 }
 
 fn recv(fd: usize) -> bool {
-    let mut buf = [0u8; 64];
+    let mut buf = [0u8; 4096];
 
     let res = syscall::read(fd, &mut buf);
 
@@ -32,6 +32,7 @@ fn recv(fd: usize) -> bool {
             let s = unsafe { core::str::from_utf8_unchecked(&buf[..len]) };
 
             print!("{}", s);
+            //syscall::write(fd, &buf[..len]);
 
             true
         }

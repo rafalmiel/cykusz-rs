@@ -23,7 +23,7 @@ pub struct Socket {
 impl Socket {
     pub fn new(port: u32) -> Socket {
         Socket {
-            buffer: BufferQueue::new(4096),
+            buffer: BufferQueue::new(4096 * 4),
             src_port: AtomicU32::new(port),
             dst_port: Spin::new(None),
             dst_ip: Spin::new(None),

@@ -1,7 +1,15 @@
 use syscall_defs::ConnectionFlags;
 
 fn send(fd: usize) -> bool {
-    let mut buf = [0u8; 64];
+    let mut buf = [0u8; 1500];
+
+    //loop {
+    //    if let Err(err) = syscall::write(fd, &buf) {
+    //        println!("Send failed {:?}", err);
+
+    //        return false
+    //    }
+    //}
 
     if let Ok(read) = syscall::read(1, &mut buf) {
         if read == 1 {
@@ -23,16 +31,18 @@ fn send(fd: usize) -> bool {
 }
 
 fn recv(fd: usize) -> bool {
-    let mut buf = [0u8; 4096];
+    let mut buf = [0u8; 1024];
 
     let res = syscall::read(fd, &mut buf);
 
     match res {
         Ok(len) if len > 1 => {
-            let s = unsafe { core::str::from_utf8_unchecked(&buf[..len]) };
+            //let s = unsafe { core::str::from_utf8_unchecked(&buf[..len]) };
 
-            print!("{}", s);
-            //syscall::write(fd, &buf[..len]);
+            //print!("{}", s);
+            if let Err(e) = syscall::write(fd, &buf[..len]) {
+                println!("Send failed: {:?}", e);
+            }
 
             true
         }

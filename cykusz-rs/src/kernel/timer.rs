@@ -13,7 +13,7 @@ pub trait TimerObject: Send + Sync {
 
 pub struct Timer {
     timeout: AtomicU64,
-    obj: Weak<dyn TimerObject>,
+    obj: Arc<dyn TimerObject>,
     self_ref: Weak<Timer>,
     link: LinkedListLink,
 }
@@ -32,7 +32,7 @@ impl Timer {
     fn new(obj: Arc<dyn TimerObject>) -> Arc<Timer> {
         Timer {
             timeout: AtomicU64::new(0),
-            obj: Arc::downgrade(&obj),
+            obj,
             self_ref: Weak::new(),
             link: LinkedListLink::new(),
         }
@@ -50,9 +50,7 @@ impl Timer {
     }
 
     fn call(&self) {
-        if let Some(o) = self.obj.upgrade() {
-            o.call();
-        }
+        self.obj.call();
     }
 
     fn unlink_locked(&self, timers: &mut SpinGuard<LinkedList<TimerAdapter>>) {

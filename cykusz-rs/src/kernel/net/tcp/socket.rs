@@ -55,14 +55,56 @@ struct TransmissionCtl {
 }
 
 #[derive(Default)]
+struct ConnTimer {
+    timeout: u64,
+    timeout_count: usize,
+    conn_timer: Option<Arc<Timer>>,
+}
+
+impl ConnTimer {
+    fn timer(&self) -> &Arc<Timer> {
+        self.conn_timer.as_ref().unwrap()
+    }
+
+    fn reset(&mut self) {
+        self.timeout = 1000;
+        self.timeout_count = 0;
+        self.timer().disable();
+    }
+
+    fn start_with_timeout(&self, timeout: u64) {
+        self.timer().start_with_timeout(timeout);
+    }
+
+    fn conn_timeout_update(&mut self) -> bool {
+        self.timeout_count += 1;
+
+        if self.timeout_count <= 5 {
+            self.timeout *= 2;
+
+            true
+        } else {
+            self.reset();
+
+            false
+        }
+    }
+
+    fn conn_timeout_start(&self) {
+        self.timer().start_with_timeout(self.timeout)
+    }
+}
+
+#[derive(Default)]
 struct SocketData {
     src_port: u16,
     dst_port: u16,
     target: Ip4,
     state: State,
-    timeout: u64,
-    timeout_count: usize,
-    timer: Option<Arc<Timer>>,
+    conn_timer: ConnTimer,
+    rx_timer: Option<Arc<Timer>>,
+    tx_timer: Option<Arc<Timer>>,
+    dc_timer: Option<Arc<Timer>>,
     ctl: TransmissionCtl,
     buffer: BufferQueue,
     out: PacketQueue,
@@ -89,70 +131,117 @@ impl Default for PacketQueue {
     }
 }
 
+struct TimerCallback {
+    sock: Weak<Socket>,
+    fun: fn(&Socket),
+}
+
+impl TimerObject for TimerCallback {
+    fn call(&self) {
+        if let Some(s) = self.sock.upgrade() {
+            (self.fun)(&s)
+        }
+    }
+}
+
+impl TimerCallback {
+    fn new(sock: Arc<Socket>, cb: fn(&Socket)) -> Arc<TimerCallback> {
+        Arc::new(TimerCallback {
+            sock: Arc::downgrade(&sock),
+            fun: cb,
+        })
+    }
+}
+
 impl SocketData {
     pub fn new(port: u16) -> SocketData {
         SocketData {
             src_port: port,
+            buffer: BufferQueue::new(4096 * 18),
             ..Default::default()
         }
     }
 
-    fn init_timers(&mut self, obj: Arc<dyn TimerObject>) {
-        self.timer = Some(create_timer(obj));
+    fn init_timers(&mut self, obj: Arc<Socket>) {
+        self.conn_timer = ConnTimer {
+            timeout_count: 0,
+            timeout: 1000,
+            conn_timer: Some(create_timer(TimerCallback::new(
+                obj.clone(),
+                Socket::conn_timeout,
+            ))),
+        };
+        self.rx_timer = Some(create_timer(TimerCallback::new(
+            obj.clone(),
+            Socket::rx_timeout,
+        )));
+        self.tx_timer = Some(create_timer(TimerCallback::new(
+            obj.clone(),
+            Socket::tx_timeout,
+        )));
+        self.dc_timer = Some(create_timer(TimerCallback::new(obj, Socket::dc_timeout)));
     }
 
-    fn start_timer(&mut self, timeout: u64) {
-        if let Some(t) = &self.timer {
-            t.start_with_timeout(timeout);
+    fn stop_timers(&mut self) {
+        self.conn_timer().reset();
+        self.rx_timer().disable();
+        self.tx_timer().disable();
+        self.dc_timer().disable();
+    }
+
+    fn conn_timer(&mut self) -> &mut ConnTimer {
+        &mut self.conn_timer
+    }
+
+    fn rx_timer(&self) -> &Arc<Timer> {
+        self.rx_timer.as_ref().unwrap()
+    }
+
+    fn tx_timer(&self) -> &Arc<Timer> {
+        self.tx_timer.as_ref().unwrap()
+    }
+
+    fn dc_timer(&self) -> &Arc<Timer> {
+        self.dc_timer.as_ref().unwrap()
+    }
+
+    fn conn_timeout(&mut self) {
+        println!("[ TCP ] SyncSent Timeout");
+
+        if self.conn_timer().conn_timeout_update() {
+            self.send_sync();
+
+            self.conn_timer().conn_timeout_start();
+        } else {
+            self.finalize();
         }
     }
 
-    fn stop_timer(&mut self) {
-        if let Some(t) = &self.timer {
-            t.disable();
+    fn rx_timeout(&mut self) {
+        let out = self.make_ack_packet(0, TcpFlags::empty());
+
+        self.send_packet(out, false);
+    }
+
+    fn tx_timeout(&mut self) {
+        let out = if let Some(p) = self.out.queue.get(0) {
+            Some(p.packet)
+        } else {
+            None
+        };
+
+        if let Some(p) = out {
+            self.resend_packet(p);
+
+            self.tx_timer().start_with_timeout(1000);
+        } else {
+            self.tx_timer().disable();
         }
     }
 
-    fn timer(&self) -> &Arc<Timer> {
-        self.timer.as_ref().unwrap()
-    }
-
-    fn timeout(&mut self) {
-        match self.state {
-            State::SynSent => {
-                println!("[ TCP ] SyncSent Timeout");
-                self.timeout_count += 1;
-                self.timeout *= 2;
-
-                if self.timeout_count < 5 {
-                    self.send_sync();
-
-                    self.start_timer(self.timeout);
-                } else {
-                    self.finalize();
-                }
-            }
-            State::Closing | State::LastAck => {
-                println!("[ TCP ] LastAck Timeout");
-                self.finalize();
-            }
-            State::Established => {
-                let out = if let Some(p) = self.out.queue.get(0) {
-                    Some(p.packet)
-                } else {
-                    None
-                };
-
-                if let Some(p) = out {
-                    self.resend_packet(p);
-
-                    self.start_timer(1000);
-                } else {
-                    self.stop_timer();
-                }
-            }
-            _ => {}
-        }
+    fn dc_timeout(&mut self) {
+        println!("[ TCP ] LastAck Timeout");
+        self.finalize();
     }
 
     pub fn src_port(&self) -> u16 {
@@ -199,9 +288,31 @@ impl SocketData {
             self.out.queue.push(queued);
 
             if start_timer {
-                self.start_timer(1000);
+                self.tx_timer().start_with_timeout(1000);
             }
         }
+    }
+
+    fn send_sync(&mut self) {
+        let packet = self.make_packet(0, TcpFlags::SYN);
+
+        println!("[ TCP ] Connection Syn Sent");
+
+        self.state = State::SynSent;
+
+        self.send_packet(packet, false);
+    }
+
+    fn send_ack(&mut self) {
+        let out = self.make_ack_packet(0, TcpFlags::empty());
+
+        self.send_packet(out, false);
+    }
+
+    fn send_ack_flags(&mut self, flags: TcpFlags) {
+        let out = self.make_ack_packet(0, flags);
+
+        self.send_packet(out, false);
     }
 
     fn process_ack(&mut self, header: &TcpHeader) {
@@ -219,7 +330,7 @@ impl SocketData {
                 self.out.queue.remove(0);
             }
 
-            self.start_timer(1000);
+            self.tx_timer().start_with_timeout(1000);
         }
     }
 
@@ -231,7 +342,7 @@ impl SocketData {
 
         out_hdr.set_seq_nr(self.ctl.snd_nxt);
         out_hdr.set_urgent_ptr(0);
-        out_hdr.set_window(63784);
+        out_hdr.set_window(u16::max_value());
 
         out_hdr.set_flags(flags);
 
@@ -266,20 +377,26 @@ impl SocketData {
         self.init_seq();
     }
 
+    fn update_rcv_next(&mut self, packet: Packet<Tcp>) {
+        let hdr = packet.header();
+        self.ctl.rcv_nxt = hdr.seq_nr().wrapping_add(packet.ack_len());
+    }
+
     fn handle_listen(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
 
         match (hdr.flag_syn(), hdr.flag_ack()) {
             (true, false) => {
                 self.ctl.iss = hdr.seq_nr();
+                self.ctl.irs = hdr.seq_nr();
 
                 self.setup_connection(packet);
 
-                let out = self.make_ack_packet(0, TcpFlags::SYN);
+                self.update_rcv_next(packet);
+
+                self.send_ack_flags(TcpFlags::SYN);
 
                 println!("[ TCP ] Syn Received");
-
-                self.send_packet(out, false);
 
                 self.state = State::SynReceived;
             }
@@ -292,7 +409,7 @@ impl SocketData {
 
         match (hdr.flag_ack(), hdr.flag_rst()) {
             (true, false) => {
-                self.stop_timer();
+                self.conn_timer().reset();
                 println!("[ TCP ] Connection established");
                 self.state = State::Established;
             }
@@ -312,14 +429,15 @@ impl SocketData {
         match (hdr.flag_syn(), hdr.flag_ack()) {
             (true, true) => {
                 self.ctl.iss = hdr.seq_nr();
+                self.ctl.irs = hdr.seq_nr();
 
-                let out = self.make_ack_packet(0, TcpFlags::empty());
+                self.update_rcv_next(packet);
 
                 println!("[ TCP ] Connection Established");
 
-                self.stop_timer();
+                self.conn_timer().reset();
 
-                self.send_packet(out, false);
+                self.send_ack();
 
                 self.state = State::Established;
             }
@@ -337,11 +455,9 @@ impl SocketData {
         }
 
         if !data.is_empty() || hdr.flag_fin() {
-            let out = self.make_ack_packet(0, TcpFlags::empty());
-
             self.buffer.append_data(data);
 
-            self.send_packet(out, false);
+            self.send_ack();
 
             if hdr.flag_fin() && data.is_empty() {
                 self.buffer.wait_queue().notify_all();
@@ -355,22 +471,26 @@ impl SocketData {
         let data = packet.data();
 
         if !data.is_empty() || hdr.flag_fin() {
-            let out = self.make_ack_packet(
-                0,
-                if hdr.flag_fin() {
-                    TcpFlags::FIN
-                } else {
-                    TcpFlags::empty()
-                },
-            );
-
             if self.buffer.append_data(data) == data.len() {
-                self.send_packet(out, false);
+                self.update_rcv_next(packet);
+
+                self.ctl.rcv_wnd += packet.ack_len();
+
+                if self.ctl.rcv_wnd >= 4096 * 4 {
+                    self.send_ack();
+                    self.rx_timer().disable();
+                    self.ctl.rcv_wnd = 0;
+                } else {
+                    self.rx_timer().start_with_timeout(200);
+                }
+            } else {
+                println!("[ TCP ] Failed to store data");
             }
 
             if hdr.flag_fin() {
                 self.state = State::LastAck;
-                self.start_timer(1000);
+                self.send_ack_flags(TcpFlags::FIN);
+                self.dc_timer().start_with_timeout(1000);
             }
         }
     }
@@ -383,23 +503,26 @@ impl SocketData {
                 self.state = State::FinWait2;
             }
             (true, true) => {
-                let out = self.make_ack_packet(0, TcpFlags::empty());
+                self.update_rcv_next(packet);
+
+                self.send_ack();
 
                 self.finalize();
-
-                self.send_packet(out, false)
             }
             (true, false) => {
-                let out = self.make_ack_packet(0, TcpFlags::empty());
+                self.update_rcv_next(packet);
 
-                self.send_packet(out, false);
+                self.send_ack();
 
                 self.state = State::Closing;
 
-                self.start_timer(500);
+                self.dc_timer().start_with_timeout(500);
             }
             _ => {
                 println!("[ TCP ] Unexpected FinWait1 packet");
+                self.send_ack_flags(TcpFlags::RST);
+
+                self.finalize();
             }
         }
     }
@@ -409,14 +532,17 @@ impl SocketData {
 
         match (hdr.flag_fin(), hdr.flag_ack()) {
             (true, true) => {
-                let out = self.make_ack_packet(0, TcpFlags::empty());
+                self.update_rcv_next(packet);
+
+                self.send_ack();
 
                 self.finalize();
-
-                self.send_packet(out, false)
             }
             _ => {
                 println!("[ TCP ] Unexpected FinWait2 packet");
+                self.send_ack_flags(TcpFlags::RST);
+
+                self.finalize();
             }
         }
     }
@@ -446,19 +572,16 @@ impl SocketData {
 
         if self.state != State::Listen && self.state != State::SynSent {
             if self.ctl.rcv_nxt != hdr.seq_nr() {
-                println!("[ TCP ] Out of Order Packet Received");
-                let out = self.make_ack_packet(0, TcpFlags::empty());
-                self.send_packet(out, false);
+                println!(
+                    "[ TCP ] Out of Order Packet Received {}, {} vs {}",
+                    (hdr.seq_nr() - self.ctl.irs),
+                    self.ctl.rcv_nxt,
+                    hdr.seq_nr()
+                );
+                self.send_ack();
                 return;
             }
         }
-
-        self.ctl.rcv_nxt = if hdr.flag_syn() || hdr.flag_fin() {
-            hdr.seq_nr().wrapping_add(1)
-        } else {
-            hdr.seq_nr()
-        }
-        .wrapping_add(packet.data().len() as u32);
 
         match self.state {
             State::Listen => self.handle_listen(packet),
@@ -488,9 +611,9 @@ impl SocketData {
 
         self.state = State::Closed;
 
-        println!("[ TCP ] Connection closed by RST");
+        println!("[ TCP ] Connection closed");
 
-        self.stop_timer();
+        self.stop_timers();
 
         crate::kernel::net::tcp::release_handler(self.src_port as u32);
 
@@ -501,21 +624,17 @@ impl SocketData {
         println!("[ TCP ] Closing");
         match self.state {
             State::Established | State::SynReceived => {
-                let out_packet = self.make_ack_packet(0, TcpFlags::FIN);
-
-                self.send_packet(out_packet, false);
+                self.send_ack_flags(TcpFlags::FIN);
 
                 self.state = State::FinWait1;
             }
             State::CloseWait => {
                 println!("[ TCP ] Close wait sent fin");
-                let out_packet = self.make_packet(0, TcpFlags::FIN);
-
-                self.send_packet(out_packet, false);
+                self.send_ack_flags(TcpFlags::FIN);
 
                 self.state = State::LastAck;
 
-                self.start_timer(500);
+                self.dc_timer().start_with_timeout(500);
             }
             _ if self.state != State::Closed => {
                 self.finalize();
@@ -524,24 +643,13 @@ impl SocketData {
         }
     }
 
-    fn send_sync(&mut self) {
-        let packet = self.make_packet(0, TcpFlags::SYN);
-
-        println!("[ TCP ] Connection Syn Sent");
-
-        self.state = State::SynSent;
-
-        self.send_packet(packet, false);
-    }
-
     pub fn connect(&mut self) {
         self.init_seq();
 
-        self.timeout = 1000;
-
         self.send_sync();
 
-        self.start_timer(self.timeout);
+        self.conn_timer().reset();
+        self.conn_timer().conn_timeout_start();
     }
 
     pub fn listen(&mut self) {
@@ -555,12 +663,6 @@ pub struct Socket {
     wait_queue: WaitQueue,
 
     self_ref: Weak<Socket>,
-}
-
-impl TimerObject for Socket {
-    fn call(&self) {
-        self.data.lock().timeout();
-    }
 }
 
 impl Socket {
@@ -588,6 +690,22 @@ impl Socket {
             (*ptr).self_ref = weak;
             Arc::from_raw(ptr)
         }
+    }
+
+    fn conn_timeout(&self) {
+        self.data.lock().conn_timeout();
+    }
+
+    fn rx_timeout(&self) {
+        self.data.lock().rx_timeout();
+    }
+
+    fn tx_timeout(&self) {
+        self.data.lock().tx_timeout();
+    }
+
+    fn dc_timeout(&self) {
+        self.data.lock().dc_timeout();
     }
 
     pub fn connect(&self) {

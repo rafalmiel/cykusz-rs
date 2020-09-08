@@ -7,7 +7,8 @@ use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
 use crate::kernel::net::tcp::socket::TcpFlags;
 use crate::kernel::net::util::{checksum, NetU16, NetU32};
 use crate::kernel::net::{
-    Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait, PacketUpHierarchy,
+    Packet, PacketBaseTrait, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
+    PacketUpHierarchy,
 };
 use crate::kernel::sync::RwSpin;
 
@@ -215,6 +216,8 @@ pub fn create_packet(src_port: u16, dst_port: u16, size: usize, target: Ip4) -> 
     header.set_dst_port(dst_port);
     header.set_src_port(src_port);
     header.set_header_len(core::mem::size_of::<TcpHeader>() as u8);
+
+    packet.set_auto_remove(false);
 
     packet
 }

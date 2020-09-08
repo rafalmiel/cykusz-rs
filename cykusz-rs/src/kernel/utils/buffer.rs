@@ -58,6 +58,14 @@ impl BufferQueue {
         written
     }
 
+    pub fn available_size(&self) -> usize {
+        let a = self.buffer.lock().available_size();
+
+        //println!(" {}", a);
+
+        a
+    }
+
     pub fn read_data(&self, buf: &mut [u8]) -> usize {
         let mut buffer = self.buffer.lock();
 
@@ -66,7 +74,7 @@ impl BufferQueue {
         self.wait_queue.add_task(task.clone());
 
         while !buffer.has_data() {
-            self.wait_queue.wait_lock(buffer);
+            WaitQueue::wait_lock(buffer);
 
             buffer = self.buffer.lock();
         }
@@ -98,6 +106,20 @@ impl Buffer {
         buf.data.resize(init_size, 0);
 
         buf
+    }
+
+    fn available_size(&self) -> usize {
+        if self.full {
+            return 0;
+        }
+
+        //print!("Available size: {} {} {}", self.data.len(), self.r, self.w);
+
+        if self.r <= self.w {
+            return self.data.len() - (self.w - self.r);
+        } else {
+            return self.r - self.w;
+        }
     }
 
     fn append_data(&mut self, data: &[u8]) -> usize {

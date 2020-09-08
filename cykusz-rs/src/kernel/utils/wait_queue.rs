@@ -9,6 +9,14 @@ pub struct WaitQueue {
     tasks: Spin<Vec<Arc<Task>>>,
 }
 
+impl Default for WaitQueue {
+    fn default() -> WaitQueue {
+        WaitQueue {
+            tasks: Spin::new(Vec::new()),
+        }
+    }
+}
+
 impl WaitQueue {
     pub const fn new() -> WaitQueue {
         WaitQueue {
@@ -16,7 +24,7 @@ impl WaitQueue {
         }
     }
 
-    pub fn wait_lock<T>(&self, lock: SpinGuard<T>) {
+    pub fn wait_lock<T>(lock: SpinGuard<T>) {
         let task = current_task();
 
         core::mem::drop(lock);
@@ -24,7 +32,7 @@ impl WaitQueue {
         task.await_io();
     }
 
-    pub fn wait(&self) {
+    pub fn wait() {
         let task = current_task();
 
         task.await_io();

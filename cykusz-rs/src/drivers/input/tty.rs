@@ -190,7 +190,7 @@ impl Tty {
         let mut buffer = self.buffer.lock_irq();
         self.wait_queue.add_task(task.clone());
         while !buffer.has_data() {
-            self.wait_queue.wait_lock(buffer);
+            WaitQueue::wait_lock(buffer);
 
             buffer = self.buffer.lock_irq();
         }

@@ -46,7 +46,7 @@ impl NetDriver for E1000 {
                 self.rx_wqueue.remove_task(task);
                 return p;
             } else {
-                self.rx_wqueue.wait_lock(data);
+                WaitQueue::wait_lock(data);
             }
         }
     }

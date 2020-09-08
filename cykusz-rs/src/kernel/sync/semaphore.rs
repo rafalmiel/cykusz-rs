@@ -30,7 +30,7 @@ impl Semaphore {
 
         loop {
             if lh.value < 1 {
-                self.wait_queue.wait_lock(lh);
+                WaitQueue::wait_lock(lh);
 
                 lh = self.internals.lock();
             } else {

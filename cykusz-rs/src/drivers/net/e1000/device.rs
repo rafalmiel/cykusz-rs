@@ -15,7 +15,7 @@ use super::regs::*;
 use super::*;
 
 pub const E1000_NUM_RX_DESCS: usize = 32;
-pub const E1000_NUM_TX_DESCS: usize = 8;
+pub const E1000_NUM_TX_DESCS: usize = 32;
 
 #[allow(dead_code)]
 #[repr(packed)]
@@ -171,6 +171,10 @@ impl E1000Data {
             while status.read_volatile().bits() & 0xff == 0 {
                 //println!("Status: 0b{:b}", status.read_volatile().bits());
             }
+        }
+
+        if packet.auto_remove() {
+            self.dealloc_packet(packet);
         }
     }
 

@@ -27,6 +27,8 @@ pub trait PacketBaseTrait {
     fn base_len(&self) -> usize;
     fn addr(&self) -> VirtAddr;
     fn len(&self) -> usize;
+    fn auto_remove(&self) -> bool;
+    fn set_auto_remove(&mut self, v: bool);
 }
 
 pub trait PacketTrait: PacketBaseTrait {
@@ -59,6 +61,7 @@ pub struct Packet<T: PacketKind> {
     pub base_len: usize,
     pub addr: VirtAddr,
     pub len: usize,
+    pub auto_remove: bool,
     _p: PhantomData<T>,
 }
 
@@ -78,6 +81,14 @@ impl<T: PacketKind> PacketBaseTrait for Packet<T> {
     fn len(&self) -> usize {
         self.len
     }
+
+    fn auto_remove(&self) -> bool {
+        self.auto_remove
+    }
+
+    fn set_auto_remove(&mut self, v: bool) {
+        self.auto_remove = v;
+    }
 }
 
 impl<T: PacketKind> Packet<T> {
@@ -87,16 +98,24 @@ impl<T: PacketKind> Packet<T> {
             base_len: len,
             addr,
             len,
+            auto_remove: true,
             _p: PhantomData::default(),
         }
     }
 
-    fn new_base(base_addr: VirtAddr, base_len: usize, addr: VirtAddr, len: usize) -> Packet<T> {
+    fn new_base(
+        base_addr: VirtAddr,
+        base_len: usize,
+        addr: VirtAddr,
+        len: usize,
+        auto_remove: bool,
+    ) -> Packet<T> {
         Packet::<T> {
             base_addr,
             base_len,
             addr,
             len,
+            auto_remove,
             _p: PhantomData::default(),
         }
     }
@@ -118,6 +137,7 @@ pub trait PacketUpHierarchy<B: PacketKind>: PacketTrait {
             self.base_len(),
             self.addr() + hs,
             self.len() - hs,
+            self.auto_remove(),
         )
     }
 }
@@ -131,6 +151,7 @@ pub trait PacketDownHierarchy<B: PacketKind>: PacketBaseTrait {
             self.base_len(),
             self.addr() - amount,
             self.len() + amount,
+            self.auto_remove(),
         )
     }
 }

@@ -6,6 +6,7 @@ use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::{Ip4, IpHeader};
 use crate::kernel::net::tcp::{Tcp, TcpHeader, TcpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::timer::{create_timer, current_ns, Timer, TimerObject};
@@ -52,6 +53,18 @@ struct TransmissionCtl {
     rcv_nxt: u32,
     rcv_wnd: u32,
     irs: u32,
+}
+
+impl TransmissionCtl {
+    fn available_window(&self) -> usize {
+        let outstanding = self.snd_nxt.wrapping_sub(self.snd_una);
+
+        if outstanding > self.snd_wnd {
+            0
+        } else {
+            self.snd_wnd as usize - outstanding as usize
+        }
+    }
 }
 
 #[derive(Default)]
@@ -108,6 +121,7 @@ struct SocketData {
     ctl: TransmissionCtl,
     buffer: BufferQueue,
     out: PacketQueue,
+    send_queue: WaitQueue,
 }
 
 struct QueuedPacket {
@@ -218,9 +232,7 @@ impl SocketData {
     }
 
     fn rx_timeout(&mut self) {
-        let out = self.make_ack_packet(0, TcpFlags::empty());
-
-        self.send_packet(out, false);
+        self.send_ack();
     }
 
     fn tx_timeout(&mut self) {
@@ -230,7 +242,11 @@ impl SocketData {
             None
         };
 
-        if let Some(p) = out {
+        if let Some(mut p) = out {
+            let hdr = p.header_mut();
+
+            hdr.set_ack_nr(self.ctl.rcv_nxt);
+
             self.resend_packet(p);
 
             self.tx_timer().start_with_timeout(1000);
@@ -277,6 +293,8 @@ impl SocketData {
 
         self.ctl.snd_nxt = self.ctl.snd_nxt.wrapping_add(packet.ack_len());
 
+        //println!("[ TCP ] Send window: {} >= {}", self.ctl.snd_wnd, self.ctl.snd_nxt.wrapping_sub(self.ctl.snd_una));
+
         if queue {
             let queued = QueuedPacket {
                 packet,
@@ -316,22 +334,46 @@ impl SocketData {
     }
 
     fn process_ack(&mut self, header: &TcpHeader) {
-        self.ctl.snd_una = header.ack_nr();
+        if self.ctl.snd_una != header.ack_nr() {
+            //println!("[ TCP ] Update snd_una {} -> {}", self.ctl.snd_una, header.ack_nr());
+            self.ctl.snd_una = header.ack_nr();
 
-        let a = self
-            .out
-            .queue
-            .iter()
-            .enumerate()
-            .find(|p| p.1.ack == header.ack_nr());
+            self.send_queue.notify_all();
 
-        if let Some((idx, _)) = a {
-            for _ in 0..=idx {
-                self.out.queue.remove(0);
+            let a = self
+                .out
+                .queue
+                .iter()
+                .enumerate()
+                .find(|p| p.1.ack >= header.ack_nr());
+
+            if let Some((idx, _)) = a {
+                for i in 0..idx {
+                    self.out.queue.remove(0);
+                }
+
+                if self.out.queue.get(0).unwrap().ack == header.ack_nr() {
+                    self.out.queue.remove(0);
+                }
+
+                //println!("[ TCP ] Removed {} packets from the queue", idx);
+
+                if !self.out.queue.is_empty() {
+                    self.tx_timer().start_with_timeout(1000);
+                } else {
+                    self.tx_timer().disable();
+                }
             }
-
-            self.tx_timer().start_with_timeout(1000);
         }
+
+        //println!("[ TCP ] Resend queue len {}", self.out.queue.len());
+
+        //if !self.out.queue.is_empty() {
+        //    for e in self.out.queue.iter() {
+        //        print!("{} ", e.ack);
+        //    }
+        //    println!(".");
+        //}
     }
 
     fn make_packet(&mut self, len: usize, flags: TcpFlags) -> Packet<Tcp> {
@@ -342,7 +384,9 @@ impl SocketData {
 
         out_hdr.set_seq_nr(self.ctl.snd_nxt);
         out_hdr.set_urgent_ptr(0);
-        out_hdr.set_window(u16::max_value());
+        out_hdr.set_window(
+            core::cmp::min(u16::max_value() as usize, self.buffer.available_size()) as u16,
+        );
 
         out_hdr.set_flags(flags);
 
@@ -471,20 +515,24 @@ impl SocketData {
         let data = packet.data();
 
         if !data.is_empty() || hdr.flag_fin() {
-            if self.buffer.append_data(data) == data.len() {
-                self.update_rcv_next(packet);
+            if hdr.seq_nr() == self.ctl.rcv_nxt {
+                if self.buffer.append_data(data) == data.len() {
+                    //println!("[ TCP ] Stored {} bytes", data.len());
+                    self.update_rcv_next(packet);
 
-                self.ctl.rcv_wnd += packet.ack_len();
+                    self.ctl.rcv_wnd += packet.ack_len();
 
-                if self.ctl.rcv_wnd >= 4096 * 4 {
-                    self.send_ack();
-                    self.rx_timer().disable();
-                    self.ctl.rcv_wnd = 0;
+                    if self.ctl.rcv_wnd >= 4096 * 4 {
+                        self.send_ack();
+
+                        self.ctl.rcv_wnd = 0;
+                        self.rx_timer().disable();
+                    } else {
+                        self.rx_timer().start_with_timeout(200);
+                    }
                 } else {
-                    self.rx_timer().start_with_timeout(200);
+                    println!("[ TCP ] Failed to store data");
                 }
-            } else {
-                println!("[ TCP ] Failed to store data");
             }
 
             if hdr.flag_fin() {
@@ -564,7 +612,15 @@ impl SocketData {
     }
 
     fn process(&mut self, packet: Packet<Tcp>) {
+        //print!(".");
         let hdr = packet.header();
+
+        self.ctl.snd_wnd = hdr.window() as u32;
+
+        //if packet.data().len() == 0 && hdr.flag_ack() && hdr.ack_nr() == self.ctl.snd_una {
+        //    println!("[ TCP ] Dup ack");
+        //    self.tx_timeout();
+        //}
 
         if hdr.flag_ack() {
             self.process_ack(hdr);
@@ -578,8 +634,14 @@ impl SocketData {
                     self.ctl.rcv_nxt,
                     hdr.seq_nr()
                 );
-                self.send_ack();
-                return;
+
+                println!("[ TCP ] Available buffer: {}", self.buffer.available_size());
+
+                //self.send_ack();
+                //self.send_ack();
+                //self.send_ack_flags(TcpFlags::RST);
+                //self.finalize();
+                //return;
             }
         }
 
@@ -743,20 +805,50 @@ impl Socket {
 
 impl INode for Socket {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        let data = self.data.lock();
+        let mut data = self.data.lock();
 
-        Ok(data.buffer.read_data(buf))
+        let wnd_update = data.buffer.available_size() == 0;
+
+        let r = data.buffer.read_data(buf);
+
+        if wnd_update {
+            data.send_ack();
+        }
+
+        //println!("[ TCP ] Read {} bytes", r);
+
+        Ok(r)
     }
 
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         let mut data = self.data.lock();
 
         if data.state == State::Established {
-            let mut packet = data.make_ack_packet(buf.len(), TcpFlags::PSH);
+            let task = current_task();
+
+            data.send_queue.add_task(task.clone());
+
+            while data.ctl.available_window() < buf.len() && data.state == State::Established {
+                //println!("[ TCP ] Awaiting available window {} {}", data.ctl.available_window(), buf.len());
+                WaitQueue::wait_lock(data);
+
+                data = self.data.lock();
+            }
+
+            data.send_queue.remove_task(task);
+
+            if data.state != State::Established {
+                return Err(FsError::NotSupported);
+            }
+
+            let mut packet = data.make_ack_packet(buf.len(), TcpFlags::empty());
 
             packet.data_mut().copy_from_slice(buf);
 
             data.send_packet(packet, true);
+
+            data.ctl.rcv_wnd = 0;
+            data.rx_timer().disable();
 
             Ok(buf.len())
         } else {

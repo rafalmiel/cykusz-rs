@@ -267,7 +267,7 @@ impl DnsService {
         self.wait_queue.add_task(current_task());
 
         while res.is_none() {
-            self.wait_queue.wait_lock(res);
+            WaitQueue::wait_lock(res);
 
             res = self.ip_result.lock();
         }

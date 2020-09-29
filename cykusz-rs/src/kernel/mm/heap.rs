@@ -1,4 +1,4 @@
-use core::alloc::{AllocErr, AllocRef, GlobalAlloc, Layout};
+use core::alloc::{GlobalAlloc, Layout};
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -38,23 +38,21 @@ impl LockedHeap {
         LockedHeap(Spin::new(Heap::empty()))
     }
 
-    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<[u8]>, AllocErr> {
+    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, ()> {
         ALLOCED_MEM.fetch_add(layout.size(), Ordering::SeqCst);
-        heap.alloc(layout.clone()).or_else(|e| match e {
-            AllocErr { .. } => {
-                let top = heap.top();
-                let req = align_up(layout.size(), 0x1000);
+        heap.allocate_first_fit(layout.clone()).or_else(|_| {
+            let top = heap.top();
+            let req = align_up(layout.size(), 0x1000);
 
-                if top as usize + req as usize > HEAP_END.0 {
-                    panic!("Out of mem!");
-                }
-
-                map_more_heap(top as *const u8, req);
-
-                heap.extend(req);
-
-                heap.alloc(layout)
+            if top as usize + req as usize > HEAP_END.0 {
+                panic!("Out of mem!");
             }
+
+            map_more_heap(top as *const u8, req);
+
+            heap.extend(req);
+
+            heap.allocate_first_fit(layout)
         })
     }
 }
@@ -71,12 +69,12 @@ unsafe impl GlobalAlloc for LockedHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.allocate(&mut self.0.lock(), layout)
             .ok()
-            .map_or(0 as *mut u8, |mut alloc| alloc.as_mut().as_mut_ptr())
+            .map_or(0 as *mut u8, |alloc| alloc.as_ptr())
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         ALLOCED_MEM.fetch_sub(layout.size(), Ordering::SeqCst);
-        self.0.lock().dealloc(NonNull::new_unchecked(ptr), layout)
+        self.0.lock().deallocate(NonNull::new_unchecked(ptr), layout)
     }
 }
 

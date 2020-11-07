@@ -62,7 +62,7 @@ pub fn init() {
 }
 
 fn serial<'a>() -> SpinGuard<'a, Serial> {
-    SERIAL.r#try().unwrap().lock_irq()
+    SERIAL.get().unwrap().lock_irq()
 }
 
 pub fn write(s: &str) {

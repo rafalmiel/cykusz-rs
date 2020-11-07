@@ -119,7 +119,7 @@ struct SocketData {
     tx_timer: Option<Arc<Timer>>,
     dc_timer: Option<Arc<Timer>>,
     ctl: TransmissionCtl,
-    buffer: BufferQueue,
+    in_buffer: BufferQueue,
     out: PacketQueue,
     send_queue: WaitQueue,
 }
@@ -171,7 +171,7 @@ impl SocketData {
     pub fn new(port: u16) -> SocketData {
         SocketData {
             src_port: port,
-            buffer: BufferQueue::new(4096 * 18),
+            in_buffer: BufferQueue::new(4096 * 18),
             ..Default::default()
         }
     }
@@ -385,7 +385,7 @@ impl SocketData {
         out_hdr.set_seq_nr(self.ctl.snd_nxt);
         out_hdr.set_urgent_ptr(0);
         out_hdr.set_window(
-            core::cmp::min(u16::max_value() as usize, self.buffer.available_size()) as u16,
+            core::cmp::min(u16::max_value() as usize, self.in_buffer.available_size()) as u16,
         );
 
         out_hdr.set_flags(flags);
@@ -499,12 +499,12 @@ impl SocketData {
         }
 
         if !data.is_empty() || hdr.flag_fin() {
-            self.buffer.append_data(data);
+            self.in_buffer.append_data(data);
 
             self.send_ack();
 
             if hdr.flag_fin() && data.is_empty() {
-                self.buffer.wait_queue().notify_all();
+                self.in_buffer.wait_queue().notify_all();
             }
         }
     }
@@ -516,7 +516,7 @@ impl SocketData {
 
         if !data.is_empty() || hdr.flag_fin() {
             if hdr.seq_nr() == self.ctl.rcv_nxt {
-                if self.buffer.append_data(data) == data.len() {
+                if self.in_buffer.append_data(data) == data.len() {
                     //println!("[ TCP ] Stored {} bytes", data.len());
                     self.update_rcv_next(packet);
 
@@ -635,7 +635,7 @@ impl SocketData {
                     hdr.seq_nr()
                 );
 
-                println!("[ TCP ] Available buffer: {}", self.buffer.available_size());
+                println!("[ TCP ] Available buffer: {}", self.in_buffer.available_size());
 
                 //self.send_ack();
                 //self.send_ack();
@@ -679,7 +679,7 @@ impl SocketData {
 
         crate::kernel::net::tcp::release_handler(self.src_port as u32);
 
-        self.buffer.wait_queue().notify_all();
+        self.in_buffer.wait_queue().notify_all();
     }
 
     fn close(&mut self) {
@@ -807,9 +807,9 @@ impl INode for Socket {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         let mut data = self.data.lock();
 
-        let wnd_update = data.buffer.available_size() == 0;
+        let wnd_update = data.in_buffer.available_size() == 0;
 
-        let r = data.buffer.read_data(buf);
+        let r = data.in_buffer.read_data(buf);
 
         if wnd_update {
             data.send_ack();
@@ -861,15 +861,15 @@ impl INode for Socket {
         let data = self.data.lock();
 
         if let Some(pt) = listen {
-            pt.listen(&data.buffer.wait_queue());
+            pt.listen(&data.in_buffer.wait_queue());
         }
 
         if (data.state == State::Closed || data.state == State::CloseWait)
-            && !data.buffer.has_data()
+            && !data.in_buffer.has_data()
         {
             Err(FsError::NotSupported)
         } else {
-            Ok(data.buffer.has_data())
+            Ok(data.in_buffer.has_data())
         }
     }
 
@@ -885,7 +885,7 @@ impl TcpService for Socket {
         data.process(packet);
 
         if data.state == State::Closed {
-            data.buffer.wait_queue().notify_all();
+            data.in_buffer.wait_queue().notify_all();
         }
     }
 

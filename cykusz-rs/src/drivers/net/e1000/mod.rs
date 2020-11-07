@@ -135,7 +135,7 @@ impl E1000 {
 static DEVICE: Once<Arc<E1000>> = Once::new();
 
 fn device() -> &'static Arc<E1000> {
-    DEVICE.r#try().unwrap()
+    DEVICE.get().unwrap()
 }
 
 fn init() {

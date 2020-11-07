@@ -138,7 +138,7 @@ impl Scheduler {
 static SCHEDULER: Once<Scheduler> = Once::new();
 
 fn scheduler() -> &'static Scheduler {
-    SCHEDULER.r#try().expect("Scheduler not initialized")
+    SCHEDULER.get().expect("Scheduler not initialized")
 }
 
 fn scheduler_main() {

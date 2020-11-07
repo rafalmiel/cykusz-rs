@@ -68,11 +68,11 @@ impl Device for StdOut {
 }
 
 pub fn stdout() -> &'static Arc<StdOut> {
-    &STDOUT.r#try().unwrap()
+    &STDOUT.get().unwrap()
 }
 
 pub fn stdin() -> &'static Arc<StdIn> {
-    &STDIN.r#try().unwrap()
+    &STDIN.get().unwrap()
 }
 
 pub fn init() {

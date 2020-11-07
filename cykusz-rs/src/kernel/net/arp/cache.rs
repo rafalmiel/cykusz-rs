@@ -90,15 +90,15 @@ static CACHE: Once<RwSpin<ArpCache>> = Once::new();
 pub fn insert(ip: Ip4, mac: &[u8; 6]) {
     //println!("[ ARP ] Cache {:?} -> {:?}", ip, mac);
 
-    CACHE.r#try().as_ref().unwrap().write().insert(ip, mac);
+    CACHE.get().as_ref().unwrap().write().insert(ip, mac);
 }
 
 pub fn get(ip: Ip4) -> Option<[u8; 6]> {
-    CACHE.r#try().as_ref().unwrap().read().get(ip)
+    CACHE.get().as_ref().unwrap().read().get(ip)
 }
 
 pub fn request_ip(ip: Ip4, packet: Packet<Eth>) {
-    let mut cache = CACHE.r#try().as_ref().unwrap().write();
+    let mut cache = CACHE.get().as_ref().unwrap().write();
 
     cache.request(ip, packet);
 }

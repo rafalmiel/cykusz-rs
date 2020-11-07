@@ -84,6 +84,12 @@ impl BufferQueue {
         buffer.read_data(buf)
     }
 
+    pub fn try_read_data_transient(&self, buf: &mut [u8]) -> usize {
+        let buffer = self.buffer.lock();
+
+        buffer.read_data_transient(buf)
+    }
+
     pub fn try_read_data(&self, buf: &mut [u8]) -> usize {
         let mut buffer = self.buffer.lock();
 
@@ -113,13 +119,15 @@ impl Buffer {
             return 0;
         }
 
-        //print!("Available size: {} {} {}", self.data.len(), self.r, self.w);
-
-        if self.r <= self.w {
-            return self.data.len() - (self.w - self.r);
+        return if self.r <= self.w {
+            self.data.len() - (self.w - self.r)
         } else {
-            return self.r - self.w;
+            self.r - self.w
         }
+    }
+
+    fn size(&self) -> usize {
+        return self.data.len() - self.available_size()
     }
 
     fn append_data(&mut self, data: &[u8]) -> usize {
@@ -173,6 +181,43 @@ impl Buffer {
             self.full = false;
             let read = if to_read < buf.len() {
                 self.read_data(&mut buf[to_read..])
+            } else {
+                0
+            };
+            read + to_read
+        }
+    }
+
+    fn mark_as_read(&mut self, amount: usize) -> usize {
+        let avail = self.available_size();
+
+        if self.available_size() < amount {
+            self.r = self.w;
+            self.full = false;
+            return avail;
+        }
+
+        self.r = (self.r + amount) % self.data.len();
+
+        amount
+    }
+
+    fn read_data_transient(&self, buf: &mut [u8]) -> usize {
+        if (self.r == self.w && !self.full) || buf.is_empty() {
+            return 0;
+        }
+
+        if self.w > self.r {
+            let cap = self.w - self.r;
+            let to_read = core::cmp::min(cap, buf.len());
+            buf[..to_read].copy_from_slice(&self.data.as_slice()[self.r..self.r + to_read]);
+            to_read
+        } else {
+            let right = self.data.len() - self.r;
+            let to_read = core::cmp::min(right, buf.len());
+            buf[..to_read].copy_from_slice(&self.data.as_slice()[self.r..self.r + to_read]);
+            let read = if to_read < buf.len() {
+                self.read_data_transient(&mut buf[to_read..])
             } else {
                 0
             };

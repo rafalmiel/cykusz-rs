@@ -20,7 +20,7 @@ static CONTROLLER: Once<PS> = Once::new();
 
 fn controller() -> &'static PS {
     CONTROLLER
-        .r#try()
+        .get()
         .expect("PS2 Controller is not initialised!")
 }
 

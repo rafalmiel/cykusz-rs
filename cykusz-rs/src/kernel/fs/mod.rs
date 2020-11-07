@@ -23,7 +23,7 @@ pub mod vfs;
 static ROOT_INODE: Once<Arc<MNode>> = Once::new();
 
 pub fn root_inode() -> &'static Arc<MNode> {
-    ROOT_INODE.r#try().unwrap()
+    ROOT_INODE.get().unwrap()
 }
 
 struct DevListener {}

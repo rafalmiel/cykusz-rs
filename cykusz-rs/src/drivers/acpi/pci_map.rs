@@ -141,11 +141,11 @@ static ROOT_BRIDGE: Once<Spin<PciBridge>> = Once::new();
 static ROOT_HANDLE: Once<AcpiHandle> = Once::new();
 
 fn root_bridge<'a>() -> SpinGuard<'a, PciBridge> {
-    ROOT_BRIDGE.r#try().unwrap().lock()
+    ROOT_BRIDGE.get().unwrap().lock()
 }
 
 fn root_handle() -> ACPI_HANDLE {
-    ROOT_HANDLE.r#try().unwrap().0
+    ROOT_HANDLE.get().unwrap().0
 }
 
 #[allow(non_snake_case)]

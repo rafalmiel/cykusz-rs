@@ -47,7 +47,7 @@ impl Default for PhysPage {
 pub static PAGES: Once<Vec<PhysPage>> = Once::new();
 
 pub fn pages() -> Option<&'static Vec<PhysPage>> {
-    PAGES.r#try()
+    PAGES.get()
 }
 
 pub fn init_pages() {

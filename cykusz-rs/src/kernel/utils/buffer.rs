@@ -15,11 +15,17 @@ impl Default for BufferQueue {
     }
 }
 
-struct Buffer {
+pub struct Buffer {
     data: Vec<u8>,
     r: usize,
     w: usize,
     full: bool, // r == w may indicate both empty and full buffer, full boolean disambiguate that
+}
+
+impl Default for Buffer {
+    fn default() -> Buffer {
+        Buffer::new(4096)
+    }
 }
 
 impl BufferQueue {
@@ -102,7 +108,7 @@ impl BufferQueue {
 }
 
 impl Buffer {
-    fn new(init_size: usize) -> Buffer {
+    pub fn new(init_size: usize) -> Buffer {
         let mut buf = Buffer {
             data: Vec::with_capacity(init_size),
             r: 0,
@@ -114,7 +120,7 @@ impl Buffer {
         buf
     }
 
-    fn available_size(&self) -> usize {
+    pub fn available_size(&self) -> usize {
         if self.full {
             return 0;
         }
@@ -126,11 +132,11 @@ impl Buffer {
         }
     }
 
-    fn size(&self) -> usize {
+    pub fn size(&self) -> usize {
         return self.data.len() - self.available_size()
     }
 
-    fn append_data(&mut self, data: &[u8]) -> usize {
+    pub fn append_data(&mut self, data: &[u8]) -> usize {
         if self.full {
             return 0;
         }
@@ -157,11 +163,11 @@ impl Buffer {
         }
     }
 
-    fn has_data(&self) -> bool {
+    pub fn has_data(&self) -> bool {
         self.r != self.w || self.full
     }
 
-    fn read_data(&mut self, buf: &mut [u8]) -> usize {
+    pub fn read_data(&mut self, buf: &mut [u8]) -> usize {
         if (self.r == self.w && !self.full) || buf.is_empty() {
             return 0;
         }
@@ -188,21 +194,22 @@ impl Buffer {
         }
     }
 
-    fn mark_as_read(&mut self, amount: usize) -> usize {
-        let avail = self.available_size();
+    pub fn mark_as_read(&mut self, amount: usize) -> usize {
+        let avail = self.size();
 
-        if self.available_size() < amount {
+        if avail < amount {
             self.r = self.w;
             self.full = false;
             return avail;
         }
 
         self.r = (self.r + amount) % self.data.len();
+        self.full = false;
 
         amount
     }
 
-    fn read_data_transient(&self, buf: &mut [u8]) -> usize {
+    pub fn read_data_transient(&self, buf: &mut [u8]) -> usize {
         if (self.r == self.w && !self.full) || buf.is_empty() {
             return 0;
         }

@@ -74,7 +74,9 @@ unsafe impl GlobalAlloc for LockedHeap {
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         ALLOCED_MEM.fetch_sub(layout.size(), Ordering::SeqCst);
-        self.0.lock().deallocate(NonNull::new_unchecked(ptr), layout)
+        self.0
+            .lock()
+            .deallocate(NonNull::new_unchecked(ptr), layout)
     }
 }
 

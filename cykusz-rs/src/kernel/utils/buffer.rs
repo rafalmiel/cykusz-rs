@@ -129,11 +129,11 @@ impl Buffer {
             self.data.len() - (self.w - self.r)
         } else {
             self.r - self.w
-        }
+        };
     }
 
     pub fn size(&self) -> usize {
-        return self.data.len() - self.available_size()
+        return self.data.len() - self.available_size();
     }
 
     pub fn append_data(&mut self, data: &[u8]) -> usize {

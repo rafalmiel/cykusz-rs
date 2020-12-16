@@ -8,6 +8,7 @@ use spin::Once;
 use addr::Addr;
 
 use crate::arch::raw::mm::VirtAddr;
+use crate::drivers::net::e1000::device::E1000_NUM_TX_DESCS;
 use crate::drivers::pci::{PciDeviceHandle, PciHeader};
 use crate::kernel::net::eth::Eth;
 use crate::kernel::net::{NetDriver, Packet, RecvPacket};
@@ -152,6 +153,7 @@ fn init() {
                 rx_cur: 0,
                 tx_cur: 0,
                 ring_buf: VirtAddr(0),
+                tx_pkts: [None; E1000_NUM_TX_DESCS],
             }),
             rx_wqueue: WaitQueue::new(),
         })

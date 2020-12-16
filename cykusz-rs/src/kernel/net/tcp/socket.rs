@@ -125,27 +125,6 @@ struct SocketData {
     send_queue: WaitQueue,
 }
 
-struct QueuedPacket {
-    packet: Packet<Tcp>,
-    ack: u32,
-}
-
-impl Drop for QueuedPacket {
-    fn drop(&mut self) {
-        self.packet.deallocate();
-    }
-}
-
-struct PacketQueue {
-    queue: Vec<QueuedPacket>,
-}
-
-impl Default for PacketQueue {
-    fn default() -> PacketQueue {
-        PacketQueue { queue: Vec::new() }
-    }
-}
-
 struct TimerCallback {
     sock: Weak<Socket>,
     fun: fn(&Socket),
@@ -343,26 +322,23 @@ impl SocketData {
     fn process_ack(&mut self, header: &TcpHeader) {
         if self.ctl.snd_una != header.ack_nr() {
             //TODO: Do a better check here (in case of wrap around)
-            //println!("[ TCP ] Update snd_una {} -> {}", self.ctl.snd_una, header.ack_nr());
 
             let bytes_acked = header.ack_nr().wrapping_sub(self.ctl.snd_una);
+
             self.snd_buffer.mark_as_read(bytes_acked as usize);
-            //println!("[ TCP ] Marked as read {} bytes", _mrked);
 
             self.ctl.snd_una = header.ack_nr();
 
             let mut window = self.ctl.available_window();
 
+            let max = 1460usize;
+
             while self.proxy_buffer.has_data() && window > 0 {
-                let mut data = [0u8; 1024];
+                let cap = core::cmp::min(self.proxy_buffer.size(), core::cmp::min(max, window));
 
-                let cap = core::cmp::min(1024, window);
+                let mut packet = self.make_ack_packet(cap, TcpFlags::empty());
 
-                let read = self.proxy_buffer.read_data(&mut data[..cap]);
-
-                let mut packet = self.make_ack_packet(read, TcpFlags::empty());
-
-                packet.data_mut().copy_from_slice(&data[..read]);
+                self.proxy_buffer.read_data(&mut packet.data_mut()[..cap]);
 
                 self.send_packet(packet, true);
 

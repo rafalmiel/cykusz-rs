@@ -72,6 +72,10 @@ impl BufferQueue {
         a
     }
 
+    pub fn size(&self) -> usize {
+        self.buffer.lock().size()
+    }
+
     pub fn read_data(&self, buf: &mut [u8]) -> usize {
         let mut buffer = self.buffer.lock();
 

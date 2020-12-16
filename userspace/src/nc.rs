@@ -3,20 +3,10 @@ use syscall_defs::ConnectionFlags;
 fn send(fd: usize) -> bool {
     let mut buf = [0u8; 1300];
 
-    //loop {
-    //    if let Err(err) = syscall::write(fd, &buf) {
-    //        println!("Send failed {:?}", err);
-
-    //        return false
-    //    }
-    //}
-
     if let Ok(read) = syscall::read(1, &mut buf) {
         if read == 1 {
             return false;
         }
-
-        //println!("Send {} bytes", read);
 
         if let Err(err) = syscall::write(fd, &buf[..read]) {
             println!("Send failed {:?}", err);
@@ -32,7 +22,7 @@ fn send(fd: usize) -> bool {
     }
 }
 
-static mut RECV_BUF: [u8; 2*4096] = [0u8; 2*4096];
+static mut RECV_BUF: [u8; 2 * 4096] = [0u8; 2 * 4096];
 static mut SENT: usize = 0;
 
 fn recv(fd: usize) -> bool {
@@ -45,9 +35,9 @@ fn recv(fd: usize) -> bool {
             //print!("{}", s);
             //println!("Sending {} bytes", len);
             //if unsafe {SENT} < 5 * 1024 * 1024 && false {
-            //if let Err(e) = unsafe { syscall::write(fd, &RECV_BUF[..len]) } {
-            //    println!("Send failed: {:?}", e);
-            //}
+            if let Err(e) = unsafe { syscall::write(fd, &RECV_BUF[..len]) } {
+                println!("Send failed: {:?}", e);
+            }
 
             unsafe {
                 SENT += len;

@@ -53,6 +53,7 @@ pub struct E1000Data {
     pub rx_cur: u32,
     pub tx_cur: u32,
     pub ring_buf: VirtAddr,
+    pub tx_pkts: [Option<Packet<Eth>>; E1000_NUM_TX_DESCS],
 }
 
 pub extern "x86-interrupt" fn e1000_handler(_frame: &mut ExceptionStackFrame) {
@@ -152,30 +153,35 @@ impl E1000Data {
         self.mac
     }
 
-    pub fn send(&mut self, packet: Packet<Eth>) {
-        let phys = packet.addr.to_phys_pagewalk().unwrap();
-
-        self.tx_ring[self.tx_cur as usize].addr = phys.0 as u64;
-        self.tx_ring[self.tx_cur as usize].length = packet.len() as u16;
-        self.tx_ring[self.tx_cur as usize].cmd = 0b1011;
-        self.tx_ring[self.tx_cur as usize].status = TStatus::default();
-
-        let old_cur = self.tx_cur;
-        self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESCS as u32;
-
-        self.addr.write(Regs::TxDescTail, self.tx_cur);
-
-        let status = &self.tx_ring[old_cur as usize].status as *const TStatus;
+    fn wait_send_ready(&mut self) {
+        let status = &self.tx_ring[self.tx_cur as usize].status as *const TStatus;
 
         unsafe {
             while status.read_volatile().bits() & 0xff == 0 {
                 //println!("Status: 0b{:b}", status.read_volatile().bits());
             }
         }
+    }
 
-        if packet.auto_remove() {
-            self.dealloc_packet(packet);
+    pub fn send(&mut self, packet: Packet<Eth>) {
+        self.wait_send_ready();
+
+        let phys = packet.addr.to_phys_pagewalk().unwrap();
+
+        if let Some(pkt) = self.tx_pkts[self.tx_cur as usize] {
+            self.dealloc_packet(pkt);
         }
+
+        self.tx_pkts[self.tx_cur as usize] = Some(packet);
+
+        self.tx_ring[self.tx_cur as usize].addr = phys.0 as u64;
+        self.tx_ring[self.tx_cur as usize].length = packet.len() as u16;
+        self.tx_ring[self.tx_cur as usize].cmd = 0b1011;
+        self.tx_ring[self.tx_cur as usize].status = TStatus::default();
+
+        self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESCS as u32;
+
+        self.addr.write(Regs::TxDescTail, self.tx_cur);
     }
 
     pub fn reset(&self) {

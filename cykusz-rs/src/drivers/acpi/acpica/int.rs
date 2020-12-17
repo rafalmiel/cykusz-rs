@@ -4,10 +4,9 @@
 use acpica::*;
 
 use crate::arch::int::{mask_int, set_irq_dest};
-use crate::arch::raw::idt::ExceptionStackFrame;
 use crate::kernel::sync::Spin;
 
-extern "x86-interrupt" fn acpi_irq(_frame: &mut ExceptionStackFrame) {
+fn acpi_irq() -> bool {
     println!("ACPI INT");
     let c = CTX.lock();
     let ctx = c.as_ref().unwrap();
@@ -18,7 +17,7 @@ extern "x86-interrupt" fn acpi_irq(_frame: &mut ExceptionStackFrame) {
 
     core::mem::drop(c);
 
-    crate::arch::int::end_of_int();
+    return true;
 }
 
 struct Ctx {
@@ -56,7 +55,7 @@ extern "C" fn AcpiOsInstallInterruptHandler(
         });
 
         set_irq_dest(InterruptNumber as u8, InterruptNumber as u8 + 32);
-        set_handler(InterruptNumber as usize + 32, acpi_irq);
+        add_shared_irq_handler(InterruptNumber as usize + 32, acpi_irq);
 
         AE_OK
     } else {

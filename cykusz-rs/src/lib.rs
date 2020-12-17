@@ -50,14 +50,6 @@ pub fn bochs() {
 }
 
 pub fn rust_main(stack_top: VirtAddr) {
-    kernel::mm::init();
-
-    println!("[ OK ] Heap Initialised");
-
-    arch::mm::phys::init_pages();
-
-    println!("[ OK ] Phys Page Map Initialised");
-
     kernel::smp::init();
 
     kernel::tls::init(stack_top);

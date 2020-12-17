@@ -84,7 +84,7 @@ fn init() {
     use crate::arch::idt;
 
     int::set_irq_dest(1, 33);
-    idt::set_handler(33, keyboard_interrupt);
+    idt::add_shared_irq_handler(33, keyboard_interrupt);
 
     {
         let mut config = ctrl.config();
@@ -101,12 +101,10 @@ fn init() {
     int::enable();
 }
 
-extern "x86-interrupt" fn keyboard_interrupt(
-    _frame: &mut crate::arch::raw::idt::ExceptionStackFrame,
-) {
+fn keyboard_interrupt() -> bool {
     handler::handle_interrupt();
 
-    crate::arch::int::end_of_int();
+    true
 }
 
 module_init!(init);

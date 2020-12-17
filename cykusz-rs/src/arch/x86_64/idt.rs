@@ -1,7 +1,17 @@
+use alloc::vec::Vec;
+
+use paste::paste;
+use spin::RwLock;
+
 use crate::arch::raw::idt;
+use crate::arch::x86_64::int::end_of_int;
 use crate::kernel::sync::Spin;
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
+
+struct SharedIrq {
+    irqs: [Vec<fn() -> bool>; 32],
+}
 
 pub fn init() {
     let mut idt = IDT.lock();
@@ -26,17 +36,47 @@ pub fn init() {
     idt.set_simd_floating_point_exception(simd_floating_point_exception);
     idt.set_virtualisation_exception(virtualisation_exception);
     idt.set_security_exception(security_exception);
-    //for i in 32..256 {
-    //    unsafe {
-    //        idt.set_handler(i, dummy);
-    //    }
-    //}
+
+    unsafe {
+        idt.set_handler(32, shared_32);
+        idt.set_handler(33, shared_33);
+        idt.set_handler(34, shared_34);
+        idt.set_handler(35, shared_35);
+        idt.set_handler(36, shared_36);
+        idt.set_handler(37, shared_37);
+        idt.set_handler(38, shared_38);
+        idt.set_handler(39, shared_39);
+        idt.set_handler(40, shared_40);
+        idt.set_handler(41, shared_41);
+        idt.set_handler(42, shared_42);
+        idt.set_handler(43, shared_43);
+        idt.set_handler(44, shared_44);
+        idt.set_handler(45, shared_45);
+        idt.set_handler(46, shared_46);
+        idt.set_handler(47, shared_47);
+        idt.set_handler(48, shared_48);
+        idt.set_handler(49, shared_49);
+        idt.set_handler(50, shared_50);
+        idt.set_handler(51, shared_51);
+        idt.set_handler(52, shared_52);
+        idt.set_handler(53, shared_53);
+        idt.set_handler(54, shared_54);
+        idt.set_handler(55, shared_55);
+        idt.set_handler(56, shared_56);
+        idt.set_handler(57, shared_57);
+        idt.set_handler(58, shared_58);
+        idt.set_handler(59, shared_59);
+        idt.set_handler(60, shared_60);
+        idt.set_handler(61, shared_61);
+        idt.set_handler(62, shared_62);
+        idt.set_handler(63, shared_63);
+    }
 
     idt.load();
 }
 
 pub fn set_handler(num: usize, f: idt::ExceptionHandlerFn) {
-    assert!(num <= 255);
+    assert!(num < 32 || num >= 64);
     unsafe {
         let mut idt = IDT.lock();
         idt.set_handler(num, f);
@@ -45,9 +85,15 @@ pub fn set_handler(num: usize, f: idt::ExceptionHandlerFn) {
 
 pub fn has_handler(num: usize) -> bool {
     assert!(num <= 255);
-    let idt = IDT.lock();
+    if num < 32 || num >= 64 {
+        let idt = IDT.lock();
 
-    idt.has_handler(num)
+        idt.has_handler(num)
+    } else {
+        let sh = SHARED_IRQS.read();
+
+        return !sh.irqs[num - 32].is_empty();
+    }
 }
 
 pub fn remove_handler(num: usize) {
@@ -64,6 +110,128 @@ pub fn set_user_handler(num: usize, f: idt::ExceptionHandlerFn) {
         idt.set_user_handler(num, f);
     }
 }
+
+static SHARED_IRQS: RwLock<SharedIrq> = RwLock::new(SharedIrq {
+    irqs: [
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    ],
+});
+
+fn handle_shared_irq(irq: u32) {
+    let idx = irq - 32;
+
+    let sh = SHARED_IRQS.read();
+
+    for h in sh.irqs[idx as usize].iter() {
+        if h() {
+            end_of_int();
+
+            break;
+        }
+    }
+}
+
+pub fn add_shared_irq_handler(irq: usize, handler: fn() -> bool) {
+    let mut sh = SHARED_IRQS.write();
+
+    assert!(irq >= 32 && irq < 64, "invalid shared irq nr");
+
+    let idx = irq - 32;
+
+    sh.irqs[idx].push(handler);
+}
+
+pub fn remove_shared_irq_handler(irq: usize, handler: fn() -> bool) {
+    let mut sh = SHARED_IRQS.write();
+
+    assert!(irq >= 32 && irq < 64, "invalid shared irq nr");
+
+    let idx = irq - 32;
+
+    if let Some(i) = sh.irqs[idx].iter().enumerate().find_map(|(i, e)| {
+        if *e == handler {
+            return Some(i);
+        } else {
+            None
+        }
+    }) {
+        sh.irqs[idx].remove(i);
+    }
+}
+
+macro_rules! def_shared {
+    ($num:expr) => {
+        paste! {
+            extern "x86-interrupt" fn [<shared_ $num>](_frame: &mut idt::ExceptionStackFrame) {
+                handle_shared_irq($num);
+            }
+        }
+    };
+}
+
+def_shared!(32);
+def_shared!(33);
+def_shared!(34);
+def_shared!(35);
+def_shared!(36);
+def_shared!(37);
+def_shared!(38);
+def_shared!(39);
+def_shared!(40);
+def_shared!(41);
+def_shared!(42);
+def_shared!(43);
+def_shared!(44);
+def_shared!(45);
+def_shared!(46);
+def_shared!(47);
+def_shared!(48);
+def_shared!(49);
+def_shared!(50);
+def_shared!(51);
+def_shared!(52);
+def_shared!(53);
+def_shared!(54);
+def_shared!(55);
+def_shared!(56);
+def_shared!(57);
+def_shared!(58);
+def_shared!(59);
+def_shared!(60);
+def_shared!(61);
+def_shared!(62);
+def_shared!(63);
 
 #[allow(unused)]
 extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {

@@ -38,6 +38,7 @@ dependencies = [
  "intrusive-collections",
  "lazy_static",
  "linked_list_allocator",
+ "paste",
  "raw-cpuid",
  "spin 0.7.0",
  "syscall-defs",
@@ -87,6 +88,12 @@ checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5d65c4d95931acda4498f675e332fcbdc9a06705cd07086c510e9b6009cd1c1"
 
 [[package]]
 name = "program"

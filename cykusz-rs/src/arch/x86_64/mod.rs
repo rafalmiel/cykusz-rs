@@ -34,6 +34,14 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
 
     mm::init(&mboot);
 
+    crate::kernel::mm::init();
+
+    println!("[ OK ] Heap Initialised");
+
+    mm::phys::init_pages();
+
+    println!("[ OK ] Phys Page Map Initialised");
+
     acpi::init();
 
     dev::init();

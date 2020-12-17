@@ -231,9 +231,9 @@ pub fn init_ap() {
     LAPIC.irq().init_ap();
 }
 
-pub fn setup_timer(f: crate::arch::raw::idt::ExceptionHandlerFn) {
+pub fn setup_timer(f: fn() -> bool) {
     int::set_irq_dest(0, 32);
-    idt::set_handler(32, f);
+    idt::add_shared_irq_handler(32, f);
 
     int::mask_int(0, false);
 }

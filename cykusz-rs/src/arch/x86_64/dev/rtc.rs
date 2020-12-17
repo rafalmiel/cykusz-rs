@@ -1,11 +1,10 @@
 use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::raw::cpuio;
-use crate::arch::raw::idt as ridt;
 
 pub fn init() {
     int::set_irq_dest(8, 40);
-    idt::set_handler(40, rtc_handler);
+    idt::add_shared_irq_handler(40, rtc_handler);
 
     int::mask_int(8, false);
 
@@ -41,7 +40,7 @@ fn eoi() {
     }
 }
 
-pub extern "x86-interrupt" fn rtc_handler(_frame: &mut ridt::ExceptionStackFrame) {
+fn rtc_handler() -> bool {
     eoi();
-    int::end_of_int();
+    true
 }

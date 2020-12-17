@@ -128,8 +128,8 @@ impl PciDeviceHandle for E1000 {
 }
 
 impl E1000 {
-    fn handle_irq(&self) {
-        self.data.lock_irq().handle_irq();
+    fn handle_irq(&self) -> bool {
+        self.data.lock_irq().handle_irq()
     }
 }
 

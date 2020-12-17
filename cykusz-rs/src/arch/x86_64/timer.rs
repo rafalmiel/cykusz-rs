@@ -1,6 +1,4 @@
 use crate::arch::dev::lapic;
-use crate::arch::int;
-use crate::arch::raw::idt as ridt;
 use crate::kernel::sync::IrqLock;
 
 struct Timer {
@@ -38,10 +36,10 @@ pub fn current_ns() -> u64 {
     crate::arch::dev::hpet::current_ns()
 }
 
-pub extern "x86-interrupt" fn timer_handler(_frame: &mut ridt::ExceptionStackFrame) {
+fn timer_handler() -> bool {
     let timer = &TIMER;
     if let Some(ref f) = timer.irq().handler {
         (f)();
     }
-    int::end_of_int();
+    true
 }

@@ -77,19 +77,9 @@ impl BufferQueue {
     }
 
     pub fn read_data(&self, buf: &mut [u8]) -> usize {
-        let mut buffer = self.buffer.lock();
-
-        let task = current_task();
-
-        self.wait_queue.add_task(task.clone());
-
-        while !buffer.has_data() {
-            WaitQueue::wait_lock(buffer);
-
-            buffer = self.buffer.lock();
-        }
-
-        self.wait_queue.remove_task(task);
+        let mut buffer = self
+            .wait_queue
+            .wait_lock_for(&self.buffer, |lck| lck.has_data());
 
         buffer.read_data(buf)
     }

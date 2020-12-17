@@ -38,6 +38,50 @@ impl WaitQueue {
         task.await_io();
     }
 
+    pub fn wait_lock_irq_for<'a, T, F: Fn(&SpinGuard<T>) -> bool>(
+        &self,
+        mtx: &'a Spin<T>,
+        cond: F,
+    ) -> SpinGuard<'a, T> {
+        let task = current_task();
+
+        let mut lock = mtx.lock_irq();
+
+        self.add_task(task.clone());
+
+        while !cond(&lock) {
+            Self::wait_lock(lock);
+
+            lock = mtx.lock_irq();
+        }
+
+        self.remove_task(task);
+
+        lock
+    }
+
+    pub fn wait_lock_for<'a, T, F: Fn(&SpinGuard<T>) -> bool>(
+        &self,
+        mtx: &'a Spin<T>,
+        cond: F,
+    ) -> SpinGuard<'a, T> {
+        let task = current_task();
+
+        let mut lock = mtx.lock();
+
+        self.add_task(task.clone());
+
+        while !cond(&lock) {
+            Self::wait_lock(lock);
+
+            lock = mtx.lock();
+        }
+
+        self.remove_task(task);
+
+        lock
+    }
+
     pub fn add_task(&self, task: Arc<Task>) {
         let mut tasks = self.tasks.lock_irq();
 

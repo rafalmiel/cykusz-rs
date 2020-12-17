@@ -1,8 +1,7 @@
 use alloc::vec::Vec;
 
-use crate::arch::idt::set_handler;
-use crate::arch::int::{end_of_int, set_active_high, set_irq_dest};
-use crate::arch::raw::idt::ExceptionStackFrame;
+use crate::arch::idt::add_shared_irq_handler;
+use crate::arch::int::{set_active_high, set_irq_dest};
 use crate::arch::raw::mm::{PhysAddr, VirtAddr};
 use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
@@ -56,12 +55,10 @@ pub struct E1000Data {
     pub tx_pkts: [Option<Packet<Eth>>; E1000_NUM_TX_DESCS],
 }
 
-pub extern "x86-interrupt" fn e1000_handler(_frame: &mut ExceptionStackFrame) {
+fn e1000_handler() -> bool {
     let dev = device();
 
-    dev.handle_irq();
-
-    end_of_int();
+    dev.handle_irq()
 }
 
 pub static mut BUF: *mut u8 = core::ptr::null_mut();
@@ -82,13 +79,15 @@ impl E1000Data {
         self.ring_buf = VirtAddr(ring_buf as usize);
     }
 
-    pub fn handle_irq(&mut self) {
+    pub fn handle_irq(&mut self) -> bool {
         //self.addr.write(Regs::IMask, 0x1);
         let c = self.addr.read(Regs::ICause);
 
         if c & 0x80 == 0x80 {
             self.handle_receive();
         }
+
+        c != 0
     }
 
     pub fn handle_receive(&mut self) {
@@ -299,7 +298,7 @@ impl E1000Data {
 
             set_irq_dest(p as u8, p as u8 + 32);
             set_active_high(p as u8, true);
-            set_handler(p as usize + 32, e1000_handler);
+            add_shared_irq_handler(p as usize + 32, e1000_handler);
 
             self.addr.write(Regs::IMask, IntFlags::default().bits());
             self.addr.read(Regs::ICause);

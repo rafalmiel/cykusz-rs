@@ -1,7 +1,6 @@
 use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::raw::cpuio::UnsafePort;
-use crate::arch::raw::idt as ridt;
 use crate::kernel::sync::Spin;
 
 static PIT: Spin<Pit> = Spin::new(Pit::new());
@@ -69,25 +68,28 @@ impl Pit {
 
 pub fn init() {
     int::set_irq_dest(0, 32);
-    idt::set_handler(32, pit_handler);
 
-    int::mask_int(0, false);
+    enable();
 
     PIT.lock_irq().init();
 }
 
 pub fn disable() {
+    idt::remove_shared_irq_handler(32, pit_handler);
     int::mask_int(0, true);
 }
 
 pub fn enable() {
+    idt::add_shared_irq_handler(32, pit_handler);
     int::mask_int(0, false);
 }
 
-pub extern "x86-interrupt" fn pit_handler(_frame: &mut ridt::ExceptionStackFrame) {
+fn pit_handler() -> bool {
     let pit = &mut *PIT.lock();
     pit.ticks += 1;
     int::end_of_int();
+
+    true
 }
 
 pub fn early_busy_sleep(mut ms: u64) {

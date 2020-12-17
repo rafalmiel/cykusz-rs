@@ -1,5 +1,4 @@
 use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};

@@ -8,7 +8,6 @@ use crate::kernel::net::util::NetU16;
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
-use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -262,17 +261,9 @@ impl DnsService {
     }
 
     fn await_result(&self) -> Ip4 {
-        let mut res = self.ip_result.lock();
-
-        self.wait_queue.add_task(current_task());
-
-        while res.is_none() {
-            WaitQueue::wait_lock(res);
-
-            res = self.ip_result.lock();
-        }
-
-        self.wait_queue.remove_task(current_task());
+        let res = self
+            .wait_queue
+            .wait_lock_for(&self.ip_result, |lck| lck.is_some());
 
         res.unwrap()
     }

@@ -117,20 +117,9 @@ lazy_static! {
 static TIMERS_WQ: WaitQueue = WaitQueue::new();
 
 fn check_timers() {
-    let task = current_task();
     let time = current_ns();
 
-    let mut timers = TIMERS.lock();
-
-    TIMERS_WQ.add_task(task.clone());
-
-    while timers.is_empty() {
-        WaitQueue::wait_lock(timers);
-
-        timers = TIMERS.lock();
-    }
-
-    TIMERS_WQ.remove_task(task);
+    let mut timers = TIMERS_WQ.wait_lock_for(&TIMERS, |lck| !lck.is_empty());
 
     loop {
         if let Some(timer) = timers.front().get() {

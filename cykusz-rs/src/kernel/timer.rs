@@ -6,6 +6,7 @@ use intrusive_collections::{LinkedList, LinkedListLink};
 
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub trait TimerObject: Send + Sync {
     fn call(&self);
@@ -78,6 +79,8 @@ impl Timer {
             } else {
                 timers.push_back(timer);
             }
+
+            TIMERS_WQ.notify_one();
         }
     }
 
@@ -111,11 +114,25 @@ lazy_static! {
         Spin::new(LinkedList::new(TimerAdapter::new()));
 }
 
+static TIMERS_WQ: WaitQueue = WaitQueue::new();
+
 fn check_timers() {
+    let task = current_task();
     let time = current_ns();
 
+    let mut timers = TIMERS.lock();
+
+    TIMERS_WQ.add_task(task.clone());
+
+    while timers.is_empty() {
+        WaitQueue::wait_lock(timers);
+
+        timers = TIMERS.lock();
+    }
+
+    TIMERS_WQ.remove_task(task);
+
     loop {
-        let mut timers = TIMERS.lock();
         if let Some(timer) = timers.front().get() {
             if timer.timeout() <= time {
                 let t = timer.self_ref.upgrade().unwrap();
@@ -125,6 +142,8 @@ fn check_timers() {
                 drop(timers);
 
                 t.call();
+
+                timers = TIMERS.lock();
             } else {
                 break;
             }

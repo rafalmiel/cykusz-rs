@@ -38,6 +38,7 @@ dependencies = [
  "intrusive-collections",
  "lazy_static",
  "linked_list_allocator",
+ "mmio",
  "paste",
  "raw-cpuid",
  "spin 0.7.0",
@@ -88,6 +89,12 @@ checksum = "043175f069eda7b85febe4a74abbaeff828d9f8b448515d3151a14a3542811aa"
 dependencies = [
  "autocfg",
 ]
+
+[[package]]
+name = "mmio"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e34c69964cca7e0fbb60cfb7e5cf0148e30f0ccaafade2dd2f704fe79bc9e607"
 
 [[package]]
 name = "paste"

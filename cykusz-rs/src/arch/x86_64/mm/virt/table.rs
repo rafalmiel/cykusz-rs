@@ -348,7 +348,7 @@ impl Table<Level4> {
             Some(entry.address() + (addr.0 & 0xFFF))
         } else {
             None
-        }
+        };
     }
 
     pub fn map_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) {

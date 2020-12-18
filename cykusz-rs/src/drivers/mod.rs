@@ -1,4 +1,5 @@
 pub mod acpi;
+pub mod block;
 pub mod elf;
 pub mod input;
 pub mod multiboot2;

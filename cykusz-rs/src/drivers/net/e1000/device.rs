@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 
 use crate::arch::idt::add_shared_irq_handler;
 use crate::arch::int::{set_active_high, set_irq_dest};
+use crate::arch::mm::phys::allocate_order;
 use crate::arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
 use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
@@ -12,7 +13,6 @@ use crate::kernel::timer::busy_sleep;
 
 use super::regs::*;
 use super::*;
-use crate::arch::mm::phys::allocate_order;
 
 pub const E1000_NUM_RX_DESCS: usize = 32;
 pub const E1000_NUM_TX_DESCS: usize = 32;

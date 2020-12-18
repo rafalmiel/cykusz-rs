@@ -5,6 +5,7 @@ pub use crate::arch::mm::phys::deallocate_order;
 pub use crate::arch::mm::virt::map;
 pub use crate::arch::mm::virt::map_flags;
 pub use crate::arch::mm::virt::map_to;
+pub use crate::arch::mm::virt::map_to_flags;
 pub use crate::arch::mm::virt::to_phys;
 pub use crate::arch::mm::virt::unmap;
 pub use crate::arch::mm::virt::update_flags;

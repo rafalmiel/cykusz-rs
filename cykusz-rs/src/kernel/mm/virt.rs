@@ -6,6 +6,8 @@ bitflags! {
         const WRITABLE      = 1 << 0;
         const USER          = 1 << 1;
         const NO_EXECUTE    = 1 << 2;
+        const WRT_THROUGH   = 1 << 3;
+        const NO_CACHE      = 1 << 4;
     }
 }
 

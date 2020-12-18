@@ -38,6 +38,12 @@ impl Entry {
         if flags.contains(virt::PageFlags::WRITABLE) {
             res.insert(Entry::WRITABLE);
         }
+        if flags.contains(virt::PageFlags::NO_CACHE) {
+            res.insert(Entry::NO_CACHE);
+        }
+        if flags.contains(virt::PageFlags::WRT_THROUGH) {
+            res.insert(Entry::WRT_THROUGH);
+        }
 
         return res;
     }

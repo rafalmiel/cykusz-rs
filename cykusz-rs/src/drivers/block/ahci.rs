@@ -1,7 +1,7 @@
+use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::pci::{register_pci_device, PciDeviceHandle, PciHeader};
 use alloc::sync::Arc;
 use spin::Once;
-use crate::arch::raw::mm::PhysAddr;
 
 #[repr(C, packed)]
 struct HbaMem {
@@ -20,6 +20,37 @@ struct HbaMem {
     vendor: [u8; 0x100 - 0xa0],
 }
 
+impl HbaMem {
+    fn cap(&self) -> u32 {
+        unsafe {
+            core::ptr::read_volatile(&self.cap)
+        }
+    }
+}
+
+#[repr(C, packed)]
+struct HbaPort {
+    clb: u32,
+    clbu: u32,
+    fb: u32,
+    fbu: u32,
+    is: u32,
+    ie: u32,
+    cmd: u32,
+    _rsv: u32,
+    tfd: u32,
+    sig: u32,
+    ssts: u32,
+    sctl: u32,
+    serr: u32,
+    sact: u32,
+    ci: u32,
+    sntf: u32,
+    fbs: u32,
+    _rsv1: [u32; 11],
+    vencor: [u32; 4],
+}
+
 struct Ahci {}
 
 impl PciDeviceHandle for Ahci {
@@ -36,12 +67,21 @@ impl PciDeviceHandle for Ahci {
         if let PciHeader::Type0(dhdr) = _pci_data {
             println!("[ AHCI ] Base: {:0x}", dhdr.base_address5());
 
-            let hba = unsafe {
-                PhysAddr(dhdr.base_address5() as usize).to_mapped().read_ref::<HbaMem>()
-            };
+            let mapped = PhysAddr(dhdr.base_address5() as usize)
+                .to_mapped()
+                .as_virt();
+
+            use crate::kernel::mm::virt::PageFlags;
+
+            crate::kernel::mm::map_flags(
+                mapped,
+                PageFlags::WRITABLE | PageFlags::NO_CACHE | PageFlags::WRT_THROUGH,
+            );
+
+            let hba = unsafe { mapped.read_volatile::<&HbaMem>() };
 
             println!("[ AHCI ] Ports: 0x{:b}", hba.pi);
-            println!("[ AHCI ] Cap:   0b{:b}", hba.cap);
+            println!("[ AHCI ] Cap:   0b{:b}", hba.cap());
             println!("[ AHCI ] ghc  : 0x{:x}", hba.ghc);
             println!("[ AHCI ] vers : 0x{:x}", hba.vs);
         }
@@ -55,10 +95,6 @@ impl PciDeviceHandle for Ahci {
         if let Some(p) = int {
             println!("[ AHCI ] Interrupt line: {}", p);
         }
-
-        
-
-
 
         true
     }

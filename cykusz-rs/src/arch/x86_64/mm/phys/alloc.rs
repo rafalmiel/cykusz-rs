@@ -7,50 +7,27 @@ use crate::kernel::mm::{Frame, PAGE_SIZE};
 use crate::kernel::mm::{MappedAddr, PhysAddr};
 use crate::kernel::sync::Spin;
 
-use super::iter;
-
-use self::iter::PhysMemIterator;
-
-const LIST_ADDR_INVALID: PhysAddr = PhysAddr(0xFFFF_FFFF_FFFF_FFFF);
-
-fn is_list_addr_valid(addr: PhysAddr) -> bool {
-    addr != LIST_ADDR_INVALID
-}
-
-struct PhysAllocatorList {
-    head: PhysAddr,
-}
-
-static PHYS_LIST: Spin<PhysAllocatorList> = Spin::new(PhysAllocatorList {
-    head: LIST_ADDR_INVALID,
-});
+use super::buddy::BuddyAlloc;
+use super::iter::RangeMemIterator;
 
 pub static NUM_PAGES: AtomicU64 = AtomicU64::new(0);
 
+static BUDDY: Spin<BuddyAlloc> = Spin::new(BuddyAlloc::new());
+
 pub fn allocate() -> Option<Frame> {
-    let mut list = PHYS_LIST.lock();
+    let mut bdy = BUDDY.lock();
 
-    if is_list_addr_valid(list.head) {
-        let ret = list.head;
-
-        list.head = unsafe { list.head.to_mapped().read::<PhysAddr>() };
-
-        let f = Frame::new(ret);
-
-        return Some(f);
+    if let Some(addr) = bdy.alloc(0) {
+        Some(Frame::new(addr))
+    } else {
+        None
     }
-
-    None
 }
 
 pub fn deallocate(frame: &Frame) {
-    let mut list = PHYS_LIST.lock();
+    let mut bdy = BUDDY.lock();
 
-    unsafe {
-        frame.address_mapped().store(list.head);
-    }
-
-    list.head = frame.address();
+    bdy.dealloc(frame.address(), 0);
 }
 
 pub fn init(mboot_info: &multiboot2::Info) {
@@ -65,7 +42,7 @@ pub fn init(mboot_info: &multiboot2::Info) {
     let modules_start: PhysAddr = mboot_info.modules_start_addr().unwrap_or_default();
     let modules_end: PhysAddr = mboot_info.modules_end_addr().unwrap_or_default();
 
-    let iter = PhysMemIterator::new(
+    let riter = RangeMemIterator::new(
         mm_iter,
         kern_start,
         kern_end,
@@ -75,34 +52,26 @@ pub fn init(mboot_info: &multiboot2::Info) {
         modules_end,
     );
 
-    let mut head: Option<PhysAddr> = None;
-    let mut tail: Option<PhysAddr> = None;
+    let mut ranges: [(PhysAddr, usize); 16] = [(PhysAddr(0), 0); 16];
+    let mut len = 0;
 
-    for el in iter {
-        if let Some(p) = tail {
-            unsafe {
-                p.to_mapped().store(el);
-            }
-        }
-
-        if head.is_none() {
-            head = Some(el);
-        }
-
-        tail = Some(el);
+    for (s, size) in riter {
+        ranges[len] = (s, size);
+        len += 1;
     }
 
-    if let Some(p) = tail {
-        unsafe {
-            p.to_mapped().store(LIST_ADDR_INVALID);
-        }
+    assert!(len > 0, "No mem detected?");
 
-        NUM_PAGES.store((p.0 / PAGE_SIZE) as u64, Ordering::SeqCst);
+    let mem_start = ranges[0].0;
+    let mem_end = ranges[len - 1].0 + ranges[len - 1].1;
+
+    let mut bdy = BUDDY.lock();
+
+    bdy.init(mem_start, mem_end);
+
+    for e in 0..len {
+        bdy.add_range(ranges[e].0, ranges[e].0 + ranges[e].1);
     }
 
-    let mut l = PHYS_LIST.lock();
-
-    if let Some(f) = head {
-        l.head = f;
-    }
+    NUM_PAGES.store((mem_end.0 / PAGE_SIZE) as u64, Ordering::SeqCst);
 }

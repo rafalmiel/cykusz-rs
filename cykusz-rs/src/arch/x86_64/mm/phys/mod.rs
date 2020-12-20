@@ -11,6 +11,8 @@ pub use self::alloc::allocate;
 pub use self::alloc::deallocate;
 
 mod alloc;
+mod buddy;
+mod bump;
 mod iter;
 
 #[repr(C)]

@@ -15,9 +15,13 @@ pub static NUM_PAGES: AtomicU64 = AtomicU64::new(0);
 static BUDDY: Spin<BuddyAlloc> = Spin::new(BuddyAlloc::new());
 
 pub fn allocate() -> Option<Frame> {
+    allocate_order(0)
+}
+
+pub fn allocate_order(order: usize) -> Option<Frame> {
     let mut bdy = BUDDY.lock();
 
-    if let Some(addr) = bdy.alloc(0) {
+    if let Some(addr) = bdy.alloc(order) {
         Some(Frame::new(addr))
     } else {
         None
@@ -25,9 +29,13 @@ pub fn allocate() -> Option<Frame> {
 }
 
 pub fn deallocate(frame: &Frame) {
+    deallocate_order(frame, 0);
+}
+
+pub fn deallocate_order(frame: &Frame, order: usize) {
     let mut bdy = BUDDY.lock();
 
-    bdy.dealloc(frame.address(), 0);
+    bdy.dealloc(frame.address(), order);
 }
 
 pub fn init(mboot_info: &multiboot2::Info) {

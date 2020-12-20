@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 
 use crate::arch::idt::add_shared_irq_handler;
 use crate::arch::int::{set_active_high, set_irq_dest};
-use crate::arch::raw::mm::{PhysAddr, VirtAddr};
+use crate::arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
 use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
 use crate::drivers::pci::{PciData, PciHeader, PciHeader0};
@@ -12,6 +12,7 @@ use crate::kernel::timer::busy_sleep;
 
 use super::regs::*;
 use super::*;
+use crate::arch::mm::phys::allocate_order;
 
 pub const E1000_NUM_RX_DESCS: usize = 32;
 pub const E1000_NUM_TX_DESCS: usize = 32;
@@ -51,7 +52,7 @@ pub struct E1000Data {
     pub tx_ring: Vec<TxDesc>,
     pub rx_cur: u32,
     pub tx_cur: u32,
-    pub ring_buf: VirtAddr,
+    pub ring_buf: MappedAddr,
     pub tx_pkts: [Option<Packet<Eth>>; E1000_NUM_TX_DESCS],
 }
 
@@ -60,8 +61,6 @@ fn e1000_handler() -> bool {
 
     dev.handle_irq()
 }
-
-pub static mut BUF: *mut u8 = core::ptr::null_mut();
 
 impl E1000Data {
     pub fn init(&mut self, hdr: &PciHeader) {
@@ -72,11 +71,11 @@ impl E1000Data {
 
         self.addr.init(bar0, bar1);
 
-        let ring_buf = allocate_align(0x1000, 0x1000).unwrap();
+        let ring_buf = allocate_order(0).unwrap().address_mapped().0 as *mut u8;
         unsafe {
             ring_buf.write_bytes(0, 0x1000);
         }
-        self.ring_buf = VirtAddr(ring_buf as usize);
+        self.ring_buf = MappedAddr(ring_buf as usize);
     }
 
     pub fn handle_irq(&mut self) -> bool {
@@ -314,15 +313,12 @@ impl E1000Data {
             )
         };
         for r in self.rx_ring.iter_mut() {
-            let buf = crate::kernel::mm::heap::allocate_align(4096, 0x1000).unwrap();
+            let buf = crate::kernel::mm::allocate_order(2).unwrap().address();
 
-            r.addr = VirtAddr(buf as usize).to_phys_pagewalk().unwrap().0 as u64;
+            r.addr = buf.0 as u64;
         }
 
-        let rx_addr = VirtAddr(self.rx_ring.as_ptr() as usize)
-            .to_phys_pagewalk()
-            .unwrap()
-            .0 as u64;
+        let rx_addr = MappedAddr(self.rx_ring.as_ptr() as usize).to_phys().0 as u64;
 
         self.addr
             .write(Regs::RxDescLo, (rx_addr & 0xffff_ffff) as u32);
@@ -343,7 +339,7 @@ impl E1000Data {
             | RCtl::RDMTS_EIGHTH
             | RCtl::BAM
             | RCtl::SECRC
-            | RCtl::BUF_SIZE_4096;
+            | RCtl::BUF_SIZE_16384;
 
         self.addr.write(Regs::RCtrl, flags.bits());
     }
@@ -360,14 +356,7 @@ impl E1000Data {
             t.status = TStatus::DD;
         }
 
-        unsafe {
-            BUF = crate::kernel::mm::heap::allocate_align(4096, 0x1000).unwrap();
-        }
-
-        let tx_addr = VirtAddr(self.tx_ring.as_ptr() as usize)
-            .to_phys_pagewalk()
-            .unwrap()
-            .0;
+        let tx_addr = MappedAddr(self.tx_ring.as_ptr() as usize).to_phys().0 as u64;
 
         self.addr
             .write(Regs::TxDescLo, (tx_addr & 0xffff_ffff) as u32);

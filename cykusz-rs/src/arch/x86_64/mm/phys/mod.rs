@@ -8,7 +8,9 @@ use crate::kernel::mm::{PhysAddr, PAGE_SIZE};
 use crate::kernel::sync::{Spin, SpinGuard};
 
 pub use self::alloc::allocate;
+pub use self::alloc::allocate_order;
 pub use self::alloc::deallocate;
+pub use self::alloc::deallocate_order;
 
 mod alloc;
 mod buddy;

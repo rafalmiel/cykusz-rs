@@ -77,8 +77,8 @@ pub fn init(mboot_info: &multiboot2::Info) {
 
     bdy.init(mem_start, mem_end);
 
-    for e in 0..len {
-        bdy.add_range(ranges[e].0, ranges[e].0 + ranges[e].1);
+    for &(s, l) in ranges[..len].iter() {
+        bdy.add_range(s, s + l);
     }
 
     NUM_PAGES.store((mem_end.0 / PAGE_SIZE) as u64, Ordering::SeqCst);

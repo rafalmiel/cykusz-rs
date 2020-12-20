@@ -109,13 +109,13 @@ impl BuddyAlloc {
     pub fn alloc(&mut self, order: usize) -> Option<PhysAddr> {
         let size = BSIZE[order];
 
-        for (i, s) in BSIZE[order..].iter().enumerate() {
+        for (i, &s) in BSIZE[order..].iter().enumerate() {
             let i = i + order;
 
-            if *s >= size && self.freecnt[i] > 0 {
+            if self.freecnt[i] > 0 {
                 let res = self.find_free(i);
 
-                let mut rem = *s - size;
+                let mut rem = s - size;
 
                 if rem > 0 {
                     for ri in (0..=i).rev() {

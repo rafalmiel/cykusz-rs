@@ -7,6 +7,7 @@ pub use crate::arch::mm::virt::map_flags;
 pub use crate::arch::mm::virt::map_to;
 pub use crate::arch::mm::virt::to_phys;
 pub use crate::arch::mm::virt::unmap;
+pub use crate::arch::mm::virt::update_flags;
 pub use crate::arch::mm::PAGE_SIZE;
 pub use crate::arch::mm::{MappedAddr, PhysAddr, VirtAddr};
 

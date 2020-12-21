@@ -101,6 +101,18 @@ where
                 fun(idx, e);
             })
     }
+
+    pub fn entry_at(&self, idx: usize) -> &Entry {
+        return &self.entries[idx];
+    }
+
+    pub fn entry_at_mut(&mut self, idx: usize) -> &mut Entry {
+        return &mut self.entries[idx];
+    }
+
+    pub fn set_entry(&mut self, idx: usize, entry: &Entry) {
+        self.entries[idx].set_raw(entry.raw());
+    }
 }
 
 impl<L> Table<L>
@@ -169,14 +181,6 @@ where
 
     pub fn new_at_phys<'a>(addr: PhysAddr) -> &'a Table<L> {
         Table::<L>::new(&Frame::new(addr))
-    }
-
-    pub fn entry_at(&self, idx: usize) -> &Entry {
-        return &self.entries[idx];
-    }
-
-    pub fn set_entry(&mut self, idx: usize, entry: &Entry) {
-        self.entries[idx].set_raw(entry.raw());
     }
 
     pub fn do_unmap(&mut self, idx: usize) -> bool {
@@ -286,14 +290,61 @@ impl Table<Level4> {
 
         let page = page::Page::new(addr);
 
-        let l1 = self
-            .next_level(page.p4_index())?
-            .next_level(page.p3_index())?
-            .next_level(page.p2_index())?;
+        let l3 = self.next_level(page.p4_index())?;
+        let entry3 = l3.entry_at(page.p3_index());
 
-        let entry = &l1.entries[page.p1_index()];
+        let l2 = if entry3.contains(Entry::HUGE_PAGE | Entry::PRESENT) {
+            return Some(entry3.address() + (addr.0 & 0x3FFFFFFF));
+        } else {
+            l3.next_level(page.p3_index())?
+        };
+
+        let entry2 = l2.entry_at(page.p2_index());
+
+        let l1 = if entry2.contains(Entry::HUGE_PAGE | Entry::PRESENT) {
+            return Some(entry2.address() + (addr.0 & 0x1FFFFF));
+        } else {
+            l2.next_level(page.p2_index())?
+        };
+
+        let entry = l1.entry_at(page.p1_index());
 
         if entry.contains(Entry::PRESENT) {
+            Some(entry.address() + (addr.0 & 0xFFF))
+        } else {
+            None
+        }
+    }
+
+    pub fn update_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) -> Option<PhysAddr> {
+        let _g = self.lock();
+
+        let page = page::Page::new(addr);
+
+        let l3 = self.next_level_mut(page.p4_index())?;
+        let entry3 = l3.entry_at_mut(page.p3_index());
+
+        let l2 = if entry3.contains(Entry::HUGE_PAGE | Entry::PRESENT) {
+            entry3.set_flags(Entry::from_kernel_flags(flags));
+            return Some(entry3.address() + (addr.0 & 0x3FFFFFFF));
+        } else {
+            l3.next_level_mut(page.p3_index())?
+        };
+
+        let entry2 = l2.entry_at_mut(page.p2_index());
+
+        let l1 = if entry2.contains(Entry::HUGE_PAGE | Entry::PRESENT) {
+            entry2.set_flags(Entry::from_kernel_flags(flags));
+
+            return Some(entry2.address() + (addr.0 & 0x1FFFFF));
+        } else {
+            l2.next_level_mut(page.p2_index())?
+        };
+
+        let entry = l1.entry_at_mut(page.p1_index());
+
+        return if entry.contains(Entry::PRESENT) {
+            entry.set_flags(Entry::from_kernel_flags(flags));
             Some(entry.address() + (addr.0 & 0xFFF))
         } else {
             None

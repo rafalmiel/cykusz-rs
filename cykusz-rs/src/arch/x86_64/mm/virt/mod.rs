@@ -41,6 +41,14 @@ pub fn map_flags(virt: VirtAddr, flags: virt::PageFlags) {
     flush(virt);
 }
 
+pub fn update_flags(virt: VirtAddr, flags: virt::PageFlags) -> bool {
+    let res = current_p4_table().update_flags(virt, flags);
+
+    flush(virt);
+
+    return res.is_some();
+}
+
 pub fn map(virt: VirtAddr) {
     map_flags(virt, virt::PageFlags::WRITABLE);
 }

@@ -8,6 +8,7 @@ use alloc::sync::Arc;
 use spin::Once;
 
 use self::reg::*;
+use bit_field::BitField;
 
 struct Ahci {}
 
@@ -19,18 +20,18 @@ impl PciDeviceHandle for Ahci {
         }
     }
 
-    fn start(&self, _pci_data: &PciHeader) -> bool {
+    fn start(&self, pci_data: &PciHeader) -> bool {
         println!("[ AHCI ] Ahci driver");
 
-        if let PciHeader::Type0(dhdr) = _pci_data {
+        if let PciHeader::Type0(dhdr) = pci_data {
             println!("[ AHCI ] Base: {:0x}", dhdr.base_address5());
 
-            let mapped = PhysAddr(dhdr.base_address5() as usize).to_virt();
+            let mut mapped = PhysAddr(dhdr.base_address5() as usize).to_virt();
 
             map_to_flags(
                 mapped,
                 PhysAddr(dhdr.base_address5() as usize),
-                PageFlags::NO_CACHE | PageFlags::WRT_THROUGH,
+                PageFlags::NO_CACHE | PageFlags::WRT_THROUGH | PageFlags::WRITABLE,
             );
 
             //use crate::kernel::mm::virt::PageFlags;
@@ -40,16 +41,29 @@ impl PciDeviceHandle for Ahci {
             //    PageFlags::WRITABLE | PageFlags::NO_CACHE | PageFlags::WRT_THROUGH,
             //);
 
-            let hba = unsafe { mapped.read_ref::<HbaMem>() };
+            let hba = unsafe { mapped.read_mut::<HbaMem>() };
 
-            println!("[ AHCI ] Ports: 0x{:b}", hba.pi());
+            //hba.set_ghc(hba.ghc() | HbaMemGhcReg::IE);
+
+            println!("[ AHCI ] Ports: 0b{:b}", hba.pi());
             println!("[ AHCI ] Cap:   0b{:b}", hba.cap());
             println!("[ AHCI ] ghc  : 0x{:x}", hba.ghc());
             println!("[ AHCI ] vers : 0x{:x}", hba.vs());
             println!("[ AHCI ] cap2 : 0x{:x}", hba.cap2());
+
+            let pi = hba.pi();
+
+            for i in 0..32 {
+                if pi.get_bit(i) {
+                    let port = hba.port(i);
+
+                    println!("[ AHCI ] Port {} fb: {}", i, port.fb());
+                    println!("[ AHCI ] Port {} cb: {}", i, port.clb());
+                }
+            }
         }
 
-        let data = _pci_data.hdr();
+        let data = pci_data.hdr();
         let pin = data.interrupt_pin();
 
         let int =

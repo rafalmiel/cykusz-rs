@@ -99,7 +99,7 @@ impl HbaPortCmdReg {
     }
 
     pub fn set_interface_communication_control(&mut self, v: HbaPortCmdRegIcc) {
-        self.bits().set_bits(28..=31, v as u32);
+        self.bits.set_bits(28..=31, v as u32);
     }
 }
 
@@ -444,8 +444,10 @@ impl HbaPortDevslp {
 
 #[repr(C, packed)]
 pub struct HbaPort {
-    clb: VCell<VirtAddr>,
-    fb: VCell<VirtAddr>,
+    clb: VCell<u32>,
+    clbu: VCell<u32>,
+    fb: VCell<u32>,
+    fbu: VCell<u32>,
     is: VCell<HbaPortISReg>,
     ie: VCell<HbaPortIEReg>,
     cmd: VCell<HbaPortCmdReg>,
@@ -466,19 +468,31 @@ pub struct HbaPort {
 
 impl HbaPort {
     pub fn clb(&self) -> VirtAddr {
-        unsafe { self.clb.get() }
+        let mut v = 0usize;
+
+        v |= unsafe { self.clb.get() as usize };
+        v |= unsafe { self.clbu.get() as usize} << 32;
+
+        return VirtAddr(v);
     }
 
     pub fn set_clb(&mut self, addr: VirtAddr) {
-        unsafe { self.clb.set(addr) }
+        unsafe { self.clb.set(addr.0 as u32) }
+        unsafe { self.clbu.set((addr.0 >> 32) as u32) }
     }
 
     pub fn fb(&self) -> VirtAddr {
-        unsafe { self.fb.get() }
+        let mut v = 0usize;
+
+        v |= unsafe { self.fb.get() as usize };
+        v |= unsafe { self.fbu.get() as usize} << 32;
+
+        return VirtAddr(v);
     }
 
     pub fn set_fb(&mut self, addr: VirtAddr) {
-        unsafe { self.fb.set(addr) }
+        unsafe { self.fb.set(addr.0 as u32) }
+        unsafe { self.fbu.set((addr.0 >> 32) as u32) }
     }
 
     pub fn is(&self) -> HbaPortISReg {

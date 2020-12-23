@@ -192,16 +192,13 @@ impl BuddyAlloc {
 
     fn get_buddy(&self, addr: PhysAddr, order: usize) -> PhysAddr {
         let size = BSIZE[order];
-        let dbl = size * 2;
 
-        let offset = (addr - self.start + size).0;
+        let base = addr.align_down(size * 2);
 
-        if offset % dbl == 0 {
-            addr - size
-        } else if offset % dbl == size {
+        if base == addr {
             addr + size
         } else {
-            panic!("BuddyAlloc get_buddy BUG!");
+            base
         }
     }
 

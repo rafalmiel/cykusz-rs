@@ -1,4 +1,5 @@
 #[repr(u8)]
+#[derive(Copy, Clone)]
 pub enum AtaCommand {
     AtaCommandWriteDma = 0xCA,
     AtaCommandWriteDmaQueued = 0xCC,

@@ -1,5 +1,6 @@
 use crate::kernel::mm::VirtAddr;
 
+use crate::arch::raw::mm::PhysAddr;
 use bit_field::BitField;
 use mmio::VCell;
 
@@ -444,10 +445,8 @@ impl HbaPortDevslp {
 
 #[repr(C, packed)]
 pub struct HbaPort {
-    clb: VCell<u32>,
-    clbu: VCell<u32>,
-    fb: VCell<u32>,
-    fbu: VCell<u32>,
+    clb: VCell<PhysAddr>,
+    fb: VCell<PhysAddr>,
     is: VCell<HbaPortISReg>,
     ie: VCell<HbaPortIEReg>,
     cmd: VCell<HbaPortCmdReg>,
@@ -467,32 +466,24 @@ pub struct HbaPort {
 }
 
 impl HbaPort {
-    pub fn clb(&self) -> VirtAddr {
-        let mut v = 0usize;
-
-        v |= unsafe { self.clb.get() as usize };
-        v |= unsafe { self.clbu.get() as usize} << 32;
-
-        return VirtAddr(v);
+    pub fn clb(&self) -> PhysAddr {
+        unsafe { self.clb.get() }
     }
 
-    pub fn set_clb(&mut self, addr: VirtAddr) {
-        unsafe { self.clb.set(addr.0 as u32) }
-        unsafe { self.clbu.set((addr.0 >> 32) as u32) }
+    pub fn set_clb(&mut self, addr: PhysAddr) {
+        unsafe {
+            self.clb.set(addr);
+        }
     }
 
-    pub fn fb(&self) -> VirtAddr {
-        let mut v = 0usize;
-
-        v |= unsafe { self.fb.get() as usize };
-        v |= unsafe { self.fbu.get() as usize} << 32;
-
-        return VirtAddr(v);
+    pub fn fb(&self) -> PhysAddr {
+        unsafe { self.fb.get() }
     }
 
-    pub fn set_fb(&mut self, addr: VirtAddr) {
-        unsafe { self.fb.set(addr.0 as u32) }
-        unsafe { self.fbu.set((addr.0 >> 32) as u32) }
+    pub fn set_fb(&mut self, addr: PhysAddr) {
+        unsafe {
+            self.fb.set(addr);
+        }
     }
 
     pub fn is(&self) -> HbaPortISReg {

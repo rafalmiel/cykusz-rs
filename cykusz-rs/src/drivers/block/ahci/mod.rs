@@ -55,10 +55,31 @@ impl PciDeviceHandle for Ahci {
 
             for i in 0..32 {
                 if pi.get_bit(i) {
-                    let port = hba.port(i);
+                    let port = hba.port_mut(i);
 
                     println!("[ AHCI ] Port {} fb: {}", i, port.fb());
                     println!("[ AHCI ] Port {} cb: {}", i, port.clb());
+
+                    let sts = port.ssts();
+                    let ipm = sts.interface_power_management();
+
+                    let dev = sts.device_detection();
+
+                    if let HbaPortSstsRegDet::PresentAndE = dev {
+                        println!("Dev present and enabled");
+                    }
+
+                    if let HbaPortSstsRegIpm::Active = ipm {
+                        println!("Dev active");
+                    }
+
+                    println!("sig: {:?}", port.sig().dev());
+
+                    println!("Port cmd: 0x{:x}", port.cmd().bits());
+
+                    port.set_cmd(port.cmd() | (HbaPortCmdReg::ST | HbaPortCmdReg::FRE));
+
+                    println!("Port cmd started: 0x{:x}", port.cmd().bits());
                 }
             }
         }

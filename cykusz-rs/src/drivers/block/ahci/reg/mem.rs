@@ -239,4 +239,10 @@ impl HbaMem {
             &*((self as *const HbaMem).offset(1) as *const HbaPort).offset(at as isize)
         };
     }
+
+    pub fn port_mut(&mut self, at: usize) -> &mut HbaPort {
+        return unsafe {
+            &mut *((self as *mut HbaMem).offset(1) as *mut HbaPort).offset(at as isize)
+        };
+    }
 }

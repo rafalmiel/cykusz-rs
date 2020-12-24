@@ -130,6 +130,15 @@ impl HbaPortTfdReg {
     }
 }
 
+#[derive(Debug)]
+pub enum HbaPortSigRegDev {
+    AhciDevNull = 0,
+    AhciDevSata = 1,
+    AhciDevSemb = 2,
+    AhciDevPm = 3,
+    AhciDevSatapi
+}
+
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct HbaPortSigReg(u32);
@@ -149,6 +158,15 @@ impl HbaPortSigReg {
 
     pub fn lba_high_reg(&self) -> usize {
         self.0.get_bits(24..=31) as usize
+    }
+
+    pub fn dev(&self) -> HbaPortSigRegDev {
+        match self.0 {
+            0xEB140101 => HbaPortSigRegDev::AhciDevSatapi,
+            0xC33C0101 => HbaPortSigRegDev::AhciDevSemb,
+            0x96690101 => HbaPortSigRegDev::AhciDevPm,
+            _ => HbaPortSigRegDev::AhciDevSata,
+        }
     }
 }
 

@@ -68,7 +68,7 @@ impl FisRegH2D {
 
     pub fn set_c(&mut self, i: bool) {
         unsafe {
-            self.flags.set(*self.flags.get().set_bit(15, i));
+            self.flags.set(*self.flags.get().set_bit(7, i));
         }
     }
 

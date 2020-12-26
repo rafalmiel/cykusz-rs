@@ -154,12 +154,10 @@ fn handle_shared_irq(irq: u32) {
     let sh = SHARED_IRQS.read();
 
     for h in sh.irqs[idx as usize].iter() {
-        if h() {
-            end_of_int();
-
-            break;
-        }
+        h();
     }
+
+    end_of_int();
 }
 
 pub fn add_shared_irq_handler(irq: usize, handler: fn() -> bool) {

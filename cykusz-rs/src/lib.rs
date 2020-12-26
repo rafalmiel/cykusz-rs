@@ -4,6 +4,7 @@
 #![feature(c_variadic)]
 #![feature(concat_idents)]
 #![feature(const_btree_new)]
+#![feature(const_in_array_repeat_expressions)]
 #![feature(const_fn)]
 #![feature(const_mut_refs)]
 #![feature(lang_items)]
@@ -13,7 +14,6 @@
 #![feature(negative_impls)]
 #![feature(nll)]
 #![feature(ptr_internals)]
-#![feature(slice_fill)]
 #![feature(step_trait)]
 #![feature(step_trait_ext)]
 #![feature(thread_local)]
@@ -27,6 +27,7 @@ extern crate intrusive_collections;
 extern crate lazy_static;
 
 use crate::kernel::mm::VirtAddr;
+use alloc::vec::Vec;
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -96,6 +97,17 @@ pub fn rust_main(stack_top: VirtAddr) {
     drivers::post_module_init();
 
     kernel::net::init();
+
+    let mut buf = Vec::<u8>::new();
+    buf.resize(256 * 512, 0);
+
+    let addr = VirtAddr(buf.as_ptr() as usize);
+
+    loop {
+        crate::drivers::block::ahci::read(0, 256, addr);
+
+        println!("val 0x{:x}", unsafe { (addr + 256).read::<u16>() });
+    }
 
     // Start test tasks on this cpu
     task_test::start();

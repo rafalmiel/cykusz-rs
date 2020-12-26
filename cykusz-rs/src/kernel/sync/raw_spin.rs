@@ -122,7 +122,11 @@ impl<T> RawSpin<T> {
 
 impl<T: ?Sized> RawSpin<T> {
     fn obtain_lock(&self) {
-        while self.lock.compare_and_swap(false, true, Ordering::Acquire) != false {
+        while self
+            .lock
+            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Acquire)
+            .is_err()
+        {
             // Wait until the lock looks unlocked before retrying
             while self.lock.load(Ordering::Relaxed) {
                 cpu_relax();
@@ -171,7 +175,11 @@ impl<T: ?Sized> RawSpin<T> {
     /// Tries to lock the mutex. If it is already locked, it will return None. Otherwise it returns
     /// a guard within Some.
     pub fn try_lock(&self) -> Option<RawSpinGuard<T>> {
-        if self.lock.compare_and_swap(false, true, Ordering::Acquire) == false {
+        if self
+            .lock
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
+            .is_ok()
+        {
             Some(RawSpinGuard {
                 lock: &self.lock,
                 data: unsafe { &mut *self.data.get() },

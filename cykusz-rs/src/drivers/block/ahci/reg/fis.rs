@@ -1,6 +1,7 @@
 use bit_field::BitField;
 use mmio::VCell;
 
+use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::reg::ata::AtaCommand;
 
 #[repr(u8)]
@@ -68,7 +69,7 @@ impl FisRegH2D {
 
     pub fn set_c(&mut self, i: bool) {
         unsafe {
-            self.flags.set(*self.flags.get().set_bit(15, i));
+            self.flags.set(*self.flags.get().set_bit(7, i));
         }
     }
 
@@ -140,6 +141,15 @@ impl FisRegH2D {
         unsafe {
             self.count.set(d);
         }
+    }
+
+    pub fn set_lba(&mut self, addr: usize) {
+        self.set_lba0(addr as u8);
+        self.set_lba1((addr >> 8) as u8);
+        self.set_lba2((addr >> 16) as u8);
+        self.set_lba3((addr >> 24) as u8);
+        self.set_lba4((addr >> 32) as u8);
+        self.set_lba5((addr >> 40) as u8);
     }
 
     pub fn lba0(&self) -> usize {

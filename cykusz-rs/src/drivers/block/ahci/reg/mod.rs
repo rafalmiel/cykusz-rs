@@ -9,6 +9,7 @@ mod port;
 use bit_field::BitField;
 use mmio::VCell;
 
+pub use self::ata::*;
 pub use self::cmd::*;
 pub use self::fis::*;
 pub use self::mem::*;

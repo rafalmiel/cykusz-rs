@@ -356,7 +356,6 @@ pub fn init() {
     pci_routing();
 }
 
-#[allow(dead_code)]
 pub fn get_irq_mapping(bus: u32, dev: u32, pin: u32) -> Option<u32> {
     let root = root_bridge();
 

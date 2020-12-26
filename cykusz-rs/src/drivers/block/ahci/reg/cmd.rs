@@ -76,6 +76,10 @@ impl HbaCmdHeader {
     pub fn set_cmd_tbl_base_addr(&mut self, a: PhysAddr) {
         unsafe { self.ctb.set(a) }
     }
+
+    pub fn cmd_tbl(&self) -> &mut HbaCmdTbl {
+        unsafe { self.cmd_tbl_base_addr().to_virt().read_mut::<HbaCmdTbl>() }
+    }
 }
 
 #[repr(C, packed)]
@@ -110,9 +114,7 @@ pub struct HbaPrdtEntry {
 
 impl HbaPrdtEntry {
     pub fn database_address(&self) -> PhysAddr {
-        unsafe {
-            self.dba.get()
-        }
+        unsafe { self.dba.get() }
     }
 
     pub fn set_database_address(&mut self, addr: PhysAddr) {

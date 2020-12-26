@@ -203,9 +203,10 @@ impl Task {
     }
 
     pub fn wake_up(&self) {
-        self.state.compare_and_swap(
+        let _ = self.state.compare_exchange(
             TaskState::AwaitingIo as usize,
             TaskState::Runnable as usize,
+            Ordering::SeqCst,
             Ordering::SeqCst,
         );
         self.set_halted(false);

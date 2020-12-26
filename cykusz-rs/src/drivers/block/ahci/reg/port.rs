@@ -1,6 +1,7 @@
 use crate::kernel::mm::VirtAddr;
 
 use crate::arch::raw::mm::PhysAddr;
+use crate::drivers::block::ahci::reg::HbaCmdHeader;
 use bit_field::BitField;
 use mmio::VCell;
 
@@ -136,7 +137,7 @@ pub enum HbaPortSigRegDev {
     AhciDevSata = 1,
     AhciDevSemb = 2,
     AhciDevPm = 3,
-    AhciDevSatapi
+    AhciDevSatapi,
 }
 
 #[repr(transparent)]
@@ -484,6 +485,22 @@ pub struct HbaPort {
 }
 
 impl HbaPort {
+    pub fn start_cmd(&mut self) {
+        while self.cmd().contains(HbaPortCmdReg::CR) {}
+
+        self.set_cmd(self.cmd() | (HbaPortCmdReg::FRE | HbaPortCmdReg::ST));
+    }
+
+    pub fn stop_cmd(&mut self) {
+        let mut cmd = self.cmd();
+
+        cmd.remove(HbaPortCmdReg::FRE | HbaPortCmdReg::ST);
+
+        self.set_cmd(cmd);
+
+        while self.cmd().intersects(HbaPortCmdReg::FR | HbaPortCmdReg::CR) {}
+    }
+
     pub fn clb(&self) -> PhysAddr {
         unsafe { self.clb.get() }
     }
@@ -491,6 +508,13 @@ impl HbaPort {
     pub fn set_clb(&mut self, addr: PhysAddr) {
         unsafe {
             self.clb.set(addr);
+        }
+    }
+
+    pub fn cmd_header_at(&self, idx: usize) -> &mut HbaCmdHeader {
+        unsafe {
+            (self.clb().to_mapped() + core::mem::size_of::<HbaCmdHeader>() * idx)
+                .read_mut::<HbaCmdHeader>()
         }
     }
 

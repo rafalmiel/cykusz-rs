@@ -82,6 +82,18 @@ impl WaitQueue {
         lock
     }
 
+    pub fn wait_for<F: Fn() -> bool>(&self, cond: F) {
+        let task = current_task();
+
+        self.add_task(task.clone());
+
+        while !cond() {
+            Self::wait();
+        }
+
+        self.remove_task(task);
+    }
+
     pub fn add_task(&self, task: Arc<Task>) {
         let mut tasks = self.tasks.lock_irq();
 

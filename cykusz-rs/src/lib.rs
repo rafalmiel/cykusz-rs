@@ -27,7 +27,6 @@ extern crate intrusive_collections;
 extern crate lazy_static;
 
 use crate::kernel::mm::VirtAddr;
-use alloc::vec::Vec;
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -98,19 +97,10 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::net::init();
 
-    let mut buf = Vec::<u8>::new();
-    buf.resize(256 * 512, 0);
-
-    let addr = VirtAddr(buf.as_ptr() as usize);
-
-    loop {
-        crate::drivers::block::ahci::read(0, 256, addr);
-
-        println!("val 0x{:x}", unsafe { (addr + 256).read::<u16>() });
-    }
-
     // Start test tasks on this cpu
     task_test::start();
+
+    crate::kernel::device::block::test_read();
 
     idle();
 }

@@ -1,27 +1,35 @@
+use alloc::sync::Arc;
+
+use bit_field::BitField;
+
 use crate::arch::idt::add_shared_irq_handler;
 use crate::arch::int::{set_active_high, set_irq_dest};
 use crate::arch::mm::phys::allocate_order;
 use crate::arch::mm::virt::map_to_flags;
 use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::reg::*;
-use crate::drivers::block::ahci::{DmaBuf, ReadRequest};
+use crate::drivers::block::ahci::request::{make_request, DmaBuf, ReadRequest};
 use crate::drivers::pci::PciHeader;
+use crate::kernel::device::block::{register_blkdev, BlockDev, BlockDevice};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::VirtAddr;
-use alloc::boxed::Box;
-use alloc::sync::Arc;
-use bit_field::BitField;
+use crate::kernel::sync::Spin;
+use alloc::string::String;
 
 struct Cmd {
     req: Arc<ReadRequest>,
 }
 
-struct Port {
+struct PortData {
     cmds: [Option<Cmd>; 32],
     port: VirtAddr,
 }
 
-impl Port {
+pub struct Port {
+    data: Spin<PortData>,
+}
+
+impl PortData {
     fn hba_port(&mut self) -> &mut HbaPort {
         unsafe { self.port.read_mut::<HbaPort>() }
     }
@@ -69,7 +77,7 @@ impl Port {
         while rem > 0 {
             let slot = {
                 let slot = self.find_cmd_slot().expect("No free cmd slots!");
-                println!("Use slot: {}", slot);
+                //println!("Use slot: {}", slot);
 
                 let port = self.hba_port();
 
@@ -95,13 +103,55 @@ impl Port {
     }
 }
 
+impl Port {
+    fn handle_interrupt(&self) {
+        self.data.lock_irq().handle_interrupt();
+    }
+}
+
+impl BlockDev for Port {
+    fn read(&self, sector: usize, count: usize, dest: &mut [u8]) -> Option<usize> {
+        if dest.len() < count * 512 {
+            return None;
+        }
+
+        let req = Arc::new(make_request(sector, count));
+
+        // post request and wait for completion.....
+        self.data.lock_irq().read(req.clone());
+
+        req.wq
+            .wait_for(|| req.incomplete.load(core::sync::atomic::Ordering::SeqCst) == 0);
+
+        let mut off = 0;
+        let mut rem = count * 512;
+
+        for buf in req.buf_vec.iter() {
+            let cnt = core::cmp::min(rem, 0x2000);
+
+            dest[off..off + cnt].copy_from_slice(unsafe {
+                core::slice::from_raw_parts(buf.buf.to_mapped().0 as *const u8, cnt)
+            });
+
+            rem -= cnt;
+            off += cnt;
+        }
+
+        Some(count * 512)
+    }
+
+    fn write(&self, _sector: usize, _buf: &[u8]) -> Option<usize> {
+        unimplemented!()
+    }
+}
+
 pub struct AhciDevice {
-    ports: [Option<Box<Port>>; 32],
+    ports: [Option<Arc<Port>>; 32],
     hba: VirtAddr,
 }
 
 impl HbaPort {
-    pub fn read(&mut self, sector: usize, count: usize, mut buf: &[DmaBuf], slot: usize) -> bool {
+    pub fn read(&mut self, sector: usize, count: usize, buf: &[DmaBuf], slot: usize) -> bool {
         let hdr = self.cmd_header_at(slot);
 
         let mut flags = hdr.flags();
@@ -109,7 +159,7 @@ impl HbaPort {
         flags.set_command_fis_length((core::mem::size_of::<FisRegH2D>() / 4) as u8);
         hdr.set_flags(flags);
 
-        let mut l = ((count - 1) >> 4) + 1;
+        let l = ((count - 1) >> 4) + 1;
         hdr.set_prdtl(l);
 
         let tbl = hdr.cmd_tbl();
@@ -260,7 +310,7 @@ impl AhciDevice {
             crate::drivers::acpi::get_irq_mapping(data.bus as u32, data.dev as u32, pin as u32 - 1);
 
         if let Some(p) = int {
-            println!("[ AHCI ] Interrupt line: {}", p);
+            println!("[ AHCI ] Using interrupt: {}", p);
 
             set_irq_dest(p as u8, p as u8 + 32);
             set_active_high(p as u8, true);
@@ -283,10 +333,20 @@ impl AhciDevice {
                     drop(port);
                     drop(hba);
 
-                    self.ports[i] = Some(Box::new(Port {
-                        cmds: [None; 32],
-                        port: VirtAddr(addr),
-                    }));
+                    let port_dev = Arc::new(Port {
+                        data: Spin::new(PortData {
+                            cmds: [None; 32],
+                            port: VirtAddr(addr),
+                        }),
+                    });
+
+                    if let Err(d) =
+                        register_blkdev(BlockDevice::new(String::from("disk"), port_dev.clone()))
+                    {
+                        panic!("Failed to register blkdev {:?}", d);
+                    }
+
+                    self.ports[i] = Some(port_dev);
 
                     hba = self.hba();
                 }
@@ -322,20 +382,14 @@ impl AhciDevice {
         let hba = self.hba();
 
         if hba.is() != 0 {
-            println!("AHCI: 0b{:b}", hba.is());
+            //println!("AHCI: 0b{:b}", hba.is());
             hba.set_is(hba.is());
 
-            if let Some(p) = &mut self.ports[0] {
+            if let Some(p) = &self.ports[0] {
                 p.handle_interrupt();
             }
         }
 
         return false;
-    }
-
-    pub fn read(&mut self, request: Arc<ReadRequest>) {
-        if let Some(port) = &mut self.ports[0] {
-            port.read(request);
-        }
     }
 }

@@ -1,9 +1,9 @@
-use crate::kernel::mm::VirtAddr;
+use bit_field::BitField;
+use mmio::VCell;
 
 use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::reg::HbaCmdHeader;
-use bit_field::BitField;
-use mmio::VCell;
+use crate::kernel::mm::VirtAddr;
 
 bitflags! {
     pub struct HbaPortISReg: u32 {

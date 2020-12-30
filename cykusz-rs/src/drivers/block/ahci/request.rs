@@ -3,6 +3,7 @@ use core::sync::atomic::AtomicUsize;
 
 use crate::arch::mm::phys::{allocate_order, deallocate_order};
 use crate::arch::raw::mm::PhysAddr;
+use crate::drivers::block::ahci::reg::AtaCommand;
 use crate::kernel::mm::Frame;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -11,16 +12,23 @@ pub struct DmaBuf {
     pub order: usize,
 }
 
-pub struct ReadRequest {
+#[derive(PartialOrd, PartialEq)]
+pub enum DmaCommand {
+    Read,
+    Write,
+}
+
+pub struct DmaRequest {
     sector: usize,
     count: usize,
     buf_vec: Vec<DmaBuf>,
     incomplete: AtomicUsize,
     wq: WaitQueue,
+    command: DmaCommand,
 }
 
-impl ReadRequest {
-    pub fn new(sector: usize, count: usize) -> ReadRequest {
+impl DmaRequest {
+    pub fn new(sector: usize, count: usize) -> DmaRequest {
         let mut size = count * 512;
 
         let mut dma = Vec::<DmaBuf>::new();
@@ -36,13 +44,26 @@ impl ReadRequest {
             size -= core::cmp::min(size, 0x2000);
         }
 
-        ReadRequest {
+        DmaRequest {
             sector,
             count,
             buf_vec: dma,
             incomplete: AtomicUsize::new(0),
             wq: WaitQueue::new(),
+            command: DmaCommand::Read,
         }
+    }
+
+    pub fn from_bytes(sector: usize, buf: &[u8]) -> DmaRequest {
+        let count = (buf.len() + 511) / 512;
+
+        let mut req = Self::new(sector, count);
+
+        req.command = DmaCommand::Write;
+
+        req.copy_from(buf);
+
+        req
     }
 
     pub fn dma_vec_from(&self, off: usize) -> &[DmaBuf] {
@@ -56,12 +77,36 @@ impl ReadRequest {
         for buf in self.buf_vec.iter() {
             let cnt = core::cmp::min(rem, 0x2000);
 
-            dest[off..off + cnt].copy_from_slice(unsafe {
-                core::slice::from_raw_parts(buf.buf.to_mapped().0 as *const u8, cnt)
-            });
+            dest[off..off + cnt].copy_from_slice(unsafe { buf.buf.to_mapped().as_bytes(cnt) });
 
             rem -= cnt;
             off += cnt;
+        }
+    }
+
+    fn copy_from(&mut self, src: &[u8]) {
+        use core::cmp::min;
+
+        let mut off = 0;
+
+        for b in self.buf_vec.iter_mut() {
+            let size = min(
+                match b.order {
+                    0 => 0x1000,
+                    1 => 2 * 0x1000,
+                    _ => unreachable!(),
+                },
+                src.len() - off,
+            );
+
+            unsafe {
+                b.buf
+                    .to_mapped()
+                    .as_bytes_mut(size)
+                    .copy_from_slice(&src[off..off + size]);
+            }
+
+            off += size;
         }
     }
 
@@ -92,9 +137,16 @@ impl ReadRequest {
     pub fn sector(&self) -> usize {
         self.sector
     }
+
+    pub fn ata_command(&self) -> AtaCommand {
+        match self.command {
+            DmaCommand::Read => AtaCommand::AtaCommandReadDmaExt,
+            DmaCommand::Write => AtaCommand::AtaCommandWriteDmaExt,
+        }
+    }
 }
 
-impl Drop for ReadRequest {
+impl Drop for DmaRequest {
     fn drop(&mut self) {
         for buf in self.buf_vec.iter() {
             deallocate_order(&Frame::new(buf.buf), buf.order);

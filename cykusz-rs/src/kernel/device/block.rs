@@ -81,23 +81,24 @@ impl BlockDev for BlockDevice {
 }
 
 pub fn test_read() {
-    let size = 128 * 1024;
-    let mut buf = Vec::new();
-    buf.resize(size, 0);
+    let size = 1024*1024*4;
+    let mut buf: Vec<u8> = Vec::new();
+    buf.resize(size, 0xCC);
 
     let addr = VirtAddr(buf.as_ptr() as usize);
 
     for (_, dev) in BLK_DEVS.read().iter() {
+        if let Some(r) = dev.write(0, buf.as_slice()) {
+            println!("[ BLOCK ] Test write of {} bytes", r);
+        }
+
         if let Some(r) = dev.read(0, size / 512, unsafe {
             core::slice::from_raw_parts_mut(addr.0 as *mut u8, size)
         }) {
-            //for o in (0..size).step_by(4096) {
-            //    println!("0x{:x} : 0x{:x}", o, unsafe { (addr + o).read::<u64>() });
-            //}
             println!(
-                "[ BLOCK ] Test read of {} bytes, val at 0x1000: 0x{:x}",
+                "[ BLOCK ] Test read of {} bytes, val at 0x0: 0x{:x}",
                 r,
-                unsafe { (addr + 4096).read::<u64>() }
+                unsafe { (addr).read::<u64>() }
             );
         }
     }

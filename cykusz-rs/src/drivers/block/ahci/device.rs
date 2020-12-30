@@ -1,3 +1,4 @@
+use alloc::string::String;
 use alloc::sync::Arc;
 
 use bit_field::BitField;
@@ -14,7 +15,7 @@ use crate::kernel::device::block::{register_blkdev, BlockDev, BlockDevice};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sync::Spin;
-use alloc::string::String;
+use crate::kernel::utils::wait_queue::WaitQueue;
 
 struct Cmd {
     req: Arc<ReadRequest>,
@@ -23,10 +24,12 @@ struct Cmd {
 struct PortData {
     cmds: [Option<Cmd>; 32],
     port: VirtAddr,
+    free_cmds: usize,
 }
 
 pub struct Port {
     data: Spin<PortData>,
+    cmd_wq: WaitQueue,
 }
 
 impl PortData {
@@ -55,6 +58,8 @@ impl PortData {
                 }
 
                 *cmd = None;
+
+                self.free_cmds += 1;
             }
         }
     }
@@ -69,43 +74,53 @@ impl PortData {
         None
     }
 
-    fn read(&mut self, request: Arc<ReadRequest>) {
-        let mut rem = request.count;
-        let mut off = 0;
-        let mut buf_off = 0;
+    fn read(&mut self, request: Arc<ReadRequest>, mut off: usize) -> usize {
+        let mut rem = request.count - off;
+        let mut buf_off = off / 16;
 
         while rem > 0 {
             let slot = {
-                let slot = self.find_cmd_slot().expect("No free cmd slots!");
-                //println!("Use slot: {}", slot);
+                if let Some(slot) = self.find_cmd_slot() {
+                    let port = self.hba_port();
 
-                let port = self.hba_port();
+                    let cnt = core::cmp::min(rem, 128);
 
-                let cnt = core::cmp::min(rem, 128);
+                    port.read(request.sector + off, cnt, &request.buf_vec[buf_off..], slot);
 
-                port.read(request.sector + off, cnt, &request.buf_vec[buf_off..], slot);
+                    rem -= cnt;
+                    off += cnt;
+                    buf_off += cnt / 16;
 
-                rem -= cnt;
-                off += cnt;
-                buf_off += 8;
-
-                slot
+                    slot
+                } else {
+                    return off;
+                }
             };
 
             self.cmds[slot] = Some(Cmd {
                 req: request.clone(),
             });
 
+            self.free_cmds -= 1;
+
             request
                 .incomplete
                 .fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         }
+
+        off
     }
 }
 
 impl Port {
     fn handle_interrupt(&self) {
-        self.data.lock_irq().handle_interrupt();
+        let mut data = self.data.lock_irq();
+
+        data.handle_interrupt();
+
+        if data.free_cmds > 0 {
+            self.cmd_wq.notify_all();
+        }
     }
 }
 
@@ -117,8 +132,15 @@ impl BlockDev for Port {
 
         let req = Arc::new(make_request(sector, count));
 
+        let mut off = 0;
         // post request and wait for completion.....
-        self.data.lock_irq().read(req.clone());
+        while off < count {
+            let mut data = self
+                .cmd_wq
+                .wait_lock_irq_for(&self.data, |d| d.free_cmds > 0);
+
+            off = data.read(req.clone(), off);
+        }
 
         req.wq
             .wait_for(|| req.incomplete.load(core::sync::atomic::Ordering::SeqCst) == 0);
@@ -156,7 +178,9 @@ impl HbaPort {
 
         let mut flags = hdr.flags();
         flags.remove(HbaCmdHeaderFlags::W);
+        flags.insert(HbaCmdHeaderFlags::P | HbaCmdHeaderFlags::C);
         flags.set_command_fis_length((core::mem::size_of::<FisRegH2D>() / 4) as u8);
+
         hdr.set_flags(flags);
 
         let l = ((count - 1) >> 4) + 1;
@@ -182,6 +206,7 @@ impl HbaPort {
         prdt.set_database_address(buf[l - 1].buf);
 
         let fis = tbl.cfis_as_h2d_mut();
+        fis.reset();
 
         fis.set_fis_type(FisType::RegH2D);
         fis.set_c(true);
@@ -192,7 +217,6 @@ impl HbaPort {
         fis.set_count(count as u16);
 
         //todo: wait here
-
         self.set_ci(self.ci() | (1 << slot)); // issue cmd
 
         true
@@ -337,7 +361,9 @@ impl AhciDevice {
                         data: Spin::new(PortData {
                             cmds: [None; 32],
                             port: VirtAddr(addr),
+                            free_cmds: 32,
                         }),
+                        cmd_wq: WaitQueue::new(),
                     });
 
                     if let Err(d) =
@@ -369,8 +395,6 @@ impl AhciDevice {
             self.enable_interrupts(pci_data);
 
             self.start_hba();
-
-            //self.hba().port_mut(0).read(0, 0, PhysAddr(0));
 
             return true;
         }

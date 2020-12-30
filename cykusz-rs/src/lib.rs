@@ -97,10 +97,10 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::net::init();
 
+    crate::kernel::device::block::test_read();
+
     // Start test tasks on this cpu
     task_test::start();
-
-    crate::kernel::device::block::test_read();
 
     idle();
 }

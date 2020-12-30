@@ -7,6 +7,7 @@ use crate::drivers::pci::{register_pci_device, PciDeviceHandle, PciHeader};
 use crate::kernel::sync::Spin;
 
 mod device;
+mod port;
 mod reg;
 mod request;
 

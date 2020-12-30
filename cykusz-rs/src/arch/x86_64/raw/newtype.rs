@@ -165,6 +165,14 @@ macro_rules! enable_unsigned_ops {
             pub unsafe fn copy_to(&self, to: usize, count: usize) {
                 (self.0 as *const u8).copy_to(to as *mut u8, count);
             }
+
+            pub unsafe fn as_bytes(&self, size: usize) -> &[u8] {
+                core::slice::from_raw_parts(self.0 as *const u8, size)
+            }
+
+            pub unsafe fn as_bytes_mut(&mut self, size: usize) -> &mut [u8] {
+                core::slice::from_raw_parts_mut(self.0 as *mut u8, size)
+            }
         }
 
         unsafe impl ::core::iter::Step for $type_ {

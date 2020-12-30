@@ -338,7 +338,7 @@ pub fn send_discovery() {
         .set_parameter_request_list()
         .finish();
 
-    println!("Sending DHCP Discovery");
+    println!("[ DHCP ] Sending DHCP Discovery");
 
     crate::kernel::net::udp::send_packet(packet.downgrade());
 }

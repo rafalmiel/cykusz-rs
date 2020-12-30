@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use bit_field::BitField;
 
 use crate::drivers::block::ahci::reg::HbaPort;
-use crate::drivers::block::ahci::request::ReadRequest;
+use crate::drivers::block::ahci::request::DmaRequest;
 use crate::kernel::device::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sync::Spin;
@@ -12,11 +12,11 @@ use crate::kernel::utils::wait_queue::WaitQueue;
 mod hba;
 
 struct Cmd {
-    req: Arc<ReadRequest>,
+    req: Arc<DmaRequest>,
 }
 
 impl Cmd {
-    pub fn request(&self) -> &Arc<ReadRequest> {
+    pub fn request(&self) -> &Arc<DmaRequest> {
         &self.req
     }
 }
@@ -71,7 +71,7 @@ impl PortData {
             .find_map(|(i, e)| if e.is_none() { Some(i) } else { None })
     }
 
-    fn read(&mut self, request: Arc<ReadRequest>, mut off: usize) -> usize {
+    fn run_request(&mut self, request: Arc<DmaRequest>, mut off: usize) -> usize {
         let mut rem = request.count() - off;
 
         while rem > 0 {
@@ -81,7 +81,13 @@ impl PortData {
 
                     let cnt = core::cmp::min(rem, 128);
 
-                    port.read(request.sector() + off, cnt, request.dma_vec_from(off), slot);
+                    port.run_command(
+                        request.ata_command(),
+                        request.sector() + off,
+                        cnt,
+                        request.dma_vec_from(off),
+                        slot,
+                    );
 
                     rem -= cnt;
                     off += cnt;
@@ -126,6 +132,22 @@ impl Port {
             self.cmd_wq.notify_all();
         }
     }
+
+    fn run_request(&self, request: Arc<DmaRequest>) -> Option<usize> {
+        let mut off = 0;
+        // post request and wait for completion.....
+        while off < request.count() {
+            let mut data = self
+                .cmd_wq
+                .wait_lock_irq_for(&self.data, |d| d.free_cmds > 0);
+
+            off = data.run_request(request.clone(), off);
+        }
+
+        request.wait_queue().wait_for(|| request.is_complete());
+
+        Some(request.count() * 512)
+    }
 }
 
 impl BlockDev for Port {
@@ -134,26 +156,20 @@ impl BlockDev for Port {
             return None;
         }
 
-        let req = Arc::new(ReadRequest::new(sector, count));
+        let request = Arc::new(DmaRequest::new(sector, count));
 
-        let mut off = 0;
-        // post request and wait for completion.....
-        while off < count {
-            let mut data = self
-                .cmd_wq
-                .wait_lock_irq_for(&self.data, |d| d.free_cmds > 0);
+        let res = self.run_request(request.clone());
 
-            off = data.read(req.clone(), off);
+        if res.is_some() {
+            request.copy_into(dest);
         }
 
-        req.wait_queue().wait_for(|| req.is_complete());
-
-        req.copy_into(dest);
-
-        Some(count * 512)
+        res
     }
 
-    fn write(&self, _sector: usize, _buf: &[u8]) -> Option<usize> {
-        unimplemented!()
+    fn write(&self, sector: usize, buf: &[u8]) -> Option<usize> {
+        let request = Arc::new(DmaRequest::from_bytes(sector, buf));
+
+        self.run_request(request.clone())
     }
 }

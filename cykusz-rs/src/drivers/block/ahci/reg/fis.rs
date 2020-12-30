@@ -42,6 +42,16 @@ pub struct FisRegH2D {
 }
 
 impl FisRegH2D {
+    pub fn reset(&mut self) {
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                self as *const _ as *mut u8,
+                core::mem::size_of::<FisRegH2D>(),
+            )
+            .fill(0);
+        }
+    }
+
     pub fn fis_type(&self) -> FisType {
         unsafe { self.fis_type.get() }
     }
@@ -193,12 +203,12 @@ impl FisRegH2D {
     }
 
     pub fn lba4(&self) -> usize {
-        unsafe { self.lba0.get() as usize }
+        unsafe { self.lba4.get() as usize }
     }
 
     pub fn set_lba4(&mut self, v: u8) {
         unsafe {
-            self.lba0.set(v);
+            self.lba4.set(v);
         }
     }
 
@@ -348,12 +358,12 @@ impl FisRegD2H {
     }
 
     pub fn lba4(&self) -> usize {
-        unsafe { self.lba0.get() as usize }
+        unsafe { self.lba4.get() as usize }
     }
 
     pub fn set_lba4(&mut self, v: u8) {
         unsafe {
-            self.lba0.set(v);
+            self.lba4.set(v);
         }
     }
 
@@ -555,12 +565,12 @@ impl FisPioSetup {
     }
 
     pub fn lba4(&self) -> usize {
-        unsafe { self.lba0.get() as usize }
+        unsafe { self.lba4.get() as usize }
     }
 
     pub fn set_lba4(&mut self, v: u8) {
         unsafe {
-            self.lba0.set(v);
+            self.lba4.set(v);
         }
     }
 

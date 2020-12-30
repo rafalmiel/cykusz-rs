@@ -180,7 +180,6 @@ fn exec(cmd: &str) {
 }
 
 fn main_cd() -> ! {
-    println!("Shell starting...");
     loop {
         let mut buf = [0u8; 256];
         let mut pwd = [0u8; 1024];

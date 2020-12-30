@@ -35,7 +35,7 @@ impl<T> Mutex<T> {
                     m: &self,
                 };
             } else {
-                WaitQueue::wait();
+                WaitQueue::task_wait();
             }
         }
     }
@@ -53,7 +53,7 @@ impl<T> Mutex<T> {
                     m: &self,
                 };
             } else {
-                WaitQueue::wait();
+                WaitQueue::task_wait();
             }
         }
     }

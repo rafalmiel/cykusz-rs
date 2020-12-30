@@ -107,7 +107,7 @@ impl HbaPortCmdReg {
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub struct HbaPortTfdReg(u32);
+pub struct HbaPortTfdReg(pub u32);
 
 pub enum HbaPortTfdRegStatus {
     Err,

@@ -5,11 +5,22 @@ use crate::drivers::block::ahci::request::DmaBuf;
 use crate::kernel::mm::virt::PageFlags;
 
 impl HbaPort {
-    pub fn read(&mut self, sector: usize, count: usize, buf: &[DmaBuf], slot: usize) -> bool {
+    pub fn run_command(
+        &mut self,
+        cmd: AtaCommand,
+        sector: usize,
+        count: usize,
+        buf: &[DmaBuf],
+        slot: usize,
+    ) -> bool {
         let hdr = self.cmd_header_at(slot);
 
         let mut flags = hdr.flags();
-        flags.remove(HbaCmdHeaderFlags::W);
+        if cmd == AtaCommand::AtaCommandWriteDmaExt {
+            flags.insert(HbaCmdHeaderFlags::W);
+        } else {
+            flags.remove(HbaCmdHeaderFlags::W);
+        }
         flags.insert(HbaCmdHeaderFlags::P | HbaCmdHeaderFlags::C);
         flags.set_command_fis_length((core::mem::size_of::<FisRegH2D>() / 4) as u8);
 
@@ -42,61 +53,17 @@ impl HbaPort {
 
         fis.set_fis_type(FisType::RegH2D);
         fis.set_c(true);
-        fis.set_command(AtaCommand::AtaCommandReadDmaExt);
+        fis.set_command(cmd);
         fis.set_lba(sector);
         fis.set_device(1 << 6);
 
         fis.set_count(count as u16);
 
         //todo: wait here
-        self.set_ci(self.ci() | (1 << slot)); // issue cmd
+        self.set_ci(1 << slot); // issue cmd
 
         true
     }
-
-    /*
-    pub fn write(&mut self) {
-        if let Some((hdr, i)) = self.find_cmd_slot() {
-            let mut flags = hdr.flags();
-            flags.insert(HbaCmdHeaderFlags::W);
-            flags.set_command_fis_length((core::mem::size_of::<FisRegH2D>() / 4) as u8);
-
-            hdr.set_flags(flags);
-
-            hdr.set_prdtl(1);
-
-            let dest_buf = allocate_order(0).unwrap().address();
-
-            unsafe {
-                core::slice::from_raw_parts_mut(dest_buf.to_mapped().0 as *mut u8, 0x1000)
-                    .fill(0xA5);
-            }
-
-            let tbl = hdr.cmd_tbl();
-
-            let prdt = tbl.prdt_entry_mut(0);
-
-            prdt.set_data_byte_count(512 - 1);
-            prdt.set_interrupt_on_completion(true);
-            prdt.set_database_address(dest_buf);
-
-            let fis = tbl.cfis_as_h2d_mut();
-
-            fis.set_fis_type(FisType::RegH2D);
-            fis.set_c(true);
-            fis.set_command(AtaCommand::AtaCommandWriteDmaExt);
-            fis.set_lba(0);
-            fis.set_device(1 << 6);
-
-            fis.set_count(1);
-
-            //todo: wait here
-
-            self.set_ci(1 << i); // issue cmd
-        } else {
-            panic!("[ AHCI ] No free cmd slot found");
-        }
-    }*/
 
     pub fn start(&mut self) {
         self.stop_cmd();

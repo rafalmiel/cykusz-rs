@@ -173,6 +173,14 @@ macro_rules! enable_unsigned_ops {
             pub unsafe fn as_bytes_mut(&mut self, size: usize) -> &mut [u8] {
                 core::slice::from_raw_parts_mut(self.0 as *mut u8, size)
             }
+
+            pub unsafe fn as_slice<T>(&self, count: usize) -> &[T] {
+                core::slice::from_raw_parts(self.0 as *const T, count)
+            }
+
+            pub unsafe fn as_slice_mut<T>(&mut self, count: usize) -> &mut [T] {
+                core::slice::from_raw_parts_mut(self.0 as *mut T, count)
+            }
         }
 
         unsafe impl ::core::iter::Step for $type_ {

@@ -95,11 +95,26 @@ pub fn test_read() {
         if let Some(r) = dev.read(0, size / 512, unsafe {
             core::slice::from_raw_parts_mut(addr.0 as *mut u8, size)
         }) {
-            println!(
-                "[ BLOCK ] Test read of {} bytes, val at 0x0: 0x{:x}",
+            let mut fail = false;
+            print!(
+                "[ BLOCK ] Test read  of {} bytes: ",
                 r,
-                unsafe { (addr).read::<u64>() }
             );
+            for &b in unsafe {
+                addr.as_slice::<u64>(size / 8).iter().step_by(0x1000)
+            } {
+                if b != 0xCCCCCCCCCCCCCCCC {
+                    fail = true;
+                    break;
+                }
+            }
+
+            if fail {
+                println!("FAIL");
+            } else {
+                println!("OK");
+            }
+
         }
     }
 }

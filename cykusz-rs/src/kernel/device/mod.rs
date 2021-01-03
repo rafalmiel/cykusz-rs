@@ -8,8 +8,6 @@ use core::sync::atomic::Ordering;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::RwSpin;
 
-pub mod block;
-
 pub trait Device: Send + Sync {
     fn id(&self) -> usize;
     fn name(&self) -> String;

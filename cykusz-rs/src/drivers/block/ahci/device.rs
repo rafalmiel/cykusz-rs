@@ -10,7 +10,7 @@ use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::port::Port;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::pci::PciHeader;
-use crate::kernel::device::block::{register_blkdev, BlockDevice};
+use crate::kernel::block::{register_blkdev, BlockDevice};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::VirtAddr;
 
@@ -50,11 +50,15 @@ impl AhciDevice {
     }
 
     fn start_hba(&mut self) -> bool {
+        use crate::alloc::string::ToString;
+
         let mut hba = self.hba();
 
         hba.set_ghc(hba.ghc() | HbaMemGhcReg::IE);
 
         let pi = hba.pi();
+
+        let mut disk_nr: u32 = 1;
 
         for i in 0..32 {
             if pi.get_bit(i) {
@@ -66,11 +70,14 @@ impl AhciDevice {
 
                     let port_dev = Arc::new(Port::new(addr));
 
-                    if let Err(d) =
-                        register_blkdev(BlockDevice::new(String::from("disk"), port_dev.clone()))
-                    {
+                    if let Err(d) = register_blkdev(BlockDevice::new(
+                        String::from("disk") + &disk_nr.to_string(),
+                        port_dev.clone(),
+                    )) {
                         panic!("Failed to register blkdev {:?}", d);
                     }
+
+                    disk_nr += 1;
 
                     self.ports[i] = Some(port_dev);
 

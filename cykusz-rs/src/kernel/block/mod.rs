@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 
 use crate::kernel::device;
 use crate::kernel::device::{alloc_id, register_device, Device};
+use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::RwSpin;
 
@@ -151,7 +152,6 @@ pub fn init() {
         if let Err(e) = register_blkdev(p.clone()) {
             panic!("Failed to register blkdev {} {:?}", p.name(), e);
         }
-
-        p.write(0, &[0xCCu8; 512]);
+        let _fs = Ext2Filesystem::new(p.clone());
     }
 }

@@ -138,47 +138,47 @@ macro_rules! enable_unsigned_ops {
         }
 
         impl $type_ {
-            pub unsafe fn store<T: Copy>(&self, v: T) {
+            pub unsafe fn store<T: Copy>(self, v: T) {
                 *(self.0 as *mut T) = v;
             }
 
-            pub unsafe fn store_volatile<T: Copy>(&self, v: T) {
+            pub unsafe fn store_volatile<T: Copy>(self, v: T) {
                 core::ptr::write_volatile(self.0 as *mut T, v);
             }
 
-            pub unsafe fn read<T: Copy>(&self) -> T {
+            pub unsafe fn read<T: Copy>(self) -> T {
                 return *(self.0 as *mut T);
             }
 
-            pub unsafe fn read_volatile<T: Copy>(&self) -> T {
+            pub unsafe fn read_volatile<T: Copy>(self) -> T {
                 return ::core::ptr::read_volatile(self.0 as *const T);
             }
 
-            pub unsafe fn read_ref<'a, T>(&self) -> &'a T {
+            pub unsafe fn read_ref<'a, T>(self) -> &'a T {
                 return &*(self.0 as *mut T);
             }
 
-            pub unsafe fn read_mut<'a, T>(&mut self) -> &'a mut T {
+            pub unsafe fn read_mut<'a, T>(self) -> &'a mut T {
                 return &mut *(self.0 as *mut T);
             }
 
-            pub unsafe fn copy_to(&self, to: usize, count: usize) {
+            pub unsafe fn copy_to(self, to: usize, count: usize) {
                 (self.0 as *const u8).copy_to(to as *mut u8, count);
             }
 
-            pub unsafe fn as_bytes(&self, size: usize) -> &[u8] {
+            pub unsafe fn as_bytes<'a>(self, size: usize) -> &'a [u8] {
                 core::slice::from_raw_parts(self.0 as *const u8, size)
             }
 
-            pub unsafe fn as_bytes_mut(&mut self, size: usize) -> &mut [u8] {
+            pub unsafe fn as_bytes_mut<'a>(self, size: usize) -> &'a mut [u8] {
                 core::slice::from_raw_parts_mut(self.0 as *mut u8, size)
             }
 
-            pub unsafe fn as_slice<T>(&self, count: usize) -> &[T] {
+            pub unsafe fn as_slice<'a, T>(self, count: usize) -> &'a [T] {
                 core::slice::from_raw_parts(self.0 as *const T, count)
             }
 
-            pub unsafe fn as_slice_mut<T>(&mut self, count: usize) -> &mut [T] {
+            pub unsafe fn as_slice_mut<'a, T>(self, count: usize) -> &'a mut [T] {
                 core::slice::from_raw_parts_mut(self.0 as *mut T, count)
             }
         }

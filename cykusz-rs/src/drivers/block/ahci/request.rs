@@ -72,7 +72,7 @@ impl DmaRequest {
 
     pub fn copy_into(&self, dest: &mut [u8]) {
         let mut off = 0;
-        let mut rem = self.count * 512;
+        let mut rem = dest.len();
 
         for buf in self.buf_vec.iter() {
             let cnt = core::cmp::min(rem, 0x2000);

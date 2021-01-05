@@ -7,7 +7,7 @@ struct ThreadPtr {
 }
 
 impl ThreadPtr {
-    pub unsafe fn new_at(mut addr: VirtAddr) -> &'static mut ThreadPtr {
+    pub unsafe fn new_at(addr: VirtAddr) -> &'static mut ThreadPtr {
         addr.read_mut::<ThreadPtr>()
     }
 

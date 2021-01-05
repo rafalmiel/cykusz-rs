@@ -192,16 +192,16 @@ impl INode for MNode {
         self.inode.write_at(offset, buf)
     }
 
-    fn mknode(&self, name: &str, devid: usize) -> Result<Arc<dyn INode>> {
-        self.inode.mknode(name, devid)
-    }
-
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
         self.inode.poll(ptable)
     }
 
     fn create(&self, name: &str) -> Result<Arc<dyn INode>> {
         self.inode.create(name)
+    }
+
+    fn mknode(&self, name: &str, devid: usize) -> Result<Arc<dyn INode>> {
+        self.inode.mknode(name, devid)
     }
 
     fn truncate(&self) -> Result<()> {

@@ -39,9 +39,9 @@ impl PortData {
 
     fn handle_interrupt(&mut self) {
         let port = self.hba_port();
-        let ci = port.ci();
-
         port.set_is(port.is());
+
+        let ci = port.ci();
 
         for (i, cmd) in self.cmds.iter_mut().enumerate() {
             if !ci.get_bit(i) {
@@ -151,10 +151,8 @@ impl Port {
 }
 
 impl BlockDev for Port {
-    fn read(&self, sector: usize, count: usize, dest: &mut [u8]) -> Option<usize> {
-        if dest.len() < count * 512 {
-            return None;
-        }
+    fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
+        let count = (dest.len() + 511) / 512;
 
         let request = Arc::new(DmaRequest::new(sector, count));
 

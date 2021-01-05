@@ -39,9 +39,9 @@ impl PortData {
 
     fn handle_interrupt(&mut self) {
         let port = self.hba_port();
-        let ci = port.ci();
-
         port.set_is(port.is());
+
+        let ci = port.ci();
 
         for (i, cmd) in self.cmds.iter_mut().enumerate() {
             if !ci.get_bit(i) {

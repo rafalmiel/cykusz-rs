@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
+#![feature(array_methods)]
 #![feature(auto_traits)]
 #![feature(c_variadic)]
 #![feature(concat_idents)]
@@ -17,6 +18,7 @@
 #![feature(step_trait)]
 #![feature(step_trait_ext)]
 #![feature(thread_local)]
+#![feature(new_uninit)]
 
 extern crate alloc;
 #[macro_use]
@@ -95,9 +97,9 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     drivers::post_module_init();
 
-    kernel::net::init();
-
     kernel::block::init();
+
+    kernel::net::init();
 
     // Start test tasks on this cpu
     task_test::start();

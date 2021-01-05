@@ -136,6 +136,20 @@ impl INode for LockedRamINode {
         }
     }
 
+    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
+        let i = self.0.read();
+
+        match &i.content {
+            Content::DevNode(Some(n)) => {
+                let n = n.clone();
+                drop(i);
+
+                n.poll(ptable)
+            }
+            _ => Err(FsError::NotSupported),
+        }
+    }
+
     fn fs(&self) -> Arc<dyn Filesystem> {
         self.0.read().fs.upgrade().unwrap().clone()
     }
@@ -165,20 +179,6 @@ impl INode for LockedRamINode {
                 return Ok(());
             }
             _ => return Ok(()),
-        }
-    }
-
-    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
-        let i = self.0.read();
-
-        match &i.content {
-            Content::DevNode(Some(n)) => {
-                let n = n.clone();
-                drop(i);
-
-                n.poll(ptable)
-            }
-            _ => Err(FsError::NotSupported),
         }
     }
 

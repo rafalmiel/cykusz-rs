@@ -1,0 +1,38 @@
+#![allow(dead_code)]
+
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone)]
+pub struct INode {
+    type_and_perm: u16,
+    user_id: u16,
+    size_lower: u32,
+    last_access: u32,
+    creation_time: u32,
+    last_modification: u32,
+    deletion_time: u32,
+    group_id: u16,
+    hl_count: u16,
+    sector_count: u32,
+    flags: u32,
+    os_specific: u32,
+    pub direct_ptr0: u32,
+    direct_ptr1: u32,
+    direct_ptr2: u32,
+    direct_ptr3: u32,
+    direct_ptr4: u32,
+    direct_ptr5: u32,
+    direct_ptr6: u32,
+    direct_ptr7: u32,
+    direct_ptr8: u32,
+    direct_ptr9: u32,
+    direct_ptr10: u32,
+    direct_ptr11: u32,
+    s_indir_ptr: u32,
+    d_indir_ptr: u32,
+    t_indir_ptr: u32,
+    gen_number: u32,
+    ext_attr_block: u32,
+    size_or_acl: u32,
+    fragment_address: u32,
+    os_specific2: [u8; 12],
+}

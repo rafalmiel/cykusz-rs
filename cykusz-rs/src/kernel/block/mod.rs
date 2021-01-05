@@ -11,7 +11,7 @@ use crate::kernel::sync::RwSpin;
 mod mbr;
 
 pub trait BlockDev: Send + Sync {
-    fn read(&self, sector: usize, count: usize, dest: &mut [u8]) -> Option<usize>;
+    fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize>;
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize>;
 }
 
@@ -21,6 +21,8 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
     let mut devs = BLK_DEVS.write();
 
     register_device(dev.clone())?;
+
+    println!("[ BLOCK ] Registered block device {}", dev.name());
 
     devs.insert(dev.id, dev);
 
@@ -41,11 +43,13 @@ pub struct PartitionBlockDev {
 }
 
 impl BlockDev for PartitionBlockDev {
-    fn read(&self, sector: usize, count: usize, dest: &mut [u8]) -> Option<usize> {
+    fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
+        let count = (dest.len() + 511) / 512;
+
         if sector + count > self.size {
             return None;
         } else {
-            self.dev.read(self.offset + sector, count, dest)
+            self.dev.read(self.offset + sector, dest)
         }
     }
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize> {
@@ -104,8 +108,8 @@ impl Device for BlockDevice {
 }
 
 impl BlockDev for BlockDevice {
-    fn read(&self, sector: usize, count: usize, dest: &mut [u8]) -> Option<usize> {
-        self.dev.read(sector, count, dest)
+    fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
+        self.dev.read(sector, dest)
     }
 
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize> {
@@ -121,7 +125,7 @@ pub fn init() {
     let mut partitions = Vec::<Arc<BlockDevice>>::new();
 
     for (_, dev) in BLK_DEVS.read().iter() {
-        dev.read(0, 1, mbr.bytes_mut());
+        dev.read(0, mbr.bytes_mut());
 
         if mbr.is_valid() {
             for p in 0..4 {

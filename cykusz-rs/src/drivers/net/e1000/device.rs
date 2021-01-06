@@ -2,12 +2,12 @@ use alloc::vec::Vec;
 
 use crate::arch::idt::add_shared_irq_handler;
 use crate::arch::int::{set_active_high, set_irq_dest};
-use crate::arch::mm::phys::allocate_order;
-use crate::arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
 use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
 use crate::drivers::pci::{PciData, PciHeader, PciHeader0};
+use crate::kernel::mm::allocate_order;
 use crate::kernel::mm::heap::{allocate_align, deallocate_align};
+use crate::kernel::mm::{MappedAddr, PhysAddr, VirtAddr};
 use crate::kernel::net::PacketBaseTrait;
 use crate::kernel::timer::busy_sleep;
 

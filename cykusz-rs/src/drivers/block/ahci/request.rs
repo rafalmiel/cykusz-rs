@@ -1,10 +1,11 @@
 use alloc::vec::Vec;
 use core::sync::atomic::AtomicUsize;
 
-use crate::arch::mm::phys::{allocate_order, deallocate_order};
-use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::reg::AtaCommand;
 use crate::kernel::mm::Frame;
+use crate::kernel::mm::PhysAddr;
+use crate::kernel::mm::{allocate_order, deallocate_order};
+use crate::kernel::utils::types::CeilDiv;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub struct DmaBuf {
@@ -55,7 +56,7 @@ impl DmaRequest {
     }
 
     pub fn from_bytes(sector: usize, buf: &[u8]) -> DmaRequest {
-        let count = (buf.len() + 511) / 512;
+        let count = buf.len().ceil_div(512);
 
         let mut req = Self::new(sector, count);
 

@@ -1,7 +1,7 @@
 use bit_field::BitField;
 
 use crate::arch::acpi::hpet::HpetHeader;
-use crate::arch::x86_64::raw::mm::MappedAddr;
+use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
 use crate::kernel::sync::Spin;
 

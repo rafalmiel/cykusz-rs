@@ -1,8 +1,9 @@
 use bit_field::BitField;
 use mmio::VCell;
 
-use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::reg::ata::AtaCommand;
+use crate::kernel::mm::PhysAddr;
+use crate::kernel::utils::slice::ToBytesMut;
 
 #[repr(u8)]
 #[derive(Copy, Clone)]
@@ -43,13 +44,8 @@ pub struct FisRegH2D {
 
 impl FisRegH2D {
     pub fn reset(&mut self) {
-        unsafe {
-            core::slice::from_raw_parts_mut(
-                self as *const _ as *mut u8,
-                core::mem::size_of::<FisRegH2D>(),
-            )
-            .fill(0);
-        }
+        let mut this = self;
+        this.to_bytes_mut().fill(0);
     }
 
     pub fn fis_type(&self) -> FisType {

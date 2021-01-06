@@ -66,8 +66,8 @@ fn task_finished() {
 }
 
 fn prepare_p4<'a>() -> &'a mut P4Table {
-    use crate::arch::mm::phys::allocate;
     use crate::arch::mm::virt::current_p4_table;
+    use crate::kernel::mm::allocate;
 
     let current_p4 = current_p4_table();
     let frame = allocate().expect("Out of mem!");
@@ -84,9 +84,9 @@ fn prepare_p4<'a>() -> &'a mut P4Table {
 }
 
 fn map_user(new_p4: &mut P4Table, elf_module: MappedAddr) -> (PhysAddr, VirtAddr, VirtAddr) {
-    use crate::arch::mm::phys::allocate;
     use crate::drivers::elf::types::ProgramType;
     use crate::drivers::elf::ElfHeader;
+    use crate::kernel::mm::allocate;
     use crate::kernel::mm::virt;
     use core::cmp::min;
 

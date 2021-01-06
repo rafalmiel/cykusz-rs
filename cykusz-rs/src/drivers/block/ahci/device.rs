@@ -5,13 +5,13 @@ use bit_field::BitField;
 
 use crate::arch::idt::add_shared_irq_handler;
 use crate::arch::int::{set_active_high, set_irq_dest};
-use crate::arch::mm::virt::map_to_flags;
-use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::port::Port;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::pci::PciHeader;
 use crate::kernel::block::{register_blkdev, BlockDevice};
+use crate::kernel::mm::map_to_flags;
 use crate::kernel::mm::virt::PageFlags;
+use crate::kernel::mm::PhysAddr;
 use crate::kernel::mm::VirtAddr;
 
 pub struct AhciDevice {

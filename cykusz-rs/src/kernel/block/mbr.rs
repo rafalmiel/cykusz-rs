@@ -1,8 +1,9 @@
 #![allow(dead_code)]
+
 use bit_field::BitField;
 
-use crate::arch::raw::mm::VirtAddr;
 use crate::kernel::mm::heap::{allocate_align, deallocate_align};
+use crate::kernel::mm::VirtAddr;
 
 pub struct Mbr {
     data: VirtAddr,

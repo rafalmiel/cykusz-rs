@@ -1,7 +1,7 @@
-use crate::arch::mm::phys::allocate_order;
 use crate::arch::mm::virt::map_to_flags;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::block::ahci::request::DmaBuf;
+use crate::kernel::mm::allocate_order;
 use crate::kernel::mm::virt::PageFlags;
 
 impl HbaPort {

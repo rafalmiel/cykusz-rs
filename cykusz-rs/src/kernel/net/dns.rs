@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU16, Ordering};
 
-use crate::arch::raw::mm::VirtAddr;
+use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::udp::{Udp, UdpService};
 use crate::kernel::net::util::NetU16;
@@ -215,7 +215,7 @@ impl Answer {
 
         a += 2;
 
-        unsafe { core::slice::from_raw_parts(a.0 as *const u8, len as usize) }
+        unsafe { a.as_bytes(len as usize) }
     }
 }
 

@@ -7,6 +7,7 @@ use crate::drivers::block::ahci::request::DmaRequest;
 use crate::kernel::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sync::Spin;
+use crate::kernel::utils::types::CeilDiv;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 mod hba;
@@ -152,7 +153,7 @@ impl Port {
 
 impl BlockDev for Port {
     fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
-        let count = (dest.len() + 511) / 512;
+        let count = dest.len().ceil_div(512);
 
         let request = Arc::new(DmaRequest::new(sector, count));
 

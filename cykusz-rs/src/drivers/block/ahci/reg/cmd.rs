@@ -1,8 +1,8 @@
 use bit_field::BitField;
 use mmio::VCell;
 
-use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::reg::FisRegH2D;
+use crate::kernel::mm::PhysAddr;
 
 bitflags! {
     pub struct HbaCmdHeaderFlags: u16 {

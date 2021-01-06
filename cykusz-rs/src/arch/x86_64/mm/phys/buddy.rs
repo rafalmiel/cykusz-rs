@@ -36,10 +36,10 @@ impl BuddyAlloc {
             let s = ((size / bs) + BMTYPE_BITS - 1) / BMTYPE_BITS;
             let als = s * (BMTYPE_BITS / 8);
 
-            let ptr = bump::alloc(als).0 as *mut BMType;
+            let slice = unsafe { bump::alloc(als).as_slice_mut::<BMType>(s) };
+            slice.fill(0);
 
-            self.buddies[idx] = unsafe { core::slice::from_raw_parts_mut(ptr, s) };
-            self.buddies[idx].fill(0);
+            self.buddies[idx] = slice;
         }
     }
 

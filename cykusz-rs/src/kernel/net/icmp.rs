@@ -45,9 +45,7 @@ impl Packet<Icmp> {
     fn icmp_echo_data(&self) -> &[u8] {
         let hdr_len = size_of::<IcmpHeader>() + size_of::<IcmpEchoHeader>();
 
-        unsafe {
-            core::slice::from_raw_parts((self.addr + hdr_len).0 as *const u8, self.len() - hdr_len)
-        }
+        unsafe { (self.addr + hdr_len).as_bytes(self.len() - hdr_len) }
     }
 
     fn icmp_dest_unreachable_header(&self) -> &IcmpDestUnreachableHeader {
@@ -61,12 +59,7 @@ impl Packet<Icmp> {
     fn icmp_echo_data_mut(&mut self) -> &mut [u8] {
         let hdr_len = size_of::<IcmpHeader>() + size_of::<IcmpEchoHeader>();
 
-        unsafe {
-            core::slice::from_raw_parts_mut(
-                (self.addr + hdr_len).0 as *mut u8,
-                self.len() - hdr_len,
-            )
-        }
+        unsafe { (self.addr + hdr_len).as_bytes_mut(self.len() - hdr_len) }
     }
 
     fn icmp_dest_unreachable_header_mut(&self) -> &mut IcmpDestUnreachableHeader {

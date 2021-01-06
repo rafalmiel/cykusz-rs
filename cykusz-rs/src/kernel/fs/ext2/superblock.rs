@@ -233,4 +233,7 @@ impl Superblock {
     pub fn rsv_group_id(&self) -> u16 {
         self.rsv_group_id
     }
+    pub fn inode_size(&self) -> u16 {
+        self.inode_size
+    }
 }

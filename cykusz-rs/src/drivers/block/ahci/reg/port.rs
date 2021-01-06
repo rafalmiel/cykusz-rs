@@ -1,8 +1,8 @@
 use bit_field::BitField;
 use mmio::VCell;
 
-use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::block::ahci::reg::HbaCmdHeader;
+use crate::kernel::mm::PhysAddr;
 use crate::kernel::mm::VirtAddr;
 
 bitflags! {

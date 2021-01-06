@@ -8,6 +8,7 @@ use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::RwSpin;
+use crate::kernel::utils::types::CeilDiv;
 
 mod mbr;
 
@@ -45,7 +46,7 @@ pub struct PartitionBlockDev {
 
 impl BlockDev for PartitionBlockDev {
     fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
-        let count = (dest.len() + 511) / 512;
+        let count = dest.len().ceil_div(512);
 
         if sector + count > self.size {
             return None;
@@ -54,7 +55,7 @@ impl BlockDev for PartitionBlockDev {
         }
     }
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize> {
-        let count = (buf.len() + 511) / 512;
+        let count = buf.len().ceil_div(512);
 
         if sector + count > self.size {
             return None;
@@ -152,6 +153,12 @@ pub fn init() {
         if let Err(e) = register_blkdev(p.clone()) {
             panic!("Failed to register blkdev {} {:?}", p.name(), e);
         }
-        let _fs = Ext2Filesystem::new(p.clone());
+        let fs = Ext2Filesystem::new(p.clone());
+
+        let node = crate::kernel::fs::root_inode()
+            .mkdir(p.name().as_str())
+            .expect("failed to mkdir");
+
+        node.mount(fs).expect("Mount failed");
     }
 }

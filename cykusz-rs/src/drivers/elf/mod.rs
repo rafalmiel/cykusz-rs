@@ -1,7 +1,7 @@
 pub use headers::elf::ElfHeader;
 pub use headers::program::ProgramHeader;
 
-use crate::arch::raw::mm::MappedAddr;
+use crate::kernel::mm::MappedAddr;
 
 pub mod headers;
 pub mod types;

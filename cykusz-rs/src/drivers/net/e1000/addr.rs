@@ -1,6 +1,6 @@
 use crate::arch::raw::cpuio::Port;
-use crate::arch::raw::mm::PhysAddr;
 use crate::drivers::net::e1000::regs::Regs;
+use crate::kernel::mm::PhysAddr;
 
 pub struct Addr {
     mmio: bool,

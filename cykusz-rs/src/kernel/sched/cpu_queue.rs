@@ -95,9 +95,18 @@ impl CpuQueue {
 
             self.schedule_next(sched_lock);
             return;
-        } else if self.tasks[self.current].locks() > 0 {
+        } else if self.tasks[self.current].locks() > 0
+            && self.tasks[self.current].state() == TaskState::Running
+        {
             self.tasks[self.current].set_to_reschedule(true);
 
+            self.switch(&self.tasks[self.current], sched_lock);
+
+            return;
+        } else if self.tasks[self.current].has_pending_io() {
+            self.tasks[self.current].set_has_pending_io(false);
+
+            self.tasks[self.current].set_state(TaskState::Running);
             self.switch(&self.tasks[self.current], sched_lock);
 
             return;

@@ -6,6 +6,7 @@ use crate::drivers::block::ahci::reg::HbaPort;
 use crate::drivers::block::ahci::request::DmaRequest;
 use crate::kernel::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::CeilDiv;
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -46,17 +47,13 @@ impl PortData {
 
         for (i, cmd) in self.cmds.iter_mut().enumerate() {
             if !ci.get_bit(i) {
-                if if let Some(cmd) = cmd {
-                    let fin = cmd.request().dec_incomplete() == 0;
+                if let Some(cmd_inner) = cmd {
+                    let fin = cmd_inner.request().dec_incomplete() == 0;
 
                     if fin {
-                        cmd.request().wait_queue().notify_one();
+                        cmd_inner.request().wait_queue().notify_one();
                     }
 
-                    true
-                } else {
-                    false
-                } {
                     *cmd = None;
 
                     self.free_cmds += 1;
@@ -144,6 +141,8 @@ impl Port {
 
             off = data.run_request(request.clone(), off);
         }
+
+        let _task = current_task();
 
         request.wait_queue().wait_for(|| request.is_complete());
 

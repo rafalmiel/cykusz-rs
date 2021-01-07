@@ -196,9 +196,11 @@ impl Task {
         if self.has_pending_io() {
             self.set_has_pending_io(false);
         } else {
-            self.set_state(TaskState::AwaitingIo);
             self.sleep_until.store(0, Ordering::SeqCst);
+            self.set_state(TaskState::AwaitingIo);
             crate::kernel::sched::reschedule();
+
+            assert_eq!(self.state(), TaskState::Running);
         }
     }
 

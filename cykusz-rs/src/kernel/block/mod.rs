@@ -124,9 +124,14 @@ pub fn init() {
 
     let mut mbr = mbr::Mbr::new();
 
+    let mut devs = Vec::<Arc<BlockDevice>>::new();
     let mut partitions = Vec::<Arc<BlockDevice>>::new();
 
     for (_, dev) in BLK_DEVS.read().iter() {
+        devs.push(dev.clone());
+    }
+
+    for dev in devs.iter() {
         dev.read(0, mbr.bytes_mut());
 
         if mbr.is_valid() {

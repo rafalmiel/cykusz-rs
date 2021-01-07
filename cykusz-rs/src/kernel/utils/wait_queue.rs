@@ -64,7 +64,9 @@ impl WaitQueue {
         self.add_task(task.clone());
 
         while !cond(&lock) {
-            Self::wait_lock(lock);
+            core::mem::drop(lock);
+
+            task.await_io();
 
             lock = mtx.lock_irq();
         }
@@ -90,7 +92,9 @@ impl WaitQueue {
         self.add_task(task.clone());
 
         while !cond(&lock) {
-            Self::wait_lock(lock);
+            core::mem::drop(lock);
+
+            task.await_io();
 
             lock = mtx.lock();
         }
@@ -106,7 +110,7 @@ impl WaitQueue {
         self.add_task(task.clone());
 
         while !cond() {
-            Self::task_wait();
+            task.await_io();
         }
 
         self.remove_task(task);
@@ -150,6 +154,29 @@ impl WaitQueue {
             } else {
                 t.set_has_pending_io(true);
             }
+
+            return true;
+        }
+
+        false
+    }
+    pub fn notify_one_debug(&self) -> bool {
+        let tasks = self.tasks.lock_irq();
+        let len = tasks.len();
+
+        if len == 0 {
+            return false;
+        }
+
+        for i in (0..len).rev() {
+            let t = tasks[i].clone();
+
+            if t.state() == TaskState::AwaitingIo {
+                t.set_state(TaskState::Runnable);
+            } else {
+                t.set_has_pending_io(true);
+            }
+
             return true;
         }
 

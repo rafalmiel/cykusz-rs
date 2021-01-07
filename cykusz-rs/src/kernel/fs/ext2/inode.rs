@@ -1,137 +1,110 @@
-#![allow(dead_code)]
+use crate::kernel::fs::ext2::disk;
+use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::vfs::Result;
+use crate::kernel::fs::vfs::{DirEntry, Metadata};
+use alloc::sync::{Arc, Weak};
+use syscall_defs::FileType;
 
-#[repr(C, packed)]
-#[derive(Debug, Default, Copy, Clone)]
-pub struct INode {
-    type_and_perm: u16,
-    user_id: u16,
-    size_lower: u32,
-    last_access: u32,
-    creation_time: u32,
-    last_modification: u32,
-    deletion_time: u32,
-    group_id: u16,
-    hl_count: u16,
-    sector_count: u32,
-    flags: u32,
-    os_specific: u32,
-    direct_ptr0: u32,
-    direct_ptr1: u32,
-    direct_ptr2: u32,
-    direct_ptr3: u32,
-    direct_ptr4: u32,
-    direct_ptr5: u32,
-    direct_ptr6: u32,
-    direct_ptr7: u32,
-    direct_ptr8: u32,
-    direct_ptr9: u32,
-    direct_ptr10: u32,
-    direct_ptr11: u32,
-    s_indir_ptr: u32,
-    d_indir_ptr: u32,
-    t_indir_ptr: u32,
-    gen_number: u32,
-    ext_attr_block: u32,
-    size_or_acl: u32,
-    fragment_address: u32,
-    os_specific2: [u8; 12],
+use crate::arch::mm::phys::{allocate_order, deallocate_order};
+use crate::arch::raw::mm::MappedAddr;
+use crate::kernel::mm::Frame;
+use crate::kernel::sched::current_task;
+use alloc::string::String;
+
+pub struct Ext2INode {
+    id: usize,
+    fs: Weak<Ext2Filesystem>,
+    typ: FileType,
 }
 
-impl INode {
-    pub fn type_and_perm(&self) -> u16 {
-        self.type_and_perm
+impl Ext2INode {
+    pub fn new(fs: Weak<Ext2Filesystem>, id: usize, typ: FileType) -> Arc<Ext2INode> {
+        let inode = Ext2INode { id, fs, typ };
+
+        let i = Arc::new(inode);
+
+        i
     }
-    pub fn user_id(&self) -> u16 {
-        self.user_id
+
+    #[allow(dead_code)]
+    fn test(&self) {
+        let fs = self.fs();
+
+        let group = fs.group_descs().get_d_inode(self.id);
+
+        let inodes = group.read();
+
+        println!("{:?}", inodes.get(self.id));
     }
-    pub fn size_lower(&self) -> u32 {
-        self.size_lower
+
+    fn fs(&self) -> Arc<Ext2Filesystem> {
+        self.fs.upgrade().unwrap()
     }
-    pub fn last_access(&self) -> u32 {
-        self.last_access
+}
+
+impl INode for Ext2INode {
+    fn metadata(&self) -> Result<Metadata> {
+        Ok(Metadata {
+            id: self.id,
+            typ: self.typ,
+        })
     }
-    pub fn creation_time(&self) -> u32 {
-        self.creation_time
-    }
-    pub fn last_modification(&self) -> u32 {
-        self.last_modification
-    }
-    pub fn deletion_time(&self) -> u32 {
-        self.deletion_time
-    }
-    pub fn group_id(&self) -> u16 {
-        self.group_id
-    }
-    pub fn hl_count(&self) -> u16 {
-        self.hl_count
-    }
-    pub fn sector_count(&self) -> u32 {
-        self.sector_count
-    }
-    pub fn flags(&self) -> u32 {
-        self.flags
-    }
-    pub fn os_specific(&self) -> u32 {
-        self.os_specific
-    }
-    pub fn direct_ptr0(&self) -> u32 {
-        self.direct_ptr0
-    }
-    pub fn direct_ptr1(&self) -> u32 {
-        self.direct_ptr1
-    }
-    pub fn direct_ptr2(&self) -> u32 {
-        self.direct_ptr2
-    }
-    pub fn direct_ptr3(&self) -> u32 {
-        self.direct_ptr3
-    }
-    pub fn direct_ptr4(&self) -> u32 {
-        self.direct_ptr4
-    }
-    pub fn direct_ptr5(&self) -> u32 {
-        self.direct_ptr5
-    }
-    pub fn direct_ptr6(&self) -> u32 {
-        self.direct_ptr6
-    }
-    pub fn direct_ptr7(&self) -> u32 {
-        self.direct_ptr7
-    }
-    pub fn direct_ptr8(&self) -> u32 {
-        self.direct_ptr8
-    }
-    pub fn direct_ptr9(&self) -> u32 {
-        self.direct_ptr9
-    }
-    pub fn direct_ptr10(&self) -> u32 {
-        self.direct_ptr10
-    }
-    pub fn direct_ptr11(&self) -> u32 {
-        self.direct_ptr11
-    }
-    pub fn s_indir_ptr(&self) -> u32 {
-        self.s_indir_ptr
-    }
-    pub fn d_indir_ptr(&self) -> u32 {
-        self.d_indir_ptr
-    }
-    pub fn t_indir_ptr(&self) -> u32 {
-        self.t_indir_ptr
-    }
-    pub fn gen_number(&self) -> u32 {
-        self.gen_number
-    }
-    pub fn ext_attr_block(&self) -> u32 {
-        self.ext_attr_block
-    }
-    pub fn size_or_acl(&self) -> u32 {
-        self.size_or_acl
-    }
-    pub fn fragment_address(&self) -> u32 {
-        self.fragment_address
-    }
-    pub fn os_specific2(&self) -> &[u8] {
-        &self.os_specific2
+
+    fn dirent(&self, idx: usize) -> Result<Option<DirEntry>> {
+        let _task = current_task();
+        let fs = self.fs();
+
+        let igroup = fs.group_descs().get_d_inode(self.id);
+        let inodeg = igroup.read();
+
+        let inode = inodeg.get(self.id);
+
+        let vec = unsafe {
+            allocate_order(0)
+                .unwrap()
+                .address_mapped()
+                .as_bytes_mut(1024)
+        };
+
+        let _bytes = fs
+            .dev()
+            .read(inode.direct_ptr0() as usize * 2, vec)
+            .unwrap();
+
+        drop(inodeg);
+
+        let mut i = idx;
+        let mut offset = 0;
+
+        while i > 0 && offset < 1024 {
+            let de = unsafe { &*(vec[offset..].as_ptr() as *const super::disk::dirent::DirEntry) };
+
+            offset += de.ent_size() as usize;
+            i -= 1;
+        }
+
+        if offset < 1024 {
+            let de = unsafe { &*(vec[offset..].as_ptr() as *const disk::dirent::DirEntry) };
+
+            let typ = match de.ftype() {
+                disk::dirent::FileType::RegularFile => FileType::File,
+                disk::dirent::FileType::CharDev => FileType::DevNode,
+                disk::dirent::FileType::Directory => FileType::Dir,
+                _ => FileType::File,
+            };
+
+            let res = Ok(Some(DirEntry {
+                name: String::from(de.name()),
+                inode: Ext2INode::new(self.fs.clone(), de.inode() as usize, typ),
+            }));
+
+            deallocate_order(&Frame::new(MappedAddr(vec.as_ptr() as usize).to_phys()), 0);
+            res
+        } else {
+            deallocate_order(&Frame::new(MappedAddr(vec.as_ptr() as usize).to_phys()), 0);
+
+            Ok(None)
+        }
     }
 }

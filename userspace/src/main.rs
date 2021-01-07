@@ -52,6 +52,9 @@ fn ls(path: &str) {
                         break;
                     }
                 }
+            } else {
+                println!("Failed to get dents");
+                break;
             }
         }
 

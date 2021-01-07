@@ -6,6 +6,7 @@ use crate::kernel::fs::inode::INode;
 use syscall_defs::FileType;
 
 mod blockgroup;
+mod dirent;
 mod disk;
 mod inode;
 mod superblock;

@@ -1,6 +1,8 @@
 use core::ops::{Deref, DerefMut};
 
-use spin::{RwLock as RW, RwLockReadGuard as RWR, RwLockWriteGuard as RWW};
+use spin::{
+    RwLock as RW, RwLockReadGuard as RWR, RwLockUpgradableGuard as RWU, RwLockWriteGuard as RWW,
+};
 
 use crate::kernel::int;
 
@@ -18,6 +20,25 @@ pub struct RwSpinWriteGuard<'a, T: ?Sized + 'a> {
     g: Option<RWW<'a, T>>,
     irq: bool,
     notify: bool,
+}
+
+pub struct RwSpinUpgradeableGuard<'a, T: ?Sized + 'a> {
+    g: Option<RWU<'a, T>>,
+    irq: bool,
+    notify: bool,
+    moved: bool,
+}
+
+impl<'a, T> RwSpinUpgradeableGuard<'a, T> {
+    pub fn upgrade(mut self) -> RwSpinWriteGuard<'a, T> {
+        self.moved = true;
+
+        RwSpinWriteGuard {
+            g: Some(self.g.take().unwrap().upgrade()),
+            irq: self.irq,
+            notify: self.notify,
+        }
+    }
 }
 
 impl<T> RwSpin<T> {
@@ -43,6 +64,27 @@ impl<T> RwSpin<T> {
             g: Some(self.l.read()),
             irq: ints,
             notify: false,
+        }
+    }
+
+    pub fn read_upgradeable(&self) -> RwSpinUpgradeableGuard<T> {
+        crate::kernel::sched::enter_critical_section();
+        RwSpinUpgradeableGuard {
+            g: Some(self.l.upgradeable_read()),
+            irq: false,
+            notify: true,
+            moved: false,
+        }
+    }
+
+    pub fn read_upgradeable_irq(&self) -> RwSpinUpgradeableGuard<T> {
+        let ints = int::is_enabled();
+        int::disable();
+        RwSpinUpgradeableGuard {
+            g: Some(self.l.upgradeable_read()),
+            irq: ints,
+            notify: false,
+            moved: false,
         }
     }
 
@@ -73,6 +115,13 @@ impl<'a, T: ?Sized> Deref for RwSpinReadGuard<'a, T> {
     }
 }
 
+impl<'a, T: ?Sized> Deref for RwSpinUpgradeableGuard<'a, T> {
+    type Target = T;
+    fn deref<'b>(&'b self) -> &'b T {
+        self.g.as_ref().unwrap()
+    }
+}
+
 impl<'a, T: ?Sized> Deref for RwSpinWriteGuard<'a, T> {
     type Target = T;
     fn deref<'b>(&'b self) -> &'b T {
@@ -94,6 +143,20 @@ impl<'a, T: ?Sized> Drop for RwSpinReadGuard<'a, T> {
         }
         if self.irq {
             int::enable();
+        }
+    }
+}
+
+impl<'a, T: ?Sized> Drop for RwSpinUpgradeableGuard<'a, T> {
+    fn drop(&mut self) {
+        if !self.moved {
+            drop(self.g.take());
+            if self.notify {
+                crate::kernel::sched::leave_critical_section();
+            }
+            if self.irq {
+                int::enable();
+            }
         }
     }
 }

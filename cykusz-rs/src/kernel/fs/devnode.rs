@@ -20,6 +20,10 @@ impl DevNode {
             Err(DevError::DeviceNotFound)
         }
     }
+
+    pub fn device(&self) -> Arc<dyn Device> {
+        self.dev.clone()
+    }
 }
 
 impl INode for DevNode {

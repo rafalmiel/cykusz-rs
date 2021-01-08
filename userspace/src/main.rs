@@ -172,6 +172,18 @@ fn exec(cmd: &str) {
                 println!("Failed to parse port");
             }
         }
+    } else if cmd.starts_with("mount ") {
+        let path = &cmd[6..];
+
+        let mut split = path.split_whitespace();
+
+        if let (Some(dev), Some(dest)) = { (split.next(), split.next()) } {
+            if let Err(e) = syscall_user::mount(dev, dest, "ext2") {
+                println!("Mount failed: {:?}", e);
+            }
+        } else {
+            println!("Param err");
+        }
     } else if cmd.is_empty() {
         return;
     } else {

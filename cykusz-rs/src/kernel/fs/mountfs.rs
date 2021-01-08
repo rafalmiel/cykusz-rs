@@ -107,6 +107,22 @@ impl MNode {
         Ok(fs)
     }
 
+    pub fn umount(&self) -> Result<()> {
+        if !self.is_root() {
+            return Err(FsError::NotSupported);
+        }
+
+        if let Some(node) = self.vfs.self_mount.as_ref() {
+            let mut mounts = node.vfs.mounts.write();
+
+            mounts.remove(&node.id()?);
+
+            Ok(())
+        } else {
+            Err(FsError::NotSupported)
+        }
+    }
+
     fn covering_node(&self) -> Arc<MNode> {
         let id = self.id();
 
@@ -236,6 +252,10 @@ impl INode for MNode {
         } else {
             Err(FsError::NotDir)
         }
+    }
+
+    fn umount(&self) -> Result<()> {
+        self.umount()
     }
 
     fn device(&self) -> Result<Arc<dyn Device>> {

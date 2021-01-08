@@ -328,6 +328,18 @@ pub fn sys_mount(
     }
 }
 
+pub fn sys_umount(path: u64, path_len: u64) -> SyscallResult {
+    let path = make_str(path, path_len);
+
+    let node = lookup_by_path(Path::new(path), LookupMode::None)?;
+
+    if let Err(e) = node.umount() {
+        Err(e)?
+    } else {
+        Ok(0)
+    }
+}
+
 pub fn sys_exit() -> ! {
     crate::task_test::start();
     crate::kernel::sched::task_finished()

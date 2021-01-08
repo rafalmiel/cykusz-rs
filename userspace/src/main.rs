@@ -173,9 +173,8 @@ fn exec(cmd: &str) {
             }
         }
     } else if cmd.starts_with("mount ") {
-        let path = &cmd[6..];
-
-        let mut split = path.split_whitespace();
+        let mut split = cmd.split_whitespace();
+        split.next();
 
         if let (Some(dev), Some(dest)) = { (split.next(), split.next()) } {
             if let Err(e) = syscall_user::mount(dev, dest, "ext2") {
@@ -183,6 +182,17 @@ fn exec(cmd: &str) {
             }
         } else {
             println!("Param err");
+        }
+    } else if cmd.starts_with("umount ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        if let Some(path) = split.next() {
+            if let Err(e) = syscall_user::umount(path) {
+                println!("Umount failed: {:?}", e);
+            }
+        } else {
+            println!("Param error");
         }
     } else if cmd.is_empty() {
         return;

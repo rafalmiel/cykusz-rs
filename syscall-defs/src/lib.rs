@@ -20,6 +20,7 @@ pub const SYS_BIND: usize = 13;
 pub const SYS_CONNECT: usize = 14;
 pub const SYS_SELECT: usize = 15;
 pub const SYS_MOUNT: usize = 16;
+pub const SYS_UMOUNT: usize = 17;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

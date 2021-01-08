@@ -66,6 +66,10 @@ pub trait INode: Send + Sync {
         return Err(FsError::NotSupported);
     }
 
+    fn umount(&self) -> Result<()> {
+        return Err(FsError::NotSupported);
+    }
+
     fn device(&self) -> Result<Arc<dyn Device>> {
         return Err(FsError::EntryNotFound);
     }

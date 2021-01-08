@@ -21,7 +21,7 @@ impl Superblock {
         self.fs.get().unwrap().upgrade().unwrap()
     }
 
-    pub fn init(&self, fs: Weak<Ext2Filesystem>) {
+    pub fn init(&self, fs: Weak<Ext2Filesystem>) -> bool {
         self.fs.call_once(|| fs);
 
         let mut sb = self.d_superblock.write();
@@ -32,6 +32,8 @@ impl Superblock {
 
         dev.read(2, sb.as_bytes_mut())
             .expect("Failed to get ext2 superblock");
+
+        sb.ext_sig() == 0xef53
     }
 
     pub fn group_count(&self) -> usize {

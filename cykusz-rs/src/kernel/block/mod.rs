@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use crate::kernel::device;
 use crate::kernel::device::{alloc_id, register_device, Device};
-use crate::kernel::fs::ext2::Ext2Filesystem;
+
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::RwSpin;
 use crate::kernel::utils::types::CeilDiv;
@@ -29,6 +29,16 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
     devs.insert(dev.id, dev);
 
     Ok(())
+}
+
+pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn BlockDev>> {
+    let devs = BLK_DEVS.read();
+
+    if let Some(d) = devs.get(&id) {
+        Some(d.clone())
+    } else {
+        None
+    }
 }
 
 pub struct BlockDevice {
@@ -125,7 +135,6 @@ pub fn init() {
     let mut mbr = mbr::Mbr::new();
 
     let mut devs = Vec::<Arc<BlockDevice>>::new();
-    let mut partitions = Vec::<Arc<BlockDevice>>::new();
 
     for (_, dev) in BLK_DEVS.read().iter() {
         devs.push(dev.clone());
@@ -144,26 +153,17 @@ pub fn init() {
                             dev.clone(),
                         );
 
-                        partitions.push(BlockDevice::new(
+                        let blkdev = BlockDevice::new(
                             dev.name() + "." + &(p + 1).to_string(),
                             Arc::new(part_dev),
-                        ));
+                        );
+
+                        if let Err(e) = register_blkdev(blkdev.clone()) {
+                            panic!("Failed to register blkdev {} {:?}", blkdev.name(), e);
+                        }
                     }
                 }
             }
         }
-    }
-
-    for p in partitions.iter() {
-        if let Err(e) = register_blkdev(p.clone()) {
-            panic!("Failed to register blkdev {} {:?}", p.name(), e);
-        }
-        let fs = Ext2Filesystem::new(p.clone());
-
-        let node = crate::kernel::fs::root_inode()
-            .mkdir(p.name().as_str())
-            .expect("failed to mkdir");
-
-        node.mount(fs).expect("Mount failed");
     }
 }

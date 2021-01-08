@@ -2,11 +2,13 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 
+use crate::kernel::device::Device;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::{DirEntry, Metadata, Result};
+use crate::kernel::fs::vfs::{DirEntry, FsError, Metadata, Result};
 use crate::kernel::sync::RwSpin;
 use crate::kernel::syscall::sys::PollTable;
+use syscall_defs::FileType;
 
 #[allow(dead_code)]
 pub struct MountFS {
@@ -76,15 +78,31 @@ impl MNode {
     }
 
     pub fn mount(&self, fs: Arc<dyn Filesystem>) -> Result<Arc<MountFS>> {
+        if self.inode.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
+        let node = if self.is_root() {
+            self.vfs.self_mount.as_ref().unwrap()
+        } else {
+            self
+        };
+
         let fs = MountFS {
             fs,
             mounts: RwSpin::new(BTreeMap::new()),
-            self_mount: Some(self.self_ref.upgrade().unwrap()),
+            self_mount: Some(node.self_ref.upgrade().unwrap()),
             self_ref: Weak::default(),
         }
         .wrap();
 
-        self.vfs.mounts.write().insert(self.id()?, fs.clone());
+        let mut mounts = node.vfs.mounts.write();
+
+        if mounts.contains_key(&node.id()?) {
+            return Err(FsError::EntryExists);
+        } else {
+            mounts.insert(node.id()?, fs.clone());
+        }
 
         Ok(fs)
     }
@@ -210,5 +228,17 @@ impl INode for MNode {
 
     fn dirent(&self, idx: usize) -> Result<Option<DirEntry>> {
         self.inode.dirent(idx)
+    }
+
+    fn mount(&self, fs: Arc<dyn Filesystem>) -> Result<Arc<dyn Filesystem>> {
+        if let Ok(res) = self.mount(fs) {
+            Ok(res)
+        } else {
+            Err(FsError::NotDir)
+        }
+    }
+
+    fn device(&self) -> Result<Arc<dyn Device>> {
+        self.inode.device()
     }
 }

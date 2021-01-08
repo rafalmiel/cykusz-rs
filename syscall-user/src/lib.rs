@@ -176,6 +176,10 @@ pub fn mount(dev: &str, dest: &str, fs: &str) -> SyscallResult {
     }
 }
 
+pub fn umount(path: &str) -> SyscallResult {
+    unsafe { syscall2(SYS_UMOUNT, path.as_ptr() as usize, path.len()) }
+}
+
 pub fn exit() -> ! {
     unsafe {
         syscall0(SYS_EXIT).expect("Failed to exit");

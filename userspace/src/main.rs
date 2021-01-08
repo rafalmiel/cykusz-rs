@@ -194,6 +194,26 @@ fn exec(cmd: &str) {
         } else {
             println!("Param error");
         }
+    } else if cmd.starts_with("cat ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        if let Some(path) = split.next() {
+            if let Some(file) = file::File::new(path, syscall_defs::OpenFlags::RDONLY) {
+                let mut buf = [0u8; 16];
+                let mut read = file.read(&mut buf);
+
+                while read > 0 {
+                    print!("{}", unsafe {
+                        core::str::from_utf8_unchecked(&buf[..read])
+                    });
+
+                    read = file.read(&mut buf);
+                }
+            }
+        } else {
+            println!("Param error");
+        }
     } else if cmd.is_empty() {
         return;
     } else {
@@ -248,7 +268,9 @@ fn main() -> ! {
 
         {
             // Write data from stdin into the file
-            File::new("test_file", OpenFlags::WRONLY | OpenFlags::CREAT).write(&buf[..r]);
+            File::new("test_file", OpenFlags::WRONLY | OpenFlags::CREAT)
+                .unwrap()
+                .write(&buf[..r]);
         }
 
         unsafe {
@@ -258,7 +280,9 @@ fn main() -> ! {
 
         {
             // Read data from the file and print the result
-            let read = File::new("test_file", OpenFlags::RDONLY).read(&mut buf);
+            let read = File::new("test_file", OpenFlags::RDONLY)
+                .unwrap()
+                .read(&mut buf);
 
             let s = make_str(&buf[..read]);
 

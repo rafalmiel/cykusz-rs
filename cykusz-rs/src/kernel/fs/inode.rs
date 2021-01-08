@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 
 use syscall_defs::FileType;
 
+use crate::kernel::device::Device;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::vfs::{DirEntry, FsError, Metadata, Result};
 use crate::kernel::syscall::sys::PollTable;
@@ -59,5 +60,13 @@ pub trait INode: Send + Sync {
 
     fn dirent(&self, _idx: usize) -> Result<Option<DirEntry>> {
         return Err(FsError::NotSupported);
+    }
+
+    fn mount(&self, _fs: Arc<dyn Filesystem>) -> Result<Arc<dyn Filesystem>> {
+        return Err(FsError::NotSupported);
+    }
+
+    fn device(&self) -> Result<Arc<dyn Device>> {
+        return Err(FsError::EntryNotFound);
     }
 }

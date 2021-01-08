@@ -9,6 +9,7 @@ use core::sync::atomic::Ordering;
 
 use syscall_defs::FileType;
 
+use crate::kernel::device::Device;
 use crate::kernel::fs::devnode::DevNode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
@@ -165,6 +166,14 @@ impl INode for LockedRamINode {
             ));
             Ok(())
         })
+    }
+
+    fn device(&self) -> Result<Arc<dyn Device>> {
+        if let Content::DevNode(Some(d)) = &self.0.read().content {
+            Ok(d.device())
+        } else {
+            Err(FsError::EntryNotFound)
+        }
     }
 
     fn truncate(&self) -> Result<()> {

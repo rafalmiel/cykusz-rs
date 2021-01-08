@@ -30,7 +30,7 @@ impl Ext2Filesystem {
         }
     }
 
-    pub fn new(dev: Arc<dyn BlockDev>) -> Arc<dyn Filesystem> {
+    pub fn new(dev: Arc<dyn BlockDev>) -> Option<Arc<dyn Filesystem>> {
         let a = Ext2Filesystem {
             self_ref: Weak::new(),
             dev,
@@ -39,18 +39,24 @@ impl Ext2Filesystem {
         }
         .wrap();
 
-        a.init();
-
-        a
+        if !a.init() {
+            None
+        } else {
+            Some(a)
+        }
     }
 
     fn dev(&self) -> &Arc<dyn BlockDev> {
         &self.dev
     }
 
-    fn init(&self) {
-        self.superblock.init(self.self_ref.clone());
+    fn init(&self) -> bool {
+        if !self.superblock.init(self.self_ref.clone()) {
+            return false;
+        }
         self.blockgroupdesc.init(self.self_ref.clone());
+
+        true
     }
 
     pub fn superblock(&self) -> &superblock::Superblock {

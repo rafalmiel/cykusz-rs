@@ -162,6 +162,20 @@ pub fn getaddrinfo(name: &str, buf: &mut [u8]) -> SyscallResult {
     }
 }
 
+pub fn mount(dev: &str, dest: &str, fs: &str) -> SyscallResult {
+    unsafe {
+        syscall6(
+            SYS_MOUNT,
+            dev.as_ptr() as usize,
+            dev.len(),
+            dest.as_ptr() as usize,
+            dest.len(),
+            fs.as_ptr() as usize,
+            fs.len(),
+        )
+    }
+}
+
 pub fn exit() -> ! {
     unsafe {
         syscall0(SYS_EXIT).expect("Failed to exit");

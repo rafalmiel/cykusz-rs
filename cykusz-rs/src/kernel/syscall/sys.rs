@@ -21,6 +21,10 @@ fn make_buf(b: u64, len: u64) -> &'static [u8] {
     unsafe { core::slice::from_raw_parts(b as *const u8, len as usize) }
 }
 
+fn make_str<'a>(b: u64, len: u64) -> &'a str {
+    core::str::from_utf8(make_buf(b, len)).expect("Invalid str")
+}
+
 pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::Inval)?;
 
@@ -287,6 +291,40 @@ pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
         Ok(fd)
     } else {
         Err(SyscallError::Fault)
+    }
+}
+
+pub fn sys_mount(
+    src: u64,
+    src_len: u64,
+    dest: u64,
+    dest_len: u64,
+    fs: u64,
+    fs_len: u64,
+) -> SyscallResult {
+    let dev_path = make_str(src, src_len);
+    let dest_path = make_str(dest, dest_len);
+    let fs = make_str(fs, fs_len);
+
+    if fs == "ext2" {
+        let dev = lookup_by_path(Path::new(dev_path), LookupMode::None)?;
+        let dest = lookup_by_path(Path::new(dest_path), LookupMode::None)?;
+
+        if let Some(dev) = crate::kernel::block::get_blkdev_by_id(dev.device()?.id()) {
+            if let Some(fs) = crate::kernel::fs::ext2::Ext2Filesystem::new(dev) {
+                if let Ok(_) = dest.mount(fs) {
+                    Ok(0)
+                } else {
+                    Err(SyscallError::Fault)
+                }
+            } else {
+                Err(SyscallError::Inval)
+            }
+        } else {
+            Err(SyscallError::NoDev)
+        }
+    } else {
+        Err(SyscallError::Inval)
     }
 }
 

@@ -9,6 +9,7 @@ use alloc::sync::{Arc, Weak};
 use syscall_defs::FileType;
 
 use alloc::string::String;
+use alloc::vec::Vec;
 
 pub struct Ext2INode {
     id: usize,
@@ -83,6 +84,42 @@ impl INode for Ext2INode {
             Ok(e)
         } else {
             Err(FsError::EntryNotFound)
+        }
+    }
+
+    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+        if self.typ != FileType::File {
+            return Err(FsError::NotSupported);
+        }
+
+        let fs = self.fs();
+
+        let igroup = fs.group_descs().get_d_inode(self.id);
+        let inodeg = igroup.read();
+
+        let inode = inodeg.get(self.id);
+
+        let size = core::cmp::min(1024, inode.size_lower() as usize);
+
+        if offset >= size {
+            return Ok(0);
+        }
+
+        let to_copy = core::cmp::min(buf.len(), size - offset);
+
+        let ptr = inode.direct_ptr0();
+
+        if ptr != 0 {
+            let mut data = Vec::<u8>::new();
+            data.resize(1024, 0);
+
+            fs.dev.read(ptr as usize * 2, data.as_mut_slice());
+
+            buf[..to_copy].copy_from_slice(&data.as_slice()[offset..offset + to_copy]);
+
+            Ok(to_copy)
+        } else {
+            Err(FsError::NotSupported)
         }
     }
 

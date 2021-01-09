@@ -39,10 +39,7 @@ impl<'a> Iterator for DirEntIter<'a> {
 
             self.buf.resize(block_size, 0);
 
-            fs.dev().read(
-                self.d_inode.direct_ptr0() as usize * 2,
-                self.buf.as_mut_slice(),
-            );
+            fs.read_block(self.d_inode.direct_ptr0() as usize, self.buf.as_mut_slice());
 
             let ent = unsafe { VirtAddr(self.buf.as_ptr() as usize).read_ref::<DirEntry>() };
 

@@ -9,7 +9,8 @@ use alloc::sync::{Arc, Weak};
 use syscall_defs::FileType;
 
 use alloc::string::String;
-use alloc::vec::Vec;
+
+use crate::kernel::fs::ext2::reader::INodeReader;
 
 pub struct Ext2INode {
     id: usize,
@@ -99,28 +100,9 @@ impl INode for Ext2INode {
 
         let inode = inodeg.get(self.id);
 
-        let size = core::cmp::min(1024, inode.size_lower() as usize);
+        let mut reader = INodeReader::new(inode, self.fs.clone(), offset);
 
-        if offset >= size {
-            return Ok(0);
-        }
-
-        let to_copy = core::cmp::min(buf.len(), size - offset);
-
-        let ptr = inode.direct_ptr0();
-
-        if ptr != 0 {
-            let mut data = Vec::<u8>::new();
-            data.resize(1024, 0);
-
-            fs.dev.read(ptr as usize * 2, data.as_mut_slice());
-
-            buf[..to_copy].copy_from_slice(&data.as_slice()[offset..offset + to_copy]);
-
-            Ok(to_copy)
-        } else {
-            Err(FsError::NotSupported)
-        }
+        Ok(reader.read(buf))
     }
 
     fn fs(&self) -> Arc<dyn Filesystem> {

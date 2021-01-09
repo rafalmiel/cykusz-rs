@@ -84,7 +84,8 @@ impl CpuQueue {
     }
 
     pub unsafe fn schedule_next(&mut self, sched_lock: SpinGuard<()>) {
-        if self.tasks[self.current].to_delete() {
+        let current = &self.tasks[self.current];
+        if current.to_delete() {
             self.remove_task(self.current);
 
             if self.current != 0 {
@@ -95,19 +96,19 @@ impl CpuQueue {
 
             self.schedule_next(sched_lock);
             return;
-        } else if self.tasks[self.current].locks() > 0
-            && self.tasks[self.current].state() == TaskState::Running
+        } else if current.locks() > 0
+            && current.state() == TaskState::Running
         {
-            self.tasks[self.current].set_to_reschedule(true);
+            current.set_to_reschedule(true);
 
-            self.switch(&self.tasks[self.current], sched_lock);
+            self.switch(current, sched_lock);
 
             return;
-        } else if self.tasks[self.current].has_pending_io() {
-            self.tasks[self.current].set_has_pending_io(false);
+        } else if current.has_pending_io() {
+            current.set_has_pending_io(false);
 
-            self.tasks[self.current].set_state(TaskState::Running);
-            self.switch(&self.tasks[self.current], sched_lock);
+            current.set_state(TaskState::Running);
+            self.switch(current, sched_lock);
 
             return;
         }
@@ -149,8 +150,8 @@ impl CpuQueue {
         }
         .expect("SCHEDULER BUG");
 
-        if self.tasks[self.current].state() == TaskState::Running {
-            self.tasks[self.current].set_state(TaskState::Runnable);
+        if current.state() == TaskState::Running {
+            current.set_state(TaskState::Runnable);
         }
 
         self.tasks[found].set_state(TaskState::Running);

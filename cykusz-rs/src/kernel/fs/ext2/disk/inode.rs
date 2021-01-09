@@ -15,18 +15,7 @@ pub struct INode {
     sector_count: u32,
     flags: u32,
     os_specific: u32,
-    direct_ptr0: u32,
-    direct_ptr1: u32,
-    direct_ptr2: u32,
-    direct_ptr3: u32,
-    direct_ptr4: u32,
-    direct_ptr5: u32,
-    direct_ptr6: u32,
-    direct_ptr7: u32,
-    direct_ptr8: u32,
-    direct_ptr9: u32,
-    direct_ptr10: u32,
-    direct_ptr11: u32,
+    direct_ptr: [u32; 12],
     s_indir_ptr: u32,
     d_indir_ptr: u32,
     t_indir_ptr: u32,
@@ -74,41 +63,44 @@ impl INode {
     pub fn os_specific(&self) -> u32 {
         self.os_specific
     }
+    pub fn direct_ptrs(&self) -> &[u32] {
+        unsafe { &self.direct_ptr }
+    }
     pub fn direct_ptr0(&self) -> u32 {
-        self.direct_ptr0
+        self.direct_ptr[0]
     }
     pub fn direct_ptr1(&self) -> u32 {
-        self.direct_ptr1
+        self.direct_ptr[1]
     }
     pub fn direct_ptr2(&self) -> u32 {
-        self.direct_ptr2
+        self.direct_ptr[2]
     }
     pub fn direct_ptr3(&self) -> u32 {
-        self.direct_ptr3
+        self.direct_ptr[3]
     }
     pub fn direct_ptr4(&self) -> u32 {
-        self.direct_ptr4
+        self.direct_ptr[4]
     }
     pub fn direct_ptr5(&self) -> u32 {
-        self.direct_ptr5
+        self.direct_ptr[5]
     }
     pub fn direct_ptr6(&self) -> u32 {
-        self.direct_ptr6
+        self.direct_ptr[6]
     }
     pub fn direct_ptr7(&self) -> u32 {
-        self.direct_ptr7
+        self.direct_ptr[7]
     }
     pub fn direct_ptr8(&self) -> u32 {
-        self.direct_ptr8
+        self.direct_ptr[8]
     }
     pub fn direct_ptr9(&self) -> u32 {
-        self.direct_ptr9
+        self.direct_ptr[9]
     }
     pub fn direct_ptr10(&self) -> u32 {
-        self.direct_ptr10
+        self.direct_ptr[10]
     }
     pub fn direct_ptr11(&self) -> u32 {
-        self.direct_ptr11
+        self.direct_ptr[11]
     }
     pub fn s_indir_ptr(&self) -> u32 {
         self.s_indir_ptr

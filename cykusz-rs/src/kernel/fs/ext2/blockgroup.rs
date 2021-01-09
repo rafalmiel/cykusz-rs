@@ -100,10 +100,7 @@ impl BlockGroupDescriptors {
             let mut vec = Vec::<disk::inode::INode>::new();
             vec.resize(sb.inodes_per_block(), disk::inode::INode::default());
 
-            let spb = sb.sectors_per_block();
-
-            fs.dev()
-                .read(block * spb, vec.as_mut_slice().to_bytes_mut());
+            fs.read_block(block, vec.as_mut_slice().to_bytes_mut());
 
             let mut inodes_w = inodes.upgrade();
 

@@ -200,7 +200,7 @@ fn exec(cmd: &str) {
 
         if let Some(path) = split.next() {
             if let Some(file) = file::File::new(path, syscall_defs::OpenFlags::RDONLY) {
-                let mut buf = [0u8; 16];
+                let mut buf = [0u8; 256];
                 let mut read = file.read(&mut buf);
 
                 while read > 0 {

@@ -96,9 +96,7 @@ impl CpuQueue {
 
             self.schedule_next(sched_lock);
             return;
-        } else if current.locks() > 0
-            && current.state() == TaskState::Running
-        {
+        } else if current.locks() > 0 && current.state() == TaskState::Running {
             current.set_to_reschedule(true);
 
             self.switch(current, sched_lock);

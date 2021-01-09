@@ -3,17 +3,20 @@ use alloc::sync::{Arc, Weak};
 use crate::kernel::block::BlockDev;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
+use spin::Once;
 use syscall_defs::FileType;
 
 mod blockgroup;
 mod dirent;
 mod disk;
 mod inode;
+mod reader;
 mod superblock;
 
 pub struct Ext2Filesystem {
     self_ref: Weak<Ext2Filesystem>,
     dev: Arc<dyn BlockDev>,
+    sectors_per_block: Once<usize>,
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
 }
@@ -34,6 +37,7 @@ impl Ext2Filesystem {
         let a = Ext2Filesystem {
             self_ref: Weak::new(),
             dev,
+            sectors_per_block: Once::new(),
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
         }
@@ -54,9 +58,23 @@ impl Ext2Filesystem {
         if !self.superblock.init(self.self_ref.clone()) {
             return false;
         }
+        self.sectors_per_block
+            .call_once(|| self.superblock.sectors_per_block());
         self.blockgroupdesc.init(self.self_ref.clone());
 
         true
+    }
+
+    fn sectors_per_block(&self) -> usize {
+        *self.sectors_per_block.get().unwrap()
+    }
+
+    pub fn read_block(&self, block: usize, dest: &mut [u8]) -> Option<usize> {
+        self.dev.read(block * self.sectors_per_block(), dest)
+    }
+
+    pub fn write_block(&self, block: usize, buf: &[u8]) -> Option<usize> {
+        self.dev.write(block * self.sectors_per_block(), buf)
     }
 
     pub fn superblock(&self) -> &superblock::Superblock {

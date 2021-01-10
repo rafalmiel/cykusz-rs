@@ -1,6 +1,7 @@
 use crate::arch::raw::mm::VirtAddr;
 use crate::kernel::fs::ext2::disk::dirent::DirEntry;
 use crate::kernel::fs::ext2::disk::inode::INode;
+use crate::kernel::fs::ext2::reader::INodeReader;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
@@ -8,17 +9,21 @@ use alloc::vec::Vec;
 pub struct DirEntIter<'a> {
     d_inode: &'a INode,
     fs: Weak<Ext2Filesystem>,
+    reader: INodeReader<'a>,
     buf: Vec<u8>,
     offset: usize,
+    block: usize,
 }
 
 impl<'a> DirEntIter<'a> {
     pub fn new(fs: Weak<Ext2Filesystem>, d_inode: &'a INode) -> DirEntIter<'a> {
         DirEntIter::<'a> {
             d_inode,
-            fs,
+            fs: fs.clone(),
+            reader: INodeReader::new(d_inode, fs, 0),
             buf: Vec::new(),
             offset: 0,
+            block: 0,
         }
     }
 
@@ -34,42 +39,42 @@ impl<'a> Iterator for DirEntIter<'a> {
         let fs = self.fs();
         let block_size = fs.superblock().block_size();
 
-        if self.buf.is_empty() {
-            let fs = self.fs();
-
-            self.buf.resize(block_size, 0);
-
-            fs.read_block(self.d_inode.direct_ptr0() as usize, self.buf.as_mut_slice());
-
-            let ent = unsafe { VirtAddr(self.buf.as_ptr() as usize).read_ref::<DirEntry>() };
-
-            if ent.ent_size() != 0 {
-                Some(ent)
-            } else {
-                None
+        let ent = loop {
+            if self.offset >= self.d_inode.size_lower() as usize {
+                return None;
             }
-        } else {
+
+            let block = self.offset / block_size;
+
+            if self.buf.is_empty() || block > self.block {
+                self.buf.resize(block_size, 0);
+                if self.reader.read(self.buf.as_mut_slice()) == 0 {
+                    return None;
+                }
+                self.block = block;
+            }
+
             let ent = unsafe {
-                VirtAddr(self.buf.as_ptr().offset(self.offset as isize) as usize)
-                    .read_ref::<DirEntry>()
+                VirtAddr(
+                    self.buf
+                        .as_ptr()
+                        .offset(self.offset as isize % block_size as isize)
+                        as usize,
+                )
+                .read_ref::<DirEntry>()
             };
 
             self.offset += ent.ent_size() as usize;
 
-            if self.offset >= block_size {
-                return None;
+            if ent.inode() != 0 {
+                break ent;
             }
+        };
 
-            let ent = unsafe {
-                VirtAddr(self.buf.as_ptr().offset(self.offset as isize) as usize)
-                    .read_ref::<DirEntry>()
-            };
-
-            if ent.ent_size() != 0 {
-                Some(ent)
-            } else {
-                None
-            }
+        if ent.ent_size() != 0 {
+            Some(ent)
+        } else {
+            None
         }
     }
 }

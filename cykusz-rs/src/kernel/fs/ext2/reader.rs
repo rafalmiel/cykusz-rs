@@ -37,102 +37,52 @@ impl<'a> INodeReader<'a> {
         let mut buf = Vec::<u32>::new();
         buf.resize(entries_per_block, 0);
 
-        if block_num < entries_per_block {
-            let ptr = self.inode.s_indir_ptr();
-
+        let mut read_ptrs = |mut ptr: usize, offsets: &[usize]| -> Option<usize> {
             if ptr == 0 {
                 return None;
             }
 
-            self.fs()
-                .read_block(ptr as usize, buf.as_mut_slice().to_bytes_mut());
+            for &offset in offsets {
+                self.fs()
+                    .read_block(ptr, buf.as_mut_slice().to_bytes_mut())?;
 
-            return Some(buf[block_num] as usize);
+                ptr = buf[offset] as usize;
+
+                if ptr == 0 {
+                    return None;
+                }
+            }
+
+            Some(ptr)
+        };
+
+        if block_num < entries_per_block {
+            return read_ptrs(self.inode.s_indir_ptr() as usize, &[block_num]);
         }
 
         let entries_per_dblock = entries_per_block * entries_per_block;
 
         if block_num < entries_per_dblock {
-            let mut ptr = self.inode.d_indir_ptr();
-
-            if ptr == 0 {
-                return None;
-            }
-
-            self.fs()
-                .read_block(ptr as usize, buf.as_mut_slice().to_bytes_mut());
-
             let off1 = block_num / entries_per_block;
             let off2 = block_num % entries_per_block;
 
-            ptr = buf[off1];
-
-            if ptr == 0 {
-                return None;
-            }
-
-            self.fs()
-                .read_block(ptr as usize, buf.as_mut_slice().to_bytes_mut());
-
-            ptr = buf[off2];
-
-            if ptr == 0 {
-                return None;
-            }
-
-            return Some(ptr as usize);
+            return read_ptrs(self.inode.d_indir_ptr() as usize, &[off1, off2]);
         }
 
         let entried_per_tblock = entries_per_dblock * entries_per_block;
 
         if block_num < entried_per_tblock {
-            let mut ptr = self.inode.t_indir_ptr();
-
-            if ptr == 0 {
-                return None;
-            }
-
-            self.fs()
-                .read_block(ptr as usize, buf.as_mut_slice().to_bytes_mut());
-
             let off1 = block_num / entries_per_dblock;
 
-            block_num = block_num - off1 * entries_per_block;
+            block_num = block_num - off1 * entries_per_dblock;
 
             let off2 = block_num / entries_per_block;
             let off3 = block_num % entries_per_block;
 
-            self.fs()
-                .read_block(ptr as usize, buf.as_mut_slice().to_bytes_mut());
-
-            ptr = buf[off1];
-
-            if ptr == 0 {
-                return None;
-            }
-
-            self.fs()
-                .read_block(ptr as usize, buf.as_mut_slice().to_bytes_mut());
-
-            ptr = buf[off2];
-
-            if ptr == 0 {
-                return None;
-            }
-
-            self.fs()
-                .read_block(ptr as usize, buf.as_mut_slice().to_bytes_mut());
-
-            ptr = buf[off3];
-
-            if ptr == 0 {
-                return None;
-            }
-
-            return Some(ptr as usize);
-        } else {
-            None
+            return read_ptrs(self.inode.t_indir_ptr() as usize, &[off1, off2, off3]);
         }
+
+        None
     }
 
     pub fn read(&mut self, dest: &mut [u8]) -> usize {

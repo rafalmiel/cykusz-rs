@@ -1,4 +1,3 @@
-use alloc::string::String;
 use alloc::sync::Arc;
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -11,7 +10,7 @@ use crate::kernel::fs::root_inode;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::new_task_id;
 use crate::kernel::sync::RwSpin;
-use crate::kernel::task::cwd::Cwd;
+use crate::kernel::task::cwd::{Cwd, Pwd};
 use crate::kernel::task::filetable::FileHandle;
 
 pub mod cwd;
@@ -113,7 +112,7 @@ impl Task {
         Some(self.cwd.read().inode.clone())
     }
 
-    pub fn get_pwd(&self) -> String {
+    pub fn get_pwd(&self) -> Pwd {
         self.cwd.read().pwd.clone()
     }
 

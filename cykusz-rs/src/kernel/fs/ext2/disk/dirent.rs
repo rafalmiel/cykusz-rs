@@ -2,7 +2,7 @@
 
 #[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub enum FileType {
+pub enum DirEntTypeIndicator {
     Unknown = 0,
     RegularFile = 1,
     Directory = 2,
@@ -19,7 +19,7 @@ pub struct DirEntry {
     inode: u32,
     ent_size: u16,
     name_size: u8,
-    ftype: FileType,
+    ftype: DirEntTypeIndicator,
 }
 
 impl DirEntry {
@@ -35,7 +35,7 @@ impl DirEntry {
         self.name_size
     }
 
-    pub fn ftype(&self) -> FileType {
+    pub fn ftype(&self) -> DirEntTypeIndicator {
         self.ftype
     }
 

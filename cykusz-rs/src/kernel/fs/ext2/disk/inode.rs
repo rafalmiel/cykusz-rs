@@ -1,5 +1,34 @@
 #![allow(dead_code)]
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum FileType {
+    Fifo,
+    CharDev,
+    Dir,
+    BlockDev,
+    File,
+    Symlink,
+    Socket,
+    Unknown,
+}
+
+impl From<u16> for FileType {
+    fn from(v: u16) -> Self {
+        let t = v >> 12;
+
+        match t {
+            0x1 => FileType::Fifo,
+            0x2 => FileType::CharDev,
+            0x4 => FileType::Dir,
+            0x6 => FileType::BlockDev,
+            0x8 => FileType::File,
+            0xA => FileType::Symlink,
+            0xC => FileType::Socket,
+            _ => FileType::Unknown,
+        }
+    }
+}
+
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct INode {
@@ -15,10 +44,7 @@ pub struct INode {
     sector_count: u32,
     flags: u32,
     os_specific: u32,
-    direct_ptr: [u32; 12],
-    s_indir_ptr: u32,
-    d_indir_ptr: u32,
-    t_indir_ptr: u32,
+    data_ptr: [u32; 15],
     gen_number: u32,
     ext_attr_block: u32,
     size_or_acl: u32,
@@ -27,6 +53,9 @@ pub struct INode {
 }
 
 impl INode {
+    pub fn ftype(&self) -> FileType {
+        self.type_and_perm.into()
+    }
     pub fn type_and_perm(&self) -> u16 {
         self.type_and_perm
     }
@@ -64,52 +93,55 @@ impl INode {
         self.os_specific
     }
     pub fn direct_ptrs(&self) -> &[u32] {
-        unsafe { &self.direct_ptr }
+        unsafe { &self.data_ptr[..12] }
+    }
+    pub fn block_ptrs(&self) -> &[u32] {
+        unsafe { &self.data_ptr }
     }
     pub fn direct_ptr0(&self) -> u32 {
-        self.direct_ptr[0]
+        self.data_ptr[0]
     }
     pub fn direct_ptr1(&self) -> u32 {
-        self.direct_ptr[1]
+        self.data_ptr[1]
     }
     pub fn direct_ptr2(&self) -> u32 {
-        self.direct_ptr[2]
+        self.data_ptr[2]
     }
     pub fn direct_ptr3(&self) -> u32 {
-        self.direct_ptr[3]
+        self.data_ptr[3]
     }
     pub fn direct_ptr4(&self) -> u32 {
-        self.direct_ptr[4]
+        self.data_ptr[4]
     }
     pub fn direct_ptr5(&self) -> u32 {
-        self.direct_ptr[5]
+        self.data_ptr[5]
     }
     pub fn direct_ptr6(&self) -> u32 {
-        self.direct_ptr[6]
+        self.data_ptr[6]
     }
     pub fn direct_ptr7(&self) -> u32 {
-        self.direct_ptr[7]
+        self.data_ptr[7]
     }
     pub fn direct_ptr8(&self) -> u32 {
-        self.direct_ptr[8]
+        self.data_ptr[8]
     }
     pub fn direct_ptr9(&self) -> u32 {
-        self.direct_ptr[9]
+        self.data_ptr[9]
     }
     pub fn direct_ptr10(&self) -> u32 {
-        self.direct_ptr[10]
+        self.data_ptr[10]
     }
     pub fn direct_ptr11(&self) -> u32 {
-        self.direct_ptr[11]
+        self.data_ptr[11]
     }
     pub fn s_indir_ptr(&self) -> u32 {
-        self.s_indir_ptr
+        self.data_ptr[12]
     }
     pub fn d_indir_ptr(&self) -> u32 {
-        self.d_indir_ptr
+        self.data_ptr[13]
     }
     pub fn t_indir_ptr(&self) -> u32 {
-        self.t_indir_ptr
+        self.data_ptr[14]
     }
     pub fn gen_number(&self) -> u32 {
         self.gen_number

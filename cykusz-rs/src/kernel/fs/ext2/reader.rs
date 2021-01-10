@@ -1,6 +1,6 @@
-use crate::kernel::fs::ext2::disk::inode::INode;
+use crate::kernel::fs::ext2::disk::inode::{FileType, INode};
 use crate::kernel::fs::ext2::Ext2Filesystem;
-use crate::kernel::utils::slice::ToBytesMut;
+use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
@@ -94,10 +94,19 @@ impl<'a> INodeReader<'a> {
             return 0;
         }
 
+        let buffer_size = min(file_size - self.offset, dest.len());
+
+        if self.inode.ftype() == FileType::Symlink && file_size <= 60 {
+            dest[..buffer_size].copy_from_slice(
+                &self.inode.block_ptrs().to_bytes()[self.offset..self.offset + buffer_size],
+            );
+
+            return buffer_size;
+        }
+
         let fs = self.fs();
         let block_size = fs.superblock().block_size();
 
-        let buffer_size = min(file_size - self.offset, dest.len());
         let mut rem = buffer_size;
 
         let mut dest_off = 0;

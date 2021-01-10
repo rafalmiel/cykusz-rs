@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use spin::Once;
 
-use syscall_defs::OpenFlags;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::inode::INode;
@@ -10,6 +10,8 @@ use crate::kernel::fs::mountfs::MNode;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 pub mod devnode;
 pub mod ext2;
@@ -89,18 +91,46 @@ impl From<OpenFlags> for LookupMode {
     }
 }
 
-pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<Arc<dyn INode>> {
-    let mut inode = if path.is_absolute() {
-        root_inode().clone()
-    } else {
-        current_task().get_cwd().expect("CWD inode invalid")
-    };
+fn read_link(inode: &Arc<dyn INode>) -> Result<String> {
+    let mut path = Vec::<u8>::new();
+    path.resize(128, 0);
 
+    let mut offset = 0;
+
+    loop {
+        offset += inode.read_at(offset, &mut path.as_mut_slice()[offset..])?;
+
+        if offset == path.len() {
+            path.resize(offset + 128, 0);
+        } else {
+            break;
+        }
+    }
+
+    Ok(String::from(unsafe {
+        core::str::from_utf8_unchecked(&path.as_slice()[..offset])
+    }))
+}
+
+fn lookup_by_path_from(
+    path: Path,
+    lookup_mode: LookupMode,
+    mut inode: Arc<dyn INode>,
+) -> Result<Arc<dyn INode>> {
     let len = path.components().count();
 
     for (idx, name) in path.components().enumerate() {
         match inode.lookup(name) {
-            Ok(i) => inode = i.inode,
+            Ok(i) => {
+                if i.inode.ftype()? == FileType::Symlink {
+                    let link = read_link(&i.inode)?;
+
+                    inode =
+                        lookup_by_path_from(Path::new(link.as_str()), lookup_mode, inode.clone())?;
+                } else {
+                    inode = i.inode
+                }
+            }
             Err(e)
                 if e == FsError::EntryNotFound
                     && idx == len - 1
@@ -115,4 +145,12 @@ pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<Arc<dyn INo
     }
 
     Ok(inode)
+}
+
+pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<Arc<dyn INode>> {
+    let mut pwd = current_task().get_pwd();
+
+    pwd.apply_path(path.str());
+
+    lookup_by_path_from(Path::new(pwd.0.as_str()), lookup_mode, root_inode().clone())
 }

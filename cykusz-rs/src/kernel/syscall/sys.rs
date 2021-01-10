@@ -117,11 +117,11 @@ pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
 
     let pwd = current_task().get_pwd();
 
-    if pwd.len() > len as usize {
+    if pwd.0.len() > len as usize {
         Err(SyscallError::IO)
     } else {
-        buf[..pwd.len()].copy_from_slice(pwd.as_bytes());
-        Ok(pwd.len())
+        buf[..pwd.0.len()].copy_from_slice(pwd.0.as_bytes());
+        Ok(pwd.0.len())
     }
 }
 

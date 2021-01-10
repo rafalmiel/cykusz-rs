@@ -27,26 +27,16 @@ impl Ext2INode {
         i
     }
 
-    #[allow(dead_code)]
-    fn test(&self) {
-        let fs = self.fs();
-
-        let group = fs.group_descs().get_d_inode(self.id);
-
-        let inodes = group.read();
-
-        println!("{:?}", inodes.get(self.id));
-    }
-
     fn fs(&self) -> Arc<Ext2Filesystem> {
         self.fs.upgrade().unwrap()
     }
 
     fn mk_dirent(&self, de: &disk::dirent::DirEntry) -> DirEntry {
         let typ = match de.ftype() {
-            disk::dirent::FileType::RegularFile => FileType::File,
-            disk::dirent::FileType::CharDev => FileType::DevNode,
-            disk::dirent::FileType::Directory => FileType::Dir,
+            disk::dirent::DirEntTypeIndicator::RegularFile => FileType::File,
+            disk::dirent::DirEntTypeIndicator::CharDev => FileType::DevNode,
+            disk::dirent::DirEntTypeIndicator::Directory => FileType::Dir,
+            disk::dirent::DirEntTypeIndicator::Symlink => FileType::Symlink,
             _ => FileType::File,
         };
 
@@ -89,7 +79,7 @@ impl INode for Ext2INode {
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        if self.typ != FileType::File {
+        if self.typ != FileType::File && self.typ != FileType::Symlink {
             return Err(FsError::NotSupported);
         }
 

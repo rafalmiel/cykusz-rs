@@ -310,6 +310,7 @@ impl RamFS {
                 FileType::DevNode => Content::DevNode(None),
                 FileType::File => Content::Bytes(Spin::new(Vec::new())),
                 FileType::Dir => Content::None,
+                FileType::Symlink => Content::None,
             },
         })));
 

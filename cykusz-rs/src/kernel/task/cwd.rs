@@ -5,24 +5,20 @@ use alloc::vec::Vec;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
 
+#[derive(Clone)]
+pub struct Pwd(pub String);
+
 pub struct Cwd {
-    pub pwd: String,
+    pub pwd: Pwd,
     pub inode: Arc<dyn INode>,
 }
 
-impl Cwd {
-    pub fn new(name: &str, inode: Arc<dyn INode>) -> Cwd {
-        Cwd {
-            pwd: String::from(name),
-            inode,
-        }
-    }
-
+impl Pwd {
     pub fn apply_path(&mut self, path: &str) {
         let p = Path::new(path);
 
         let mut comps = if !p.is_absolute() {
-            self.pwd.split("/").collect::<Vec<&str>>()
+            self.0.split("/").collect::<Vec<&str>>()
         } else {
             Vec::<&str>::new()
         };
@@ -46,6 +42,19 @@ impl Cwd {
                 .trim_end_matches("/"),
         );
 
-        self.pwd = pwd;
+        self.0 = pwd;
+    }
+}
+
+impl Cwd {
+    pub fn new(name: &str, inode: Arc<dyn INode>) -> Cwd {
+        Cwd {
+            pwd: Pwd(String::from(name)),
+            inode,
+        }
+    }
+
+    pub fn apply_path(&mut self, path: &str) {
+        self.pwd.apply_path(path);
     }
 }

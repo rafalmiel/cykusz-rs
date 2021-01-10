@@ -64,6 +64,7 @@ pub enum FileType {
     File = 0x1,
     Dir = 0x2,
     DevNode = 0x3,
+    Symlink = 0x4,
 }
 
 impl Default for FileType {

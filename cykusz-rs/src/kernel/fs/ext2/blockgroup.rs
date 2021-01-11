@@ -1,12 +1,10 @@
 use super::disk;
 use crate::kernel::fs::ext2::Ext2Filesystem;
-use crate::kernel::sync::{RwSpin, RwSpinReadGuard};
+use crate::kernel::sync::{Mutex, RwSpin, RwSpinReadGuard};
 use crate::kernel::utils::slice::ToBytesMut;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use spin::Once;
-
-use alloc::collections::BTreeMap;
 
 pub struct INodeVec(pub Vec<disk::inode::INode>);
 
@@ -28,7 +26,7 @@ impl INodeGroup {
 
 pub struct BlockGroupDescriptors {
     d_desc: RwSpin<Vec<disk::blockgroup::BlockGroupDescriptor>>,
-    d_inodes: RwSpin<BTreeMap<usize, Arc<INodeGroup>>>,
+    d_inodes: Mutex<lru::LruCache<usize, Arc<INodeGroup>>>,
     fs: Once<Weak<super::Ext2Filesystem>>,
 }
 
@@ -36,7 +34,7 @@ impl BlockGroupDescriptors {
     pub fn new() -> BlockGroupDescriptors {
         BlockGroupDescriptors {
             d_desc: RwSpin::new(Vec::new()),
-            d_inodes: RwSpin::new(BTreeMap::new()),
+            d_inodes: Mutex::new(lru::LruCache::new(256)),
             fs: Once::new(),
         }
     }
@@ -89,7 +87,8 @@ impl BlockGroupDescriptors {
     pub fn get_d_inode(&self, id: usize) -> Arc<INodeGroup> {
         let block = self.get_inode_block(id);
 
-        let inodes = self.d_inodes.read_upgradeable();
+        let mut inodes = self.d_inodes.lock();
+
         if let Some(e) = inodes.get(&block) {
             e.clone()
         } else {
@@ -102,13 +101,11 @@ impl BlockGroupDescriptors {
 
             fs.read_block(block, vec.as_mut_slice().to_bytes_mut());
 
-            let mut inodes_w = inodes.upgrade();
-
             let res = Arc::new(INodeGroup {
                 inodes: RwSpin::new(INodeVec(vec)),
             });
 
-            inodes_w.insert(block, res.clone());
+            inodes.put(block, res.clone());
 
             res
         }

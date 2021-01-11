@@ -15,6 +15,7 @@ bit_field = "*"
 intrusive-collections = "*"
 paste = "*"
 mmio = "*"
+lru = "*"
 
 [dependencies.linked_list_allocator]
 version = "*"

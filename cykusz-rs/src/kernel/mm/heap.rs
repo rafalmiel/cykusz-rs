@@ -1,7 +1,7 @@
 use core::alloc::{GlobalAlloc, Layout};
 use core::ops::Deref;
 use core::ptr::NonNull;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use linked_list_allocator::{align_up, Heap};
 
@@ -31,6 +31,10 @@ fn map_more_heap(from: *const u8, size: usize) {
 pub struct LockedHeap(pub Spin<Heap>);
 
 pub static ALLOCED_MEM: AtomicUsize = AtomicUsize::new(0);
+
+pub fn heap_mem() -> usize {
+    ALLOCED_MEM.load(Ordering::SeqCst)
+}
 
 impl LockedHeap {
     /// Creates an empty heap. All allocate calls will return `None`.
@@ -65,14 +69,42 @@ impl Deref for LockedHeap {
     }
 }
 
+pub static HEAP_DEBUG: AtomicBool = AtomicBool::new(false);
+
+pub struct HeapDebug {}
+
+impl HeapDebug {
+    pub fn new() -> HeapDebug {
+        HEAP_DEBUG.store(true, Ordering::SeqCst);
+
+        HeapDebug {}
+    }
+}
+
+impl Drop for HeapDebug {
+    fn drop(&mut self) {
+        HEAP_DEBUG.store(false, Ordering::SeqCst);
+    }
+}
+
 unsafe impl GlobalAlloc for LockedHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.allocate(&mut self.0.lock(), layout)
+        let ptr = self
+            .allocate(&mut self.0.lock(), layout)
             .ok()
-            .map_or(0 as *mut u8, |alloc| alloc.as_ptr())
+            .map_or(0 as *mut u8, |alloc| alloc.as_ptr());
+
+        if HEAP_DEBUG.load(Ordering::SeqCst) {
+            println!("Alloc {:p} {}", ptr, layout.size());
+        };
+
+        ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        if HEAP_DEBUG.load(Ordering::SeqCst) {
+            println!("Dealloc {:p} {}", ptr, layout.size());
+        };
         ALLOCED_MEM.fetch_sub(layout.size(), Ordering::SeqCst);
         self.0
             .lock()

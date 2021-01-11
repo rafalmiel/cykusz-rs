@@ -68,33 +68,45 @@ fn ls(path: &str) {
 
 fn exec(cmd: &str) {
     if cmd.starts_with("cd ") {
-        let path = &cmd[3..];
-
-        if let Err(e) = syscall::chdir(path.trim()) {
-            println!("Failed to change dir: {:?}", e);
+        let mut iter = cmd.split_whitespace();
+        iter.next();
+        if let Some(path) = iter.next() {
+            if let Err(e) = syscall::chdir(path.trim()) {
+                println!("Failed to change dir: {:?}", e);
+            }
+        } else {
+            println!("Param error");
         }
     } else if cmd.starts_with("mkdir ") {
-        let path = &cmd[6..];
+        let mut iter = cmd.split_whitespace();
+        iter.next();
 
-        for p in path.split_whitespace() {
+        while let Some(p) = iter.next() {
             if let Err(e) = syscall::mkdir(p.trim()) {
                 println!("Failed to mkdir: {:?}", e);
             }
         }
     } else if cmd.starts_with("host ") {
-        let name = &cmd[5..];
+        let mut iter = cmd.split_whitespace();
+        iter.next();
 
-        let mut res = [0u8; 4];
+        if let Some(name) = iter.next() {
+            let mut res = [0u8; 4];
 
-        if let Ok(_) = syscall::getaddrinfo(name, &mut res) {
-            println!("{:?}", res);
+            if let Ok(_) = syscall::getaddrinfo(name, &mut res) {
+                println!("{:?}", res);
+            } else {
+                println!("getaddrinfo failed");
+            }
         } else {
-            println!("getaddrinfo failed");
+            println!("Param error");
         }
+
     } else if cmd.starts_with("ls ") {
-        let path = &cmd[3..];
-        let p = path.split_whitespace();
-        let print_hdr = path.contains(" ");
+        let mut iter = cmd.split_whitespace();
+        iter.next();
+        let p = iter;
+        let print_hdr = cmd.split_whitespace().count() > 2;
         for (idx, name) in p.enumerate() {
             let name = name.trim();
             if print_hdr {
@@ -112,7 +124,7 @@ fn exec(cmd: &str) {
     } else if cmd == "exit" {
         syscall::exit();
     } else if cmd.starts_with("sleep") {
-        let mut args = cmd.split_ascii_whitespace();
+        let mut args = cmd.split_whitespace();
         let ms = if let Some(arg) = args.nth(1) {
             if let Ok(ms) = arg.parse::<usize>() {
                 ms
@@ -133,16 +145,20 @@ fn exec(cmd: &str) {
             println!("Reboot failed.. {:?}", e);
         }
     } else if cmd.starts_with("bind") {
-        if cmd.len() < 6 {
-            println!("Format: bind <port>");
-            return;
-        }
+        let mut args = cmd.split_whitespace();
+        args.next();
 
-        if let Ok(port) = cmd[5..].parse::<u32>() {
-            nc::bind(port);
+        if let Some(port) = args.next() {
+            if let Ok(port) = port.parse::<u32>() {
+                nc::bind(port);
+            } else {
+                println!("Invalid port format");
+            }
+        } else {
+            println!("Format: bind <port>");
         }
     } else if cmd.starts_with("connect") {
-        let mut args = cmd.split_ascii_whitespace();
+        let mut args = cmd.split_whitespace();
 
         if args.clone().count() >= 3 {
             let addr = args.nth(1).unwrap();
@@ -177,7 +193,7 @@ fn exec(cmd: &str) {
         split.next();
 
         if let (Some(dev), Some(dest)) = { (split.next(), split.next()) } {
-            if let Err(e) = syscall_user::mount(dev, dest, "ext2") {
+            if let Err(e) = syscall::mount(dev, dest, "ext2") {
                 println!("Mount failed: {:?}", e);
             }
         } else {
@@ -188,7 +204,7 @@ fn exec(cmd: &str) {
         split.next();
 
         if let Some(path) = split.next() {
-            if let Err(e) = syscall_user::umount(path) {
+            if let Err(e) = syscall::umount(path) {
                 println!("Umount failed: {:?}", e);
             }
         } else {

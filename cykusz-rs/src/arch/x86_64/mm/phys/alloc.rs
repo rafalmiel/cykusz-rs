@@ -38,6 +38,18 @@ pub fn deallocate_order(frame: &Frame, order: usize) {
     bdy.dealloc(frame.address(), order);
 }
 
+pub fn used_mem() -> usize {
+    let bdy = BUDDY.lock();
+
+    bdy.used_mem()
+}
+
+pub fn free_mem() -> usize {
+    let bdy = BUDDY.lock();
+
+    bdy.free_mem()
+}
+
 pub fn init(mboot_info: &multiboot2::Info) {
     let mem = mboot_info
         .memory_map_tag()

@@ -221,4 +221,15 @@ impl BuddyAlloc {
             }
         }
     }
+
+    pub fn used_mem(&self) -> usize {
+        (self.end - self.start).0 - self.free_mem()
+    }
+
+    pub fn free_mem(&self) -> usize {
+        self.freecnt
+            .iter()
+            .enumerate()
+            .fold(0, |acc, (i, e)| acc + (*e * BSIZE[i]))
+    }
 }

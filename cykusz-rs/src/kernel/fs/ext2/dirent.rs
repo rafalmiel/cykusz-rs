@@ -1,34 +1,61 @@
-use crate::arch::raw::mm::VirtAddr;
-use crate::kernel::fs::ext2::disk::dirent::DirEntry;
-use crate::kernel::fs::ext2::disk::inode::INode;
-use crate::kernel::fs::ext2::reader::INodeReader;
-use crate::kernel::fs::ext2::Ext2Filesystem;
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use core::marker::PhantomData;
+
+use crate::arch::raw::mm::VirtAddr;
+use crate::kernel::fs::ext2::disk::dirent::DirEntry;
+use crate::kernel::fs::ext2::inode::LockedExt2INode;
+use crate::kernel::fs::ext2::reader::INodeReader;
+use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::sync::Spin;
+
+pub struct SysDirEntIter<'a> {
+    iter: Spin<DirEntIter<'a>>,
+}
+
+impl<'a> SysDirEntIter<'a> {
+    pub fn new(inode: Arc<LockedExt2INode>) -> SysDirEntIter<'a> {
+        SysDirEntIter::<'a> {
+            iter: Spin::new(DirEntIter::new(inode)),
+        }
+    }
+}
+
+impl<'a> crate::kernel::fs::vfs::DirEntIter for SysDirEntIter<'a> {
+    fn next(&self) -> Option<crate::kernel::fs::vfs::DirEntry> {
+        let mut lock = self.iter.lock();
+        if let Some(e) = lock.next() {
+            Some(lock.inode.mk_dirent(e))
+        } else {
+            None
+        }
+    }
+}
+
 pub struct DirEntIter<'a> {
-    d_inode: &'a INode,
-    fs: Weak<Ext2Filesystem>,
-    reader: INodeReader<'a>,
+    inode: Arc<LockedExt2INode>,
+    reader: INodeReader,
     buf: Vec<u8>,
     offset: usize,
     block: usize,
+    _phantom: PhantomData<&'a ()>,
 }
 
 impl<'a> DirEntIter<'a> {
-    pub fn new(fs: Weak<Ext2Filesystem>, d_inode: &'a INode) -> DirEntIter<'a> {
+    pub fn new(inode: Arc<LockedExt2INode>) -> DirEntIter<'a> {
         DirEntIter::<'a> {
-            d_inode,
-            fs: fs.clone(),
-            reader: INodeReader::new(d_inode, fs, 0),
+            inode: inode.clone(),
+            reader: INodeReader::new(inode, 0),
             buf: Vec::new(),
             offset: 0,
             block: 0,
+            _phantom: PhantomData::default(),
         }
     }
 
     fn fs(&self) -> Arc<Ext2Filesystem> {
-        self.fs.upgrade().unwrap().clone()
+        self.inode.fs()
     }
 }
 
@@ -39,8 +66,10 @@ impl<'a> Iterator for DirEntIter<'a> {
         let fs = self.fs();
         let block_size = fs.superblock().block_size();
 
+        let file_size = { self.inode.read().d_inode().size_lower() };
+
         let ent = loop {
-            if self.offset >= self.d_inode.size_lower() as usize {
+            if self.offset >= file_size as usize {
                 return None;
             }
 

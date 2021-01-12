@@ -1,10 +1,12 @@
 use alloc::sync::{Arc, Weak};
 
+use spin::Once;
+
 use crate::kernel::block::BlockDev;
+use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use spin::Once;
-use syscall_defs::FileType;
+use crate::kernel::sync::RwSpin;
 
 mod blockgroup;
 mod dirent;
@@ -19,6 +21,7 @@ pub struct Ext2Filesystem {
     sectors_per_block: Once<usize>,
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
+    inode_cache: RwSpin<lru::LruCache<usize, Arc<inode::LockedExt2INode>>>,
 }
 
 impl Ext2Filesystem {
@@ -40,6 +43,7 @@ impl Ext2Filesystem {
             sectors_per_block: Once::new(),
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
+            inode_cache: RwSpin::new(lru::LruCache::new(256)),
         }
         .wrap();
 
@@ -84,10 +88,24 @@ impl Ext2Filesystem {
     pub fn group_descs(&self) -> &blockgroup::BlockGroupDescriptors {
         &self.blockgroupdesc
     }
+
+    pub fn get_inode(&self, id: usize) -> Arc<LockedExt2INode> {
+        let mut cache = self.inode_cache.write();
+
+        if let Some(el) = cache.get(&id) {
+            el.clone()
+        } else {
+            let el = inode::LockedExt2INode::new(self.self_ref.clone(), id);
+
+            cache.put(id, el.clone());
+
+            el
+        }
+    }
 }
 
 impl Filesystem for Ext2Filesystem {
     fn root_inode(&self) -> Arc<dyn INode> {
-        inode::Ext2INode::new(self.self_ref.clone(), 2, FileType::Dir)
+        self.get_inode(2)
     }
 }

@@ -4,7 +4,7 @@ use syscall_defs::FileType;
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::vfs::{DirEntry, FsError, Metadata, Result};
+use crate::kernel::fs::vfs::{DirEntIter, DirEntry, FsError, Metadata, Result};
 use crate::kernel::syscall::sys::PollTable;
 
 pub trait INode: Send + Sync {
@@ -58,8 +58,12 @@ pub trait INode: Send + Sync {
         return Err(FsError::NotSupported);
     }
 
-    fn dirent(&self, _idx: usize) -> Result<Option<DirEntry>> {
+    fn dir_ent(&self, _idx: usize) -> Result<Option<DirEntry>> {
         return Err(FsError::NotSupported);
+    }
+
+    fn dir_iter(&self) -> Option<Arc<dyn DirEntIter>> {
+        None
     }
 
     fn mount(&self, _fs: Arc<dyn Filesystem>) -> Result<Arc<dyn Filesystem>> {

@@ -155,7 +155,7 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task();
     return if let Some(f) = task.get_handle(fd) {
-        Ok(f.getdents(make_buf_mut(buf, len))?)
+        Ok(f.get_dents(make_buf_mut(buf, len))?)
     } else {
         Err(SyscallError::BadFD)
     };

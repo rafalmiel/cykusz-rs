@@ -2,13 +2,14 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 
+use syscall_defs::FileType;
+
 use crate::kernel::device::Device;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::{DirEntry, FsError, Metadata, Result};
+use crate::kernel::fs::vfs::{DirEntIter, DirEntry, FsError, Metadata, Result};
 use crate::kernel::sync::RwSpin;
 use crate::kernel::syscall::sys::PollTable;
-use syscall_defs::FileType;
 
 #[allow(dead_code)]
 pub struct MountFS {
@@ -242,8 +243,12 @@ impl INode for MNode {
         self.inode.truncate()
     }
 
-    fn dirent(&self, idx: usize) -> Result<Option<DirEntry>> {
-        self.inode.dirent(idx)
+    fn dir_ent(&self, idx: usize) -> Result<Option<DirEntry>> {
+        self.inode.dir_ent(idx)
+    }
+
+    fn dir_iter(&self) -> Option<Arc<dyn DirEntIter>> {
+        self.inode.dir_iter()
     }
 
     fn mount(&self, fs: Arc<dyn Filesystem>) -> Result<Arc<dyn Filesystem>> {

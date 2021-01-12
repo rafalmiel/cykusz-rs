@@ -191,7 +191,7 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn dirent(&self, idx: usize) -> Result<Option<DirEntry>> {
+    fn dir_ent(&self, idx: usize) -> Result<Option<DirEntry>> {
         let d = self.0.read();
 
         if d.typ != FileType::Dir {

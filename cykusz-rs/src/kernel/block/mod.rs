@@ -5,7 +5,6 @@ use alloc::vec::Vec;
 
 use crate::kernel::device;
 use crate::kernel::device::{alloc_id, register_device, Device};
-
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::RwSpin;
 use crate::kernel::utils::types::CeilDiv;

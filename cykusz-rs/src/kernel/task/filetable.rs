@@ -5,8 +5,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::Result;
-use crate::kernel::sync::RwSpin;
+use crate::kernel::fs::vfs::{DirEntIter, Result};
+use crate::kernel::sync::{Mutex, RwSpin};
 
 const FILE_NUM: usize = 256;
 
@@ -15,6 +15,7 @@ pub struct FileHandle {
     pub inode: Arc<dyn INode>,
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
+    pub dir_iter: Mutex<Option<Arc<dyn DirEntIter>>>,
 }
 
 impl FileHandle {
@@ -38,15 +39,36 @@ impl FileHandle {
         Ok(wrote)
     }
 
-    pub fn getdents(&self, mut buf: &mut [u8]) -> Result<usize> {
+    fn get_dir_iter(&self) -> Option<Arc<dyn DirEntIter>> {
+        let mut lock = self.dir_iter.lock();
+
+        if self.offset.load(Ordering::SeqCst) == 0 && lock.is_none() {
+            let i = self.inode.dir_iter();
+            *lock = i;
+        };
+
+        if let Some(i) = &*lock {
+            Some(i.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn get_dents(&self, mut buf: &mut [u8]) -> Result<usize> {
         let mut offset = 0usize;
 
         let struct_len = core::mem::size_of::<SysDirEntry>();
 
+        let iter = self.get_dir_iter();
+
         Ok(loop {
-            let dentry = self
-                .inode
-                .dirent(self.offset.fetch_add(1, Ordering::SeqCst))?;
+            let dentry = {
+                let o = self.offset.fetch_add(1, Ordering::SeqCst);
+                match &iter {
+                    Some(i) => i.next(),
+                    None => self.inode.dir_ent(o)?,
+                }
+            };
 
             if let Some(d) = &dentry {
                 let mut sysd = SysDirEntry {
@@ -113,6 +135,7 @@ impl FileTable {
                 inode,
                 offset: AtomicUsize::new(0),
                 flags,
+                dir_iter: Mutex::new(None),
             }))
         };
 

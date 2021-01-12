@@ -101,7 +101,6 @@ fn exec(cmd: &str) {
         } else {
             println!("Param error");
         }
-
     } else if cmd.starts_with("ls ") {
         let mut iter = cmd.split_whitespace();
         iter.next();

@@ -1,31 +1,28 @@
-use crate::kernel::fs::ext2::disk::inode::{FileType, INode};
-use crate::kernel::fs::ext2::Ext2Filesystem;
-use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-pub struct INodeReader<'a> {
-    inode: &'a INode,
-    fs: Weak<Ext2Filesystem>,
+use crate::kernel::fs::ext2::disk::inode::{FileType, INode};
+use crate::kernel::fs::ext2::inode::LockedExt2INode;
+use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
+
+pub struct INodeReader {
+    inode: Arc<LockedExt2INode>,
     offset: usize,
 }
 
-impl<'a> INodeReader<'a> {
-    pub fn new(inode: &'a INode, fs: Weak<Ext2Filesystem>, offset: usize) -> INodeReader<'a> {
-        INodeReader::<'a> {
-            inode,
-            fs: fs.clone(),
-            offset,
-        }
+impl INodeReader {
+    pub fn new(inode: Arc<LockedExt2INode>, offset: usize) -> INodeReader {
+        INodeReader { inode, offset }
     }
 
     fn fs(&self) -> Arc<Ext2Filesystem> {
-        self.fs.upgrade().unwrap()
+        self.inode.fs()
     }
 
-    fn get_block(&self, mut block_num: usize) -> Option<usize> {
+    fn get_block(&self, mut block_num: usize, inode: &INode) -> Option<usize> {
         if block_num < 12 {
-            return Some(self.inode.direct_ptrs()[block_num] as usize);
+            return Some(inode.direct_ptrs()[block_num] as usize);
         }
 
         let block_size = self.fs().superblock().block_size();
@@ -57,7 +54,7 @@ impl<'a> INodeReader<'a> {
         };
 
         if block_num < entries_per_block {
-            return read_ptrs(self.inode.s_indir_ptr() as usize, &[block_num]);
+            return read_ptrs(inode.s_indir_ptr() as usize, &[block_num]);
         }
 
         let entries_per_dblock = entries_per_block * entries_per_block;
@@ -66,7 +63,7 @@ impl<'a> INodeReader<'a> {
             let off1 = block_num / entries_per_block;
             let off2 = block_num % entries_per_block;
 
-            return read_ptrs(self.inode.d_indir_ptr() as usize, &[off1, off2]);
+            return read_ptrs(inode.d_indir_ptr() as usize, &[off1, off2]);
         }
 
         let entried_per_tblock = entries_per_dblock * entries_per_block;
@@ -79,7 +76,7 @@ impl<'a> INodeReader<'a> {
             let off2 = block_num / entries_per_block;
             let off3 = block_num % entries_per_block;
 
-            return read_ptrs(self.inode.t_indir_ptr() as usize, &[off1, off2, off3]);
+            return read_ptrs(inode.t_indir_ptr() as usize, &[off1, off2, off3]);
         }
 
         None
@@ -88,7 +85,10 @@ impl<'a> INodeReader<'a> {
     pub fn read(&mut self, dest: &mut [u8]) -> usize {
         use core::cmp::min;
 
-        let file_size = self.inode.size_lower() as usize;
+        let linode = self.inode.read();
+        let inode = linode.d_inode();
+
+        let file_size = inode.size_lower() as usize;
 
         if self.offset >= file_size {
             return 0;
@@ -96,9 +96,9 @@ impl<'a> INodeReader<'a> {
 
         let buffer_size = min(file_size - self.offset, dest.len());
 
-        if self.inode.ftype() == FileType::Symlink && file_size <= 60 {
+        if inode.ftype() == FileType::Symlink && file_size <= 60 {
             dest[..buffer_size].copy_from_slice(
-                &self.inode.block_ptrs().to_bytes()[self.offset..self.offset + buffer_size],
+                &inode.block_ptrs().to_bytes()[self.offset..self.offset + buffer_size],
             );
 
             return buffer_size;
@@ -114,7 +114,7 @@ impl<'a> INodeReader<'a> {
             let block_num = self.offset / block_size;
             let block_offset = self.offset % block_size;
 
-            if let Some(block) = self.get_block(block_num) {
+            if let Some(block) = self.get_block(block_num, inode) {
                 let mut buf = Vec::<u8>::new();
                 buf.resize(block_size, 0);
 

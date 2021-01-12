@@ -1,4 +1,6 @@
+use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 use spin::Once;
 
@@ -10,8 +12,6 @@ use crate::kernel::fs::mountfs::MNode;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
-use alloc::string::String;
-use alloc::vec::Vec;
 
 pub mod devnode;
 pub mod ext2;

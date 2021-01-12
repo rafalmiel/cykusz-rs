@@ -1,11 +1,13 @@
-use super::disk;
+use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
+
+use spin::Once;
+
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::sync::{Mutex, RwSpin, RwSpinReadGuard};
 use crate::kernel::utils::slice::ToBytesMut;
 
-use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
-use spin::Once;
+use super::disk;
 
 pub struct INodeVec(pub Vec<disk::inode::INode>);
 
@@ -110,5 +112,12 @@ impl BlockGroupDescriptors {
 
             res
         }
+    }
+
+    pub fn read_d_inode(&self, id: usize, d_inode: &mut disk::inode::INode) {
+        let group = self.get_d_inode(id);
+        let vec = group.read();
+
+        *d_inode = *vec.get(id);
     }
 }

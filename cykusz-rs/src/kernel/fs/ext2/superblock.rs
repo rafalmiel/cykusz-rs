@@ -1,8 +1,11 @@
-use super::disk;
+use alloc::sync::{Arc, Weak};
+
+use spin::Once;
+
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard};
-use alloc::sync::{Arc, Weak};
-use spin::Once;
+
+use super::disk;
 
 pub struct Superblock {
     d_superblock: RwSpin<disk::superblock::Superblock>,

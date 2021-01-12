@@ -32,6 +32,10 @@ impl From<FsError> for syscall_defs::SyscallError {
 
 pub type Result<T> = core::result::Result<T, FsError>;
 
+pub trait DirEntIter: Send + Sync {
+    fn next(&self) -> Option<DirEntry>;
+}
+
 pub struct DirEntry {
     pub name: String,
     pub inode: Arc<dyn INode>,

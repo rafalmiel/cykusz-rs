@@ -1,69 +1,114 @@
-use crate::kernel::fs::ext2::dirent::DirEntIter;
+use alloc::string::String;
+use alloc::sync::{Arc, Weak};
+
+use syscall_defs::FileType;
+
+use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
+use crate::kernel::fs::ext2::reader::INodeReader;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Metadata};
 use crate::kernel::fs::vfs::{FsError, Result};
-use alloc::sync::{Arc, Weak};
-use syscall_defs::FileType;
+use crate::kernel::sync::{RwSpin, RwSpinReadGuard};
 
-use alloc::string::String;
+pub struct LockedExt2INode {
+    node: RwSpin<Ext2INode>,
+    fs: Weak<Ext2Filesystem>,
+    self_ref: Weak<LockedExt2INode>,
+}
 
-use crate::kernel::fs::ext2::reader::INodeReader;
+impl LockedExt2INode {
+    pub fn new(fs: Weak<Ext2Filesystem>, id: usize) -> Arc<LockedExt2INode> {
+        let ptr = LockedExt2INode {
+            node: RwSpin::new(Ext2INode::new(fs.clone(), id)),
+            fs,
+            self_ref: Weak::new(),
+        }
+        .wrap();
+
+        ptr
+    }
+
+    pub fn mk_dirent(&self, de: &disk::dirent::DirEntry) -> DirEntry {
+        DirEntry {
+            name: String::from(de.name()),
+            inode: self.fs().get_inode(de.inode() as usize),
+        }
+    }
+
+    fn wrap(self) -> Arc<LockedExt2INode> {
+        let fs = Arc::new(self);
+        let weak = Arc::downgrade(&fs);
+        let ptr = Arc::into_raw(fs) as *mut Self;
+
+        unsafe {
+            (*ptr).self_ref = weak;
+            Arc::from_raw(ptr)
+        }
+    }
+
+    pub fn read(&self) -> RwSpinReadGuard<Ext2INode> {
+        self.node.read()
+    }
+
+    pub fn fs(&self) -> Arc<Ext2Filesystem> {
+        self.fs.upgrade().unwrap()
+    }
+}
 
 pub struct Ext2INode {
     id: usize,
-    fs: Weak<Ext2Filesystem>,
-    typ: FileType,
+    d_inode: disk::inode::INode,
 }
 
-impl Ext2INode {
-    pub fn new(fs: Weak<Ext2Filesystem>, id: usize, typ: FileType) -> Arc<Ext2INode> {
-        let inode = Ext2INode { id, fs, typ };
-
-        let i = Arc::new(inode);
-
-        i
-    }
-
-    fn fs(&self) -> Arc<Ext2Filesystem> {
-        self.fs.upgrade().unwrap()
-    }
-
-    fn mk_dirent(&self, de: &disk::dirent::DirEntry) -> DirEntry {
-        let typ = match de.ftype() {
-            disk::dirent::DirEntTypeIndicator::RegularFile => FileType::File,
-            disk::dirent::DirEntTypeIndicator::CharDev => FileType::DevNode,
-            disk::dirent::DirEntTypeIndicator::Directory => FileType::Dir,
-            disk::dirent::DirEntTypeIndicator::Symlink => FileType::Symlink,
+impl From<disk::inode::FileType> for syscall_defs::FileType {
+    fn from(v: disk::inode::FileType) -> Self {
+        match v {
+            disk::inode::FileType::File => FileType::File,
+            disk::inode::FileType::Symlink => FileType::Symlink,
+            disk::inode::FileType::Dir => FileType::Dir,
             _ => FileType::File,
-        };
-
-        DirEntry {
-            name: String::from(de.name()),
-            inode: Ext2INode::new(self.fs.clone(), de.inode() as usize, typ),
         }
     }
 }
 
-impl INode for Ext2INode {
+impl Ext2INode {
+    pub fn new(fs: Weak<Ext2Filesystem>, id: usize) -> Ext2INode {
+        let mut inode = Ext2INode {
+            id,
+            d_inode: disk::inode::INode::default(),
+        };
+
+        fs.upgrade()
+            .unwrap()
+            .group_descs()
+            .read_d_inode(id, &mut inode.d_inode);
+
+        inode
+    }
+
+    pub fn d_inode(&self) -> &disk::inode::INode {
+        &self.d_inode
+    }
+
+    pub fn ftype(&self) -> syscall_defs::FileType {
+        self.d_inode.ftype().into()
+    }
+}
+
+impl INode for LockedExt2INode {
     fn metadata(&self) -> Result<Metadata> {
+        let inode = self.read();
         Ok(Metadata {
-            id: self.id,
-            typ: self.typ,
+            id: inode.id,
+            typ: inode.d_inode.ftype().into(),
         })
     }
 
     fn lookup(&self, name: &str) -> Result<DirEntry> {
-        let fs = self.fs();
-
-        let igroup = fs.group_descs().get_d_inode(self.id);
-        let inodeg = igroup.read();
-
-        let inode = inodeg.get(self.id);
-
-        let mut iter = DirEntIter::new(self.fs.clone(), inode);
+        let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
 
         if let Some(e) = iter.find_map(|e| {
             if e.name() == name {
@@ -79,18 +124,15 @@ impl INode for Ext2INode {
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        if self.typ != FileType::File && self.typ != FileType::Symlink {
+        let inode = self.node.read();
+
+        if inode.ftype() != FileType::File && inode.ftype() != FileType::Symlink {
             return Err(FsError::NotSupported);
         }
 
-        let fs = self.fs();
+        drop(inode);
 
-        let igroup = fs.group_descs().get_d_inode(self.id);
-        let inodeg = igroup.read();
-
-        let inode = inodeg.get(self.id);
-
-        let mut reader = INodeReader::new(inode, self.fs.clone(), offset);
+        let mut reader = INodeReader::new(self.self_ref.upgrade().unwrap(), offset);
 
         Ok(reader.read(buf))
     }
@@ -99,20 +141,19 @@ impl INode for Ext2INode {
         self.fs()
     }
 
-    fn dirent(&self, idx: usize) -> Result<Option<DirEntry>> {
-        let fs = self.fs();
-
-        let igroup = fs.group_descs().get_d_inode(self.id);
-        let inodeg = igroup.read();
-
-        let inode = inodeg.get(self.id);
-
-        let mut iter = DirEntIter::new(self.fs.clone(), inode);
+    fn dir_ent(&self, idx: usize) -> Result<Option<DirEntry>> {
+        let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
 
         if let Some(de) = iter.nth(idx) {
             Ok(Some(self.mk_dirent(de)))
         } else {
             Ok(None)
         }
+    }
+
+    fn dir_iter(&self) -> Option<Arc<dyn crate::kernel::fs::vfs::DirEntIter>> {
+        Some(Arc::new(SysDirEntIter::new(
+            self.self_ref.upgrade().unwrap(),
+        )))
     }
 }

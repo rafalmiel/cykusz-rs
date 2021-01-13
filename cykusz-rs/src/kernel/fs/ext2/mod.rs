@@ -6,7 +6,7 @@ use crate::kernel::block::BlockDev;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::sync::RwSpin;
+use crate::kernel::sync::Spin;
 
 mod blockgroup;
 mod dirent;
@@ -21,7 +21,7 @@ pub struct Ext2Filesystem {
     sectors_per_block: Once<usize>,
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
-    inode_cache: RwSpin<lru::LruCache<usize, Arc<inode::LockedExt2INode>>>,
+    inode_cache: Spin<lru::LruCache<usize, Arc<inode::LockedExt2INode>>>,
 }
 
 impl Ext2Filesystem {
@@ -43,7 +43,7 @@ impl Ext2Filesystem {
             sectors_per_block: Once::new(),
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
-            inode_cache: RwSpin::new(lru::LruCache::new(256)),
+            inode_cache: Spin::new(lru::LruCache::new(256)),
         }
         .wrap();
 
@@ -90,7 +90,7 @@ impl Ext2Filesystem {
     }
 
     pub fn get_inode(&self, id: usize) -> Arc<LockedExt2INode> {
-        let mut cache = self.inode_cache.write();
+        let mut cache = self.inode_cache.lock();
 
         if let Some(el) = cache.get(&id) {
             el.clone()

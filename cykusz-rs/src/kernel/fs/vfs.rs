@@ -36,6 +36,7 @@ pub trait DirEntIter: Send + Sync {
     fn next(&self) -> Option<DirEntry>;
 }
 
+#[derive(Clone)]
 pub struct DirEntry {
     pub name: String,
     pub inode: Arc<dyn INode>,

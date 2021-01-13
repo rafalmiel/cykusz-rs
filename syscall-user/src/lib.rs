@@ -176,6 +176,17 @@ pub fn mount(dev: &str, dest: &str, fs: &str) -> SyscallResult {
     }
 }
 
+pub fn time() -> Result<isize, SyscallError> {
+    unsafe {
+        let res = syscall0(SYS_TIME);
+
+        match res {
+            Ok(t) => Ok(t as isize),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 pub fn umount(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_UMOUNT, path.as_ptr() as usize, path.len()) }
 }

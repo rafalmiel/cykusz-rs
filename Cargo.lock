@@ -35,12 +35,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c0496836a84f8d0495758516b8621a622beb77c0fed418570e50764093ced48"
 
 [[package]]
+name = "chrono"
+version = "0.4.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "cykusz_rs"
 version = "0.1.0"
 dependencies = [
  "acpica",
  "bit_field",
  "bitflags",
+ "chrono",
  "intrusive-collections",
  "lazy_static",
  "linked_list_allocator",
@@ -122,6 +133,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e34c69964cca7e0fbb60cfb7e5cf0148e30f0ccaafade2dd2f704fe79bc9e607"
 
 [[package]]
+name = "num-integer"
+version = "0.1.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
+dependencies = [
+ "autocfg",
+ "num-traits",
+]
+
+[[package]]
+name = "num-traits"
+version = "0.2.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "paste"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -131,6 +161,7 @@ checksum = "c5d65c4d95931acda4498f675e332fcbdc9a06705cd07086c510e9b6009cd1c1"
 name = "program"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "rlibc",
  "syscall-defs",
  "syscall-user",

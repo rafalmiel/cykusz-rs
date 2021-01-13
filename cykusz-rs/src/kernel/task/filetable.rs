@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::{DirEntIter, Result, DirEntry};
+use crate::kernel::fs::vfs::{DirEntIter, DirEntry, Result};
 use crate::kernel::sync::{Mutex, RwSpin};
 
 const FILE_NUM: usize = 256;
@@ -53,7 +53,7 @@ impl FileHandle {
             ret.0 = Some(l.clone());
         }
 
-        if let (_, Some(l)) = &*lock{
+        if let (_, Some(l)) = &*lock {
             ret.1 = Some(l.clone());
         }
 

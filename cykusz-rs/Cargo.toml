@@ -17,6 +17,10 @@ paste = "*"
 mmio = "*"
 lru = "*"
 
+[dependencies.chrono]
+default-features = false
+version = "*"
+
 [dependencies.linked_list_allocator]
 version = "*"
 

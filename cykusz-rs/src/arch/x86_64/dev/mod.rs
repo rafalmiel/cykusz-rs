@@ -40,6 +40,10 @@ pub fn init() {
     }
 
     println!("[ OK ] PIT Disabled");
+
+    rtc::init();
+
+    println!("[ OK ] RTC Enabled")
 }
 
 pub fn init_ap() {

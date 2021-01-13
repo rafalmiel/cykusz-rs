@@ -7,6 +7,10 @@ edition = "2018"
 [dependencies]
 rlibc = "*"
 
+[dependencies.chrono]
+default-features = false
+version = "*"
+
 [dependencies.syscall-defs]
 path = "../syscall-defs"
 [dependencies.syscall-user]

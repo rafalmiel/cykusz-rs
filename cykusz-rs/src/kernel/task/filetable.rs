@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::{DirEntIter, Result};
+use crate::kernel::fs::vfs::{DirEntIter, Result, DirEntry};
 use crate::kernel::sync::{Mutex, RwSpin};
 
 const FILE_NUM: usize = 256;
@@ -15,7 +15,7 @@ pub struct FileHandle {
     pub inode: Arc<dyn INode>,
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
-    pub dir_iter: Mutex<Option<Arc<dyn DirEntIter>>>,
+    pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntry>)>,
 }
 
 impl FileHandle {
@@ -39,19 +39,27 @@ impl FileHandle {
         Ok(wrote)
     }
 
-    fn get_dir_iter(&self) -> Option<Arc<dyn DirEntIter>> {
+    fn get_dir_iter(&self) -> (Option<Arc<dyn DirEntIter>>, Option<DirEntry>) {
         let mut lock = self.dir_iter.lock();
 
-        if self.offset.load(Ordering::SeqCst) == 0 && lock.is_none() {
+        if self.offset.load(Ordering::SeqCst) == 0 && lock.0.is_none() {
             let i = self.inode.dir_iter();
-            *lock = i;
+            lock.0 = i;
         };
 
-        if let Some(i) = &*lock {
-            Some(i.clone())
-        } else {
-            None
+        let mut ret = (None, None);
+
+        if let (Some(l), _) = &*lock {
+            ret.0 = Some(l.clone());
         }
+
+        if let (_, Some(l)) = &*lock{
+            ret.1 = Some(l.clone());
+        }
+
+        lock.1 = None;
+
+        ret
     }
 
     pub fn get_dents(&self, mut buf: &mut [u8]) -> Result<usize> {
@@ -59,14 +67,20 @@ impl FileHandle {
 
         let struct_len = core::mem::size_of::<SysDirEntry>();
 
-        let iter = self.get_dir_iter();
+        let (iter, mut cached) = self.get_dir_iter();
 
         Ok(loop {
             let dentry = {
-                let o = self.offset.fetch_add(1, Ordering::SeqCst);
-                match &iter {
-                    Some(i) => i.next(),
-                    None => self.inode.dir_ent(o)?,
+                if cached.is_some() {
+                    let res = cached.clone();
+                    cached = None;
+                    res
+                } else {
+                    let o = self.offset.load(Ordering::SeqCst);
+                    match &iter {
+                        Some(i) => i.next(),
+                        None => self.inode.dir_ent(o)?,
+                    }
                 }
             };
 
@@ -83,6 +97,8 @@ impl FileHandle {
                 sysd.off = offset + sysd.reclen;
 
                 if buf.len() < sysd.reclen {
+                    self.dir_iter.lock().1 = Some(d.clone());
+
                     break offset;
                 }
 
@@ -98,6 +114,7 @@ impl FileHandle {
                 }
 
                 offset += sysd.reclen;
+                self.offset.fetch_add(1, Ordering::SeqCst);
                 buf = &mut buf[sysd.reclen..];
             } else {
                 break offset;
@@ -135,7 +152,7 @@ impl FileTable {
                 inode,
                 offset: AtomicUsize::new(0),
                 flags,
-                dir_iter: Mutex::new(None),
+                dir_iter: Mutex::new((None, None)),
             }))
         };
 

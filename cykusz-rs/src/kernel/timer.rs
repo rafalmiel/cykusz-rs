@@ -31,23 +31,12 @@ unsafe impl Send for Timer {}
 
 impl Timer {
     fn new(obj: Arc<dyn TimerObject>) -> Arc<Timer> {
-        Timer {
+        Arc::new_cyclic(|me| Timer {
             timeout: AtomicU64::new(0),
             obj,
-            self_ref: Weak::new(),
+            self_ref: me.clone(),
             link: LinkedListLink::new(),
-        }
-        .wrap()
-    }
-
-    fn wrap(self) -> Arc<Timer> {
-        let fs = Arc::new(self);
-        let weak = Arc::downgrade(&fs);
-        let ptr = Arc::into_raw(fs) as *mut Self;
-        unsafe {
-            (*ptr).self_ref = weak;
-            Arc::from_raw(ptr)
-        }
+        })
     }
 
     fn call(&self) {

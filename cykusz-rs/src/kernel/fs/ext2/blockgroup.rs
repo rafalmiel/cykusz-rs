@@ -4,26 +4,53 @@ use alloc::vec::Vec;
 use spin::Once;
 
 use crate::kernel::fs::ext2::Ext2Filesystem;
-use crate::kernel::sync::{Mutex, RwSpin, RwSpinReadGuard};
-use crate::kernel::utils::slice::ToBytesMut;
+use crate::kernel::sync::{Mutex, RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
+use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 
 use super::disk;
 
-pub struct INodeVec(pub Vec<disk::inode::INode>);
+pub struct INodeVec {
+    vec: Vec<disk::inode::INode>,
+    src_block: usize,
+    dirty: bool,
+}
 
 pub struct INodeGroup {
+    fs: Weak<Ext2Filesystem>,
     inodes: RwSpin<INodeVec>,
 }
 
 impl INodeVec {
     pub fn get(&self, id: usize) -> &disk::inode::INode {
-        &self.0[(id - 1) % self.0.len()]
+        &self.vec[(id - 1) % self.vec.len()]
+    }
+    pub fn get_mut(&mut self, id: usize) -> &mut disk::inode::INode {
+        let len = self.vec.len();
+        self.dirty = true;
+        &mut self.vec[(id - 1) % len]
     }
 }
 
 impl INodeGroup {
     pub fn read(&self) -> RwSpinReadGuard<INodeVec> {
         self.inodes.read()
+    }
+    pub fn write(&self) -> RwSpinWriteGuard<INodeVec> {
+        self.inodes.write()
+    }
+}
+
+impl Drop for INodeGroup {
+    fn drop(&mut self) {
+        let l = self.inodes.read();
+
+        if l.dirty {
+            if let Some(fs) = self.fs.upgrade() {
+                println!("syncing block {}", l.src_block);
+
+                fs.write_block(l.src_block, l.vec.as_slice().to_bytes());
+            }
+        }
     }
 }
 
@@ -37,7 +64,7 @@ impl BlockGroupDescriptors {
     pub fn new() -> BlockGroupDescriptors {
         BlockGroupDescriptors {
             d_desc: RwSpin::new(Vec::new()),
-            d_inodes: Mutex::new(lru::LruCache::new(256)),
+            d_inodes: Mutex::new(lru::LruCache::new(32)),
             fs: Once::new(),
         }
     }
@@ -105,7 +132,12 @@ impl BlockGroupDescriptors {
             fs.read_block(block, vec.as_mut_slice().to_bytes_mut());
 
             let res = Arc::new(INodeGroup {
-                inodes: RwSpin::new(INodeVec(vec)),
+                fs: Arc::downgrade(&fs),
+                inodes: RwSpin::new(INodeVec {
+                    vec,
+                    src_block: block,
+                    dirty: false,
+                }),
             });
 
             inodes.put(block, res.clone());
@@ -114,10 +146,39 @@ impl BlockGroupDescriptors {
         }
     }
 
+    pub fn write_d_inode(&self, id: usize, d_inode: &disk::inode::INode) {
+        let group = self.get_d_inode(id);
+        let mut vec = group.write();
+
+        *vec.get_mut(id) = *d_inode;
+    }
+
     pub fn read_d_inode(&self, id: usize, d_inode: &mut disk::inode::INode) {
         let group = self.get_d_inode(id);
         let vec = group.read();
 
         *d_inode = *vec.get(id);
+    }
+
+    pub fn debug(&self) {
+        let l = self.d_desc.read();
+
+        for d in l.iter() {
+            println!("{:?}", d);
+        }
+    }
+
+    pub fn sync(&self, fs: &Ext2Filesystem) {
+        let iter = self.d_inodes.lock();
+
+        for (block, e) in iter.iter() {
+            let mut el = e.write();
+
+            if el.dirty {
+                fs.write_block(*block, el.vec.as_slice().to_bytes());
+
+                el.dirty = false;
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
+#![feature(arc_new_cyclic)]
 #![feature(array_methods)]
 #![feature(auto_traits)]
 #![feature(c_variadic)]

@@ -82,23 +82,12 @@ impl PartitionBlockDev {
 
 impl BlockDevice {
     pub fn new(name: String, imp: Arc<dyn BlockDev>) -> Arc<BlockDevice> {
-        BlockDevice {
+        Arc::new_cyclic(|me| BlockDevice {
             id: alloc_id(),
             name,
             dev: imp,
-            self_ref: Weak::new(),
-        }
-        .wrap()
-    }
-
-    fn wrap(self) -> Arc<BlockDevice> {
-        let fs = Arc::new(self);
-        let weak = Arc::downgrade(&fs);
-        let ptr = Arc::into_raw(fs) as *mut Self;
-        unsafe {
-            (*ptr).self_ref = weak;
-            Arc::from_raw(ptr)
-        }
+            self_ref: me.clone(),
+        })
     }
 }
 

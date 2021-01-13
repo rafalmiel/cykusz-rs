@@ -25,27 +25,15 @@ pub struct Ext2Filesystem {
 }
 
 impl Ext2Filesystem {
-    fn wrap(self) -> Arc<Ext2Filesystem> {
-        let fs = Arc::new(self);
-        let weak = Arc::downgrade(&fs);
-        let ptr = Arc::into_raw(fs) as *mut Self;
-
-        unsafe {
-            (*ptr).self_ref = weak;
-            Arc::from_raw(ptr)
-        }
-    }
-
     pub fn new(dev: Arc<dyn BlockDev>) -> Option<Arc<dyn Filesystem>> {
-        let a = Ext2Filesystem {
-            self_ref: Weak::new(),
+        let a = Arc::new_cyclic(|me| Ext2Filesystem {
+            self_ref: me.clone(),
             dev,
             sectors_per_block: Once::new(),
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
             inode_cache: Spin::new(lru::LruCache::new(256)),
-        }
-        .wrap();
+        });
 
         if !a.init() {
             None
@@ -101,6 +89,17 @@ impl Ext2Filesystem {
 
             el
         }
+    }
+
+    fn sync(&self) {
+        self.blockgroupdesc.sync(self);
+    }
+}
+
+impl Drop for Ext2Filesystem {
+    fn drop(&mut self) {
+        println!("[ EXT2 ] Syncing...");
+        self.sync();
     }
 }
 

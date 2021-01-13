@@ -2,6 +2,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
 
@@ -11,6 +12,7 @@ pub struct Pwd(pub String);
 pub struct Cwd {
     pub pwd: Pwd,
     pub inode: Arc<dyn INode>,
+    pub fs: Arc<dyn Filesystem>,
 }
 
 impl Pwd {
@@ -50,7 +52,8 @@ impl Cwd {
     pub fn new(name: &str, inode: Arc<dyn INode>) -> Cwd {
         Cwd {
             pwd: Pwd(String::from(name)),
-            inode,
+            inode: inode.clone(),
+            fs: inode.fs(),
         }
     }
 

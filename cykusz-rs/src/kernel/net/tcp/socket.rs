@@ -706,28 +706,17 @@ pub struct Socket {
 impl Socket {
     pub fn new(port: u32) -> Arc<Socket> {
         use core::convert::TryInto;
-        let sock = Socket {
+        let sock = Arc::new_cyclic(|me| Socket {
             data: Spin::new(SocketData::new(
                 port.try_into().expect("Invalid port number"),
             )),
             wait_queue: WaitQueue::new(),
-            self_ref: Weak::default(),
-        }
-        .wrap();
+            self_ref: me.clone(),
+        });
 
         sock.data.lock().init_timers(sock.clone());
 
         sock
-    }
-
-    fn wrap(self) -> Arc<Socket> {
-        let fs = Arc::new(self);
-        let weak = Arc::downgrade(&fs);
-        let ptr = Arc::into_raw(fs) as *mut Self;
-        unsafe {
-            (*ptr).self_ref = weak;
-            Arc::from_raw(ptr)
-        }
     }
 
     fn conn_timeout(&self) {

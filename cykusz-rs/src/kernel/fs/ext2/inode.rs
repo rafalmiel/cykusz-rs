@@ -21,12 +21,11 @@ pub struct LockedExt2INode {
 
 impl LockedExt2INode {
     pub fn new(fs: Weak<Ext2Filesystem>, id: usize) -> Arc<LockedExt2INode> {
-        let ptr = LockedExt2INode {
+        let ptr = Arc::new_cyclic(|me| LockedExt2INode {
             node: RwSpin::new(Ext2INode::new(fs.clone(), id)),
             fs,
-            self_ref: Weak::new(),
-        }
-        .wrap();
+            self_ref: me.clone(),
+        });
 
         ptr
     }
@@ -35,17 +34,6 @@ impl LockedExt2INode {
         DirEntry {
             name: String::from(de.name()),
             inode: self.fs().get_inode(de.inode() as usize),
-        }
-    }
-
-    fn wrap(self) -> Arc<LockedExt2INode> {
-        let fs = Arc::new(self);
-        let weak = Arc::downgrade(&fs);
-        let ptr = Arc::into_raw(fs) as *mut Self;
-
-        unsafe {
-            (*ptr).self_ref = weak;
-            Arc::from_raw(ptr)
         }
     }
 
@@ -124,13 +112,13 @@ impl INode for LockedExt2INode {
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        let inode = self.node.read();
+        {
+            let inode = self.node.read();
 
-        if inode.ftype() != FileType::File && inode.ftype() != FileType::Symlink {
-            return Err(FsError::NotSupported);
+            if inode.ftype() != FileType::File && inode.ftype() != FileType::Symlink {
+                return Err(FsError::NotSupported);
+            }
         }
-
-        drop(inode);
 
         let mut reader = INodeReader::new(self.self_ref.upgrade().unwrap(), offset);
 

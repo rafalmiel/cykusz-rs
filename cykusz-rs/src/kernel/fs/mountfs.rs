@@ -20,34 +20,22 @@ pub struct MountFS {
 }
 
 impl MountFS {
-    fn wrap(self) -> Arc<MountFS> {
-        let fs = Arc::new(self);
-        let weak = Arc::downgrade(&fs);
-        let ptr = Arc::into_raw(fs) as *mut Self;
-        unsafe {
-            (*ptr).self_ref = weak;
-            Arc::from_raw(ptr)
-        }
-    }
-
     pub fn new(fs: Arc<dyn Filesystem>) -> Arc<MountFS> {
-        MountFS {
+        Arc::new_cyclic(|me| MountFS {
             fs,
             mounts: RwSpin::new(BTreeMap::new()),
             self_mount: None,
-            self_ref: Weak::default(),
-        }
-        .wrap()
+            self_ref: me.clone(),
+        })
     }
 
     pub fn root_inode(&self) -> Arc<MNode> {
-        MNode {
+        Arc::new_cyclic(|me| MNode {
             name: String::from("/"),
             inode: self.fs.root_inode(),
             vfs: self.self_ref.upgrade().unwrap(),
-            self_ref: Weak::default(),
-        }
-        .wrap()
+            self_ref: me.clone(),
+        })
     }
 }
 
@@ -68,14 +56,11 @@ pub struct MNode {
 }
 
 impl MNode {
-    fn wrap(self) -> Arc<Self> {
-        let node = Arc::new(self);
-        let weak = Arc::downgrade(&node);
-        let ptr = Arc::into_raw(node) as *mut Self;
-        unsafe {
-            (*ptr).self_ref = weak;
-            Arc::from_raw(ptr)
-        }
+    fn wrap(mut self) -> Arc<MNode> {
+        Arc::new_cyclic(|me| {
+            self.self_ref = me.clone();
+            self
+        })
     }
 
     pub fn mount(&self, fs: Arc<dyn Filesystem>) -> Result<Arc<MountFS>> {
@@ -89,13 +74,12 @@ impl MNode {
             self
         };
 
-        let fs = MountFS {
+        let fs = Arc::new_cyclic(|me| MountFS {
             fs,
             mounts: RwSpin::new(BTreeMap::new()),
             self_mount: Some(node.self_ref.upgrade().unwrap()),
-            self_ref: Weak::default(),
-        }
-        .wrap();
+            self_ref: me.clone(),
+        });
 
         let mut mounts = node.vfs.mounts.write();
 
@@ -116,7 +100,15 @@ impl MNode {
         if let Some(node) = self.vfs.self_mount.as_ref() {
             let mut mounts = node.vfs.mounts.write();
 
-            mounts.remove(&node.id()?);
+            let node_id = node.id()?;
+
+            if let Some(mount) = mounts.get(&node_id) {
+                if Arc::strong_count(&mount.fs) > 1 {
+                    println!("[ MountFS ] Warn: Trying to unmount busy filesystem");
+                }
+            }
+
+            mounts.remove(&node_id);
 
             Ok(())
         } else {
@@ -167,6 +159,7 @@ impl MNode {
                         self_ref: Weak::default(),
                     }
                     .wrap();
+
                     Ok(DirEntry {
                         name: mnode.name.clone(),
                         inode: mnode,
@@ -229,6 +222,10 @@ impl INode for MNode {
 
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
         self.inode.poll(ptable)
+    }
+
+    fn fs(&self) -> Arc<dyn Filesystem> {
+        self.inode.fs()
     }
 
     fn create(&self, name: &str) -> Result<Arc<dyn INode>> {

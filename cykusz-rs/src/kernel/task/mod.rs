@@ -127,6 +127,7 @@ impl Task {
     pub fn set_cwd(&self, inode: Arc<dyn INode>, path: &str) {
         let mut cwd = self.cwd.write();
 
+        cwd.fs = inode.fs().clone();
         cwd.inode = inode;
         cwd.apply_path(path);
     }

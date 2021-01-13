@@ -8,6 +8,7 @@ extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
 
+use chrono::{Datelike, Timelike};
 use syscall_defs::{OpenFlags, SysDirEntry};
 
 pub mod file;
@@ -228,6 +229,21 @@ fn exec(cmd: &str) {
             }
         } else {
             println!("Param error");
+        }
+    } else if cmd.starts_with("date") {
+        if let Ok(t) = syscall::time() {
+            let time = chrono::NaiveDateTime::from_timestamp(t as i64, 0);
+            println!(
+                "{}-{}-{} {}:{}:{}",
+                time.year(),
+                time.month(),
+                time.day(),
+                time.hour(),
+                time.minute(),
+                time.second()
+            );
+        } else {
+            println!("Time syscall failed");
         }
     } else if cmd.is_empty() {
         return;

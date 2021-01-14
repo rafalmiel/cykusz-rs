@@ -144,8 +144,12 @@ impl Default for Superblock {
 }
 
 impl Superblock {
-    pub fn self_addr(&mut self) -> VirtAddr {
+    pub fn self_addr(&self) -> VirtAddr {
         VirtAddr(self as *const _ as usize)
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe { self.self_addr().as_bytes(core::mem::size_of::<Self>()) }
     }
 
     pub fn as_bytes_mut(&mut self) -> &mut [u8] {

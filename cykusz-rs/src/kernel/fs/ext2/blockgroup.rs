@@ -73,13 +73,24 @@ impl BlockGroupDescriptors {
         self.fs.get().unwrap().upgrade().unwrap()
     }
 
+    fn sector(&self, fs: &Ext2Filesystem) -> usize {
+        let sb = fs.superblock();
+
+        match sb.block_size() {
+            1024 => 4,
+            a if a > 1024 => a / 512,
+            _ => unreachable!(),
+        }
+    }
+
     pub fn init(&self, fs: Weak<Ext2Filesystem>) {
         self.fs.call_once(|| fs);
 
         let fs = self.fs();
-        let sb = fs.superblock();
 
         let mut desc = self.d_desc.write();
+
+        let sb = fs.superblock();
 
         desc.resize_with(sb.group_count(), || {
             disk::blockgroup::BlockGroupDescriptor::default()
@@ -87,11 +98,7 @@ impl BlockGroupDescriptors {
 
         let dev = fs.dev();
 
-        let sector = match sb.block_size() {
-            1024 => 4,
-            a if a > 1024 => a / 512,
-            _ => unreachable!(),
-        };
+        let sector = self.sector(&fs);
 
         dev.read(sector, desc.as_mut_slice().to_bytes_mut())
             .expect("Failed to read Block Group Descriptors");
@@ -169,13 +176,22 @@ impl BlockGroupDescriptors {
     }
 
     pub fn sync(&self, fs: &Ext2Filesystem) {
+        let sector = self.sector(&fs);
+
+        let desc = self.d_desc.read();
+
+        fs.dev
+            .write(sector, desc.as_slice().to_bytes())
+            .expect("Failed to sync Block Group Descriptors");
+
         let iter = self.d_inodes.lock();
 
         for (block, e) in iter.iter() {
             let mut el = e.write();
 
             if el.dirty {
-                fs.write_block(*block, el.vec.as_slice().to_bytes());
+                fs.write_block(*block, el.vec.as_slice().to_bytes())
+                    .expect("Failed to sync inode group");
 
                 el.dirty = false;
             }

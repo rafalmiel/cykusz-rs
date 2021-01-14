@@ -62,4 +62,10 @@ impl Superblock {
     pub fn read_inner(&self) -> RwSpinReadGuard<disk::superblock::Superblock> {
         self.d_superblock.read()
     }
+
+    pub fn sync(&self, fs: &Ext2Filesystem) {
+        let sb = self.read_inner();
+
+        fs.dev.write(2, sb.as_bytes());
+    }
 }

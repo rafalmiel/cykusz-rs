@@ -93,6 +93,7 @@ impl Ext2Filesystem {
 
     fn sync(&self) {
         self.blockgroupdesc.sync(self);
+        self.superblock.sync(self);
     }
 }
 

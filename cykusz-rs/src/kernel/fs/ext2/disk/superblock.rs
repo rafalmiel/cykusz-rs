@@ -174,8 +174,20 @@ impl Superblock {
     pub fn free_blocks(&self) -> u32 {
         self.free_blocks
     }
+    pub fn dec_free_blocks(&mut self) {
+        self.free_blocks -= 1;
+    }
+    pub fn inc_free_blocks(&mut self) {
+        self.free_blocks += 1;
+    }
     pub fn free_inodes(&self) -> u32 {
         self.free_inodes
+    }
+    pub fn dec_free_inodes(&mut self) {
+        self.free_inodes -= 1;
+    }
+    pub fn inc_free_inodes(&mut self) {
+        self.free_inodes += 1;
     }
     pub fn superblock_block(&self) -> u32 {
         self.superblock_block

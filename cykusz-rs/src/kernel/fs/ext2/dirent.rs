@@ -1,14 +1,18 @@
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 use core::marker::PhantomData;
 
 use crate::arch::raw::mm::VirtAddr;
+use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::disk::dirent::DirEntry;
+use crate::kernel::fs::ext2::disk::inode::FileType;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::ext2::reader::INodeReader;
 use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::Spin;
+use crate::kernel::utils::types::Align;
 
 pub struct SysDirEntIter<'a> {
     iter: Spin<DirEntIter<'a>>,
@@ -36,9 +40,10 @@ impl<'a> crate::kernel::fs::vfs::DirEntIter for SysDirEntIter<'a> {
 pub struct DirEntIter<'a> {
     inode: Arc<LockedExt2INode>,
     reader: INodeReader,
-    buf: Vec<u8>,
+    buf: BufBlock,
     offset: usize,
     block: usize,
+    skip_empty: bool,
     _phantom: PhantomData<&'a ()>,
 }
 
@@ -47,20 +52,93 @@ impl<'a> DirEntIter<'a> {
         DirEntIter::<'a> {
             inode: inode.clone(),
             reader: INodeReader::new(inode, 0),
-            buf: Vec::new(),
+            buf: BufBlock::empty(),
             offset: 0,
             block: 0,
+            skip_empty: true,
             _phantom: PhantomData::default(),
         }
+    }
+
+    pub fn new_no_skip(inode: Arc<LockedExt2INode>) -> DirEntIter<'a> {
+        let mut iter = Self::new(inode);
+        iter.skip_empty = false;
+
+        iter
     }
 
     fn fs(&self) -> Arc<Ext2Filesystem> {
         self.inode.fs()
     }
+
+    pub fn add_dir_entry(
+        &mut self,
+        target: &LockedExt2INode,
+        typ: FileType,
+        name: &str,
+    ) -> Result<()> {
+        let fs = self.fs();
+
+        let required_size = (name.len() + 8).align_up(4);
+
+        if let Some(found) = self.find(|el| el.available_size() as usize >= required_size) {
+            let target_id = target.id()?;
+            if let Some(entry) = found.extract() {
+                entry.set_inode(target_id as u32);
+                entry.set_ftype(typ.into());
+                entry.set_name(name);
+
+                {
+                    let mut inner = target.write();
+
+                    let d_inode = inner.d_inode_mut();
+                    d_inode.inc_hl_count();
+
+                    fs.group_descs().write_d_inode(target_id, d_inode);
+                }
+
+                self.sync_current_buf();
+
+                self.offset -= entry.ent_size() as usize;
+            } else {
+                panic!("Failed to extract DirEnt");
+            }
+
+            Ok(())
+        } else {
+            let file_size = { self.inode.read().d_inode().size_lower() } as usize;
+
+            if self.offset >= file_size {
+                return if let Some(new_block) = self.reader.append_block() {
+                    let entry = unsafe {
+                        VirtAddr(new_block.bytes().as_ptr() as usize).read_mut::<DirEntry>()
+                    };
+                    entry.set_ent_size(new_block.len() as u16);
+                    entry.set_inode(0);
+
+                    fs.write_block(new_block.block(), new_block.bytes());
+
+                    self.add_dir_entry(target, typ, name)
+                } else {
+                    Err(FsError::NotSupported)
+                };
+            } else {
+                unreachable!();
+            }
+        }
+    }
+
+    pub fn sync_current_buf(&self) {
+        if !self.buf.is_empty() {
+            self.fs()
+                .write_block(self.buf.block(), self.buf.bytes())
+                .expect("Failed to sync BufBlock");
+        }
+    }
 }
 
 impl<'a> Iterator for DirEntIter<'a> {
-    type Item = &'a DirEntry;
+    type Item = &'a mut DirEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
         let fs = self.fs();
@@ -76,26 +154,28 @@ impl<'a> Iterator for DirEntIter<'a> {
             let block = self.offset / block_size;
 
             if self.buf.is_empty() || block > self.block {
-                self.buf.resize(block_size, 0);
-                if self.reader.read(self.buf.as_mut_slice()) == 0 {
+                self.block = block;
+                if let Some(b) = self.reader.read_block() {
+                    self.buf = b;
+                } else {
                     return None;
                 }
-                self.block = block;
             }
 
             let ent = unsafe {
                 VirtAddr(
                     self.buf
+                        .bytes()
                         .as_ptr()
                         .offset(self.offset as isize % block_size as isize)
                         as usize,
                 )
-                .read_ref::<DirEntry>()
+                .read_mut::<DirEntry>()
             };
 
             self.offset += ent.ent_size() as usize;
 
-            if ent.inode() != 0 {
+            if !self.skip_empty || ent.inode() != 0 {
                 break ent;
             }
         };

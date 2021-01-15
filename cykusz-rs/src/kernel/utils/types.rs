@@ -17,12 +17,12 @@ macro_rules! align_impl {
                 } else if align == 0 {
                     self
                 } else {
-                    panic!("`align` must be a power of 2");
+                    panic!("`align` must be a power of 2: {}", align);
                 }
             }
 
             fn align_up(self, align: $t) -> $t {
-                self.align(self + align - 1)
+                (self + align - 1).align(align)
             }
         }
     )*)

@@ -3,7 +3,7 @@ use alloc::sync::{Arc, Weak};
 use spin::Once;
 
 use crate::kernel::fs::ext2::Ext2Filesystem;
-use crate::kernel::sync::{RwSpin, RwSpinReadGuard};
+use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
 
 use super::disk;
 
@@ -59,13 +59,32 @@ impl Superblock {
         self.d_superblock.read().block_size()
     }
 
+    pub fn blocks_in_group(&self) -> usize {
+        self.d_superblock.read().blocks_in_group() as usize
+    }
+
     pub fn read_inner(&self) -> RwSpinReadGuard<disk::superblock::Superblock> {
         self.d_superblock.read()
+    }
+    pub fn write_inner(&self) -> RwSpinWriteGuard<disk::superblock::Superblock> {
+        self.d_superblock.write()
     }
 
     pub fn sync(&self, fs: &Ext2Filesystem) {
         let sb = self.read_inner();
 
         fs.dev.write(2, sb.as_bytes());
+    }
+
+    pub fn debug(&self) {
+        println!("{:?}", *self.d_superblock.read());
+    }
+
+    pub fn block_groups_sector(&self) -> usize {
+        match self.block_size() {
+            1024 => 4,
+            a if a > 1024 => a / 512,
+            _ => unreachable!(),
+        }
     }
 }

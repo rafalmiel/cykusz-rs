@@ -3,12 +3,14 @@ use alloc::sync::{Arc, Weak};
 use spin::Once;
 
 use crate::kernel::block::BlockDev;
+use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::Spin;
 
 mod blockgroup;
+mod buf_block;
 mod dirent;
 mod disk;
 mod inode;
@@ -54,6 +56,8 @@ impl Ext2Filesystem {
             .call_once(|| self.superblock.sectors_per_block());
         self.blockgroupdesc.init(self.self_ref.clone());
 
+        //self.debug();
+
         true
     }
 
@@ -91,9 +95,42 @@ impl Ext2Filesystem {
         }
     }
 
+    pub fn alloc_inode(&self, hint: usize) -> Option<Arc<LockedExt2INode>> {
+        if let Some(id) = self.group_descs().alloc_inode_id(hint) {
+            Some(self.get_inode(id))
+        } else {
+            None
+        }
+    }
+
+    pub fn alloc_block(&self, hint: usize) -> Option<BufBlock> {
+        if let Some(ptr) = self.group_descs().alloc_block_ptr(hint) {
+            let mut buf = self.make_buf();
+            buf.set_block(ptr);
+
+            Some(buf)
+        } else {
+            None
+        }
+    }
+
     fn sync(&self) {
         self.blockgroupdesc.sync(self);
         self.superblock.sync(self);
+    }
+
+    pub fn make_buf(&self) -> BufBlock {
+        BufBlock::new(self.superblock().block_size())
+    }
+
+    pub fn make_buf_size(&self, size: usize) -> BufBlock {
+        BufBlock::new(size)
+    }
+
+    #[allow(dead_code)]
+    fn debug(&self) {
+        self.superblock.debug();
+        self.blockgroupdesc.debug();
     }
 }
 

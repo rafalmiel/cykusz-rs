@@ -15,6 +15,7 @@ pub mod int;
 pub mod mm;
 pub mod smp;
 pub mod syscall;
+pub mod time;
 pub mod timer;
 pub mod tls;
 pub mod user;

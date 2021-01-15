@@ -341,7 +341,7 @@ pub fn sys_umount(path: u64, path_len: u64) -> SyscallResult {
 }
 
 pub fn sys_time() -> SyscallResult {
-    Ok(crate::arch::dev::rtc::get_unix_ts() as usize)
+    Ok(crate::kernel::time::unix_timestamp() as usize)
 }
 
 pub fn sys_exit() -> ! {

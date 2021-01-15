@@ -5,13 +5,16 @@ use syscall_defs::FileType;
 
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
+
 use crate::kernel::fs::ext2::reader::INodeReader;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Metadata};
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::sync::{RwSpin, RwSpinReadGuard};
+use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
+
+use crate::kernel::utils::slice::ToBytesMut;
 
 pub struct LockedExt2INode {
     node: RwSpin<Ext2INode>,
@@ -31,14 +34,64 @@ impl LockedExt2INode {
     }
 
     pub fn mk_dirent(&self, de: &disk::dirent::DirEntry) -> DirEntry {
+        let inode = self.fs().get_inode(de.inode() as usize);
+
         DirEntry {
             name: String::from(de.name()),
-            inode: self.fs().get_inode(de.inode() as usize),
+            inode,
         }
+    }
+
+    pub fn mk_inode(&self, typ: FileType) -> Result<Arc<LockedExt2INode>> {
+        match typ {
+            FileType::Dir => self.mk_dir_inode(),
+            _ => {
+                unimplemented!()
+            }
+        }
+    }
+
+    pub fn mk_dir_inode(&self) -> Result<Arc<LockedExt2INode>> {
+        let fs = self.fs();
+
+        let parent_id = self.id().expect("Failed to get id");
+
+        if let Some(new) = fs.alloc_inode(parent_id) {
+            let mut inner = new.node.write();
+
+            (&mut inner.d_inode).to_bytes_mut().fill(0);
+
+            inner.d_inode.set_ftype(disk::inode::FileType::Dir);
+            inner.d_inode.set_perm(0o755);
+            inner.d_inode.set_user_id(0);
+            inner.d_inode.set_group_id(0);
+
+            let time = crate::kernel::time::unix_timestamp();
+            inner.d_inode.set_creation_time(time as u32);
+            inner.d_inode.set_last_modification(time as u32);
+            inner.d_inode.set_last_access(time as u32);
+
+            let _id = inner.id;
+
+            drop(inner);
+
+            let mut iter = DirEntIter::new_no_skip(new.clone());
+
+            iter.add_dir_entry(&new, disk::inode::FileType::Dir, ".")?;
+            iter.add_dir_entry(&self, disk::inode::FileType::Dir, "..")?;
+
+            return Ok(new);
+        }
+
+        Err(FsError::NotSupported)
     }
 
     pub fn read(&self) -> RwSpinReadGuard<Ext2INode> {
         self.node.read()
+    }
+
+    pub fn write(&self) -> RwSpinWriteGuard<Ext2INode> {
+        self.node.write()
     }
 
     pub fn fs(&self) -> Arc<Ext2Filesystem> {
@@ -57,6 +110,7 @@ impl From<disk::inode::FileType> for syscall_defs::FileType {
             disk::inode::FileType::File => FileType::File,
             disk::inode::FileType::Symlink => FileType::Symlink,
             disk::inode::FileType::Dir => FileType::Dir,
+            disk::inode::FileType::BlockDev | disk::inode::FileType::CharDev => FileType::DevNode,
             _ => FileType::File,
         }
     }
@@ -79,6 +133,14 @@ impl Ext2INode {
 
     pub fn d_inode(&self) -> &disk::inode::INode {
         &self.d_inode
+    }
+
+    pub fn d_inode_mut(&mut self) -> &mut disk::inode::INode {
+        &mut self.d_inode
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 
     pub fn ftype(&self) -> syscall_defs::FileType {
@@ -109,6 +171,23 @@ impl INode for LockedExt2INode {
         } else {
             Err(FsError::EntryNotFound)
         }
+    }
+
+    fn mkdir(&self, name: &str) -> Result<Arc<dyn INode>> {
+        if DirEntIter::new(self.self_ref.upgrade().unwrap())
+            .find(|e| e.name() == name)
+            .is_some()
+        {
+            return Err(FsError::EntryExists);
+        }
+
+        let new_inode = self.mk_dir_inode()?;
+
+        let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
+
+        iter.add_dir_entry(&new_inode, disk::inode::FileType::Dir, name)?;
+
+        Ok(new_inode)
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {

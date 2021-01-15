@@ -117,22 +117,22 @@ macro_rules! enable_unsigned_ops {
         }
 
         impl $type_ {
-            pub fn align_down(&self, align: usize) -> $type_ {
+            pub fn align_down(self, align: usize) -> $type_ {
                 if align.is_power_of_two() {
                     $type_(self.0 & !(align - 1))
                 } else if align == 0 {
-                    *self
+                    self
                 } else {
                     panic!("`align` must be a power of 2");
                 }
             }
 
-            pub fn align_up(&self, align: usize) -> $type_ {
+            pub fn align_up(self, align: usize) -> $type_ {
                 let v = $type_(self.0 + align - 1);
                 v.align_down(align)
             }
 
-            pub fn align(&self, align: usize) -> $type_ {
+            pub fn align(self, align: usize) -> $type_ {
                 self.align_up(align)
             }
         }

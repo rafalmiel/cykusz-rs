@@ -36,7 +36,7 @@ impl PciDeviceHandle for Ahci {
     }
 
     fn start(&self, pci_data: &PciHeader) -> bool {
-        device().dev.lock().start(pci_data)
+        device().dev.lock_irq().start(pci_data)
     }
 }
 

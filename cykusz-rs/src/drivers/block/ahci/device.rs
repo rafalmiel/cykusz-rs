@@ -99,9 +99,9 @@ impl AhciDevice {
                 PageFlags::NO_CACHE | PageFlags::WRT_THROUGH | PageFlags::WRITABLE,
             );
 
-            self.enable_interrupts(pci_data);
-
             self.start_hba();
+
+            self.enable_interrupts(pci_data);
 
             return true;
         }

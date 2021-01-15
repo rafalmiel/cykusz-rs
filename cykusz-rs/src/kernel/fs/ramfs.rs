@@ -168,14 +168,6 @@ impl INode for LockedRamINode {
         })
     }
 
-    fn device(&self) -> Result<Arc<dyn Device>> {
-        if let Content::DevNode(Some(d)) = &self.0.read().content {
-            Ok(d.device())
-        } else {
-            Err(FsError::EntryNotFound)
-        }
-    }
-
     fn truncate(&self) -> Result<()> {
         let node = self.0.write();
 
@@ -220,6 +212,14 @@ impl INode for LockedRamINode {
         };
 
         Ok(dir)
+    }
+
+    fn device(&self) -> Result<Arc<dyn Device>> {
+        if let Content::DevNode(Some(d)) = &self.0.read().content {
+            Ok(d.device())
+        } else {
+            Err(FsError::EntryNotFound)
+        }
     }
 }
 

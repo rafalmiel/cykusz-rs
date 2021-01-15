@@ -1,5 +1,6 @@
 use core::ptr::*;
 
+use crate::kernel::sync::IrqGuard;
 use ::acpica::*;
 pub use pci_map::get_irq_mapping;
 
@@ -7,6 +8,7 @@ pub mod acpica;
 pub mod pci_map;
 
 pub fn init() {
+    let _guard = IrqGuard::new();
     unsafe {
         assert_eq!(AcpiInitializeSubsystem(), AE_OK);
         assert_eq!(

@@ -25,10 +25,31 @@ impl BlockGroupDescriptor {
     pub fn unallocated_blocks(&self) -> u16 {
         self.unallocated_blocks
     }
+    pub fn dec_unallocated_blocks(&mut self) {
+        self.unallocated_blocks -= 1;
+    }
+    pub fn inc_unallocated_blocks(&mut self) {
+        self.unallocated_blocks += 1;
+    }
     pub fn unallocated_inodes(&self) -> u16 {
         self.unallocated_inodes
     }
+    pub fn dec_unallocated_inodes(&mut self) {
+        self.unallocated_inodes -= 1;
+    }
+    pub fn inc_unallocated_inodes(&mut self) {
+        self.unallocated_inodes += 1;
+    }
     pub fn dir_count(&self) -> u16 {
         self.dir_count
+    }
+    pub fn set_dir_count(&mut self, count: u16) {
+        self.dir_count = count;
+    }
+    pub fn dec_dir_count(&mut self) {
+        self.dir_count -= 1;
+    }
+    pub fn inc_dir_count(&mut self) {
+        self.dir_count += 1;
     }
 }

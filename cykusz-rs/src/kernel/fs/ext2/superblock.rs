@@ -87,4 +87,8 @@ impl Superblock {
             _ => unreachable!(),
         }
     }
+
+    pub fn first_block(&self) -> usize {
+        1
+    }
 }

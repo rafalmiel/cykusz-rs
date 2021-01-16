@@ -46,6 +46,24 @@ pub mod task_test;
 #[thread_local]
 static mut CPU_ID: u8 = 0;
 
+static mut DEBUG: bool = false;
+
+pub fn enable_debug() {
+    unsafe {
+        DEBUG = true;
+    }
+}
+
+pub fn disable_debug() {
+    unsafe {
+        DEBUG = false;
+    }
+}
+
+pub fn is_debug() -> bool {
+    unsafe { DEBUG }
+}
+
 pub fn bochs() {
     unsafe {
         llvm_asm!("xchg %bx, %bx");

@@ -58,6 +58,32 @@ impl Ext2Filesystem {
 
         //self.debug();
 
+        //let i = self.get_inode(7);
+
+        //let lock = i.read();
+
+        //let d_inode = lock.d_inode();
+
+        //println!("{:?}", d_inode);
+
+        //let ptr = d_inode.d_indir_ptr();
+
+        //let mut vec = Vec::<u32>::new();
+        //vec.resize(1024 / 4, 0);
+
+        //self.read_block(ptr as usize, vec.as_mut_slice().to_bytes_mut());
+
+        //println!("{:?}", vec);
+
+        //let mut vec2 = Vec::<u32>::new();
+        //vec2.resize(1024 / 4, 0);
+
+        //for (i, p) in vec.iter().enumerate() {
+        //    self.read_block(*p as usize, vec2.as_mut_slice().to_bytes_mut());
+
+        //    println!("{}: {:?}", i, vec2);
+        //}
+
         true
     }
 
@@ -97,7 +123,9 @@ impl Ext2Filesystem {
 
     pub fn alloc_inode(&self, hint: usize) -> Option<Arc<LockedExt2INode>> {
         if let Some(id) = self.group_descs().alloc_inode_id(hint) {
-            Some(self.get_inode(id))
+            let inode = self.get_inode(id);
+
+            Some(inode)
         } else {
             None
         }

@@ -96,6 +96,9 @@ impl INode {
     pub fn set_size_lower(&mut self, size: u32) {
         self.size_lower = size;
     }
+    pub fn inc_size_lower(&mut self, by: u32) {
+        self.size_lower += by;
+    }
     pub fn last_access(&self) -> u32 {
         self.last_access
     }
@@ -140,6 +143,9 @@ impl INode {
     }
     pub fn set_sector_count(&mut self, count: u32) {
         self.sector_count = count;
+    }
+    pub fn inc_sector_count(&mut self, by: u32) {
+        self.sector_count += by;
     }
     pub fn flags(&self) -> u32 {
         self.flags

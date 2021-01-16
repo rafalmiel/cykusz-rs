@@ -67,6 +67,22 @@ fn ls(path: &str) {
     }
 }
 
+#[allow(dead_code)]
+fn base_10_bytes(mut n: u64, buf: &mut [u8]) -> &[u8] {
+    if n == 0 {
+        return b"0";
+    }
+    let mut i = 0;
+    while n > 0 {
+        buf[i] = (n % 10) as u8 + b'0';
+        n /= 10;
+        i += 1;
+    }
+    let slice = &mut buf[..i];
+    slice.reverse();
+    &*slice
+}
+
 fn exec(cmd: &str) {
     if cmd.starts_with("cd ") {
         let mut iter = cmd.split_whitespace();
@@ -195,7 +211,14 @@ fn exec(cmd: &str) {
         if let (Some(dev), Some(dest)) = { (split.next(), split.next()) } {
             if let Err(e) = syscall::mount(dev, dest, "ext2") {
                 println!("Mount failed: {:?}", e);
-            }
+            } /* else {
+                  syscall::chdir("/home");
+                  for i in 0..2500u64 {
+                      let mut buf = [0u8; 9];
+                      let res = base_10_bytes(i, &mut buf);
+                      syscall::mkdir(unsafe { core::str::from_utf8_unchecked(res) });
+                  }
+              }*/
         } else {
             println!("Param err");
         }

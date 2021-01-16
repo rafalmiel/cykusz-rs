@@ -1,5 +1,6 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
+use core::ops::{Deref, DerefMut};
 
 use syscall_defs::FileType;
 
@@ -13,8 +14,6 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{DirEntry, Metadata};
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
-
-use crate::kernel::utils::slice::ToBytesMut;
 
 pub struct LockedExt2INode {
     node: RwSpin<Ext2INode>,
@@ -57,21 +56,19 @@ impl LockedExt2INode {
         let parent_id = self.id().expect("Failed to get id");
 
         if let Some(new) = fs.alloc_inode(parent_id) {
-            let mut inner = new.node.write();
+            let mut inner = new.d_inode_writer();
 
-            (&mut inner.d_inode).to_bytes_mut().fill(0);
+            *inner = disk::inode::INode::default();
 
-            inner.d_inode.set_ftype(disk::inode::FileType::Dir);
-            inner.d_inode.set_perm(0o755);
-            inner.d_inode.set_user_id(0);
-            inner.d_inode.set_group_id(0);
+            inner.set_ftype(disk::inode::FileType::Dir);
+            inner.set_perm(0o755);
+            inner.set_user_id(0);
+            inner.set_group_id(0);
 
             let time = crate::kernel::time::unix_timestamp();
-            inner.d_inode.set_creation_time(time as u32);
-            inner.d_inode.set_last_modification(time as u32);
-            inner.d_inode.set_last_access(time as u32);
-
-            let _id = inner.id;
+            inner.set_creation_time(time as u32);
+            inner.set_last_modification(time as u32);
+            inner.set_last_access(time as u32);
 
             drop(inner);
 
@@ -90,12 +87,58 @@ impl LockedExt2INode {
         self.node.read()
     }
 
+    pub fn d_inode_writer(&self) -> DINodeWriter {
+        DINodeWriter {
+            locked: self.write(),
+            fs: self.fs.clone(),
+            dirty: false,
+        }
+    }
+
     pub fn write(&self) -> RwSpinWriteGuard<Ext2INode> {
         self.node.write()
     }
 
     pub fn fs(&self) -> Arc<Ext2Filesystem> {
         self.fs.upgrade().unwrap()
+    }
+}
+
+pub struct DINodeWriter<'a> {
+    locked: RwSpinWriteGuard<'a, Ext2INode>,
+    fs: Weak<Ext2Filesystem>,
+    dirty: bool,
+}
+
+impl<'a> DINodeWriter<'a> {
+    pub fn id(&self) -> usize {
+        self.locked.id
+    }
+}
+
+impl<'a> Deref for DINodeWriter<'a> {
+    type Target = disk::inode::INode;
+
+    fn deref(&self) -> &Self::Target {
+        &self.locked.d_inode
+    }
+}
+
+impl<'a> DerefMut for DINodeWriter<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.dirty = true;
+        &mut self.locked.d_inode
+    }
+}
+
+impl<'a> Drop for DINodeWriter<'a> {
+    fn drop(&mut self) {
+        if let Some(fs) = self.fs.upgrade() {
+            if self.dirty {
+                fs.group_descs()
+                    .write_d_inode(self.locked.id, &self.locked.d_inode);
+            }
+        }
     }
 }
 
@@ -186,6 +229,10 @@ impl INode for LockedExt2INode {
         let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
 
         iter.add_dir_entry(&new_inode, disk::inode::FileType::Dir, name)?;
+
+        self.fs()
+            .group_descs()
+            .inc_dir_count(new_inode.node.read().id);
 
         Ok(new_inode)
     }

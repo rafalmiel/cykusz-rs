@@ -50,8 +50,6 @@ impl Drop for INodeGroup {
 
         if l.dirty {
             if let Some(fs) = self.fs.upgrade() {
-                println!("syncing block {}", l.src_block);
-
                 fs.write_block(l.src_block, l.vec.as_slice().to_bytes());
             }
         }
@@ -108,22 +106,24 @@ impl GroupDescriptors {
         }
     }
 
-    fn find_free_inodes_group(&self, hint: usize) -> Option<usize> {
-        if self.vec[hint].unallocated_inodes() > 0 {
-            Some(hint)
-        } else {
-            let res = self
-                .vec
-                .iter()
-                .enumerate()
-                .max_by_key(|e| e.1.unallocated_inodes())
-                .unwrap();
-
-            if res.1.unallocated_inodes() > 0 {
-                Some(res.0)
-            } else {
-                None
+    fn find_free_inodes_group(&self, hint: Option<usize>) -> Option<usize> {
+        if let Some(h) = hint {
+            if self.vec[h].unallocated_inodes() > 0 {
+                return Some(h);
             }
+        }
+
+        let res = self
+            .vec
+            .iter()
+            .enumerate()
+            .max_by_key(|e| e.1.unallocated_inodes())
+            .unwrap();
+
+        if res.1.unallocated_inodes() > 0 {
+            Some(res.0)
+        } else {
+            None
         }
     }
 }
@@ -195,7 +195,7 @@ impl BlockGroupDescriptors {
     pub fn new() -> BlockGroupDescriptors {
         BlockGroupDescriptors {
             d_desc: RwSpin::new(GroupDescriptors::new()),
-            d_inodes: Mutex::new(lru::LruCache::new(32)),
+            d_inodes: Mutex::new(lru::LruCache::new(256)),
             fs: Once::new(),
         }
     }
@@ -289,9 +289,10 @@ impl BlockGroupDescriptors {
         let fs = self.fs();
         let sb = fs.superblock();
 
-        let inodes_per_group = sb.inodes_per_group();
+        let blocks_in_group = sb.blocks_in_group();
+        let inodes_in_group = sb.inodes_per_group();
 
-        let bg_idx = (hint_id - 1) / inodes_per_group;
+        let bg_idx = (hint_id - 1) / inodes_in_group;
 
         let mut bg = self.d_desc.write();
 
@@ -305,7 +306,7 @@ impl BlockGroupDescriptors {
             if let Some(block_nr) = bmap.alloc_bit() {
                 bmap.sync(&fs, block);
 
-                let id = found_bg * inodes_per_group + block_nr;
+                let id = found_bg * blocks_in_group + block_nr + sb.first_block();
 
                 bgroup.dec_unallocated_blocks();
 
@@ -327,7 +328,11 @@ impl BlockGroupDescriptors {
 
         let inodes_per_group = sb.inodes_per_group();
 
-        let bg_idx = (hint_id - 1) / inodes_per_group;
+        let bg_idx = if hint_id != 2 {
+            Some((hint_id - 1) / inodes_per_group)
+        } else {
+            None
+        };
 
         let mut bg = self.d_desc.write();
 

@@ -89,12 +89,9 @@ impl<'a> DirEntIter<'a> {
                 entry.set_name(name);
 
                 {
-                    let mut inner = target.write();
+                    let mut inner = target.d_inode_writer();
 
-                    let d_inode = inner.d_inode_mut();
-                    d_inode.inc_hl_count();
-
-                    fs.group_descs().write_d_inode(target_id, d_inode);
+                    inner.inc_hl_count();
                 }
 
                 self.sync_current_buf();
@@ -123,6 +120,12 @@ impl<'a> DirEntIter<'a> {
                     Err(FsError::NotSupported)
                 };
             } else {
+                println!(
+                    "Unreachable? offset {} filesize {} inode: {}",
+                    self.offset,
+                    file_size,
+                    self.inode.id().unwrap()
+                );
                 unreachable!();
             }
         }

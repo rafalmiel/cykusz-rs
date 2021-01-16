@@ -32,6 +32,28 @@ impl BufBlock {
         self.buf.as_slice()
     }
 
+    pub fn slice<T: Sized>(&self) -> &[T] {
+        let len = self.len();
+
+        unsafe {
+            core::slice::from_raw_parts(
+                self.buf.as_ptr() as *const T,
+                len / core::mem::size_of::<T>(),
+            )
+        }
+    }
+
+    pub fn slice_mut<T: Sized>(&mut self) -> &mut [T] {
+        let len = self.len();
+
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                self.buf.as_mut_ptr() as *mut T,
+                len / core::mem::size_of::<T>(),
+            )
+        }
+    }
+
     pub fn bytes_mut(&mut self) -> &mut [u8] {
         self.buf.as_mut_slice()
     }

@@ -36,12 +36,7 @@ impl LockedExt2INode {
     pub fn mk_dirent2(&self, parent: Arc<DirEntry>, de: &disk::dirent::DirEntry) -> Arc<DirEntry> {
         let inode = self.fs().get_inode(de.inode() as usize);
 
-        DirEntry::new(
-            parent,
-            Arc::downgrade(&self.fs().dentry_cache),
-            inode,
-            String::from(de.name()),
-        )
+        DirEntry::new(parent, inode, String::from(de.name()))
     }
 
     pub fn mk_inode(&self, typ: FileType) -> Result<Arc<LockedExt2INode>> {

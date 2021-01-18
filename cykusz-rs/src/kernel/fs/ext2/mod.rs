@@ -3,7 +3,7 @@ use alloc::sync::{Arc, Weak};
 use spin::Once;
 
 use crate::kernel::block::BlockDev;
-use crate::kernel::fs::dirent::{DirEntry, DirEntryCache};
+use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
@@ -26,7 +26,6 @@ pub struct Ext2Filesystem {
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
     inode_cache: Spin<lru::LruCache<usize, Arc<inode::LockedExt2INode>>>,
-    dentry_cache: Arc<DirEntryCache>,
 }
 
 impl Ext2Filesystem {
@@ -38,7 +37,6 @@ impl Ext2Filesystem {
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
             inode_cache: Spin::new(lru::LruCache::new(256)),
-            dentry_cache: Arc::new(DirEntryCache::new()),
         });
 
         if !a.init() {
@@ -185,10 +183,6 @@ impl Filesystem for Ext2Filesystem {
     }
 
     fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
-        DirEntry::new_root(
-            Arc::downgrade(&self.dentry_cache),
-            self.root_inode(),
-            String::from("/"),
-        )
+        DirEntry::new_root(self.root_inode(), String::from("/"))
     }
 }

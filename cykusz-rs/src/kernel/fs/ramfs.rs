@@ -65,7 +65,6 @@ impl INode for LockedRamINode {
 
         Ok(super::dirent::DirEntry::new(
             parent.clone(),
-            Arc::downgrade(&this.fs.upgrade().unwrap().dentry_cache),
             child.clone(),
             String::from(name),
         ))
@@ -152,10 +151,8 @@ impl INode for LockedRamINode {
         parent: Arc<crate::kernel::fs::dirent::DirEntry>,
         name: &str,
     ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
-        let this = self.0.read().fs.upgrade().unwrap().dentry_cache.clone();
         Ok(super::dirent::DirEntry::new(
             parent.clone(),
-            Arc::downgrade(&this),
             self.make_inode(name, FileType::File, |_| Ok(()))?,
             String::from(name),
         ))
@@ -201,13 +198,11 @@ impl INode for LockedRamINode {
         let dir = match idx {
             0 => Some(crate::kernel::fs::dirent::DirEntry::new(
                 parent,
-                Arc::downgrade(&fs.dentry_cache),
                 d.this.upgrade().unwrap(),
                 String::from("."),
             )),
             1 => Some(crate::kernel::fs::dirent::DirEntry::new(
                 parent,
-                Arc::downgrade(&fs.dentry_cache),
                 d.parent.upgrade().unwrap(),
                 String::from(".."),
             )),
@@ -215,7 +210,6 @@ impl INode for LockedRamINode {
                 if let Some(e) = d.children.iter().nth(idx - 2) {
                     Some(crate::kernel::fs::dirent::DirEntry::new(
                         parent,
-                        Arc::downgrade(&fs.dentry_cache),
                         e.1.clone(),
                         e.0.clone(),
                     ))
@@ -283,7 +277,6 @@ impl LockedRamINode {
 pub struct RamFS {
     root: Arc<LockedRamINode>,
     root_dentry: Arc<super::dirent::DirEntry>,
-    dentry_cache: Arc<super::dirent::DirEntryCache>,
     next_id: AtomicUsize,
 }
 
@@ -295,28 +288,17 @@ impl Filesystem for RamFS {
     fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
         self.root_dentry.clone()
     }
-
-    fn dentry_cache(&self) -> Arc<super::dirent::DirEntryCache> {
-        self.dentry_cache.clone()
-    }
 }
 
 impl RamFS {
     pub fn new() -> Arc<RamFS> {
         let root = Arc::new(LockedRamINode(RwSpin::new(RamINode::default())));
 
-        let cache = Arc::new(super::dirent::DirEntryCache::new());
-
-        let root_de = super::dirent::DirEntry::new_root_no_fs(
-            Arc::downgrade(&cache),
-            root.clone(),
-            String::from("/"),
-        );
+        let root_de = super::dirent::DirEntry::new_root_no_fs(root.clone(), String::from("/"));
 
         let fs = Arc::new(RamFS {
             root: root.clone(),
             root_dentry: root_de.clone(),
-            dentry_cache: cache,
             next_id: AtomicUsize::new(1),
         });
 

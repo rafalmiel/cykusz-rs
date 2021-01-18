@@ -147,8 +147,11 @@ fn lookup_by_path_from(
             s => {
                 {
                     let current = cur.read();
+                    //println!("looking for entry");
                     if let Some(f) = dirent::cache().get_dirent(cur.clone(), String::from(s)) {
                         drop(current);
+
+                        //println!("lookup found in cache");
 
                         cur = f;
                     } else {
@@ -182,8 +185,6 @@ fn lookup_by_path_from(
                                     );
                                 }
 
-                                dirent::cache().insert(&res);
-
                                 cur = res;
                             }
                             Err(e)
@@ -195,8 +196,6 @@ fn lookup_by_path_from(
                                 let new = inode.create(cur.clone(), s)?;
 
                                 drop(current);
-
-                                dirent::cache().insert(&new);
 
                                 cur = new;
                             }

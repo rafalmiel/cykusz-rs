@@ -101,6 +101,10 @@ impl<'a> DirEntIter<'a> {
                 panic!("Failed to extract DirEnt");
             }
 
+            if ![".", ".."].contains(&name) {
+                fs.group_descs().inc_dir_count(self.inode.id()?);
+            }
+
             Ok(())
         } else {
             let file_size = { self.inode.read().d_inode().size_lower() } as usize;

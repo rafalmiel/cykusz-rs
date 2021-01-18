@@ -6,12 +6,13 @@ use syscall_defs::OpenFlags;
 
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::root_inode;
+use crate::kernel::fs::root_dentry;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::new_task_id;
 use crate::kernel::sync::RwSpin;
-use crate::kernel::task::cwd::{Cwd, Pwd};
+use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
+use alloc::string::String;
 
 pub mod cwd;
 pub mod filetable;
@@ -67,7 +68,7 @@ impl Default for Task {
             halted: AtomicBool::new(false),
             filetable: filetable::FileTable::new(),
             sleep_until: AtomicUsize::new(0),
-            cwd: RwSpin::new(Cwd::new("/", root_inode().self_inode())),
+            cwd: RwSpin::new(Cwd::new(root_dentry().clone())),
         }
     }
 }
@@ -108,12 +109,12 @@ impl Task {
         self.filetable.get_handle(fd)
     }
 
-    pub fn get_cwd(&self) -> Option<Arc<dyn INode>> {
-        Some(self.cwd.read().inode.clone())
+    pub fn get_dent(&self) -> Arc<crate::kernel::fs::dirent::DirEntry> {
+        self.cwd.read().dentry.clone()
     }
 
-    pub fn get_pwd(&self) -> Pwd {
-        self.cwd.read().pwd.clone()
+    pub fn get_pwd(&self) -> String {
+        self.cwd.read().pwd()
     }
 
     pub fn open_file(&self, inode: Arc<dyn INode>, flags: OpenFlags) -> Option<usize> {
@@ -124,12 +125,10 @@ impl Task {
         self.filetable.close_file(fd)
     }
 
-    pub fn set_cwd(&self, inode: Arc<dyn INode>, path: &str) {
+    pub fn set_cwd(&self, dentry: Arc<crate::kernel::fs::dirent::DirEntry>) {
         let mut cwd = self.cwd.write();
 
-        cwd.fs = inode.fs().clone();
-        cwd.inode = inode;
-        cwd.apply_path(path);
+        cwd.dentry = dentry;
     }
 
     pub fn set_state(&self, state: TaskState) {

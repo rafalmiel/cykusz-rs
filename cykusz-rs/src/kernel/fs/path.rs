@@ -2,7 +2,14 @@ pub struct Path<'a>(&'a str);
 
 impl<'a> Path<'a> {
     pub fn new(path: &'a str) -> Self {
-        Path::<'a>(path.trim().trim_end_matches("/"))
+        let is_absolute = path.starts_with("/");
+        let p = Path::<'a>(path.trim().trim_end_matches("/"));
+
+        if p.0.is_empty() && is_absolute {
+            Path::<'a>("/")
+        } else {
+            p
+        }
     }
 
     pub fn is_absolute(&self) -> bool {

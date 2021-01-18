@@ -5,6 +5,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::dirent::DirEntry;
+use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::vfs::{DirEntIter, Result};
 use crate::kernel::sync::{Mutex, RwSpin};
 
@@ -16,6 +17,8 @@ pub struct FileHandle {
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
     pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<Arc<DirEntry>>)>,
+    #[allow(unused)]
+    fs: Arc<dyn Filesystem>,
 }
 
 impl FileHandle {
@@ -155,6 +158,7 @@ impl FileTable {
                 offset: AtomicUsize::new(0),
                 flags,
                 dir_iter: Mutex::new((None, None)),
+                fs: inode.inode().fs(),
             }))
         };
 

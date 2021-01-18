@@ -290,15 +290,13 @@ impl RamFS {
     pub fn new() -> Arc<RamFS> {
         let root = Arc::new(LockedRamINode(RwSpin::new(RamINode::default())));
 
-        let root_de = super::dirent::DirEntry::new_root_no_fs(root.clone(), String::from("/"));
+        let root_de = super::dirent::DirEntry::new_root(root.clone(), String::from("/"));
 
         let fs = Arc::new(RamFS {
             root: root.clone(),
             root_dentry: root_de.clone(),
             next_id: AtomicUsize::new(1),
         });
-
-        root_de.set_fs(Some(fs.clone()));
 
         root.setup(
             "/",

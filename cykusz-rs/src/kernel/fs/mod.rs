@@ -56,11 +56,11 @@ impl DeviceListener for DevListener {
 static DEV_LISTENER: Once<Arc<DevListener>> = Once::new();
 
 pub fn init() {
+    dirent::init();
     mount::init();
 
     ROOT_INODE.call_once(|| {
         let fs = ramfs::RamFS::new();
-        println!("RamFS created");
 
         ROOT_MOUNT.call_once(|| RwSpin::new(fs.clone()));
 
@@ -147,8 +147,7 @@ fn lookup_by_path_from(
             s => {
                 {
                     let current = cur.read();
-                    let cache = current.cache.upgrade().unwrap().clone();
-                    if let Some(f) = cache.get_dirent(cur.clone(), String::from(s)) {
+                    if let Some(f) = dirent::cache().get_dirent(cur.clone(), String::from(s)) {
                         drop(current);
 
                         cur = f;
@@ -178,13 +177,12 @@ fn lookup_by_path_from(
 
                                     res = crate::kernel::fs::dirent::DirEntry::new(
                                         cur.clone(),
-                                        cur.read().cache.clone(),
                                         new.inode(),
                                         String::from(s),
                                     );
                                 }
 
-                                cache.insert(&res);
+                                dirent::cache().insert(&res);
 
                                 cur = res;
                             }
@@ -198,7 +196,7 @@ fn lookup_by_path_from(
 
                                 drop(current);
 
-                                cache.insert(&new);
+                                dirent::cache().insert(&new);
 
                                 cur = new;
                             }

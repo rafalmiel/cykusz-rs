@@ -7,13 +7,13 @@ use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard, Spin};
 use alloc::collections::BTreeMap;
+use spin::Once;
 
 #[derive(Clone)]
 pub struct DirEntryData {
     pub parent: Option<Arc<DirEntry>>,
     pub name: String,
     pub inode: Arc<dyn INode>,
-    pub cache: Weak<DirEntryCache>,
     fs: Option<Arc<dyn Filesystem>>,
 }
 
@@ -24,34 +24,24 @@ pub struct DirEntry {
 }
 
 impl DirEntry {
-    pub fn new_root(
-        cache: Weak<DirEntryCache>,
-        inode: Arc<dyn INode>,
-        name: String,
-    ) -> Arc<DirEntry> {
+    pub fn new_root(inode: Arc<dyn INode>, name: String) -> Arc<DirEntry> {
         Arc::new(DirEntry {
             data: RwSpin::new(DirEntryData {
                 parent: None,
                 name,
                 inode: inode.clone(),
-                cache,
                 fs: Some(inode.fs()),
             }),
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
         })
     }
-    pub fn new_root_no_fs(
-        cache: Weak<DirEntryCache>,
-        inode: Arc<dyn INode>,
-        name: String,
-    ) -> Arc<DirEntry> {
+    pub fn new_root_no_fs(inode: Arc<dyn INode>, name: String) -> Arc<DirEntry> {
         Arc::new(DirEntry {
             data: RwSpin::new(DirEntryData {
                 parent: None,
                 name,
                 inode: inode.clone(),
-                cache,
                 fs: None,
             }),
             used: AtomicBool::new(false),
@@ -59,18 +49,12 @@ impl DirEntry {
         })
     }
 
-    pub fn new(
-        parent: Arc<DirEntry>,
-        cache: Weak<DirEntryCache>,
-        inode: Arc<dyn INode>,
-        name: String,
-    ) -> Arc<DirEntry> {
+    pub fn new(parent: Arc<DirEntry>, inode: Arc<dyn INode>, name: String) -> Arc<DirEntry> {
         Arc::new(DirEntry {
             data: RwSpin::new(DirEntryData {
                 parent: Some(parent),
                 name,
                 inode: inode.clone(),
-                cache,
                 fs: Some(inode.fs()),
             }),
             used: AtomicBool::new(false),
@@ -84,7 +68,6 @@ impl DirEntry {
                 parent: None,
                 name: String::new(),
                 inode: inode.clone(),
-                cache: Weak::default(),
                 fs: None,
             }),
             used: AtomicBool::new(false),
@@ -176,9 +159,7 @@ impl Drop for DirEntry {
         if self.is_used() {
             self.mark_unused();
 
-            if let Some(cache) = self.read().cache.upgrade() {
-                cache.move_to_unused(self.clone());
-            }
+            cache().move_to_unused(self.clone());
         }
     }
 }
@@ -262,4 +243,14 @@ impl DirEntryCache {
     fn move_to_unused(&self, ent: DirEntry) {
         self.data.lock().move_to_unused(ent);
     }
+}
+
+static CACHE: Once<DirEntryCache> = Once::new();
+
+pub fn cache() -> &'static DirEntryCache {
+    CACHE.get().as_ref().unwrap()
+}
+
+pub fn init() {
+    CACHE.call_once(|| DirEntryCache::new());
 }

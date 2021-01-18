@@ -35,7 +35,7 @@ impl<'a> crate::kernel::fs::vfs::DirEntIter for SysDirEntIter<'a> {
     fn next(&self) -> Option<Arc<crate::kernel::fs::dirent::DirEntry>> {
         let mut lock = self.iter.lock();
         if let Some(e) = lock.next() {
-            Some(lock.inode.mk_dirent2(self.parent.clone(), &e))
+            Some(lock.inode.mk_dirent(self.parent.clone(), &e))
         } else {
             None
         }
@@ -107,7 +107,7 @@ impl<'a> DirEntIter<'a> {
             }
 
             if ![".", ".."].contains(&name) {
-                fs.group_descs().inc_dir_count(self.inode.id()?);
+                fs.group_descs().inc_dir_count(target_id);
             }
 
             Ok(())

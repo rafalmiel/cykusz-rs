@@ -33,7 +33,7 @@ impl LockedExt2INode {
         ptr
     }
 
-    pub fn mk_dirent2(&self, parent: Arc<DirEntry>, de: &disk::dirent::DirEntry) -> Arc<DirEntry> {
+    pub fn mk_dirent(&self, parent: Arc<DirEntry>, de: &disk::dirent::DirEntry) -> Arc<DirEntry> {
         let inode = self.fs().get_inode(de.inode() as usize);
 
         DirEntry::new(parent, inode, String::from(de.name()))
@@ -203,7 +203,7 @@ impl INode for LockedExt2INode {
 
         if let Some(e) = iter.find_map(|e| {
             if e.name() == name {
-                Some(self.mk_dirent2(parent.clone(), e))
+                Some(self.mk_dirent(parent.clone(), e))
             } else {
                 None
             }
@@ -253,7 +253,7 @@ impl INode for LockedExt2INode {
         let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
 
         if let Some(de) = iter.nth(idx) {
-            Ok(Some(self.mk_dirent2(parent, de)))
+            Ok(Some(self.mk_dirent(parent, de)))
         } else {
             Ok(None)
         }

@@ -3,11 +3,13 @@ use alloc::sync::{Arc, Weak};
 use spin::Once;
 
 use crate::kernel::block::BlockDev;
+use crate::kernel::fs::dirent::{DirEntry, DirEntryCache};
 use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::Spin;
+use alloc::string::String;
 
 mod blockgroup;
 mod buf_block;
@@ -24,6 +26,7 @@ pub struct Ext2Filesystem {
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
     inode_cache: Spin<lru::LruCache<usize, Arc<inode::LockedExt2INode>>>,
+    dentry_cache: Arc<DirEntryCache>,
 }
 
 impl Ext2Filesystem {
@@ -35,6 +38,7 @@ impl Ext2Filesystem {
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
             inode_cache: Spin::new(lru::LruCache::new(256)),
+            dentry_cache: Arc::new(DirEntryCache::new()),
         });
 
         if !a.init() {
@@ -57,32 +61,6 @@ impl Ext2Filesystem {
         self.blockgroupdesc.init(self.self_ref.clone());
 
         //self.debug();
-
-        //let i = self.get_inode(7);
-
-        //let lock = i.read();
-
-        //let d_inode = lock.d_inode();
-
-        //println!("{:?}", d_inode);
-
-        //let ptr = d_inode.d_indir_ptr();
-
-        //let mut vec = Vec::<u32>::new();
-        //vec.resize(1024 / 4, 0);
-
-        //self.read_block(ptr as usize, vec.as_mut_slice().to_bytes_mut());
-
-        //println!("{:?}", vec);
-
-        //let mut vec2 = Vec::<u32>::new();
-        //vec2.resize(1024 / 4, 0);
-
-        //for (i, p) in vec.iter().enumerate() {
-        //    self.read_block(*p as usize, vec2.as_mut_slice().to_bytes_mut());
-
-        //    println!("{}: {:?}", i, vec2);
-        //}
 
         true
     }
@@ -160,6 +138,38 @@ impl Ext2Filesystem {
         self.superblock.debug();
         self.blockgroupdesc.debug();
     }
+
+    #[allow(dead_code)]
+    fn debug_resize_inode(&self) {
+        use crate::kernel::utils::slice::ToBytesMut;
+        use alloc::vec::Vec;
+
+        let i = self.get_inode(7);
+
+        let lock = i.read();
+
+        let d_inode = lock.d_inode();
+
+        println!("{:?}", d_inode);
+
+        let ptr = d_inode.d_indir_ptr();
+
+        let mut vec = Vec::<u32>::new();
+        vec.resize(1024 / 4, 0);
+
+        self.read_block(ptr as usize, vec.as_mut_slice().to_bytes_mut());
+
+        println!("{:?}", vec);
+
+        let mut vec2 = Vec::<u32>::new();
+        vec2.resize(1024 / 4, 0);
+
+        for (i, p) in vec.iter().enumerate() {
+            self.read_block(*p as usize, vec2.as_mut_slice().to_bytes_mut());
+
+            println!("{}: {:?}", i, vec2);
+        }
+    }
 }
 
 impl Drop for Ext2Filesystem {
@@ -172,5 +182,13 @@ impl Drop for Ext2Filesystem {
 impl Filesystem for Ext2Filesystem {
     fn root_inode(&self) -> Arc<dyn INode> {
         self.get_inode(2)
+    }
+
+    fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
+        DirEntry::new_root(
+            Arc::downgrade(&self.dentry_cache),
+            self.root_inode(),
+            String::from("/"),
+        )
     }
 }

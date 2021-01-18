@@ -20,7 +20,11 @@ pub trait INode: Send + Sync {
         Err(FsError::NotSupported)
     }
 
-    fn lookup(&self, _name: &str) -> Result<DirEntry> {
+    fn lookup(
+        &self,
+        _parent: Arc<crate::kernel::fs::dirent::DirEntry>,
+        _name: &str,
+    ) -> Result<Arc<super::dirent::DirEntry>> {
         Err(FsError::NotSupported)
     }
 
@@ -44,7 +48,11 @@ pub trait INode: Send + Sync {
         unimplemented!()
     }
 
-    fn create(&self, _name: &str) -> Result<Arc<dyn INode>> {
+    fn create(
+        &self,
+        _parent: Arc<crate::kernel::fs::dirent::DirEntry>,
+        _name: &str,
+    ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
         Err(FsError::NotSupported)
     }
 
@@ -64,14 +72,6 @@ pub trait INode: Send + Sync {
 
     fn dir_iter(&self) -> Option<Arc<dyn DirEntIter>> {
         None
-    }
-
-    fn mount(&self, _fs: Arc<dyn Filesystem>) -> Result<Arc<dyn Filesystem>> {
-        return Err(FsError::NotSupported);
-    }
-
-    fn umount(&self) -> Result<()> {
-        return Err(FsError::NotSupported);
     }
 
     fn device(&self) -> Result<Arc<dyn Device>> {

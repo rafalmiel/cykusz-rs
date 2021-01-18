@@ -29,27 +29,24 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::Inval)?;
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        if let Ok(inode) = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into()) {
-            let task = current_task();
+        let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?.inode();
 
-            if flags.contains(OpenFlags::DIRECTORY) && inode.ftype()? != FileType::Dir {
-                return Err(SyscallError::NotDir);
-            }
+        let task = current_task();
 
-            if flags.contains(OpenFlags::CREAT) {
-                if let Err(e) = inode.truncate() {
-                    println!("Truncate failed: {:?}", e);
-                }
-            }
+        if flags.contains(OpenFlags::DIRECTORY) && inode.ftype()? != FileType::Dir {
+            return Err(SyscallError::NotDir);
+        }
 
-            if let Some(fd) = task.open_file(inode, flags) {
-                return Ok(fd);
-            } else {
-                Err(SyscallError::NoDev)
+        if flags.contains(OpenFlags::CREAT) {
+            if let Err(e) = inode.truncate() {
+                println!("Truncate failed: {:?}", e);
             }
+        }
+
+        if let Some(fd) = task.open_file(inode, flags) {
+            return Ok(fd);
         } else {
-            println!("Failed lookup_by_path");
-            Err(SyscallError::NoEnt)
+            Err(SyscallError::NoDev)
         }
     } else {
         Err(SyscallError::Inval)
@@ -98,10 +95,12 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
 pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        if let Ok(dir) = lookup_by_path(Path::new(path), LookupMode::None) {
+        if let Ok(dentry) = lookup_by_path(Path::new(path), LookupMode::None) {
+            let dir = dentry.read().inode.clone();
+
             if dir.ftype()? == FileType::Dir {
                 let task = current_task();
-                task.set_cwd(dir, path);
+                task.set_cwd(dentry);
                 return Ok(0);
             } else {
                 return Err(SyscallError::NotDir);
@@ -117,11 +116,11 @@ pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
 
     let pwd = current_task().get_pwd();
 
-    if pwd.0.len() > len as usize {
+    if pwd.len() > len as usize {
         Err(SyscallError::IO)
     } else {
-        buf[..pwd.0.len()].copy_from_slice(pwd.0.as_bytes());
-        Ok(pwd.0.len())
+        buf[..pwd.len()].copy_from_slice(pwd.as_bytes());
+        Ok(pwd.len())
     }
 }
 
@@ -132,7 +131,7 @@ pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
         let (inode, name) = {
             let (dir, target) = path.containing_dir();
 
-            (lookup_by_path(dir, LookupMode::None)?, target)
+            (lookup_by_path(dir, LookupMode::None)?.inode(), target)
         };
 
         if inode.ftype()? == FileType::Dir {
@@ -307,12 +306,12 @@ pub fn sys_mount(
     let fs = make_str(fs, fs_len);
 
     if fs == "ext2" {
-        let dev = lookup_by_path(Path::new(dev_path), LookupMode::None)?;
+        let dev = lookup_by_path(Path::new(dev_path), LookupMode::None)?.inode();
         let dest = lookup_by_path(Path::new(dest_path), LookupMode::None)?;
 
         if let Some(dev) = crate::kernel::block::get_blkdev_by_id(dev.device()?.id()) {
             if let Some(fs) = crate::kernel::fs::ext2::Ext2Filesystem::new(dev) {
-                if let Ok(_) = dest.mount(fs) {
+                if let Ok(_) = crate::kernel::fs::mount::mount(dest, fs) {
                     Ok(0)
                 } else {
                     Err(SyscallError::Fault)
@@ -333,7 +332,7 @@ pub fn sys_umount(path: u64, path_len: u64) -> SyscallResult {
 
     let node = lookup_by_path(Path::new(path), LookupMode::None)?;
 
-    if let Err(e) = node.umount() {
+    if let Err(e) = crate::kernel::fs::mount::umount(node) {
         Err(e)?
     } else {
         Ok(0)

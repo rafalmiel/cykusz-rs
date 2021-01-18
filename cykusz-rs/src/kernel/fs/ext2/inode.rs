@@ -4,10 +4,9 @@ use core::ops::{Deref, DerefMut};
 
 use syscall_defs::FileType;
 
+use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
-
-use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::ext2::reader::INodeReader;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;

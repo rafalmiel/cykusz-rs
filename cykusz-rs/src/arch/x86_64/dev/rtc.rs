@@ -1,7 +1,8 @@
+use core::sync::atomic::{AtomicI64, Ordering};
+
 use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::raw::cpuio;
-use core::sync::atomic::{AtomicI64, Ordering};
 
 fn read_naive_date() -> chrono::NaiveDateTime {
     unsafe {

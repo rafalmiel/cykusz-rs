@@ -7,9 +7,8 @@ use spin::Once;
 use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
-use crate::kernel::fs::inode::INode;
-
 use crate::kernel::fs::filesystem::Filesystem;
+use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;

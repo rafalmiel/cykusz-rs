@@ -1,17 +1,17 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
+use core::ops::Index;
+use core::ops::IndexMut;
 
+use bit_field::BitField;
 use spin::Once;
 
+use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::sync::{Mutex, RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 
 use super::disk;
-use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
-use bit_field::BitField;
-use core::ops::Index;
-use core::ops::IndexMut;
 
 pub struct INodeVec {
     vec: Vec<disk::inode::INode>,

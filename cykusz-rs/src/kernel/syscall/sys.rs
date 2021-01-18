@@ -5,6 +5,7 @@ use intrusive_collections::UnsafeRef;
 use syscall_defs::{ConnectionFlags, FileType, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
+use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::net::ip::Ip4;
@@ -29,16 +30,16 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::Inval)?;
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?.inode();
+        let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
 
         let task = current_task();
 
-        if flags.contains(OpenFlags::DIRECTORY) && inode.ftype()? != FileType::Dir {
+        if flags.contains(OpenFlags::DIRECTORY) && inode.inode().ftype()? != FileType::Dir {
             return Err(SyscallError::NotDir);
         }
 
         if flags.contains(OpenFlags::CREAT) {
-            if let Err(e) = inode.truncate() {
+            if let Err(e) = inode.inode().truncate() {
                 println!("Truncate failed: {:?}", e);
             }
         }
@@ -193,7 +194,7 @@ pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
     if let Some(socket) = socket {
         let task = current_task();
 
-        if let Some(fd) = task.open_file(socket, OpenFlags::RDWR) {
+        if let Some(fd) = task.open_file(DirEntry::inode_wrap(socket), OpenFlags::RDWR) {
             Ok(fd)
         } else {
             Err(SyscallError::Fault)
@@ -218,7 +219,7 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
     if let Some(socket) = socket {
         let task = current_task();
 
-        if let Some(fd) = task.open_file(socket, OpenFlags::RDWR) {
+        if let Some(fd) = task.open_file(DirEntry::inode_wrap(socket), OpenFlags::RDWR) {
             Ok(fd)
         } else {
             Err(SyscallError::Fault)
@@ -263,9 +264,11 @@ pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
     'search: loop {
         for fd in buf {
             if let Some(handle) = task.get_handle(*fd as usize) {
-                if let Ok(f) = handle
-                    .inode
-                    .poll(if first { Some(&mut poll_table) } else { None })
+                if let Ok(f) =
+                    handle
+                        .inode
+                        .inode()
+                        .poll(if first { Some(&mut poll_table) } else { None })
                 {
                     if f {
                         fd_found = Some(*fd as usize);

@@ -4,26 +4,25 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use syscall_defs::{OpenFlags, SysDirEntry};
 
-use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::{DirEntIter, DirEntry, Result};
+use crate::kernel::fs::dirent::DirEntry;
+use crate::kernel::fs::vfs::{DirEntIter, Result};
 use crate::kernel::sync::{Mutex, RwSpin};
 
 const FILE_NUM: usize = 256;
 
 pub struct FileHandle {
     pub fd: usize,
-    pub inode: Arc<dyn INode>,
+    pub inode: Arc<DirEntry>,
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
-    pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntry>)>,
-    pub fs: Arc<dyn Filesystem>,
+    pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<Arc<DirEntry>>)>,
 }
 
 impl FileHandle {
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let read = self
             .inode
+            .inode()
             .read_at(self.offset.load(Ordering::SeqCst), buf)?;
 
         self.offset.fetch_add(read, Ordering::SeqCst);
@@ -34,6 +33,7 @@ impl FileHandle {
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
         let wrote = self
             .inode
+            .inode()
             .write_at(self.offset.load(Ordering::SeqCst), buf)?;
 
         self.offset.fetch_add(wrote, Ordering::SeqCst);
@@ -41,11 +41,11 @@ impl FileHandle {
         Ok(wrote)
     }
 
-    fn get_dir_iter(&self) -> (Option<Arc<dyn DirEntIter>>, Option<DirEntry>) {
+    fn get_dir_iter(&self) -> (Option<Arc<dyn DirEntIter>>, Option<Arc<DirEntry>>) {
         let mut lock = self.dir_iter.lock();
 
         if self.offset.load(Ordering::SeqCst) == 0 && lock.0.is_none() {
-            let i = self.inode.dir_iter();
+            let i = self.inode.inode().dir_iter(self.inode.clone());
             lock.0 = i;
         };
 
@@ -81,21 +81,21 @@ impl FileHandle {
                     let o = self.offset.load(Ordering::SeqCst);
                     match &iter {
                         Some(i) => i.next(),
-                        None => self.inode.dir_ent(o)?,
+                        None => self.inode.inode().dir_ent(self.inode.clone(), o)?,
                     }
                 }
             };
 
             if let Some(d) = &dentry {
                 let mut sysd = SysDirEntry {
-                    ino: d.inode.id()?,
+                    ino: d.inode().id()?,
                     off: offset,
                     reclen: 0,
-                    typ: d.inode.ftype()?,
+                    typ: d.inode().ftype()?,
                     name: [],
                 };
 
-                sysd.reclen = struct_len + d.name.len();
+                sysd.reclen = struct_len + d.name().len();
                 sysd.off = offset + sysd.reclen;
 
                 if buf.len() < sysd.reclen {
@@ -112,7 +112,7 @@ impl FileHandle {
                     sysd_ref
                         .name
                         .as_mut_ptr()
-                        .copy_from(d.name.as_ptr(), d.name.len());
+                        .copy_from(d.name().as_ptr(), d.name().len());
                 }
 
                 offset += sysd.reclen;
@@ -145,27 +145,26 @@ impl FileTable {
         }
     }
 
-    pub fn open_file(&self, inode: Arc<dyn INode>, flags: OpenFlags) -> Option<usize> {
+    pub fn open_file(&self, dentry: Arc<DirEntry>, flags: OpenFlags) -> Option<usize> {
         let mut files = self.files.write();
 
-        let mk_handle = |fd: usize, inode: Arc<dyn INode>| {
+        let mk_handle = |fd: usize, inode: Arc<DirEntry>| {
             Some(Arc::new(FileHandle {
                 fd,
                 inode: inode.clone(),
                 offset: AtomicUsize::new(0),
                 flags,
                 dir_iter: Mutex::new((None, None)),
-                fs: inode.fs(),
             }))
         };
 
         if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
-            *f = mk_handle(idx, inode);
+            *f = mk_handle(idx, dentry);
 
             return Some(idx);
         } else if files.len() < FILE_NUM {
             let len = files.len();
-            files.push(mk_handle(len, inode));
+            files.push(mk_handle(len, dentry));
 
             return Some(len);
         }
@@ -177,7 +176,7 @@ impl FileTable {
         let mut files = self.files.write();
 
         if let Some(f) = &files[fd] {
-            f.inode.close();
+            f.inode.inode().close();
             files[fd] = None;
             return true;
         }

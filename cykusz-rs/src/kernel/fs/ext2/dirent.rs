@@ -15,22 +15,27 @@ use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 
 pub struct SysDirEntIter<'a> {
+    parent: Arc<crate::kernel::fs::dirent::DirEntry>,
     iter: Spin<DirEntIter<'a>>,
 }
 
 impl<'a> SysDirEntIter<'a> {
-    pub fn new(inode: Arc<LockedExt2INode>) -> SysDirEntIter<'a> {
+    pub fn new(
+        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
+        inode: Arc<LockedExt2INode>,
+    ) -> SysDirEntIter<'a> {
         SysDirEntIter::<'a> {
+            parent,
             iter: Spin::new(DirEntIter::new(inode)),
         }
     }
 }
 
 impl<'a> crate::kernel::fs::vfs::DirEntIter for SysDirEntIter<'a> {
-    fn next(&self) -> Option<crate::kernel::fs::vfs::DirEntry> {
+    fn next(&self) -> Option<Arc<crate::kernel::fs::dirent::DirEntry>> {
         let mut lock = self.iter.lock();
         if let Some(e) = lock.next() {
-            Some(lock.inode.mk_dirent(e))
+            Some(lock.inode.mk_dirent2(self.parent.clone(), &e))
         } else {
             None
         }
@@ -145,7 +150,7 @@ impl<'a> DirEntIter<'a> {
 }
 
 impl<'a> Iterator for DirEntIter<'a> {
-    type Item = &'a mut DirEntry;
+    type Item = &'a mut super::disk::dirent::DirEntry;
 
     fn next(&mut self) -> Option<Self::Item> {
         let fs = self.fs();

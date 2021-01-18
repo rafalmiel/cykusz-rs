@@ -13,7 +13,7 @@ use crate::kernel::device::Device;
 use crate::kernel::fs::devnode::DevNode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::{DirEntry, Result};
+use crate::kernel::fs::vfs::Result;
 use crate::kernel::fs::vfs::{FsError, Metadata};
 use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::syscall::sys::PollTable;
@@ -185,28 +185,40 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn dir_ent(&self, idx: usize) -> Result<Option<DirEntry>> {
+    fn dir_ent(
+        &self,
+        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
+        idx: usize,
+    ) -> Result<Option<Arc<crate::kernel::fs::dirent::DirEntry>>> {
         let d = self.0.read();
 
         if d.typ != FileType::Dir {
             return Err(FsError::NotDir);
         }
 
+        let fs = d.fs.upgrade().unwrap();
+
         let dir = match idx {
-            0 => Some(DirEntry {
-                name: String::from("."),
-                inode: d.this.upgrade().unwrap(),
-            }),
-            1 => Some(DirEntry {
-                name: String::from(".."),
-                inode: d.parent.upgrade().unwrap(),
-            }),
+            0 => Some(crate::kernel::fs::dirent::DirEntry::new(
+                parent,
+                Arc::downgrade(&fs.dentry_cache),
+                d.this.upgrade().unwrap(),
+                String::from("."),
+            )),
+            1 => Some(crate::kernel::fs::dirent::DirEntry::new(
+                parent,
+                Arc::downgrade(&fs.dentry_cache),
+                d.parent.upgrade().unwrap(),
+                String::from(".."),
+            )),
             idx => {
                 if let Some(e) = d.children.iter().nth(idx - 2) {
-                    Some(DirEntry {
-                        name: e.0.clone(),
-                        inode: e.1.clone(),
-                    })
+                    Some(crate::kernel::fs::dirent::DirEntry::new(
+                        parent,
+                        Arc::downgrade(&fs.dentry_cache),
+                        e.1.clone(),
+                        e.0.clone(),
+                    ))
                 } else {
                     None
                 }

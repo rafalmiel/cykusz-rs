@@ -1,9 +1,6 @@
-use alloc::string::String;
 use alloc::sync::Arc;
 
 use syscall_defs::{FileType, SyscallError};
-
-use crate::kernel::fs::inode::INode;
 
 #[derive(Debug, PartialEq)]
 pub enum FsError {
@@ -35,13 +32,7 @@ impl From<FsError> for syscall_defs::SyscallError {
 pub type Result<T> = core::result::Result<T, FsError>;
 
 pub trait DirEntIter: Send + Sync {
-    fn next(&self) -> Option<DirEntry>;
-}
-
-#[derive(Clone)]
-pub struct DirEntry {
-    pub name: String,
-    pub inode: Arc<dyn INode>,
+    fn next(&self) -> Option<Arc<crate::kernel::fs::dirent::DirEntry>>;
 }
 
 #[derive(Copy, Clone)]

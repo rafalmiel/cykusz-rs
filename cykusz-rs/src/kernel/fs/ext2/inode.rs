@@ -7,11 +7,12 @@ use syscall_defs::FileType;
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
 
+use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::ext2::reader::INodeReader;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::vfs::{DirEntry, Metadata};
+use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
 
@@ -32,28 +33,14 @@ impl LockedExt2INode {
         ptr
     }
 
-    pub fn mk_dirent(&self, de: &disk::dirent::DirEntry) -> DirEntry {
+    pub fn mk_dirent2(&self, parent: Arc<DirEntry>, de: &disk::dirent::DirEntry) -> Arc<DirEntry> {
         let inode = self.fs().get_inode(de.inode() as usize);
 
-        DirEntry {
-            name: String::from(de.name()),
-            inode,
-        }
-    }
-
-    pub fn mk_dirent2(
-        &self,
-        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        name: String,
-        de: &disk::dirent::DirEntry,
-    ) -> Arc<crate::kernel::fs::dirent::DirEntry> {
-        let inode = self.fs().get_inode(de.inode() as usize);
-
-        crate::kernel::fs::dirent::DirEntry::new(
+        DirEntry::new(
             parent,
             Arc::downgrade(&self.fs().dentry_cache),
             inode,
-            name,
+            String::from(de.name()),
         )
     }
 
@@ -216,16 +203,12 @@ impl INode for LockedExt2INode {
         })
     }
 
-    fn lookup(
-        &self,
-        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        name: &str,
-    ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+    fn lookup(&self, parent: Arc<DirEntry>, name: &str) -> Result<Arc<DirEntry>> {
         let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
 
         if let Some(e) = iter.find_map(|e| {
             if e.name() == name {
-                Some(self.mk_dirent2(parent.clone(), String::from(name), e))
+                Some(self.mk_dirent2(parent.clone(), e))
             } else {
                 None
             }
@@ -271,18 +254,22 @@ impl INode for LockedExt2INode {
         self.fs()
     }
 
-    fn dir_ent(&self, idx: usize) -> Result<Option<DirEntry>> {
+    fn dir_ent(&self, parent: Arc<DirEntry>, idx: usize) -> Result<Option<Arc<DirEntry>>> {
         let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
 
         if let Some(de) = iter.nth(idx) {
-            Ok(Some(self.mk_dirent(de)))
+            Ok(Some(self.mk_dirent2(parent, de)))
         } else {
             Ok(None)
         }
     }
 
-    fn dir_iter(&self) -> Option<Arc<dyn crate::kernel::fs::vfs::DirEntIter>> {
+    fn dir_iter(
+        &self,
+        parent: Arc<DirEntry>,
+    ) -> Option<Arc<dyn crate::kernel::fs::vfs::DirEntIter>> {
         Some(Arc::new(SysDirEntIter::new(
+            parent,
             self.self_ref.upgrade().unwrap(),
         )))
     }

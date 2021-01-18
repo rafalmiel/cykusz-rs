@@ -78,6 +78,20 @@ impl DirEntry {
         })
     }
 
+    pub fn inode_wrap(inode: Arc<dyn INode>) -> Arc<DirEntry> {
+        Arc::new(DirEntry {
+            data: RwSpin::new(DirEntryData {
+                parent: None,
+                name: String::new(),
+                inode: inode.clone(),
+                cache: Weak::default(),
+                fs: None,
+            }),
+            used: AtomicBool::new(false),
+            mountpoint: AtomicBool::new(false),
+        })
+    }
+
     pub fn read(&self) -> RwSpinReadGuard<DirEntryData> {
         self.data.read()
     }

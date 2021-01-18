@@ -118,11 +118,6 @@ impl Ext2Filesystem {
         }
     }
 
-    fn sync(&self) {
-        self.blockgroupdesc.sync(self);
-        self.superblock.sync(self);
-    }
-
     pub fn make_buf(&self) -> BufBlock {
         BufBlock::new(self.superblock().block_size())
     }
@@ -172,7 +167,6 @@ impl Ext2Filesystem {
 
 impl Drop for Ext2Filesystem {
     fn drop(&mut self) {
-        println!("[ EXT2 ] Syncing...");
         self.sync();
     }
 }
@@ -180,5 +174,11 @@ impl Drop for Ext2Filesystem {
 impl Filesystem for Ext2Filesystem {
     fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
         DirEntry::new_root(self.get_inode(2), String::from("/"))
+    }
+
+    fn sync(&self) {
+        println!("[ EXT2 ] Syncing...");
+        self.blockgroupdesc.sync(self);
+        self.superblock.sync(self);
     }
 }

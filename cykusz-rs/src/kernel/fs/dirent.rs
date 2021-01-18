@@ -171,6 +171,8 @@ impl Drop for DirEntry {
             self.mark_unused();
 
             cache().move_to_unused(self.clone());
+        } else {
+            //println!("drop {:?}", self.cache_key());
         }
     }
 }

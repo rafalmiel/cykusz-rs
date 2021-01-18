@@ -5,6 +5,7 @@ use crate::kernel::sync::RwSpin;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use spin::Once;
 
 #[derive(Clone)]
@@ -71,6 +72,8 @@ impl Mounts {
         if let Some(ent) = mounts.get(&key) {
             ent.orig_entry.set_is_mountpont(false);
 
+            ent.fs.sync();
+
             drop(ent);
 
             mounts.remove(&key);
@@ -96,6 +99,24 @@ impl Mounts {
             Err(FsError::EntryNotFound)
         }
     }
+
+    fn umount_all(&self) {
+        let mut mounts = self.mounts.read();
+
+        let mut mnts = Vec::<Mountpoint>::new();
+
+        for (_k, m) in mounts.iter() {
+            mnts.push(m.clone());
+        }
+
+        for m in mnts.iter() {
+            drop(mounts);
+            if let Err(e) = self.umount(m.orig_entry.clone()) {
+                println!("[ ERR ] Unmount failed {:?}", e);
+            }
+            mounts = self.mounts.read();
+        }
+    }
 }
 
 static MOUNTS: Once<Mounts> = Once::new();
@@ -118,4 +139,8 @@ pub fn umount(dir: Arc<DirEntry>) -> Result<()> {
 
 pub fn find_mount(dir: &Arc<DirEntry>) -> Result<Mountpoint> {
     mounts().find_mount(dir)
+}
+
+pub fn umount_all() {
+    mounts().umount_all();
 }

@@ -358,6 +358,8 @@ pub fn sys_sleep(time_ns: u64) -> SyscallResult {
 }
 
 pub fn sys_poweroff() -> ! {
+    crate::kernel::fs::mount::umount_all();
+
     crate::arch::acpi::power_off()
 }
 

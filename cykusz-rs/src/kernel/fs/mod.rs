@@ -13,7 +13,6 @@ use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
-use crate::kernel::sync::RwSpin;
 
 pub mod devnode;
 pub mod dirent;
@@ -26,13 +25,7 @@ pub mod ramfs;
 pub mod stdio;
 pub mod vfs;
 
-static ROOT_MOUNT: Once<RwSpin<Arc<dyn Filesystem>>> = Once::new();
-static ROOT_INODE: Once<Arc<dyn INode>> = Once::new();
 static ROOT_DENTRY: Once<Arc<dirent::DirEntry>> = Once::new();
-
-pub fn root_inode() -> &'static Arc<dyn INode> {
-    ROOT_INODE.get().unwrap()
-}
 
 pub fn root_dentry() -> &'static Arc<dirent::DirEntry> {
     ROOT_DENTRY.get().unwrap()
@@ -42,7 +35,7 @@ struct DevListener {}
 
 impl DeviceListener for DevListener {
     fn device_added(&self, dev: Arc<dyn Device>) {
-        if let Ok(dev_dir) = root_inode().lookup(root_dentry().clone(), "dev") {
+        if let Ok(dev_dir) = root_dentry().inode().lookup(root_dentry().clone(), "dev") {
             dev_dir
                 .inode()
                 .mknode(dev.name().as_str(), dev.id())
@@ -59,21 +52,26 @@ pub fn init() {
     dirent::init();
     mount::init();
 
-    ROOT_INODE.call_once(|| {
+    ROOT_DENTRY.call_once(|| {
         let fs = ramfs::RamFS::new();
 
-        ROOT_MOUNT.call_once(|| RwSpin::new(fs.clone()));
+        let root = fs.root_dentry();
 
-        ROOT_DENTRY.call_once(|| fs.root_dentry());
-
-        let root = fs.root_inode();
-
-        root.mkdir("dev").expect("Failed to create /dev directory");
-        root.mkdir("etc").expect("Failed to create /etc directory");
-        root.mkdir("home")
+        root.inode()
+            .mkdir("dev")
+            .expect("Failed to create /dev directory");
+        root.inode()
+            .mkdir("etc")
+            .expect("Failed to create /etc directory");
+        root.inode()
+            .mkdir("home")
             .expect("Failed to create /home directory");
-        root.mkdir("var").expect("Failed to create /var directory");
-        root.mkdir("tmp").expect("Failed to create /tmp directory");
+        root.inode()
+            .mkdir("var")
+            .expect("Failed to create /var directory");
+        root.inode()
+            .mkdir("tmp")
+            .expect("Failed to create /tmp directory");
 
         root
     });

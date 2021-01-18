@@ -281,10 +281,6 @@ pub struct RamFS {
 }
 
 impl Filesystem for RamFS {
-    fn root_inode(&self) -> Arc<dyn INode> {
-        self.root.clone()
-    }
-
     fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
         self.root_dentry.clone()
     }

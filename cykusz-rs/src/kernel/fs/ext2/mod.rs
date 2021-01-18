@@ -7,7 +7,7 @@ use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::inode::INode;
+
 use crate::kernel::sync::Spin;
 use alloc::string::String;
 
@@ -178,11 +178,7 @@ impl Drop for Ext2Filesystem {
 }
 
 impl Filesystem for Ext2Filesystem {
-    fn root_inode(&self) -> Arc<dyn INode> {
-        self.get_inode(2)
-    }
-
     fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
-        DirEntry::new_root(self.root_inode(), String::from("/"))
+        DirEntry::new_root(self.get_inode(2), String::from("/"))
     }
 }

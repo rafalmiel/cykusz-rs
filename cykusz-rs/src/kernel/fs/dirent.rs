@@ -9,6 +9,8 @@ use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard, Spin};
 use alloc::collections::BTreeMap;
 use spin::Once;
 
+type CacheKey = (usize, String);
+
 #[derive(Clone)]
 pub struct DirEntryData {
     pub parent: Option<Arc<DirEntry>>,
@@ -50,16 +52,24 @@ impl DirEntry {
     }
 
     pub fn new(parent: Arc<DirEntry>, inode: Arc<dyn INode>, name: String) -> Arc<DirEntry> {
-        Arc::new(DirEntry {
-            data: RwSpin::new(DirEntryData {
-                parent: Some(parent),
-                name,
-                inode: inode.clone(),
-                fs: Some(inode.fs()),
-            }),
-            used: AtomicBool::new(false),
-            mountpoint: AtomicBool::new(false),
-        })
+        if let Some(e) = cache().get_dirent(parent.clone(), name.clone()) {
+            return e;
+        } else {
+            let e = Arc::new(DirEntry {
+                data: RwSpin::new(DirEntryData {
+                    parent: Some(parent),
+                    name,
+                    inode: inode.clone(),
+                    fs: Some(inode.fs()),
+                }),
+                used: AtomicBool::new(false),
+                mountpoint: AtomicBool::new(false),
+            });
+
+            cache().insert(&e);
+
+            e
+        }
     }
 
     pub fn inode_wrap(inode: Arc<dyn INode>) -> Arc<DirEntry> {
@@ -107,16 +117,17 @@ impl DirEntry {
         self.used.load(Ordering::SeqCst)
     }
 
-    pub fn cache_key(&self) -> (usize, String) {
-        let data = self.data.read();
-        if let Some(parent) = &data.parent {
-            (
-                parent.as_ref() as *const DirEntry as usize,
-                data.name.clone(),
-            )
+    fn make_key(parent: Option<&Arc<DirEntry>>, name: &String) -> CacheKey {
+        if let Some(p) = parent {
+            (p.as_ref() as *const _ as usize, name.clone())
         } else {
-            (0, data.name.clone())
+            (0, name.clone())
         }
+    }
+
+    pub fn cache_key(&self) -> CacheKey {
+        let data = self.data.read();
+        Self::make_key(data.parent.as_ref(), &data.name)
     }
 
     pub fn update_inode(&self, inode: Arc<dyn INode>) {
@@ -165,8 +176,8 @@ impl Drop for DirEntry {
 }
 
 pub struct DirEntryCacheData {
-    unused: lru::LruCache<(usize, String), Arc<DirEntry>>,
-    used: BTreeMap<(usize, String), Weak<DirEntry>>,
+    unused: lru::LruCache<CacheKey, Arc<DirEntry>>,
+    used: BTreeMap<CacheKey, Weak<DirEntry>>,
 }
 
 pub struct DirEntryCache {
@@ -178,9 +189,12 @@ impl DirEntryCacheData {
         let key = (current.as_ref() as *const DirEntry as usize, name);
 
         if let Some(e) = self.used.get(&key) {
-            e.clone().upgrade()
+            let found = e.clone().upgrade();
+            //println!("get_dirent {:?} found some? {}", key, found.is_some());
+            found
         } else {
             if let Some(e) = self.unused.get(&key) {
+                //println!("get_dirent {:?} found unused", key);
                 let entry = e.clone();
 
                 let inode = entry.inode();
@@ -198,6 +212,7 @@ impl DirEntryCacheData {
 
                 Some(entry)
             } else {
+                //println!("get_dirent {:?} not found", key);
                 None
             }
         }
@@ -206,11 +221,16 @@ impl DirEntryCacheData {
     fn insert(&mut self, entry: &Arc<DirEntry>) {
         let key = entry.cache_key();
 
+        //println!("cache insert {:?}", key);
+        entry.mark_used();
+
         self.used.insert(key, Arc::downgrade(entry));
     }
 
     fn move_to_unused(&mut self, ent: DirEntry) {
         let key = ent.cache_key();
+
+        //println!("move_to_unused {:?}", key);
 
         ent.data.write().parent = None;
         ent.data.write().fs = None;

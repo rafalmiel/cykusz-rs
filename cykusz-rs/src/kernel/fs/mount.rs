@@ -72,7 +72,9 @@ impl Mounts {
         if let Some(ent) = mounts.get(&key) {
             ent.orig_entry.set_is_mountpont(false);
 
-            ent.fs.sync();
+            if Arc::strong_count(&ent.fs) > 1 {
+                println!("Syncing fs in use...");
+            }
 
             drop(ent);
 
@@ -103,15 +105,15 @@ impl Mounts {
     fn umount_all(&self) {
         let mut mounts = self.mounts.read();
 
-        let mut mnts = Vec::<Mountpoint>::new();
+        let mut mnts = Vec::<Arc<DirEntry>>::new();
 
         for (_k, m) in mounts.iter() {
-            mnts.push(m.clone());
+            mnts.push(m.orig_entry.clone());
         }
 
         for m in mnts.iter() {
             drop(mounts);
-            if let Err(e) = self.umount(m.orig_entry.clone()) {
+            if let Err(e) = self.umount(m.clone()) {
                 println!("[ ERR ] Unmount failed {:?}", e);
             }
             mounts = self.mounts.read();

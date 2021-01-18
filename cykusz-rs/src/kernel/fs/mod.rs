@@ -25,6 +25,7 @@ pub mod ramfs;
 pub mod stdio;
 pub mod vfs;
 
+static ROOT_MOUNT: Once<Arc<dyn Filesystem>> = Once::new();
 static ROOT_DENTRY: Once<Arc<dirent::DirEntry>> = Once::new();
 
 pub fn root_dentry() -> &'static Arc<dirent::DirEntry> {
@@ -54,6 +55,8 @@ pub fn init() {
 
     ROOT_DENTRY.call_once(|| {
         let fs = ramfs::RamFS::new();
+
+        ROOT_MOUNT.call_once(|| fs.clone());
 
         let root = fs.root_dentry();
 
@@ -203,11 +206,11 @@ fn lookup_by_path_from(
                         }
                     }
                 }
-                if cur.is_mountpoint() {
-                    if let Ok(mp) = mount::find_mount(&cur) {
-                        cur = mp.root_entry();
-                    }
-                }
+            }
+        }
+        if cur.is_mountpoint() {
+            if let Ok(mp) = mount::find_mount(&cur) {
+                cur = mp.root_entry();
             }
         }
     }

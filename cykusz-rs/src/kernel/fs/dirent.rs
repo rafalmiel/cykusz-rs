@@ -3,7 +3,6 @@ use alloc::sync::{Arc, Weak};
 use core::sync::atomic::AtomicBool;
 use core::sync::atomic::Ordering;
 
-use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard, Spin};
 use alloc::collections::BTreeMap;
@@ -16,7 +15,6 @@ pub struct DirEntryData {
     pub parent: Option<Arc<DirEntry>>,
     pub name: String,
     pub inode: Arc<dyn INode>,
-    fs: Option<Arc<dyn Filesystem>>,
 }
 
 pub struct DirEntry {
@@ -32,19 +30,6 @@ impl DirEntry {
                 parent: None,
                 name,
                 inode: inode.clone(),
-                fs: Some(inode.fs()),
-            }),
-            used: AtomicBool::new(false),
-            mountpoint: AtomicBool::new(false),
-        })
-    }
-    pub fn new_root_no_fs(inode: Arc<dyn INode>, name: String) -> Arc<DirEntry> {
-        Arc::new(DirEntry {
-            data: RwSpin::new(DirEntryData {
-                parent: None,
-                name,
-                inode: inode.clone(),
-                fs: None,
             }),
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
@@ -60,7 +45,6 @@ impl DirEntry {
                     parent: Some(parent),
                     name,
                     inode: inode.clone(),
-                    fs: Some(inode.fs()),
                 }),
                 used: AtomicBool::new(false),
                 mountpoint: AtomicBool::new(false),
@@ -78,7 +62,6 @@ impl DirEntry {
                 parent: None,
                 name: String::new(),
                 inode: inode.clone(),
-                fs: None,
             }),
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
@@ -149,10 +132,6 @@ impl DirEntry {
     pub fn set_is_mountpont(&self, is: bool) {
         self.mountpoint.store(is, Ordering::SeqCst);
     }
-
-    pub fn set_fs(&self, fs: Option<Arc<dyn Filesystem>>) {
-        self.data.write().fs = fs;
-    }
 }
 
 impl Clone for DirEntry {
@@ -199,10 +178,7 @@ impl DirEntryCacheData {
                 //println!("get_dirent {:?} found unused", key);
                 let entry = e.clone();
 
-                let inode = entry.inode();
-
                 entry.write().parent = Some(current);
-                entry.write().fs = Some(inode.fs());
 
                 drop(e);
 
@@ -235,7 +211,6 @@ impl DirEntryCacheData {
         //println!("move_to_unused {:?}", key);
 
         ent.data.write().parent = None;
-        ent.data.write().fs = None;
 
         if let Some(_e) = self.used.remove(&key) {
             self.unused.put(key, Arc::new(ent));

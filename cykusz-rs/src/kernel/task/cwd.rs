@@ -1,15 +1,18 @@
+use crate::kernel::fs::filesystem::Filesystem;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 pub struct Cwd {
     pub dentry: Arc<crate::kernel::fs::dirent::DirEntry>,
+    pub fs: Arc<dyn Filesystem>,
 }
 
 impl Cwd {
     pub fn new(dentry: Arc<crate::kernel::fs::dirent::DirEntry>) -> Cwd {
         Cwd {
             dentry: dentry.clone(),
+            fs: dentry.inode().fs(),
         }
     }
 

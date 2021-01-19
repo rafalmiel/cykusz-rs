@@ -6,6 +6,7 @@ use core::sync::atomic::Ordering;
 
 use spin::Once;
 
+use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard, Spin};
 
@@ -16,6 +17,7 @@ pub struct DirEntryData {
     pub parent: Option<Arc<DirEntry>>,
     pub name: String,
     pub inode: Arc<dyn INode>,
+    fs: Option<Arc<dyn Filesystem>>,
 }
 
 pub struct DirEntry {
@@ -31,6 +33,7 @@ impl DirEntry {
                 parent: None,
                 name,
                 inode: inode.clone(),
+                fs: None,
             }),
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
@@ -46,6 +49,7 @@ impl DirEntry {
                     parent: Some(parent),
                     name,
                     inode: inode.clone(),
+                    fs: None,
                 }),
                 used: AtomicBool::new(false),
                 mountpoint: AtomicBool::new(false),
@@ -57,12 +61,30 @@ impl DirEntry {
         }
     }
 
+    pub fn new_no_cache(
+        parent: Arc<DirEntry>,
+        inode: Arc<dyn INode>,
+        name: String,
+    ) -> Arc<DirEntry> {
+        Arc::new(DirEntry {
+            data: RwSpin::new(DirEntryData {
+                parent: Some(parent),
+                name,
+                inode: inode.clone(),
+                fs: None,
+            }),
+            used: AtomicBool::new(false),
+            mountpoint: AtomicBool::new(false),
+        })
+    }
+
     pub fn inode_wrap(inode: Arc<dyn INode>) -> Arc<DirEntry> {
         Arc::new(DirEntry {
             data: RwSpin::new(DirEntryData {
                 parent: None,
                 name: String::new(),
                 inode: inode.clone(),
+                fs: None,
             }),
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
@@ -133,6 +155,16 @@ impl DirEntry {
     pub fn set_is_mountpont(&self, is: bool) {
         self.mountpoint.store(is, Ordering::SeqCst);
     }
+
+    pub fn ref_fs(&self) {
+        let inode = self.inode();
+
+        self.data.write().fs = Some(inode.fs());
+
+        if let Some(p) = self.data.read().parent.clone() {
+            p.ref_fs();
+        }
+    }
 }
 
 impl Clone for DirEntry {
@@ -168,7 +200,7 @@ pub struct DirEntryCache {
 
 impl DirEntryCacheData {
     fn get_dirent(&mut self, current: Arc<DirEntry>, name: String) -> Option<Arc<DirEntry>> {
-        let key = (current.as_ref() as *const DirEntry as usize, name);
+        let key = DirEntry::make_key(Some(&current), &name);
 
         if let Some(e) = self.used.get(&key) {
             let found = e.clone().upgrade();
@@ -212,6 +244,7 @@ impl DirEntryCacheData {
         //println!("move_to_unused {:?}", key);
 
         ent.data.write().parent = None;
+        ent.data.write().fs = None;
 
         if let Some(_e) = self.used.remove(&key) {
             self.unused.put(key, Arc::new(ent));

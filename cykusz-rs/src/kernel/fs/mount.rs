@@ -76,6 +76,8 @@ impl Mounts {
 
             if Arc::strong_count(&ent.fs) > 1 {
                 println!("Syncing fs in use...");
+
+                ent.fs.sync();
             }
 
             drop(ent);

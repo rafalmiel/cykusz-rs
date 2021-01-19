@@ -126,11 +126,9 @@ impl Task {
     }
 
     pub fn set_cwd(&self, dentry: Arc<DirEntry>) {
-        dentry.ref_fs();
-
         let mut cwd = self.cwd.write();
 
-        //cwd.fs = dentry.inode().fs();
+        cwd.fs = dentry.inode().fs();
         cwd.dentry = dentry;
     }
 

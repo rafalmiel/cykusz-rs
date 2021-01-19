@@ -284,6 +284,10 @@ impl Filesystem for RamFS {
     fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
         self.root_dentry.clone()
     }
+
+    fn name(&self) -> &'static str {
+        "ramfs"
+    }
 }
 
 impl RamFS {
@@ -297,6 +301,10 @@ impl RamFS {
             root_dentry: root_de.clone(),
             next_id: AtomicUsize::new(1),
         });
+
+        let cpy: Arc<dyn Filesystem> = fs.clone();
+
+        root_de.init_fs(Arc::downgrade(&cpy));
 
         root.setup(
             "/",

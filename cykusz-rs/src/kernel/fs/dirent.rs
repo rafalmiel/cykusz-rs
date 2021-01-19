@@ -17,13 +17,13 @@ pub struct DirEntryData {
     pub parent: Option<Arc<DirEntry>>,
     pub name: String,
     pub inode: Arc<dyn INode>,
-    fs: Option<Arc<dyn Filesystem>>,
 }
 
 pub struct DirEntry {
     data: RwSpin<DirEntryData>,
     used: AtomicBool,
     mountpoint: AtomicBool,
+    fs: Once<Weak<dyn Filesystem>>,
 }
 
 impl DirEntry {
@@ -33,10 +33,10 @@ impl DirEntry {
                 parent: None,
                 name,
                 inode: inode.clone(),
-                fs: None,
             }),
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
+            fs: Once::new(),
         })
     }
 
@@ -49,10 +49,10 @@ impl DirEntry {
                     parent: Some(parent),
                     name,
                     inode: inode.clone(),
-                    fs: None,
                 }),
                 used: AtomicBool::new(false),
                 mountpoint: AtomicBool::new(false),
+                fs: Once::initialized(Arc::downgrade(&inode.fs())),
             });
 
             cache().insert(&e);
@@ -71,10 +71,10 @@ impl DirEntry {
                 parent: Some(parent),
                 name,
                 inode: inode.clone(),
-                fs: None,
             }),
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
+            fs: Once::initialized(Arc::downgrade(&inode.fs())),
         })
     }
 
@@ -84,10 +84,10 @@ impl DirEntry {
                 parent: None,
                 name: String::new(),
                 inode: inode.clone(),
-                fs: None,
             }),
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
+            fs: Once::initialized(Arc::downgrade(&inode.fs())),
         })
     }
 
@@ -156,14 +156,12 @@ impl DirEntry {
         self.mountpoint.store(is, Ordering::SeqCst);
     }
 
-    pub fn ref_fs(&self) {
-        let inode = self.inode();
+    pub fn is_valid(&self) -> bool {
+        Weak::strong_count(&self.fs.get().unwrap()) > 0
+    }
 
-        self.data.write().fs = Some(inode.fs());
-
-        if let Some(p) = self.data.read().parent.clone() {
-            p.ref_fs();
-        }
+    pub fn init_fs(&self, fs: Weak<dyn Filesystem>) {
+        self.fs.call_once(|| fs);
     }
 }
 
@@ -173,6 +171,7 @@ impl Clone for DirEntry {
             data: RwSpin::new(self.data.read().clone()),
             used: AtomicBool::new(self.used.load(Ordering::SeqCst)),
             mountpoint: AtomicBool::new(self.mountpoint.load(Ordering::SeqCst)),
+            fs: Once::initialized(self.fs.get().unwrap().clone()),
         }
     }
 }
@@ -244,7 +243,6 @@ impl DirEntryCacheData {
         //println!("move_to_unused {:?}", key);
 
         ent.data.write().parent = None;
-        ent.data.write().fs = None;
 
         if let Some(_e) = self.used.remove(&key) {
             self.unused.put(key, Arc::new(ent));

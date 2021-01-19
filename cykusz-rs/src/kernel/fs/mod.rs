@@ -137,14 +137,17 @@ fn lookup_by_path_from(
     for (idx, name) in path.components().enumerate() {
         match name {
             "." => {}
-            ".." => {
+            ".." => loop {
                 let current = cur.read();
                 if let Some(parent) = current.parent.clone() {
                     drop(current);
 
                     cur = parent.clone();
                 }
-            }
+                if cur.is_valid() {
+                    break;
+                }
+            },
             s => {
                 let r = dirent::cache()
                     .get_dirent(cur.clone(), String::from(s))

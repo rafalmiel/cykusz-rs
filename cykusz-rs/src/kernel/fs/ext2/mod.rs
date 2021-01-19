@@ -131,10 +131,14 @@ impl Ext2Filesystem {
     pub fn make_buf_from(&self, block: usize) -> BufBlock {
         let mut buf = self.make_buf();
 
-        self.read_block(block, buf.bytes_mut());
+        self.read_block(block, buf.slice_mut());
         buf.set_block(block);
 
         buf
+    }
+
+    pub fn make_slice_buf<T: Sized + Default + Copy>(&self) -> SliceBlock<T> {
+        SliceBlock::<T>::new(self.superblock().block_size() / core::mem::size_of::<T>())
     }
 
     pub fn make_slice_buf_from<T: Sized + Default + Copy>(&self, block: usize) -> SliceBlock<T> {
@@ -198,12 +202,18 @@ impl Drop for Ext2Filesystem {
 
 impl Filesystem for Ext2Filesystem {
     fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
-        DirEntry::new_root(self.get_inode(2), String::from("/"))
+        let e = DirEntry::new_root(self.get_inode(2), String::from("/"));
+        e.init_fs(self.self_ref.clone());
+        e
     }
 
     fn sync(&self) {
         println!("[ EXT2 ] Syncing...");
         self.blockgroupdesc.sync(self);
         self.superblock.sync(self);
+    }
+
+    fn name(&self) -> &'static str {
+        "ext2"
     }
 }

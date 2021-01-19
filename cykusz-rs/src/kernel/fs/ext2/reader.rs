@@ -34,7 +34,7 @@ impl INodeReader {
         let next_block_num = (inode.size_lower() as usize).ceil_div(block_size);
 
         if let Some(new_block) = fs.alloc_block(id) {
-            let new_blocks = self.set_block(next_block_num, new_block.block(), id, &mut inode);
+            let new_blocks = self.set_block(next_block_num, new_block.block(), id, &mut inode)?;
 
             inode.inc_size_lower(block_size as u32);
             inode.inc_sector_count(new_blocks as u32 * sb.sectors_per_block() as u32);
@@ -53,13 +53,13 @@ impl INodeReader {
         ptr: usize,
         inode_id: usize,
         inode: &mut INode,
-    ) -> usize {
+    ) -> Option<usize> {
         let mut new_blocks = 0;
         if block_num < 12 {
             assert_eq!(inode.direct_ptrs()[block_num], 0);
             inode.direct_ptrs_mut()[block_num] = ptr as u32;
             new_blocks += 1;
-            return new_blocks;
+            return Some(new_blocks);
         }
 
         let block_size = self.fs().superblock().block_size();
@@ -68,59 +68,83 @@ impl INodeReader {
 
         let entries_per_block = block_size / core::mem::size_of::<u32>();
 
+        let mut revert_ptrs = Vec::<usize>::with_capacity(4);
+
         let mut buf = self.fs().make_buf();
 
-        let mut set_ptrs = |mut ptr: usize, offsets: &[usize], val: usize| -> usize {
+        let mut set_ptrs = |mut ptr: usize,
+                            offsets: &[usize],
+                            val: usize,
+                            reverts: &mut Vec<usize>|
+         -> Option<usize> {
             let mut new_blocks = 0;
             if ptr == 0 {
-                return new_blocks;
+                return None;
             }
 
-            for (i, &offset) in offsets.iter().enumerate() {
-                if self.fs().read_block(ptr, buf.bytes_mut()).is_none() {
-                    return new_blocks;
-                }
+            let result: Option<usize> = try {
+                for (i, &offset) in offsets.iter().enumerate() {
+                    self.fs().read_block(ptr, buf.bytes_mut())?;
 
-                if i == offsets.len() - 1 {
-                    assert_eq!(buf.slice::<u32>()[offset], 0);
-                    buf.slice_mut::<u32>()[offset] = val as u32;
+                    if i == offsets.len() - 1 {
+                        assert_eq!(buf.slice::<u32>()[offset], 0);
+                        buf.slice_mut::<u32>()[offset] = val as u32;
 
-                    new_blocks += 1;
+                        new_blocks += 1;
 
-                    self.fs()
-                        .write_block(ptr, buf.bytes())
-                        .expect("Write block failed");
-                } else {
-                    if buf.slice::<u32>()[offset] as usize == 0 {
-                        if let Some(p) = self.fs().group_descs().alloc_block_ptr(inode_id) {
+                        self.fs()
+                            .write_block(ptr, buf.bytes())
+                            .expect("Write block failed");
+                    } else {
+                        if buf.slice::<u32>()[offset] as usize == 0 {
+                            let p = self.fs().group_descs().alloc_block_ptr(inode_id)?;
+
+                            reverts.push(p);
+
                             new_blocks += 1;
                             buf.slice_mut::<u32>()[offset] = p as u32;
 
                             self.fs()
                                 .write_block(ptr, buf.bytes())
                                 .expect("Write block failed");
-                        } else {
-                            return new_blocks;
                         }
-                    }
 
-                    ptr = buf.slice::<u32>()[offset] as usize;
+                        ptr = buf.slice::<u32>()[offset] as usize;
+                    }
+                }
+
+                new_blocks
+            };
+
+            if result.is_none() {
+                let fs = self.fs();
+                let bg = fs.group_descs();
+
+                for &ptr in reverts.iter() {
+                    bg.free_block_ptr(ptr);
                 }
             }
 
-            new_blocks
+            result
         };
 
         if block_num < entries_per_block {
             if inode.s_indir_ptr() == 0 {
-                if let Some(id) = self.fs().group_descs().alloc_block_ptr(inode_id) {
-                    new_blocks += 1;
-                    inode.set_s_indir_ptr(id as u32);
-                }
+                let id = self.fs().group_descs().alloc_block_ptr(inode_id)?;
+
+                revert_ptrs.push(id);
+
+                new_blocks += 1;
+                inode.set_s_indir_ptr(id as u32);
             }
 
-            new_blocks += set_ptrs(inode.s_indir_ptr() as usize, &[block_num], ptr);
-            return new_blocks;
+            new_blocks += set_ptrs(
+                inode.s_indir_ptr() as usize,
+                &[block_num],
+                ptr,
+                &mut revert_ptrs,
+            )?;
+            return Some(new_blocks);
         }
 
         let entries_per_dblock = entries_per_block * entries_per_block;
@@ -130,14 +154,21 @@ impl INodeReader {
             let off2 = block_num % entries_per_block;
 
             if inode.d_indir_ptr() == 0 {
-                if let Some(id) = self.fs().group_descs().alloc_block_ptr(inode_id) {
-                    new_blocks += 1;
-                    inode.set_d_indir_ptr(id as u32);
-                }
+                let id = self.fs().group_descs().alloc_block_ptr(inode_id)?;
+
+                revert_ptrs.push(id);
+
+                new_blocks += 1;
+                inode.set_d_indir_ptr(id as u32);
             }
 
-            new_blocks += set_ptrs(inode.d_indir_ptr() as usize, &[off1, off2], ptr);
-            return new_blocks;
+            new_blocks += set_ptrs(
+                inode.d_indir_ptr() as usize,
+                &[off1, off2],
+                ptr,
+                &mut revert_ptrs,
+            )?;
+            return Some(new_blocks);
         }
 
         let entried_per_tblock = entries_per_dblock * entries_per_block;
@@ -151,16 +182,23 @@ impl INodeReader {
             let off3 = block_num % entries_per_block;
 
             if inode.t_indir_ptr() == 0 {
-                if let Some(id) = self.fs().group_descs().alloc_block_ptr(inode_id) {
-                    new_blocks += 1;
-                    inode.set_t_indir_ptr(id as u32);
-                }
+                let id = self.fs().group_descs().alloc_block_ptr(inode_id)?;
+
+                revert_ptrs.push(id);
+
+                new_blocks += 1;
+                inode.set_t_indir_ptr(id as u32);
             }
 
-            new_blocks += set_ptrs(inode.t_indir_ptr() as usize, &[off1, off2, off3], ptr);
+            new_blocks += set_ptrs(
+                inode.t_indir_ptr() as usize,
+                &[off1, off2, off3],
+                ptr,
+                &mut revert_ptrs,
+            )?;
         }
 
-        return new_blocks;
+        return Some(new_blocks);
     }
 
     fn get_block(&self, mut block_num: usize, inode: &INode) -> Option<usize> {

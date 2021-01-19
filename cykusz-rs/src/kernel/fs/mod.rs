@@ -1,6 +1,7 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::ops::Try;
 
 use spin::Once;
 
@@ -145,15 +146,13 @@ fn lookup_by_path_from(
                 }
             }
             s => {
-                //println!("looking for entry {}", s);
-                let r = if let Some(f) = dirent::cache().get_dirent(cur.clone(), String::from(s)) {
-                    //println!("lookup found in cache");
-
-                    Ok(f)
-                } else {
-                    let current = cur.read();
-                    current.inode.lookup(cur.clone(), s)
-                };
+                let r = dirent::cache()
+                    .get_dirent(cur.clone(), String::from(s))
+                    .into_result()
+                    .or_else(|_| {
+                        let current = cur.read();
+                        current.inode.lookup(cur.clone(), s)
+                    });
 
                 match r {
                     Ok(mut res) => {

@@ -71,10 +71,17 @@ impl LockedExt2INode {
 
             let mut iter = DirEntIter::new_no_skip(new.clone());
 
-            iter.add_dir_entry(&new, disk::inode::FileType::Dir, ".")?;
-            iter.add_dir_entry(&self, disk::inode::FileType::Dir, "..")?;
+            let result: Result<()> = try {
+                iter.add_dir_entry(&new, disk::inode::FileType::Dir, ".")?;
+                iter.add_dir_entry(&self, disk::inode::FileType::Dir, "..")?;
 
-            return Ok(new);
+                ()
+            };
+
+            if result.is_err() {
+            } else {
+                return Ok(new);
+            }
         }
 
         Err(FsError::NotSupported)
@@ -186,6 +193,67 @@ impl Ext2INode {
     pub fn ftype(&self) -> syscall_defs::FileType {
         self.d_inode.ftype().into()
     }
+
+    fn free_s_ptr(ptr: usize, fs: &Ext2Filesystem) {
+        let block = fs.make_slice_buf_from::<u32>(ptr);
+
+        for &p in block.slice() {
+            if p != 0 {
+                fs.group_descs().free_block_ptr(p as usize);
+            } else {
+                break;
+            }
+        }
+        fs.group_descs().free_block_ptr(ptr);
+    }
+
+    fn free_d_ptr(ptr: usize, fs: &Ext2Filesystem) {
+        let block = fs.make_slice_buf_from::<u32>(ptr);
+
+        for &p in block.slice() {
+            if p != 0 {
+                Self::free_s_ptr(p as usize, fs);
+            } else {
+                break;
+            }
+        }
+        fs.group_descs().free_block_ptr(ptr);
+    }
+    fn free_t_ptr(ptr: usize, fs: &Ext2Filesystem) {
+        let block = fs.make_slice_buf_from::<u32>(ptr);
+
+        for &p in block.slice() {
+            if p != 0 {
+                Self::free_d_ptr(p as usize, fs);
+            } else {
+                break;
+            }
+        }
+        fs.group_descs().free_block_ptr(ptr);
+    }
+
+    pub fn free_blocks(&mut self, fs: &Ext2Filesystem) {
+        for i in 0usize..15 {
+            let ptr = self.d_inode.block_ptrs()[i] as usize;
+
+            if ptr == 0 {
+                return;
+            }
+
+            if i < 12 {
+                fs.group_descs().free_block_ptr(ptr);
+            } else {
+                match i {
+                    12 => Self::free_s_ptr(ptr, fs),
+                    13 => Self::free_d_ptr(ptr, fs),
+                    14 => Self::free_t_ptr(ptr, fs),
+                    _ => unreachable!(),
+                }
+            }
+
+            self.d_inode.block_ptrs_mut()[i] = 0;
+        }
+    }
 }
 
 impl INode for LockedExt2INode {
@@ -225,9 +293,13 @@ impl INode for LockedExt2INode {
 
         let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
 
-        iter.add_dir_entry(&new_inode, disk::inode::FileType::Dir, name)?;
+        if let Err(e) = iter.add_dir_entry(&new_inode, disk::inode::FileType::Dir, name) {
+            self.fs().free_inode(new_inode);
 
-        Ok(new_inode)
+            Err(e)
+        } else {
+            Ok(new_inode)
+        }
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {

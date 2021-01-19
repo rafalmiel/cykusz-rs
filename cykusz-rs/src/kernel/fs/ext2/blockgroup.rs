@@ -12,6 +12,7 @@ use crate::kernel::sync::{Mutex, RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 
 use super::disk;
+use crate::kernel::utils::types::Align;
 
 pub struct INodeVec {
     vec: Vec<disk::inode::INode>,
@@ -82,9 +83,26 @@ impl GroupDescriptors {
     fn sync(&self, fs: &Ext2Filesystem) {
         let sb = fs.superblock();
 
-        fs.dev()
-            .write(sb.block_groups_sector(), self.vec.as_slice().to_bytes())
-            .expect("Failed to sync GroupDescriptors");
+        let aligned_count = sb.group_count().align_up(16);
+        let actual_len = self.vec.len();
+
+        if actual_len < aligned_count {
+            let mut vec = Vec::<BlockGroupDescriptor>::new();
+            vec.resize(aligned_count, BlockGroupDescriptor::default());
+
+            fs.dev()
+                .read(sb.block_groups_sector(), vec.as_mut_slice().to_bytes_mut());
+
+            vec[..actual_len].copy_from_slice(&self.vec[..actual_len]);
+
+            fs.dev()
+                .write(sb.block_groups_sector(), vec.as_slice().to_bytes())
+                .expect("Failed to sync GroupDescriptors");
+        } else {
+            fs.dev()
+                .write(sb.block_groups_sector(), self.vec.as_slice().to_bytes())
+                .expect("Failed to sync GroupDescriptors");
+        }
     }
 
     fn find_free_blocks_group(&self, hint: usize) -> Option<usize> {
@@ -177,6 +195,13 @@ impl BlocksBitmap {
         }
 
         None
+    }
+
+    fn free_bit(&mut self, bit: usize) {
+        let idx = bit / 8;
+        let bit = bit % 8;
+
+        self.map[idx].set_bit(bit, false);
     }
 
     fn sync(&self, fs: &Ext2Filesystem, block: usize) {
@@ -360,6 +385,58 @@ impl BlockGroupDescriptors {
         } else {
             None
         }
+    }
+
+    pub fn free_block_ptr(&self, mut block: usize) {
+        let fs = self.fs();
+        let sb = fs.superblock();
+
+        block -= sb.first_block();
+
+        let blocks_in_group = sb.blocks_in_group();
+
+        let group = block / blocks_in_group;
+        let bit = block % blocks_in_group;
+
+        let mut descs = self.d_desc.write();
+
+        let bg = &mut descs.vec[group];
+
+        let block_bitmap = bg.block_usage_bitmap();
+
+        let mut bmap = BlocksBitmap::new_from_block(&fs, block_bitmap as usize);
+
+        bmap.free_bit(bit);
+        bmap.sync(&fs, block_bitmap as usize);
+
+        bg.inc_unallocated_blocks();
+        sb.write_inner().inc_free_blocks();
+    }
+
+    pub fn free_inode_id(&self, mut inode: usize) {
+        let fs = self.fs();
+        let sb = fs.superblock();
+
+        inode -= 1;
+
+        let inodes_per_group = sb.inodes_per_group();
+
+        let group = inode / inodes_per_group;
+        let bit = inode % inodes_per_group;
+
+        let mut descs = self.d_desc.write();
+
+        let bg = &mut descs.vec[group];
+
+        let inode_bitmap = bg.inode_usage_bitmap();
+
+        let mut bmap = BlocksBitmap::new_from_block(&fs, inode_bitmap as usize);
+
+        bmap.free_bit(bit);
+        bmap.sync(&fs, inode_bitmap as usize);
+
+        bg.inc_unallocated_inodes();
+        sb.write_inner().inc_free_inodes();
     }
 
     pub fn inc_dir_count(&self, inode: usize) {

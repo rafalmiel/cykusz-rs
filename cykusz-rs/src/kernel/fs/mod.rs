@@ -145,64 +145,59 @@ fn lookup_by_path_from(
                 }
             }
             s => {
-                {
+                //println!("looking for entry {}", s);
+                let r = if let Some(f) = dirent::cache().get_dirent(cur.clone(), String::from(s)) {
+                    //println!("lookup found in cache");
+
+                    Ok(f)
+                } else {
                     let current = cur.read();
-                    //println!("looking for entry");
-                    if let Some(f) = dirent::cache().get_dirent(cur.clone(), String::from(s)) {
-                        drop(current);
+                    current.inode.lookup(cur.clone(), s)
+                };
 
-                        //println!("lookup found in cache");
+                match r {
+                    Ok(mut res) => {
+                        //println!("found {:?}", res.inode().ftype()?);
 
-                        cur = f;
-                    } else {
-                        let r = current.inode.lookup(cur.clone(), s);
+                        if res.inode().ftype()? == FileType::Symlink {
+                            let link = read_link(&res.inode())?;
+                            //println!("its symlink! {}", link);
 
-                        match r {
-                            Ok(mut res) => {
-                                drop(current);
+                            let path = Path::new(link.as_str());
 
-                                if res.inode().ftype()? == FileType::Symlink {
-                                    let link = read_link(&res.inode())?;
+                            let is_absolute = path.is_absolute();
 
-                                    let path = Path::new(link.as_str());
+                            let new = lookup_by_path_from(
+                                path,
+                                lookup_mode,
+                                if !is_absolute {
+                                    cur.clone()
+                                } else {
+                                    root_dentry().clone()
+                                },
+                            )?;
 
-                                    let is_absolute = path.is_absolute();
-
-                                    let new = lookup_by_path_from(
-                                        path,
-                                        lookup_mode,
-                                        if !is_absolute {
-                                            cur.clone()
-                                        } else {
-                                            root_dentry().clone()
-                                        },
-                                    )?;
-
-                                    res = crate::kernel::fs::dirent::DirEntry::new(
-                                        cur.clone(),
-                                        new.inode(),
-                                        String::from(s),
-                                    );
-                                }
-
-                                cur = res;
-                            }
-                            Err(e)
-                                if e == FsError::EntryNotFound
-                                    && idx == len - 1
-                                    && lookup_mode == LookupMode::Create =>
-                            {
-                                let inode = cur.inode();
-                                let new = inode.create(cur.clone(), s)?;
-
-                                drop(current);
-
-                                cur = new;
-                            }
-                            Err(e) => {
-                                return Err(e);
-                            }
+                            res = crate::kernel::fs::dirent::DirEntry::new_no_cache(
+                                cur.clone(),
+                                new.inode(),
+                                String::from(s),
+                            );
                         }
+
+                        cur = res;
+                    }
+                    Err(e)
+                        if e == FsError::EntryNotFound
+                            && idx == len - 1
+                            && lookup_mode == LookupMode::Create =>
+                    {
+                        let inode = cur.inode();
+                        let new = inode.create(cur.clone(), s)?;
+
+                        cur = new;
+                    }
+                    Err(e) => {
+                        return Err(e);
                     }
                 }
             }

@@ -1,3 +1,4 @@
+use alloc::string::String;
 use alloc::sync::Arc;
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -12,7 +13,6 @@ use crate::kernel::sched::new_task_id;
 use crate::kernel::sync::RwSpin;
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
-use alloc::string::String;
 
 pub mod cwd;
 pub mod filetable;
@@ -126,9 +126,11 @@ impl Task {
     }
 
     pub fn set_cwd(&self, dentry: Arc<DirEntry>) {
+        dentry.ref_fs();
+
         let mut cwd = self.cwd.write();
 
-        cwd.fs = dentry.inode().fs();
+        //cwd.fs = dentry.inode().fs();
         cwd.dentry = dentry;
     }
 

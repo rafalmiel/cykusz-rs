@@ -5,10 +5,11 @@ use spin::Once;
 
 use crate::kernel::block::BlockDev;
 use crate::kernel::fs::dirent::DirEntry;
-use crate::kernel::fs::ext2::buf_block::BufBlock;
+use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::sync::Spin;
+use crate::kernel::utils::slice::ToBytesMut;
 
 mod blockgroup;
 mod buf_block;
@@ -106,6 +107,12 @@ impl Ext2Filesystem {
         }
     }
 
+    pub fn free_inode(&self, inode: Arc<LockedExt2INode>) {
+        inode.write().free_blocks(self);
+
+        self.group_descs().free_inode_id(inode.read().id());
+    }
+
     pub fn alloc_block(&self, hint: usize) -> Option<BufBlock> {
         if let Some(ptr) = self.group_descs().alloc_block_ptr(hint) {
             let mut buf = self.make_buf();
@@ -121,6 +128,26 @@ impl Ext2Filesystem {
         BufBlock::new(self.superblock().block_size())
     }
 
+    pub fn make_buf_from(&self, block: usize) -> BufBlock {
+        let mut buf = self.make_buf();
+
+        self.read_block(block, buf.bytes_mut());
+        buf.set_block(block);
+
+        buf
+    }
+
+    pub fn make_slice_buf_from<T: Sized + Default + Copy>(&self, block: usize) -> SliceBlock<T> {
+        let mut slice =
+            SliceBlock::<T>::new(self.superblock().block_size() / core::mem::size_of::<T>());
+
+        self.read_block(block, slice.slice_mut().to_bytes_mut())
+            .expect("Failed to read block");
+        slice.set_block(block);
+
+        slice
+    }
+
     pub fn make_buf_size(&self, size: usize) -> BufBlock {
         BufBlock::new(size)
     }
@@ -133,7 +160,6 @@ impl Ext2Filesystem {
 
     #[allow(dead_code)]
     fn debug_resize_inode(&self) {
-        use crate::kernel::utils::slice::ToBytesMut;
         use alloc::vec::Vec;
 
         let i = self.get_inode(7);

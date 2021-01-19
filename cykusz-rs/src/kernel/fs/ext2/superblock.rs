@@ -77,6 +77,10 @@ impl Superblock {
     }
 
     pub fn debug(&self) {
+        println!(
+            "SIZE: {}",
+            core::mem::size_of::<disk::superblock::Superblock>()
+        );
         println!("{:?}", *self.d_superblock.read());
     }
 

@@ -92,6 +92,7 @@ pub struct Superblock {
     journal_inode: u32,
     journal_dev: u32,
     orphan_list_head: u32,
+    _unused2: [u8; 1024 - 236],
 }
 
 impl Default for Superblock {
@@ -139,6 +140,7 @@ impl Default for Superblock {
             journal_inode: 0,
             journal_dev: 0,
             orphan_list_head: 0,
+            _unused2: [0u8; 1024 - 236],
         }
     }
 }

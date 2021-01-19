@@ -6,4 +6,6 @@ pub trait Filesystem: Send + Sync {
     }
 
     fn sync(&self) {}
+
+    fn name(&self) -> &'static str;
 }

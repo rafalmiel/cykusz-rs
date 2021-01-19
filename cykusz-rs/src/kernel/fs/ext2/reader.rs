@@ -70,7 +70,7 @@ impl INodeReader {
 
         let mut revert_ptrs = Vec::<usize>::with_capacity(4);
 
-        let mut buf = self.fs().make_buf();
+        let mut buf = self.fs().make_slice_buf::<u32>();
 
         let mut set_ptrs = |mut ptr: usize,
                             offsets: &[usize],
@@ -84,32 +84,32 @@ impl INodeReader {
 
             let result: Option<usize> = try {
                 for (i, &offset) in offsets.iter().enumerate() {
-                    self.fs().read_block(ptr, buf.bytes_mut())?;
+                    self.fs().read_block(ptr, buf.slice_mut().to_bytes_mut())?;
 
                     if i == offsets.len() - 1 {
-                        assert_eq!(buf.slice::<u32>()[offset], 0);
-                        buf.slice_mut::<u32>()[offset] = val as u32;
+                        assert_eq!(buf.slice()[offset], 0);
+                        buf.slice_mut()[offset] = val as u32;
 
                         new_blocks += 1;
 
                         self.fs()
-                            .write_block(ptr, buf.bytes())
+                            .write_block(ptr, buf.slice().to_bytes())
                             .expect("Write block failed");
                     } else {
-                        if buf.slice::<u32>()[offset] as usize == 0 {
+                        if buf.slice()[offset] as usize == 0 {
                             let p = self.fs().group_descs().alloc_block_ptr(inode_id)?;
 
                             reverts.push(p);
 
                             new_blocks += 1;
-                            buf.slice_mut::<u32>()[offset] = p as u32;
+                            buf.slice_mut()[offset] = p as u32;
 
                             self.fs()
-                                .write_block(ptr, buf.bytes())
+                                .write_block(ptr, buf.slice().to_bytes())
                                 .expect("Write block failed");
                         }
 
-                        ptr = buf.slice::<u32>()[offset] as usize;
+                        ptr = buf.slice()[offset] as usize;
                     }
                 }
 

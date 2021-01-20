@@ -378,8 +378,21 @@ impl INodeData {
         let inode = linode.d_inode();
 
         let file_size = inode.size_lower() as usize;
+        let file_type = inode.ftype();
 
         drop(linode);
+
+        if file_type == FileType::Symlink && self.offset + data.len() <= 60 {
+            let mut writer = self.inode.d_inode_writer();
+
+            writer.block_ptrs_mut().to_bytes_mut()[self.offset..self.offset + data.len()]
+                .copy_from_slice(&data);
+            self.offset += data.len();
+
+            writer.set_size_lower(self.offset as u32);
+
+            return Ok(data.len());
+        }
 
         if self.offset > file_size {
             return Err(FsError::InvalidParam);

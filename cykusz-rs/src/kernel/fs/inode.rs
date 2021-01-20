@@ -62,6 +62,10 @@ pub trait INode: Send + Sync {
         return Err(FsError::NotSupported);
     }
 
+    fn symlink(&self, _name: &str, _target: &str) -> Result<()> {
+        return Err(FsError::NotSupported);
+    }
+
     fn truncate(&self) -> Result<()> {
         return Err(FsError::NotSupported);
     }

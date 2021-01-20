@@ -161,6 +161,32 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
     };
 }
 
+pub fn sys_symlink(
+    target: u64,
+    target_len: u64,
+    linkpath: u64,
+    linkpath_len: u64,
+) -> SyscallResult {
+    let target = make_str(target, target_len);
+    let path = make_str(linkpath, linkpath_len);
+
+    let path = Path::new(path);
+
+    let (inode, name) = {
+        let (dir, target) = path.containing_dir();
+
+        (lookup_by_path(dir, LookupMode::None)?.inode(), target)
+    };
+
+    if inode.ftype()? == FileType::Dir {
+        inode.symlink(name.str(), target)?;
+
+        Ok(0)
+    } else {
+        Err(SyscallError::NotDir)
+    }
+}
+
 pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResult {
     if let Ok(name) = core::str::from_utf8(make_buf(name, nlen)) {
         let res = crate::kernel::net::dns::get_ip_by_host(name.as_bytes());

@@ -31,6 +31,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_MOUNT => sys::sys_mount(a, b, c, d, e, f),
         SYS_UMOUNT => sys::sys_umount(a, b),
         SYS_TIME => sys::sys_time(),
+        SYS_SYMLINK => sys::sys_symlink(a, b, c, d),
 
         _ => Err(SyscallError::Inval),
     }

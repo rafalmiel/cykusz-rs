@@ -10,9 +10,9 @@ use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::sync::{Mutex, RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
+use crate::kernel::utils::types::Align;
 
 use super::disk;
-use crate::kernel::utils::types::Align;
 
 pub struct INodeVec {
     vec: Vec<disk::inode::INode>,

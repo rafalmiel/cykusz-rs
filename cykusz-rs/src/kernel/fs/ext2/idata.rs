@@ -5,17 +5,18 @@ use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::disk::inode::{FileType, INode};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 use crate::kernel::utils::types::{Align, CeilDiv};
 
-pub struct INodeReader {
+pub struct INodeData {
     inode: Arc<LockedExt2INode>,
     offset: usize,
 }
 
-impl INodeReader {
-    pub fn new(inode: Arc<LockedExt2INode>, offset: usize) -> INodeReader {
-        INodeReader { inode, offset }
+impl INodeData {
+    pub fn new(inode: Arc<LockedExt2INode>, offset: usize) -> INodeData {
+        INodeData { inode, offset }
     }
 
     fn fs(&self) -> Arc<Ext2Filesystem> {
@@ -263,7 +264,28 @@ impl INodeReader {
         None
     }
 
-    pub fn read_block(&mut self) -> Option<BufBlock> {
+    pub fn read_block_at(&mut self, block_num: usize) -> Option<BufBlock> {
+        let linode = self.inode.read();
+        let inode = linode.d_inode();
+
+        let file_size = inode.size_lower() as usize;
+
+        let fs = self.fs();
+
+        if inode.ftype() == FileType::Symlink && file_size <= 60 {
+            return None;
+        }
+
+        if let Some(ptr) = self.get_block(block_num, inode) {
+            let buf = fs.make_buf_from(ptr);
+
+            Some(buf)
+        } else {
+            None
+        }
+    }
+
+    pub fn read_next_block(&mut self) -> Option<BufBlock> {
         let linode = self.inode.read();
         let inode = linode.d_inode();
 
@@ -278,7 +300,6 @@ impl INodeReader {
         if inode.ftype() == FileType::Symlink && file_size <= 60 {
             return None;
         }
-
         let block_size = fs.superblock.block_size();
 
         self.offset = self.offset.align_up(block_size);
@@ -289,9 +310,8 @@ impl INodeReader {
 
         if let Some(ptr) = self.get_block(block_num, inode) {
             let mut buf = fs.make_buf_size(rem);
+            fs.read_block(ptr, buf.slice_mut());
             buf.set_block(ptr);
-
-            fs.read_block(ptr, buf.bytes_mut())?;
 
             self.offset += rem;
 
@@ -351,5 +371,55 @@ impl INodeReader {
         }
 
         buffer_size - rem
+    }
+
+    pub fn write(&mut self, data: &[u8]) -> Result<usize> {
+        let linode = self.inode.read();
+        let inode = linode.d_inode();
+
+        let file_size = inode.size_lower() as usize;
+
+        drop(linode);
+
+        if self.offset > file_size {
+            return Err(FsError::InvalidParam);
+        }
+
+        let fs = self.fs();
+        let block_size = fs.superblock().block_size();
+
+        let mut rem = data.len();
+
+        while rem > 0 {
+            let block_num = self.offset / block_size;
+            let block_offset = self.offset % block_size;
+
+            if let Some(mut block) = if block_offset == 0 && file_size == self.offset {
+                self.append_block()
+            } else {
+                self.read_block_at(block_num)
+            } {
+                let to_write = core::cmp::min(block_size - block_offset, rem);
+                let data_offset = data.len() - rem;
+
+                block.slice_mut()[block_offset..block_offset + to_write]
+                    .copy_from_slice(&data[data_offset..data_offset + to_write]);
+
+                fs.write_block(block.block(), block.slice());
+
+                self.offset += to_write;
+
+                rem -= to_write;
+            } else {
+                break;
+            }
+        }
+
+        if self.offset > file_size {
+            let mut w = self.inode.d_inode_writer();
+            w.set_size_lower(self.offset as u32);
+        }
+
+        Ok(data.len() - rem)
     }
 }

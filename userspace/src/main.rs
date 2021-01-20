@@ -8,6 +8,7 @@ extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
 
+use crate::file::File;
 use chrono::{Datelike, Timelike};
 use syscall_defs::{OpenFlags, SysDirEntry};
 
@@ -267,6 +268,38 @@ fn exec(cmd: &str) {
             );
         } else {
             println!("Time syscall failed");
+        }
+    } else if cmd.starts_with("write ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        if let Some(path) = split.next() {
+            if let Some(file) = File::new(path, OpenFlags::RDWR) {
+                let mut buf = [0u8; 64];
+                loop {
+                    if let Ok(r) = syscall::read(1, &mut buf) {
+                        if r > 1 {
+                            file.write(&buf[..r]);
+                        } else {
+                            break;
+                        }
+                    } else {
+                        println!("stdin read failed");
+                        break;
+                    }
+                }
+            }
+        }
+    } else if cmd.starts_with("create ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        if let Some(path) = split.next() {
+            if let Some(_) = File::new(path, OpenFlags::RDWR | OpenFlags::CREAT) {
+                println!("Created file {}", path);
+            } else {
+                println!("Failed to create file {}", path);
+            }
         }
     } else if cmd.is_empty() {
         return;

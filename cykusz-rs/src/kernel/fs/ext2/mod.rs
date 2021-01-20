@@ -15,8 +15,8 @@ mod blockgroup;
 mod buf_block;
 mod dirent;
 mod disk;
+mod idata;
 mod inode;
-mod reader;
 mod superblock;
 
 pub struct Ext2Filesystem {

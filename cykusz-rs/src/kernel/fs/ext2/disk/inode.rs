@@ -46,6 +46,17 @@ impl From<u16> for FileType {
     }
 }
 
+impl From<syscall_defs::FileType> for FileType {
+    fn from(t: syscall_defs::FileType) -> Self {
+        match t {
+            syscall_defs::FileType::File => FileType::File,
+            syscall_defs::FileType::Dir => FileType::Dir,
+            syscall_defs::FileType::DevNode => FileType::CharDev,
+            syscall_defs::FileType::Symlink => FileType::Symlink,
+        }
+    }
+}
+
 #[repr(C, packed)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct INode {

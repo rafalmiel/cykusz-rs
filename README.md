@@ -23,7 +23,7 @@ Currently implemented:
 - [x] PS2/Keyboard driver + basic TTY
 - [x] Virtual File System
 - [x] Storage (ahci)
-- [x] Filesystem (readonly ext2)
+- [x] Filesystem (ext2)
 - [x] Network Stack (e1000, ETH, ARP, IP, UDP, TCP, ICMP, DHCP, DNS)
 - [x] Userspace support
 

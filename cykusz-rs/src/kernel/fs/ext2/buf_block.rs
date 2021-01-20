@@ -20,6 +20,10 @@ impl<T: Sized + Default + Copy> SliceBlock<T> {
         }
     }
 
+    pub fn alloc(&mut self, size: usize) {
+        self.buf.resize(size, T::default());
+    }
+
     pub fn set_block(&mut self, nr: usize) {
         self.block = nr;
     }

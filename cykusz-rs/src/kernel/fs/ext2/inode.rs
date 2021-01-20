@@ -7,7 +7,7 @@ use syscall_defs::FileType;
 use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
-use crate::kernel::fs::ext2::reader::INodeReader;
+use crate::kernel::fs::ext2::idata::INodeData;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
@@ -39,25 +39,16 @@ impl LockedExt2INode {
     }
 
     pub fn mk_inode(&self, typ: FileType) -> Result<Arc<LockedExt2INode>> {
-        match typ {
-            FileType::Dir => self.mk_dir_inode(),
-            _ => {
-                unimplemented!()
-            }
-        }
-    }
-
-    pub fn mk_dir_inode(&self) -> Result<Arc<LockedExt2INode>> {
         let fs = self.fs();
 
-        let parent_id = self.id().expect("Failed to get id");
+        let parent_id = self.id()?;
 
         if let Some(new) = fs.alloc_inode(parent_id) {
             let mut inner = new.d_inode_writer();
 
             *inner = disk::inode::INode::default();
 
-            inner.set_ftype(disk::inode::FileType::Dir);
+            inner.set_ftype(typ.into());
             inner.set_perm(0o755);
             inner.set_user_id(0);
             inner.set_group_id(0);
@@ -69,16 +60,18 @@ impl LockedExt2INode {
 
             drop(inner);
 
-            let mut iter = DirEntIter::new_no_skip(new.clone());
-
             let result: Result<()> = try {
-                iter.add_dir_entry(&new, disk::inode::FileType::Dir, ".")?;
-                iter.add_dir_entry(&self, disk::inode::FileType::Dir, "..")?;
+                if typ == FileType::Dir {
+                    let mut iter = DirEntIter::new_no_skip(new.clone());
+                    iter.add_dir_entry(&new, disk::inode::FileType::Dir, ".")?;
+                    iter.add_dir_entry(&self, disk::inode::FileType::Dir, "..")?;
+                }
 
                 ()
             };
 
             if result.is_err() {
+                fs.free_inode(new);
             } else {
                 return Ok(new);
             }
@@ -289,7 +282,7 @@ impl INode for LockedExt2INode {
             return Err(FsError::EntryExists);
         }
 
-        let new_inode = self.mk_dir_inode()?;
+        let new_inode = self.mk_inode(FileType::Dir)?;
 
         let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
 
@@ -311,13 +304,67 @@ impl INode for LockedExt2INode {
             }
         }
 
-        let mut reader = INodeReader::new(self.self_ref.upgrade().unwrap(), offset);
+        let mut reader = INodeData::new(self.self_ref.upgrade().unwrap(), offset);
 
         Ok(reader.read(buf))
     }
 
+    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        {
+            let inode = self.node.read();
+
+            if inode.ftype() != FileType::File {
+                return Err(FsError::NotSupported);
+            }
+        }
+
+        let mut writer = INodeData::new(self.self_ref.upgrade().unwrap(), offset);
+
+        Ok(writer.write(buf)?)
+    }
+
     fn fs(&self) -> Arc<dyn Filesystem> {
         self.fs()
+    }
+
+    fn create(
+        &self,
+        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
+        name: &str,
+    ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+        if DirEntIter::new(self.self_ref.upgrade().unwrap())
+            .find(|e| e.name() == name)
+            .is_some()
+        {
+            return Err(FsError::EntryExists);
+        }
+
+        let new_inode = self.mk_inode(FileType::File)?;
+
+        let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
+
+        if let Err(e) = iter.add_dir_entry(&new_inode, disk::inode::FileType::File, name) {
+            self.fs().free_inode(new_inode);
+
+            Err(e)
+        } else {
+            Ok(DirEntry::new(parent, new_inode, String::from(name)))
+        }
+    }
+
+    fn truncate(&self) -> Result<()> {
+        if self.ftype()? != FileType::File {
+            return Err(FsError::NotFile);
+        }
+
+        self.node.write().free_blocks(&self.fs());
+
+        let mut node = self.d_inode_writer();
+
+        node.set_size_lower(0);
+        node.set_sector_count(0);
+
+        Ok(())
     }
 
     fn dir_ent(&self, parent: Arc<DirEntry>, idx: usize) -> Result<Option<Arc<DirEntry>>> {

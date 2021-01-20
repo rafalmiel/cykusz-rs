@@ -5,8 +5,8 @@ use crate::arch::raw::mm::VirtAddr;
 use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::disk::dirent::DirEntry;
 use crate::kernel::fs::ext2::disk::inode::FileType;
+use crate::kernel::fs::ext2::idata::INodeData;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
-use crate::kernel::fs::ext2::reader::INodeReader;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
@@ -43,7 +43,7 @@ impl<'a> crate::kernel::fs::vfs::DirEntIter for SysDirEntIter<'a> {
 
 pub struct DirEntIter<'a> {
     inode: Arc<LockedExt2INode>,
-    reader: INodeReader,
+    reader: INodeData,
     buf: BufBlock,
     offset: usize,
     block: usize,
@@ -55,7 +55,7 @@ impl<'a> DirEntIter<'a> {
     pub fn new(inode: Arc<LockedExt2INode>) -> DirEntIter<'a> {
         DirEntIter::<'a> {
             inode: inode.clone(),
-            reader: INodeReader::new(inode, 0),
+            reader: INodeData::new(inode, 0),
             buf: BufBlock::empty(),
             offset: 0,
             block: 0,
@@ -105,7 +105,7 @@ impl<'a> DirEntIter<'a> {
                 panic!("Failed to extract DirEnt");
             }
 
-            if ![".", ".."].contains(&name) {
+            if typ == FileType::Dir && ![".", ".."].contains(&name) {
                 fs.group_descs().inc_dir_count(target_id);
             }
 
@@ -166,7 +166,7 @@ impl<'a> Iterator for DirEntIter<'a> {
 
             if self.buf.is_empty() || block > self.block {
                 self.block = block;
-                if let Some(b) = self.reader.read_block() {
+                if let Some(b) = self.reader.read_next_block() {
                     self.buf = b;
                 } else {
                     return None;

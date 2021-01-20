@@ -113,7 +113,7 @@ impl INode for LockedRamINode {
                     vec.resize(offset + buf.len(), 0);
                 }
 
-                vec.as_mut_slice()[offset..buf.len()].copy_from_slice(buf);
+                vec.as_mut_slice()[offset..offset + buf.len()].copy_from_slice(buf);
 
                 Ok(buf.len())
             }

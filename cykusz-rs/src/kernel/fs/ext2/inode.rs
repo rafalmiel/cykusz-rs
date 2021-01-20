@@ -259,6 +259,10 @@ impl INode for LockedExt2INode {
     }
 
     fn lookup(&self, parent: Arc<DirEntry>, name: &str) -> Result<Arc<DirEntry>> {
+        if self.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
         let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
 
         if let Some(e) = iter.find_map(|e| {
@@ -275,6 +279,10 @@ impl INode for LockedExt2INode {
     }
 
     fn mkdir(&self, name: &str) -> Result<Arc<dyn INode>> {
+        if self.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
         if DirEntIter::new(self.self_ref.upgrade().unwrap())
             .find(|e| e.name() == name)
             .is_some()
@@ -296,12 +304,8 @@ impl INode for LockedExt2INode {
     }
 
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
-        {
-            let inode = self.node.read();
-
-            if inode.ftype() != FileType::File && inode.ftype() != FileType::Symlink {
-                return Err(FsError::NotSupported);
-            }
+        if self.ftype()? != FileType::File && self.ftype()? != FileType::Symlink {
+            return Err(FsError::NotFile);
         }
 
         let mut reader = INodeData::new(self.self_ref.upgrade().unwrap(), offset);
@@ -310,12 +314,8 @@ impl INode for LockedExt2INode {
     }
 
     fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
-        {
-            let inode = self.node.read();
-
-            if inode.ftype() != FileType::File {
-                return Err(FsError::NotSupported);
-            }
+        if self.ftype()? != FileType::File && self.ftype()? != FileType::Symlink {
+            return Err(FsError::NotFile);
         }
 
         let mut writer = INodeData::new(self.self_ref.upgrade().unwrap(), offset);
@@ -332,6 +332,10 @@ impl INode for LockedExt2INode {
         parent: Arc<crate::kernel::fs::dirent::DirEntry>,
         name: &str,
     ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+        if self.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
         if DirEntIter::new(self.self_ref.upgrade().unwrap())
             .find(|e| e.name() == name)
             .is_some()
@@ -352,6 +356,37 @@ impl INode for LockedExt2INode {
         }
     }
 
+    fn symlink(&self, name: &str, target: &str) -> Result<()> {
+        if self.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
+        if DirEntIter::new(self.self_ref.upgrade().unwrap())
+            .find(|e| e.name() == name)
+            .is_some()
+        {
+            return Err(FsError::EntryExists);
+        }
+
+        let new_inode = self.mk_inode(FileType::Symlink)?;
+
+        if let Err(e) = new_inode.write_at(0, target.as_bytes()) {
+            self.fs().free_inode(new_inode);
+
+            return Err(e);
+        }
+
+        let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
+
+        if let Err(e) = iter.add_dir_entry(&new_inode, disk::inode::FileType::Symlink, name) {
+            self.fs().free_inode(new_inode);
+
+            Err(e)
+        } else {
+            Ok(())
+        }
+    }
+
     fn truncate(&self) -> Result<()> {
         if self.ftype()? != FileType::File {
             return Err(FsError::NotFile);
@@ -368,6 +403,10 @@ impl INode for LockedExt2INode {
     }
 
     fn dir_ent(&self, parent: Arc<DirEntry>, idx: usize) -> Result<Option<Arc<DirEntry>>> {
+        if self.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
         let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
 
         if let Some(de) = iter.nth(idx) {
@@ -381,6 +420,10 @@ impl INode for LockedExt2INode {
         &self,
         parent: Arc<DirEntry>,
     ) -> Option<Arc<dyn crate::kernel::fs::vfs::DirEntIter>> {
+        if self.ftype().ok()? != FileType::Dir {
+            return None;
+        }
+
         Some(Arc::new(SysDirEntIter::new(
             parent,
             self.self_ref.upgrade().unwrap(),

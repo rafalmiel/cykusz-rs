@@ -269,6 +269,17 @@ fn exec(cmd: &str) {
         } else {
             println!("Time syscall failed");
         }
+    } else if cmd.starts_with("ln ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        if let (Some(target), Some(path)) = (split.next(), split.next()) {
+            if let Err(e) = syscall::symlink(target, path) {
+                println!("ln failed: {:?}", e);
+            }
+        } else {
+            println!("param error");
+        }
     } else if cmd.starts_with("write ") {
         let mut split = cmd.split_whitespace();
         split.next();

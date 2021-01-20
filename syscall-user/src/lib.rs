@@ -119,6 +119,18 @@ pub fn mkdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_MKDIR, path.as_ptr() as usize, path.len()) }
 }
 
+pub fn symlink(target: &str, path: &str) -> SyscallResult {
+    unsafe {
+        syscall4(
+            SYS_SYMLINK,
+            target.as_ptr() as usize,
+            target.len(),
+            path.as_ptr() as usize,
+            path.len(),
+        )
+    }
+}
+
 pub fn bind(port: u32, flags: syscall_defs::ConnectionFlags) -> SyscallResult {
     unsafe { syscall2(SYS_BIND, port as usize, flags.bits()) }
 }

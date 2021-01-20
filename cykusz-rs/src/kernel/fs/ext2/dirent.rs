@@ -114,7 +114,9 @@ impl<'a> DirEntIter<'a> {
             let file_size = { self.inode.read().d_inode().size_lower() } as usize;
 
             if self.offset >= file_size {
-                return if let Some(new_block) = self.reader.append_block() {
+                return if let Some(new_block) =
+                    self.reader.append_block(fs.superblock().block_size())
+                {
                     let entry = unsafe {
                         VirtAddr(new_block.bytes().as_ptr() as usize).read_mut::<DirEntry>()
                     };

@@ -290,7 +290,23 @@ fn exec(cmd: &str) {
                 loop {
                     if let Ok(r) = syscall::read(1, &mut buf) {
                         if r > 1 {
-                            file.write(&buf[..r]);
+                            let w = file.write(&buf[..r]);
+
+                            if w < r {
+                                println!("Disk full?");
+                                break;
+                            }
+                            //loop {
+                            //    let bigbuf = ['L' as u8; 786];
+                            //    let written = file.write(&bigbuf);
+
+                            //    if written == 0 {
+                            //        break;
+                            //    }
+
+                            //    //println!("written: {}", written);
+                            //}
+                            //println!("no space");
                         } else {
                             break;
                         }

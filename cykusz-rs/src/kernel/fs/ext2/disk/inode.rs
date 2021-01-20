@@ -158,6 +158,9 @@ impl INode {
     pub fn inc_sector_count(&mut self, by: u32) {
         self.sector_count += by;
     }
+    pub fn dec_sector_count(&mut self, by: u32) {
+        self.sector_count -= by;
+    }
     pub fn flags(&self) -> u32 {
         self.flags
     }

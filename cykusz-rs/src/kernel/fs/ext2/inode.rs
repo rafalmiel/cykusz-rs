@@ -14,6 +14,7 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
+use crate::kernel::utils::slice::ToBytes;
 
 pub struct LockedExt2INode {
     node: RwSpin<Ext2INode>,
@@ -187,41 +188,53 @@ impl Ext2INode {
         self.d_inode.ftype().into()
     }
 
-    fn free_s_ptr(ptr: usize, fs: &Ext2Filesystem) {
-        let block = fs.make_slice_buf_from::<u32>(ptr);
+    fn free_s_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
+        let mut block = fs.make_slice_buf_from::<u32>(ptr);
 
-        for &p in block.slice() {
-            if p != 0 {
-                fs.group_descs().free_block_ptr(p as usize);
+        for p in block.slice_mut() {
+            if *p != 0 {
+                fs.group_descs().free_block_ptr(*p as usize);
+
+                *p = 0;
             } else {
                 break;
             }
         }
+        fs.write_block(ptr, block.slice().to_bytes());
+
         fs.group_descs().free_block_ptr(ptr);
     }
 
-    fn free_d_ptr(ptr: usize, fs: &Ext2Filesystem) {
-        let block = fs.make_slice_buf_from::<u32>(ptr);
+    fn free_d_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
+        let mut block = fs.make_slice_buf_from::<u32>(ptr);
 
-        for &p in block.slice() {
-            if p != 0 {
-                Self::free_s_ptr(p as usize, fs);
+        for p in block.slice_mut() {
+            if *p != 0 {
+                self.free_s_ptr(*p as usize, fs);
+
+                *p = 0;
             } else {
                 break;
             }
         }
+        fs.write_block(ptr, block.slice().to_bytes());
+
         fs.group_descs().free_block_ptr(ptr);
     }
-    fn free_t_ptr(ptr: usize, fs: &Ext2Filesystem) {
-        let block = fs.make_slice_buf_from::<u32>(ptr);
+    fn free_t_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
+        let mut block = fs.make_slice_buf_from::<u32>(ptr);
 
-        for &p in block.slice() {
-            if p != 0 {
-                Self::free_d_ptr(p as usize, fs);
+        for p in block.slice_mut() {
+            if *p != 0 {
+                self.free_d_ptr(*p as usize, fs);
+
+                *p = 0;
             } else {
                 break;
             }
         }
+        fs.write_block(ptr, block.slice().to_bytes());
+
         fs.group_descs().free_block_ptr(ptr);
     }
 
@@ -237,15 +250,23 @@ impl Ext2INode {
                 fs.group_descs().free_block_ptr(ptr);
             } else {
                 match i {
-                    12 => Self::free_s_ptr(ptr, fs),
-                    13 => Self::free_d_ptr(ptr, fs),
-                    14 => Self::free_t_ptr(ptr, fs),
+                    12 => {
+                        self.free_s_ptr(ptr, fs);
+                    }
+                    13 => {
+                        self.free_d_ptr(ptr, fs);
+                    }
+                    14 => {
+                        self.free_t_ptr(ptr, fs);
+                    }
                     _ => unreachable!(),
                 }
             }
 
             self.d_inode.block_ptrs_mut()[i] = 0;
         }
+
+        fs.group_descs().write_d_inode(self.id, self.d_inode());
     }
 }
 

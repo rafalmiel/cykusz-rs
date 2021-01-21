@@ -328,6 +328,15 @@ fn exec(cmd: &str) {
                 println!("Failed to create file {}", path);
             }
         }
+    } else if cmd.starts_with("rmdir ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        while let Some(path) = split.next() {
+            if let Err(e) = syscall::rmdir(path) {
+                println!("rmdir failed: {:?}", e);
+            }
+        }
     } else if cmd.is_empty() {
         return;
     } else {

@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 
 use crate::arch::raw::mm::VirtAddr;
 use crate::kernel::fs::ext2::buf_block::BufBlock;
-use crate::kernel::fs::ext2::disk::dirent::DirEntry;
+use crate::kernel::fs::ext2::disk::dirent::{DirEntTypeIndicator, DirEntry};
 use crate::kernel::fs::ext2::disk::inode::FileType;
 use crate::kernel::fs::ext2::idata::INodeData;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
@@ -73,6 +73,52 @@ impl<'a> DirEntIter<'a> {
 
     fn fs(&self) -> Arc<Ext2Filesystem> {
         self.inode.fs()
+    }
+    pub fn remove_dir_entry(&mut self, name: &str) -> Result<()> {
+        if let Some(e) = self.find(|e| e.name() == name) {
+            self.fs().get_inode(e.inode() as usize).unref_hardlink();
+
+            let fs = self.fs();
+
+            let block_size = fs.superblock().block_size();
+
+            e.set_inode(0);
+            e.set_name_size(0);
+            e.set_ftype(DirEntTypeIndicator::Unknown);
+
+            let mut entry_at = |o: usize| unsafe {
+                VirtAddr(self.buf.slice_mut().as_mut_ptr().offset(o as isize) as usize)
+                    .read_mut::<DirEntry>()
+            };
+
+            let mut offset = 0;
+
+            let mut ent = entry_at(offset);
+
+            offset += ent.ent_size() as usize;
+
+            while offset < block_size {
+                let next = entry_at(offset);
+
+                if next.inode() == 0 {
+                    let nsize = next.ent_size() as usize;
+
+                    ent.set_ent_size(ent.ent_size() + nsize as u16);
+
+                    offset += nsize;
+                } else {
+                    ent = next;
+
+                    offset += ent.ent_size() as usize;
+                }
+            }
+
+            self.sync_current_buf();
+
+            return Ok(());
+        }
+
+        Err(FsError::EntryNotFound)
     }
 
     pub fn add_dir_entry(

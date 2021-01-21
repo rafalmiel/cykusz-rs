@@ -97,6 +97,12 @@ impl Ext2Filesystem {
         }
     }
 
+    pub fn drop_from_cache(&self, id: usize) {
+        let mut cache = self.inode_cache.lock();
+
+        cache.pop(&id);
+    }
+
     pub fn alloc_inode(&self, hint: usize) -> Option<Arc<LockedExt2INode>> {
         if let Some(id) = self.group_descs().alloc_inode_id(hint) {
             let inode = self.get_inode(id);
@@ -107,10 +113,16 @@ impl Ext2Filesystem {
         }
     }
 
-    pub fn free_inode(&self, inode: Arc<LockedExt2INode>) {
+    pub fn free_inode(&self, inode: &LockedExt2INode) {
         inode.write().free_blocks(self);
 
-        self.group_descs().free_inode_id(inode.read().id());
+        let id = inode.read().id();
+
+        if inode.read().ftype() == syscall_defs::FileType::Dir {
+            self.group_descs().dec_dir_count(id)
+        }
+
+        self.group_descs().free_inode_id(id);
     }
 
     pub fn alloc_block(&self, hint: usize) -> Option<BufBlock> {

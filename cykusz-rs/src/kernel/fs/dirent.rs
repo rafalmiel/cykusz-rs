@@ -44,6 +44,8 @@ impl DirEntry {
         if let Some(e) = cache().get_dirent(parent.clone(), name.clone()) {
             return e;
         } else {
+            let do_cache = ![".", ".."].contains(&name.as_str());
+
             let e = Arc::new(DirEntry {
                 data: RwSpin::new(DirEntryData {
                     parent: Some(parent),
@@ -55,7 +57,9 @@ impl DirEntry {
                 fs: Once::initialized(Arc::downgrade(&inode.fs())),
             });
 
-            cache().insert(&e);
+            if do_cache {
+                cache().insert(&e);
+            }
 
             e
         }
@@ -163,6 +167,10 @@ impl DirEntry {
     pub fn init_fs(&self, fs: Weak<dyn Filesystem>) {
         self.fs.call_once(|| fs);
     }
+
+    pub fn drop_from_cache(&self) {
+        cache().remove(self);
+    }
 }
 
 impl Clone for DirEntry {
@@ -182,8 +190,6 @@ impl Drop for DirEntry {
             self.mark_unused();
 
             cache().move_to_unused(self.clone());
-        } else {
-            //println!("drop {:?}", self.cache_key());
         }
     }
 }
@@ -231,16 +237,25 @@ impl DirEntryCacheData {
     fn insert(&mut self, entry: &Arc<DirEntry>) {
         let key = entry.cache_key();
 
-        //println!("cache insert {:?}", key);
         entry.mark_used();
 
         self.used.insert(key, Arc::downgrade(entry));
     }
 
+    fn remove(&mut self, entry: &DirEntry) {
+        let key = entry.cache_key();
+
+        if let Some(e) = self.used.get(&key) {
+            if let Some(e) = e.upgrade() {
+                e.mark_unused();
+            }
+        } else {
+            self.unused.pop(&key);
+        }
+    }
+
     fn move_to_unused(&mut self, ent: DirEntry) {
         let key = ent.cache_key();
-
-        //println!("move_to_unused {:?}", key);
 
         ent.data.write().parent = None;
 
@@ -271,6 +286,10 @@ impl DirEntryCache {
 
     fn move_to_unused(&self, ent: DirEntry) {
         self.data.lock().move_to_unused(ent);
+    }
+
+    fn remove(&self, entry: &DirEntry) {
+        self.data.lock().remove(entry);
     }
 }
 

@@ -131,7 +131,13 @@ fn lookup_by_path_from(
     path: Path,
     lookup_mode: LookupMode,
     mut cur: Arc<crate::kernel::fs::dirent::DirEntry>,
+    real_path: bool,
+    depth: usize,
 ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+    if depth > 40 {
+        println!("[ WARN ] Lookup recursion limit exceeded");
+        return Err(FsError::EntryNotFound);
+    }
     let len = path.components().count();
 
     for (idx, name) in path.components().enumerate() {
@@ -161,7 +167,9 @@ fn lookup_by_path_from(
                     Ok(mut res) => {
                         //println!("found {:?}", res.inode().ftype()?);
 
-                        if res.inode().ftype()? == FileType::Symlink {
+                        if res.inode().ftype()? == FileType::Symlink
+                            && (depth > 0 || !real_path || idx < len - 1)
+                        {
                             let link = read_link(&res.inode())?;
                             //println!("its symlink! {}", link);
 
@@ -177,13 +185,19 @@ fn lookup_by_path_from(
                                 } else {
                                     root_dentry().clone()
                                 },
+                                real_path,
+                                depth + 1,
                             )?;
 
-                            res = crate::kernel::fs::dirent::DirEntry::new_no_cache(
-                                cur.clone(),
-                                new.inode(),
-                                String::from(s),
-                            );
+                            res = if !real_path {
+                                crate::kernel::fs::dirent::DirEntry::new_no_cache(
+                                    cur.clone(),
+                                    new.inode(),
+                                    String::from(s),
+                                )
+                            } else {
+                                new
+                            }
                         }
 
                         cur = res;
@@ -224,5 +238,18 @@ pub fn lookup_by_path(
         root_dentry().clone()
     };
 
-    lookup_by_path_from(path, lookup_mode, cur)
+    lookup_by_path_from(path, lookup_mode, cur, false, 0)
+}
+
+pub fn lookup_by_real_path(
+    path: Path,
+    lookup_mode: LookupMode,
+) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+    let cur = if !path.is_absolute() {
+        current_task().get_dent()
+    } else {
+        root_dentry().clone()
+    };
+
+    lookup_by_path_from(path, lookup_mode, cur, true, 0)
 }

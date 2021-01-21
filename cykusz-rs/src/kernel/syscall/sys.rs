@@ -7,7 +7,7 @@ use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::path::Path;
-use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -184,6 +184,24 @@ pub fn sys_symlink(
         Ok(0)
     } else {
         Err(SyscallError::NotDir)
+    }
+}
+
+pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
+    let path = Path::new(make_str(path, path_len));
+
+    let (_, name) = path.containing_dir();
+
+    let dir = lookup_by_real_path(path, LookupMode::None)?;
+
+    if dir.inode().ftype()? == FileType::Dir {
+        dir.inode().rmdir(name.str())?;
+
+        dir.drop_from_cache();
+
+        Ok(0)
+    } else {
+        return Err(SyscallError::NotDir);
     }
 }
 

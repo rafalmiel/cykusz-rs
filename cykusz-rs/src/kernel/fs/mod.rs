@@ -208,7 +208,8 @@ fn lookup_by_path_from(
                             && lookup_mode == LookupMode::Create =>
                     {
                         let inode = cur.inode();
-                        let new = inode.create(cur.clone(), s)?;
+                        //println!("Creating file with parent {} {:?}", cur.name(), cur.cache_key());
+                        let new = inode.create(cur, s)?;
 
                         cur = new;
                     }

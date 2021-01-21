@@ -337,6 +337,15 @@ fn exec(cmd: &str) {
                 println!("rmdir failed: {:?}", e);
             }
         }
+    } else if cmd.starts_with("rm ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        while let Some(path) = split.next() {
+            if let Err(e) = syscall::unlink(path) {
+                println!("unlink failed: {:?}", e);
+            }
+        }
     } else if cmd.is_empty() {
         return;
     } else {

@@ -135,6 +135,10 @@ pub fn rmdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_RMDIR, path.as_ptr() as usize, path.len()) }
 }
 
+pub fn unlink(path: &str) -> SyscallResult {
+    unsafe { syscall2(SYS_UNLINK, path.as_ptr() as usize, path.len()) }
+}
+
 pub fn bind(port: u32, flags: syscall_defs::ConnectionFlags) -> SyscallResult {
     unsafe { syscall2(SYS_BIND, port as usize, flags.bits()) }
 }

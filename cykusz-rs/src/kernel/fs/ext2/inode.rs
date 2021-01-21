@@ -111,13 +111,13 @@ impl LockedExt2INode {
         if hl_count > 0 {
             let mut writer = self.d_inode_writer();
 
-            if writer.hl_count() > 0 {
-                writer.dec_hl_count();
-            }
+            writer.dec_hl_count();
 
             if hl_count == 1 {
                 writer.set_deletion_time(crate::kernel::time::unix_timestamp() as u32);
             }
+
+            //println!("unref {} hl: {}", id, hl_count - 1);
         }
 
         if hl_count == 1 {
@@ -278,6 +278,10 @@ impl Ext2INode {
     }
 
     pub fn free_blocks(&mut self, fs: &Ext2Filesystem) {
+        if self.ftype() == FileType::Symlink && self.d_inode.size_lower() <= 60 {
+            return;
+        }
+
         for i in 0usize..15 {
             let ptr = self.d_inode.block_ptrs()[i] as usize;
 
@@ -402,6 +406,32 @@ impl INode for LockedExt2INode {
 
             iter.remove_dir_entry(name)?;
         }
+
+        Ok(())
+    }
+
+    fn unlink(&self, name: &str) -> Result<()> {
+        if self.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
+        if [".", ".."].contains(&name) {
+            return Err(FsError::NotSupported);
+        }
+
+        let this = self.self_ref.upgrade().unwrap();
+
+        if let Some(target) = DirEntIter::new(this.clone()).find(|e| e.name() == name) {
+            let inode = self.fs().get_inode(target.inode() as usize);
+
+            if inode.ftype()? == FileType::Dir {
+                return Err(FsError::NotFile);
+            }
+        }
+
+        let mut iter = DirEntIter::new(this);
+
+        iter.remove_dir_entry(name)?;
 
         Ok(())
     }

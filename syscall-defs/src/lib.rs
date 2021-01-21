@@ -24,6 +24,7 @@ pub const SYS_UMOUNT: usize = 17;
 pub const SYS_TIME: usize = 18;
 pub const SYS_SYMLINK: usize = 19;
 pub const SYS_RMDIR: usize = 20;
+pub const SYS_UNLINK: usize = 21;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

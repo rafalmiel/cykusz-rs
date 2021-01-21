@@ -30,7 +30,7 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::Inval)?;
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
+        let inode = crate::kernel::fs::lookup_by_real_path(Path::new(path), flags.into())?;
 
         let task = current_task();
 
@@ -202,6 +202,26 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
         Ok(0)
     } else {
         return Err(SyscallError::NotDir);
+    }
+}
+
+pub fn sys_unlink(path: u64, path_len: u64) -> SyscallResult {
+    let path = Path::new(make_str(path, path_len));
+
+    let (_, name) = path.containing_dir();
+
+    let file = lookup_by_real_path(path, LookupMode::None)?;
+
+    if let Some(dir) = file.parent() {
+        if dir.inode().ftype()? == FileType::Dir && file.inode().ftype()? != FileType::Dir {
+            dir.inode().unlink(name.str())?;
+
+            file.drop_from_cache();
+        }
+
+        Ok(0)
+    } else {
+        return Err(SyscallError::Fault);
     }
 }
 

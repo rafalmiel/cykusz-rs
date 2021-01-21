@@ -36,6 +36,10 @@ pub trait INode: Send + Sync {
         Err(FsError::NotSupported)
     }
 
+    fn unlink(&self, _name: &str) -> Result<()> {
+        Err(FsError::NotSupported)
+    }
+
     fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
         Err(FsError::NotSupported)
     }

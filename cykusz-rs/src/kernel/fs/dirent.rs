@@ -2,6 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::sync::atomic::AtomicBool;
+use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
 use spin::Once;
@@ -11,6 +12,12 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard, Spin};
 
 type CacheKey = (usize, String);
+
+static CACHE_MARKER_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+fn new_cache_marker() -> usize {
+    CACHE_MARKER_COUNTER.fetch_add(1, Ordering::SeqCst)
+}
 
 #[derive(Clone)]
 pub struct DirEntryData {
@@ -24,6 +31,7 @@ pub struct DirEntry {
     used: AtomicBool,
     mountpoint: AtomicBool,
     fs: Once<Weak<dyn Filesystem>>,
+    cache_marker: usize,
 }
 
 impl DirEntry {
@@ -37,6 +45,7 @@ impl DirEntry {
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
             fs: Once::new(),
+            cache_marker: new_cache_marker(),
         })
     }
 
@@ -48,16 +57,18 @@ impl DirEntry {
 
             let e = Arc::new(DirEntry {
                 data: RwSpin::new(DirEntryData {
-                    parent: Some(parent),
+                    parent: Some(parent.clone()),
                     name,
                     inode: inode.clone(),
                 }),
                 used: AtomicBool::new(false),
                 mountpoint: AtomicBool::new(false),
                 fs: Once::initialized(Arc::downgrade(&inode.fs())),
+                cache_marker: new_cache_marker(),
             });
 
             if do_cache {
+                //println!("insert to cache {:?} parent name: {}", e.cache_key(), parent.name());
                 cache().insert(&e);
             }
 
@@ -79,6 +90,7 @@ impl DirEntry {
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
             fs: Once::initialized(Arc::downgrade(&inode.fs())),
+            cache_marker: 0,
         })
     }
 
@@ -92,6 +104,7 @@ impl DirEntry {
             used: AtomicBool::new(false),
             mountpoint: AtomicBool::new(false),
             fs: Once::initialized(Arc::downgrade(&inode.fs())),
+            cache_marker: 0,
         })
     }
 
@@ -116,11 +129,14 @@ impl DirEntry {
     }
 
     pub fn mark_used(&self) {
+        //println!("mark_used: {:?}", self.cache_key());
         self.used.store(true, Ordering::SeqCst);
     }
 
     pub fn mark_unused(&self) {
+        //println!("mark_unused: {:?}", self.cache_key());
         self.used.store(false, Ordering::SeqCst);
+        //println!("marked");
     }
 
     pub fn is_used(&self) -> bool {
@@ -129,7 +145,7 @@ impl DirEntry {
 
     fn make_key(parent: Option<&Arc<DirEntry>>, name: &String) -> CacheKey {
         if let Some(p) = parent {
-            (p.as_ref() as *const _ as usize, name.clone())
+            (p.cache_marker, name.clone())
         } else {
             (0, name.clone())
         }
@@ -138,6 +154,10 @@ impl DirEntry {
     pub fn cache_key(&self) -> CacheKey {
         let data = self.data.read();
         Self::make_key(data.parent.as_ref(), &data.name)
+    }
+
+    pub fn parent(&self) -> Option<Arc<DirEntry>> {
+        self.data.read().parent.clone()
     }
 
     pub fn update_inode(&self, inode: Arc<dyn INode>) {
@@ -175,21 +195,29 @@ impl DirEntry {
 
 impl Clone for DirEntry {
     fn clone(&self) -> Self {
-        DirEntry {
+        let ret = DirEntry {
             data: RwSpin::new(self.data.read().clone()),
             used: AtomicBool::new(self.used.load(Ordering::SeqCst)),
             mountpoint: AtomicBool::new(self.mountpoint.load(Ordering::SeqCst)),
             fs: Once::initialized(self.fs.get().unwrap().clone()),
-        }
+            cache_marker: self.cache_marker,
+        };
+        //println!("Clone DirEntry {:?} -> {:?}", self.cache_key(), ret.cache_key());
+
+        ret
     }
 }
 
 impl Drop for DirEntry {
     fn drop(&mut self) {
+        //println!("drop DirEntry {:?} is used {}", self.cache_key(), self.is_used());
         if self.is_used() {
             self.mark_unused();
 
             cache().move_to_unused(self.clone());
+
+            //println!("moved to used");
+        } else {
         }
     }
 }
@@ -224,6 +252,8 @@ impl DirEntryCacheData {
 
                 entry.mark_used();
 
+                //println!("Insert into used {:?} vs {:?}", key, entry.cache_key());
+
                 self.used.insert(key, Arc::downgrade(&entry));
 
                 Some(entry)
@@ -245,11 +275,15 @@ impl DirEntryCacheData {
     fn remove(&mut self, entry: &DirEntry) {
         let key = entry.cache_key();
 
+        //println!("drop_from_cache: {:?}", key);
+
         if let Some(e) = self.used.get(&key) {
             if let Some(e) = e.upgrade() {
+                //println!("drop_from_cache sc: {}", Arc::strong_count(&e));
                 e.mark_unused();
             }
         } else {
+            //println!("drop_from_cache unused: {:?}", key);
             self.unused.pop(&key);
         }
     }
@@ -262,8 +296,13 @@ impl DirEntryCacheData {
         if let Some(_e) = self.used.remove(&key) {
             self.unused.put(key, Arc::new(ent));
         } else {
-            panic!("move_to_unused missing entry");
+            panic!("move_to_unused missing entry {:?}", key);
         }
+    }
+
+    fn clear(&mut self) {
+        self.used.clear();
+        self.unused.clear();
     }
 }
 impl DirEntryCache {
@@ -290,6 +329,10 @@ impl DirEntryCache {
 
     fn remove(&self, entry: &DirEntry) {
         self.data.lock().remove(entry);
+    }
+
+    pub fn clear(&self) {
+        self.data.lock().clear();
     }
 }
 

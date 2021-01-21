@@ -33,6 +33,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_TIME => sys::sys_time(),
         SYS_SYMLINK => sys::sys_symlink(a, b, c, d),
         SYS_RMDIR => sys::sys_rmdir(a, b),
+        SYS_UNLINK => sys::sys_unlink(a, b),
 
         _ => Err(SyscallError::Inval),
     }

@@ -98,6 +98,8 @@ impl Ext2Filesystem {
     }
 
     pub fn drop_from_cache(&self, id: usize) {
+        //println!("drop from ext2 cache: {}", id);
+
         let mut cache = self.inode_cache.lock();
 
         cache.pop(&id);

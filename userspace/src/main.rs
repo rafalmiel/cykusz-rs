@@ -274,8 +274,17 @@ fn exec(cmd: &str) {
         split.next();
 
         if let (Some(target), Some(path)) = (split.next(), split.next()) {
-            if let Err(e) = syscall::symlink(target, path) {
-                println!("ln failed: {:?}", e);
+            if target == "-s" {
+                let target = path;
+                if let Some(path) = split.next() {
+                    if let Err(e) = syscall::symlink(target, path) {
+                        println!("ln -s failed: {:?}", e);
+                    }
+                }
+            } else {
+                if let Err(e) = syscall::link(target, path) {
+                    println!("ln failed: {:?}", e);
+                }
             }
         } else {
             println!("param error");

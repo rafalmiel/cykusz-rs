@@ -11,6 +11,7 @@ use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
 use crate::kernel::utils::wait_queue::WaitQueue;
+use alloc::sync::Arc;
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
@@ -30,7 +31,7 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::Inval)?;
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        let inode = crate::kernel::fs::lookup_by_real_path(Path::new(path), flags.into())?;
+        let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
 
         let task = current_task();
 
@@ -223,6 +224,33 @@ pub fn sys_unlink(path: u64, path_len: u64) -> SyscallResult {
     } else {
         return Err(SyscallError::Fault);
     }
+}
+
+pub fn sys_link(target: u64, target_len: u64, linkpath: u64, linkpath_len: u64) -> SyscallResult {
+    let target = make_str(target, target_len);
+    let path = make_str(linkpath, linkpath_len);
+
+    let target_entry = lookup_by_real_path(Path::new(target), LookupMode::None)?;
+
+    let path = Path::new(path);
+
+    let (inode, name) = {
+        let (dir, name) = path.containing_dir();
+
+        (lookup_by_path(dir, LookupMode::None)?.inode(), name)
+    };
+
+    if Arc::as_ptr(&inode.fs()) != Arc::as_ptr(&target_entry.inode().fs()) {
+        return Err(SyscallError::Inval);
+    }
+
+    if inode.ftype()? == FileType::Dir {
+        inode.link(name.str(), target_entry.inode())?;
+    } else {
+        return Err(SyscallError::NotDir);
+    }
+
+    Ok(0)
 }
 
 pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResult {

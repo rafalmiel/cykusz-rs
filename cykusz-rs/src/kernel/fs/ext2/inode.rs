@@ -64,8 +64,8 @@ impl LockedExt2INode {
             let result: Result<()> = try {
                 if typ == FileType::Dir {
                     let mut iter = DirEntIter::new_no_skip(new.clone());
-                    iter.add_dir_entry(&new, disk::inode::FileType::Dir, ".")?;
-                    iter.add_dir_entry(&self, disk::inode::FileType::Dir, "..")?;
+                    iter.add_dir_entry(&new, ".")?;
+                    iter.add_dir_entry(&self, "..")?;
                 }
 
                 ()
@@ -358,7 +358,7 @@ impl INode for LockedExt2INode {
 
         let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
 
-        if let Err(e) = iter.add_dir_entry(&new_inode, disk::inode::FileType::Dir, name) {
+        if let Err(e) = iter.add_dir_entry(&new_inode, name) {
             self.fs().free_inode(&new_inode);
 
             Err(e)
@@ -480,7 +480,7 @@ impl INode for LockedExt2INode {
 
         let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
 
-        if let Err(e) = iter.add_dir_entry(&new_inode, disk::inode::FileType::File, name) {
+        if let Err(e) = iter.add_dir_entry(&new_inode, name) {
             self.fs().free_inode(&new_inode);
 
             Err(e)
@@ -494,7 +494,9 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotDir);
         }
 
-        if DirEntIter::new(self.self_ref.upgrade().unwrap())
+        let me = self.self_ref.upgrade().unwrap();
+
+        if DirEntIter::new(me.clone())
             .find(|e| e.name() == name)
             .is_some()
         {
@@ -509,15 +511,36 @@ impl INode for LockedExt2INode {
             return Err(e);
         }
 
-        let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
+        let mut iter = DirEntIter::new_no_skip(me);
 
-        if let Err(e) = iter.add_dir_entry(&new_inode, disk::inode::FileType::Symlink, name) {
+        if let Err(e) = iter.add_dir_entry(&new_inode, name) {
             self.fs().free_inode(&new_inode);
 
             Err(e)
         } else {
             Ok(())
         }
+    }
+
+    fn link(&self, name: &str, target: Arc<dyn INode>) -> Result<()> {
+        if self.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
+        let me = self.self_ref.upgrade().unwrap();
+
+        if DirEntIter::new(me.clone())
+            .find(|e| e.name() == name)
+            .is_some()
+        {
+            return Err(FsError::EntryExists);
+        }
+
+        let mut iter = DirEntIter::new_no_skip(me);
+
+        iter.add_dir_entry(&self.fs().get_inode(target.id()?), name)?;
+
+        Ok(())
     }
 
     fn truncate(&self) -> Result<()> {

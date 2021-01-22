@@ -131,6 +131,18 @@ pub fn symlink(target: &str, path: &str) -> SyscallResult {
     }
 }
 
+pub fn link(target: &str, path: &str) -> SyscallResult {
+    unsafe {
+        syscall4(
+            SYS_LINK,
+            target.as_ptr() as usize,
+            target.len(),
+            path.as_ptr() as usize,
+            path.len(),
+        )
+    }
+}
+
 pub fn rmdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_RMDIR, path.as_ptr() as usize, path.len()) }
 }

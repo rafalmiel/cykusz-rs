@@ -74,6 +74,10 @@ pub trait INode: Send + Sync {
         return Err(FsError::NotSupported);
     }
 
+    fn link(&self, _name: &str, _target: Arc<dyn INode>) -> Result<()> {
+        return Err(FsError::NotSupported);
+    }
+
     fn truncate(&self) -> Result<()> {
         return Err(FsError::NotSupported);
     }

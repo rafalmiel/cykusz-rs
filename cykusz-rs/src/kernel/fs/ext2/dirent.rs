@@ -121,12 +121,9 @@ impl<'a> DirEntIter<'a> {
         Err(FsError::EntryNotFound)
     }
 
-    pub fn add_dir_entry(
-        &mut self,
-        target: &LockedExt2INode,
-        typ: FileType,
-        name: &str,
-    ) -> Result<()> {
+    pub fn add_dir_entry(&mut self, target: &LockedExt2INode, name: &str) -> Result<()> {
+        let typ = target.read().d_inode().ftype();
+
         let fs = self.fs();
 
         let required_size = (name.len() + 8).align_up(4);
@@ -171,7 +168,7 @@ impl<'a> DirEntIter<'a> {
 
                     fs.write_block(new_block.block(), new_block.bytes());
 
-                    self.add_dir_entry(target, typ, name)
+                    self.add_dir_entry(target, name)
                 } else {
                     Err(FsError::NotSupported)
                 };

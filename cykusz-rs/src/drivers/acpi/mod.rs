@@ -1,8 +1,9 @@
 use core::ptr::*;
 
-use crate::kernel::sync::IrqGuard;
 use ::acpica::*;
 pub use pci_map::get_irq_mapping;
+
+use crate::kernel::sync::IrqGuard;
 
 pub mod acpica;
 pub mod pci_map;

@@ -2,27 +2,26 @@ use alloc::sync::Arc;
 use core::marker::PhantomData;
 
 use crate::arch::raw::mm::VirtAddr;
+use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::disk::dirent::{DirEntTypeIndicator, DirEntry};
 use crate::kernel::fs::ext2::disk::inode::FileType;
 use crate::kernel::fs::ext2::idata::INodeData;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::ext2::Ext2Filesystem;
+
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 
 pub struct SysDirEntIter<'a> {
-    parent: Arc<crate::kernel::fs::dirent::DirEntry>,
+    parent: DirEntryItem,
     iter: Spin<DirEntIter<'a>>,
 }
 
 impl<'a> SysDirEntIter<'a> {
-    pub fn new(
-        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        inode: Arc<LockedExt2INode>,
-    ) -> SysDirEntIter<'a> {
+    pub fn new(parent: DirEntryItem, inode: Arc<LockedExt2INode>) -> SysDirEntIter<'a> {
         SysDirEntIter::<'a> {
             parent,
             iter: Spin::new(DirEntIter::new(inode)),
@@ -31,7 +30,7 @@ impl<'a> SysDirEntIter<'a> {
 }
 
 impl<'a> crate::kernel::fs::vfs::DirEntIter for SysDirEntIter<'a> {
-    fn next(&self) -> Option<Arc<crate::kernel::fs::dirent::DirEntry>> {
+    fn next(&self) -> Option<DirEntryItem> {
         let mut lock = self.iter.lock();
         if let Some(e) = lock.next() {
             Some(lock.inode.mk_dirent(self.parent.clone(), &e))
@@ -72,11 +71,15 @@ impl<'a> DirEntIter<'a> {
     }
 
     fn fs(&self) -> Arc<Ext2Filesystem> {
-        self.inode.fs()
+        self.inode.ext2_fs()
     }
+
     pub fn remove_dir_entry(&mut self, name: &str) -> Result<()> {
         if let Some(e) = self.find(|e| e.name() == name) {
-            self.fs().get_inode(e.inode() as usize).unref_hardlink();
+            self.fs()
+                .get_inode(e.inode() as usize)
+                .as_impl::<LockedExt2INode>()
+                .unref_hardlink();
 
             let fs = self.fs();
 

@@ -309,7 +309,7 @@ fn exec(cmd: &str) {
                             //    let bigbuf = ['L' as u8; 786];
                             //    let written = file.write(&bigbuf);
 
-                            //    if written == 0 {
+                            //    if written < 768 {
                             //        break;
                             //    }
 

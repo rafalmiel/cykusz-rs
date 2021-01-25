@@ -6,7 +6,7 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use syscall_defs::OpenFlags;
 
 use crate::arch::task::Task as ArchTask;
-use crate::kernel::fs::dirent::DirEntry;
+use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::new_task_id;
@@ -109,7 +109,7 @@ impl Task {
         self.filetable.get_handle(fd)
     }
 
-    pub fn get_dent(&self) -> Arc<DirEntry> {
+    pub fn get_dent(&self) -> DirEntryItem {
         self.cwd.read().dentry.clone()
     }
 
@@ -117,7 +117,7 @@ impl Task {
         self.cwd.read().pwd()
     }
 
-    pub fn open_file(&self, inode: Arc<DirEntry>, flags: OpenFlags) -> Option<usize> {
+    pub fn open_file(&self, inode: DirEntryItem, flags: OpenFlags) -> Option<usize> {
         self.filetable.open_file(inode, flags)
     }
 
@@ -125,11 +125,19 @@ impl Task {
         self.filetable.close_file(fd)
     }
 
-    pub fn set_cwd(&self, dentry: Arc<DirEntry>) {
+    pub fn close_all_files(&self) {
+        self.filetable.close_all_files();
+    }
+
+    pub fn set_cwd(&self, dentry: DirEntryItem) {
         let mut cwd = self.cwd.write();
 
-        cwd.fs = dentry.inode().fs();
-        cwd.dentry = dentry;
+        if let Some(fs) = dentry.inode().fs().upgrade() {
+            cwd.fs = fs;
+            cwd.dentry = dentry;
+        } else {
+            println!("[ WARN ] CWD failed");
+        }
     }
 
     pub fn set_state(&self, state: TaskState) {

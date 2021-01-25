@@ -4,13 +4,15 @@ use core::ops::{Deref, DerefMut};
 
 use syscall_defs::FileType;
 
-use crate::kernel::fs::dirent::DirEntry;
+use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
 use crate::kernel::fs::ext2::idata::INodeData;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
+
+use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
@@ -23,29 +25,39 @@ pub struct LockedExt2INode {
 }
 
 impl LockedExt2INode {
-    pub fn new(fs: Weak<Ext2Filesystem>, id: usize) -> Arc<LockedExt2INode> {
-        let ptr = Arc::new_cyclic(|me| LockedExt2INode {
-            node: RwSpin::new(Ext2INode::new(fs.clone(), id)),
-            fs,
-            self_ref: me.clone(),
-        });
+    pub fn new(fs: Weak<Ext2Filesystem>, id: usize) -> INodeItem {
+        let cache = crate::kernel::fs::icache::cache();
 
-        ptr
+        let fsg: Weak<dyn Filesystem> = fs.clone();
+
+        if let Some(e) = cache.get(INodeItemStruct::make_key(&fsg, id)) {
+            e
+        } else {
+            cache.make_item(INodeItemStruct::from(Arc::new_cyclic(|me| {
+                LockedExt2INode {
+                    node: RwSpin::new(Ext2INode::new(fs.clone(), id)),
+                    fs,
+                    self_ref: me.clone(),
+                }
+            })))
+        }
     }
 
-    pub fn mk_dirent(&self, parent: Arc<DirEntry>, de: &disk::dirent::DirEntry) -> Arc<DirEntry> {
-        let inode = self.fs().get_inode(de.inode() as usize);
+    pub fn mk_dirent(&self, parent: DirEntryItem, de: &disk::dirent::DirEntry) -> DirEntryItem {
+        let inode = self.ext2_fs().get_inode(de.inode() as usize);
 
         DirEntry::new(parent, inode, String::from(de.name()))
     }
 
-    pub fn mk_inode(&self, typ: FileType) -> Result<Arc<LockedExt2INode>> {
-        let fs = self.fs();
+    pub fn mk_inode(&self, typ: FileType) -> Result<INodeItem> {
+        let fs = self.ext2_fs();
 
         let parent_id = self.id()?;
 
         if let Some(new) = fs.alloc_inode(parent_id) {
-            let mut inner = new.d_inode_writer();
+            let imp = new.as_impl::<LockedExt2INode>();
+
+            let mut inner = imp.d_inode_writer();
 
             *inner = disk::inode::INode::default();
 
@@ -63,8 +75,8 @@ impl LockedExt2INode {
 
             let result: Result<()> = try {
                 if typ == FileType::Dir {
-                    let mut iter = DirEntIter::new_no_skip(new.clone());
-                    iter.add_dir_entry(&new, ".")?;
+                    let mut iter = DirEntIter::new_no_skip(new.as_ext2_inode_arc());
+                    iter.add_dir_entry(imp, ".")?;
                     iter.add_dir_entry(&self, "..")?;
                 }
 
@@ -72,7 +84,7 @@ impl LockedExt2INode {
             };
 
             if result.is_err() {
-                fs.free_inode(&new);
+                fs.free_inode(imp);
             } else {
                 return Ok(new);
             }
@@ -97,7 +109,11 @@ impl LockedExt2INode {
         self.node.write()
     }
 
-    pub fn fs(&self) -> Arc<Ext2Filesystem> {
+    pub fn fs(&self) -> Weak<Ext2Filesystem> {
+        self.fs.clone()
+    }
+
+    pub fn ext2_fs(&self) -> Arc<Ext2Filesystem> {
         self.fs.upgrade().unwrap()
     }
 
@@ -122,8 +138,12 @@ impl LockedExt2INode {
 
         if hl_count == 1 {
             //It's 0 after decrement
-            self.fs().drop_from_cache(id);
+            self.ext2_fs().drop_from_cache(id);
         }
+    }
+
+    fn self_ref(&self) -> Arc<LockedExt2INode> {
+        self.self_ref.upgrade().unwrap()
     }
 }
 
@@ -132,11 +152,14 @@ impl Drop for LockedExt2INode {
         let inode = self.node.read();
 
         let hl_count = inode.d_inode.hl_count();
+        let _id = inode.id;
 
         drop(inode);
 
+        //println!("Dropping inode {} hl {}", id, hl_count);
+
         if hl_count == 0 {
-            self.fs().free_inode(self)
+            self.ext2_fs().free_inode(self)
         }
     }
 }
@@ -260,6 +283,7 @@ impl Ext2INode {
 
         fs.group_descs().free_block_ptr(ptr);
     }
+
     fn free_t_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
         let mut block = fs.make_slice_buf_from::<u32>(ptr);
 
@@ -322,12 +346,16 @@ impl INode for LockedExt2INode {
         })
     }
 
-    fn lookup(&self, parent: Arc<DirEntry>, name: &str) -> Result<Arc<DirEntry>> {
+    fn lookup(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);
         }
 
-        let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
+        if self.node.read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
+
+        let mut iter = DirEntIter::new(self.self_ref());
 
         if let Some(e) = iter.find_map(|e| {
             if e.name() == name {
@@ -342,24 +370,28 @@ impl INode for LockedExt2INode {
         }
     }
 
-    fn mkdir(&self, name: &str) -> Result<Arc<dyn INode>> {
+    fn mkdir(&self, name: &str) -> Result<INodeItem> {
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);
         }
 
-        if DirEntIter::new(self.self_ref.upgrade().unwrap())
+        if DirEntIter::new(self.self_ref())
             .find(|e| e.name() == name)
             .is_some()
         {
             return Err(FsError::EntryExists);
         }
 
+        if self.node.read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
+
         let new_inode = self.mk_inode(FileType::Dir)?;
 
-        let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
+        let mut iter = DirEntIter::new_no_skip(self.self_ref());
 
-        if let Err(e) = iter.add_dir_entry(&new_inode, name) {
-            self.fs().free_inode(&new_inode);
+        if let Err(e) = iter.add_dir_entry(new_inode.as_ext2_inode(), name) {
+            self.ext2_fs().free_inode(new_inode.as_ext2_inode());
 
             Err(e)
         } else {
@@ -372,18 +404,22 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotDir);
         }
 
+        if self.node.read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
+
         if [".", ".."].contains(&name) {
             return Err(FsError::NotSupported);
         }
 
-        let this = self.self_ref.upgrade().unwrap();
+        let _this = self.self_ref();
 
-        if this.id()? == 2 {
+        if self.id()? == 2 {
             return Err(FsError::NotSupported);
         }
 
         // Check if dir is not empty
-        if DirEntIter::new(this.clone())
+        if DirEntIter::new(self.self_ref())
             .find(|e| ![".", ".."].contains(&e.name()))
             .is_some()
         {
@@ -391,18 +427,18 @@ impl INode for LockedExt2INode {
         }
 
         if let Some(parent) =
-            if let Some(e) = DirEntIter::new(this.clone()).find(|e| e.name() == "..") {
-                Some(self.fs().get_inode(e.inode() as usize))
+            if let Some(e) = DirEntIter::new(self.self_ref()).find(|e| e.name() == "..") {
+                Some(self.ext2_fs().get_inode(e.inode() as usize))
             } else {
                 None
             }
         {
-            let mut iter = DirEntIter::new(this);
+            let mut iter = DirEntIter::new(self.self_ref());
 
             iter.remove_dir_entry(".")?;
             iter.remove_dir_entry("..")?;
 
-            let mut iter = DirEntIter::new(parent.clone());
+            let mut iter = DirEntIter::new(parent.as_ext2_inode_arc());
 
             iter.remove_dir_entry(name)?;
         }
@@ -415,21 +451,25 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotDir);
         }
 
+        if self.node.read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
+
         if [".", ".."].contains(&name) {
             return Err(FsError::NotSupported);
         }
 
-        let this = self.self_ref.upgrade().unwrap();
+        let _this = self.self_ref();
 
-        if let Some(target) = DirEntIter::new(this.clone()).find(|e| e.name() == name) {
-            let inode = self.fs().get_inode(target.inode() as usize);
+        if let Some(target) = DirEntIter::new(self.self_ref()).find(|e| e.name() == name) {
+            let inode = self.ext2_fs().get_inode(target.inode() as usize);
 
             if inode.ftype()? == FileType::Dir {
                 return Err(FsError::NotFile);
             }
         }
 
-        let mut iter = DirEntIter::new(this);
+        let mut iter = DirEntIter::new(self.self_ref());
 
         iter.remove_dir_entry(name)?;
 
@@ -441,7 +481,7 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotFile);
         }
 
-        let mut reader = INodeData::new(self.self_ref.upgrade().unwrap(), offset);
+        let mut reader = INodeData::new(self.self_ref(), offset);
 
         Ok(reader.read(buf))
     }
@@ -451,25 +491,25 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotFile);
         }
 
-        let mut writer = INodeData::new(self.self_ref.upgrade().unwrap(), offset);
+        let mut writer = INodeData::new(self.self_ref(), offset);
 
         Ok(writer.write(buf)?)
     }
 
-    fn fs(&self) -> Arc<dyn Filesystem> {
+    fn fs(&self) -> Weak<dyn Filesystem> {
         self.fs()
     }
 
-    fn create(
-        &self,
-        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        name: &str,
-    ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+    fn create(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);
         }
 
-        if DirEntIter::new(self.self_ref.upgrade().unwrap())
+        if self.node.read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
+
+        if DirEntIter::new(self.self_ref())
             .find(|e| e.name() == name)
             .is_some()
         {
@@ -478,10 +518,10 @@ impl INode for LockedExt2INode {
 
         let new_inode = self.mk_inode(FileType::File)?;
 
-        let mut iter = DirEntIter::new_no_skip(self.self_ref.upgrade().unwrap());
+        let mut iter = DirEntIter::new_no_skip(self.self_ref());
 
-        if let Err(e) = iter.add_dir_entry(&new_inode, name) {
-            self.fs().free_inode(&new_inode);
+        if let Err(e) = iter.add_dir_entry(new_inode.as_ext2_inode(), name) {
+            self.ext2_fs().free_inode(&new_inode.as_ext2_inode());
 
             Err(e)
         } else {
@@ -494,9 +534,13 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotDir);
         }
 
-        let me = self.self_ref.upgrade().unwrap();
+        if self.node.read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
 
-        if DirEntIter::new(me.clone())
+        let _me = self.self_ref();
+
+        if DirEntIter::new(self.self_ref())
             .find(|e| e.name() == name)
             .is_some()
         {
@@ -506,15 +550,15 @@ impl INode for LockedExt2INode {
         let new_inode = self.mk_inode(FileType::Symlink)?;
 
         if let Err(e) = new_inode.write_at(0, target.as_bytes()) {
-            self.fs().free_inode(&new_inode);
+            self.ext2_fs().free_inode(&new_inode.as_ext2_inode());
 
             return Err(e);
         }
 
-        let mut iter = DirEntIter::new_no_skip(me);
+        let mut iter = DirEntIter::new_no_skip(self.self_ref());
 
-        if let Err(e) = iter.add_dir_entry(&new_inode, name) {
-            self.fs().free_inode(&new_inode);
+        if let Err(e) = iter.add_dir_entry(&new_inode.as_ext2_inode(), name) {
+            self.ext2_fs().free_inode(&new_inode.as_ext2_inode());
 
             Err(e)
         } else {
@@ -522,23 +566,34 @@ impl INode for LockedExt2INode {
         }
     }
 
-    fn link(&self, name: &str, target: Arc<dyn INode>) -> Result<()> {
+    fn link(&self, name: &str, target: INodeItem) -> Result<()> {
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);
         }
 
-        let me = self.self_ref.upgrade().unwrap();
+        if self.node.read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
 
-        if DirEntIter::new(me.clone())
+        if target.ftype()? == FileType::Dir {
+            return Err(FsError::IsDir);
+        }
+
+        let _me = self.self_ref();
+
+        if DirEntIter::new(self.self_ref())
             .find(|e| e.name() == name)
             .is_some()
         {
             return Err(FsError::EntryExists);
         }
 
-        let mut iter = DirEntIter::new_no_skip(me);
+        let mut iter = DirEntIter::new_no_skip(self.self_ref());
 
-        iter.add_dir_entry(&self.fs().get_inode(target.id()?), name)?;
+        iter.add_dir_entry(
+            &self.ext2_fs().get_inode(target.id()?).as_ext2_inode(),
+            name,
+        )?;
 
         Ok(())
     }
@@ -548,7 +603,7 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotFile);
         }
 
-        self.node.write().free_blocks(&self.fs());
+        self.node.write().free_blocks(&self.ext2_fs());
 
         let mut node = self.d_inode_writer();
 
@@ -558,12 +613,12 @@ impl INode for LockedExt2INode {
         Ok(())
     }
 
-    fn dir_ent(&self, parent: Arc<DirEntry>, idx: usize) -> Result<Option<Arc<DirEntry>>> {
+    fn dir_ent(&self, parent: DirEntryItem, idx: usize) -> Result<Option<DirEntryItem>> {
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);
         }
 
-        let mut iter = DirEntIter::new(self.self_ref.upgrade().unwrap());
+        let mut iter = DirEntIter::new(self.self_ref());
 
         if let Some(de) = iter.nth(idx) {
             Ok(Some(self.mk_dirent(parent, de)))
@@ -574,15 +629,12 @@ impl INode for LockedExt2INode {
 
     fn dir_iter(
         &self,
-        parent: Arc<DirEntry>,
+        parent: DirEntryItem,
     ) -> Option<Arc<dyn crate::kernel::fs::vfs::DirEntIter>> {
         if self.ftype().ok()? != FileType::Dir {
             return None;
         }
 
-        Some(Arc::new(SysDirEntIter::new(
-            parent,
-            self.self_ref.upgrade().unwrap(),
-        )))
+        Some(Arc::new(SysDirEntIter::new(parent, self.self_ref())))
     }
 }

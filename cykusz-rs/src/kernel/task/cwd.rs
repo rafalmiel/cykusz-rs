@@ -2,18 +2,19 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 
 pub struct Cwd {
-    pub dentry: Arc<crate::kernel::fs::dirent::DirEntry>,
+    pub dentry: DirEntryItem,
     pub fs: Arc<dyn Filesystem>,
 }
 
 impl Cwd {
-    pub fn new(dentry: Arc<crate::kernel::fs::dirent::DirEntry>) -> Cwd {
+    pub fn new(dentry: DirEntryItem) -> Cwd {
         Cwd {
             dentry: dentry.clone(),
-            fs: dentry.inode().fs(),
+            fs: dentry.inode().fs().upgrade().unwrap(),
         }
     }
 

@@ -3,11 +3,17 @@ use alloc::sync::Arc;
 use syscall_defs::FileType;
 
 use crate::kernel::device::Device;
+use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Metadata, Result};
 use crate::kernel::syscall::sys::PollTable;
 
-pub trait INode: Send + Sync {
+use downcast_rs::DowncastSync;
+
+use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
+use alloc::sync::Weak;
+
+pub trait INode: Send + Sync + DowncastSync {
     fn id(&self) -> Result<usize> {
         Ok(self.metadata()?.id)
     }
@@ -22,13 +28,13 @@ pub trait INode: Send + Sync {
 
     fn lookup(
         &self,
-        _parent: Arc<crate::kernel::fs::dirent::DirEntry>,
+        _parent: crate::kernel::fs::dirent::DirEntryItem,
         _name: &str,
-    ) -> Result<Arc<super::dirent::DirEntry>> {
+    ) -> Result<super::dirent::DirEntryItem> {
         Err(FsError::NotSupported)
     }
 
-    fn mkdir(&self, _name: &str) -> Result<Arc<dyn INode>> {
+    fn mkdir(&self, _name: &str) -> Result<INodeItem> {
         Err(FsError::NotSupported)
     }
 
@@ -52,21 +58,17 @@ pub trait INode: Send + Sync {
         Err(FsError::NotSupported)
     }
 
-    fn fs(&self) -> Arc<dyn Filesystem> {
+    fn fs(&self) -> Weak<dyn Filesystem> {
         unimplemented!()
     }
 
-    fn create(
-        &self,
-        _parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        _name: &str,
-    ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+    fn create(&self, _parent: DirEntryItem, _name: &str) -> Result<DirEntryItem> {
         Err(FsError::NotSupported)
     }
 
     fn close(&self) {}
 
-    fn mknode(&self, _name: &str, _devid: usize) -> Result<Arc<dyn INode>> {
+    fn mknode(&self, _name: &str, _devid: usize) -> Result<INodeItem> {
         return Err(FsError::NotSupported);
     }
 
@@ -74,7 +76,7 @@ pub trait INode: Send + Sync {
         return Err(FsError::NotSupported);
     }
 
-    fn link(&self, _name: &str, _target: Arc<dyn INode>) -> Result<()> {
+    fn link(&self, _name: &str, _target: INodeItem) -> Result<()> {
         return Err(FsError::NotSupported);
     }
 
@@ -82,22 +84,19 @@ pub trait INode: Send + Sync {
         return Err(FsError::NotSupported);
     }
 
-    fn dir_ent(
-        &self,
-        _parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        _idx: usize,
-    ) -> Result<Option<Arc<crate::kernel::fs::dirent::DirEntry>>> {
+    fn dir_ent(&self, _parent: DirEntryItem, _idx: usize) -> Result<Option<DirEntryItem>> {
         return Err(FsError::NotSupported);
     }
 
-    fn dir_iter(
-        &self,
-        _parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-    ) -> Option<Arc<dyn DirEntIter>> {
+    fn dir_iter(&self, _parent: DirEntryItem) -> Option<Arc<dyn DirEntIter>> {
         None
     }
 
     fn device(&self) -> Result<Arc<dyn Device>> {
         return Err(FsError::EntryNotFound);
     }
+
+    fn ref_update(&self, _new_ref: Weak<INodeItemInt>) {}
 }
+
+impl_downcast!(sync INode);

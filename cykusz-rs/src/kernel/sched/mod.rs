@@ -130,6 +130,10 @@ impl Scheduler {
         self.tasks.register_task(task)
     }
 
+    fn close_all_tasks(&self) {
+        self.tasks.close_all_tasks();
+    }
+
     fn init_tasks(&self) {
         self.cpu_queues.init_tasks();
     }
@@ -173,6 +177,10 @@ pub fn create_user_task(fun: MappedAddr, code_size: u64) -> Arc<Task> {
 
 pub fn current_task() -> Arc<Task> {
     scheduler().current_task()
+}
+
+pub fn close_all_tasks() {
+    scheduler().close_all_tasks();
 }
 
 fn lock_protection_ready() -> bool {

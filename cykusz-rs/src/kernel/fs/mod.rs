@@ -8,16 +8,19 @@ use spin::Once;
 use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
+use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
 
+pub mod cache;
 pub mod devnode;
 pub mod dirent;
 pub mod ext2;
 pub mod filesystem;
+pub mod icache;
 pub mod inode;
 pub mod mount;
 pub mod path;
@@ -26,9 +29,9 @@ pub mod stdio;
 pub mod vfs;
 
 static ROOT_MOUNT: Once<Arc<dyn Filesystem>> = Once::new();
-static ROOT_DENTRY: Once<Arc<dirent::DirEntry>> = Once::new();
+static ROOT_DENTRY: Once<DirEntryItem> = Once::new();
 
-pub fn root_dentry() -> &'static Arc<dirent::DirEntry> {
+pub fn root_dentry() -> &'static DirEntryItem {
     ROOT_DENTRY.get().unwrap()
 }
 
@@ -50,6 +53,7 @@ impl DeviceListener for DevListener {
 static DEV_LISTENER: Once<Arc<DevListener>> = Once::new();
 
 pub fn init() {
+    icache::init();
     dirent::init();
     mount::init();
 
@@ -130,10 +134,11 @@ fn read_link(inode: &Arc<dyn INode>) -> Result<String> {
 fn lookup_by_path_from(
     path: Path,
     lookup_mode: LookupMode,
-    mut cur: Arc<crate::kernel::fs::dirent::DirEntry>,
+    mut cur: DirEntryItem,
     real_path: bool,
     depth: usize,
-) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+) -> Result<DirEntryItem> {
+    //println!("looking up {}", path.str());
     if depth > 40 {
         println!("[ WARN ] Lookup recursion limit exceeded");
         return Err(FsError::EntryNotFound);
@@ -141,6 +146,7 @@ fn lookup_by_path_from(
     let len = path.components().count();
 
     for (idx, name) in path.components().enumerate() {
+        //println!("lookup component {}", name);
         match name {
             "." => {}
             ".." => loop {
@@ -155,11 +161,11 @@ fn lookup_by_path_from(
                 }
             },
             s => {
-                let r = dirent::cache()
-                    .get_dirent(cur.clone(), String::from(s))
+                let r = dirent::get(cur.clone(), &String::from(s))
                     .into_result()
                     .or_else(|_| {
                         let current = cur.read();
+
                         current.inode.lookup(cur.clone(), s)
                     });
 
@@ -189,15 +195,7 @@ fn lookup_by_path_from(
                                 depth + 1,
                             )?;
 
-                            res = if !real_path {
-                                crate::kernel::fs::dirent::DirEntry::new_no_cache(
-                                    cur.clone(),
-                                    new.inode(),
-                                    String::from(s),
-                                )
-                            } else {
-                                new
-                            }
+                            res = new;
                         }
 
                         cur = res;
@@ -229,10 +227,7 @@ fn lookup_by_path_from(
     Ok(cur)
 }
 
-pub fn lookup_by_path(
-    path: Path,
-    lookup_mode: LookupMode,
-) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
     let cur = if !path.is_absolute() {
         current_task().get_dent()
     } else {
@@ -242,10 +237,7 @@ pub fn lookup_by_path(
     lookup_by_path_from(path, lookup_mode, cur, false, 0)
 }
 
-pub fn lookup_by_real_path(
-    path: Path,
-    lookup_mode: LookupMode,
-) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+pub fn lookup_by_real_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
     let cur = if !path.is_absolute() {
         current_task().get_dent()
     } else {

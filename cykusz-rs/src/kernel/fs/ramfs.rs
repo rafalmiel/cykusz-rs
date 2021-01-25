@@ -11,7 +11,9 @@ use syscall_defs::FileType;
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::devnode::DevNode;
+use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
+use crate::kernel::fs::icache::{INodeItem, INodeItemInt, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::fs::vfs::{FsError, Metadata};
@@ -37,9 +39,9 @@ struct RamINode {
     id: usize,
     name: String,
     typ: FileType,
-    parent: Weak<LockedRamINode>,
-    this: Weak<LockedRamINode>,
-    children: BTreeMap<String, Arc<LockedRamINode>>,
+    parent: Weak<INodeItemInt>,
+    this: Weak<INodeItemInt>,
+    children: BTreeMap<String, INodeItem>,
     fs: Weak<RamFS>,
     content: Content,
 }
@@ -48,17 +50,15 @@ impl INode for LockedRamINode {
     fn metadata(&self) -> Result<Metadata> {
         let i = self.0.read();
 
-        Ok(Metadata {
+        let res = Ok(Metadata {
             id: i.id,
             typ: i.typ,
-        })
+        });
+
+        res
     }
 
-    fn lookup(
-        &self,
-        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        name: &str,
-    ) -> Result<Arc<super::dirent::DirEntry>> {
+    fn lookup(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {
         let this = self.0.read();
 
         let child = this.children.get(name).ok_or(FsError::EntryNotFound)?;
@@ -70,7 +70,7 @@ impl INode for LockedRamINode {
         ))
     }
 
-    fn mkdir(&self, name: &str) -> Result<Arc<dyn INode>> {
+    fn mkdir(&self, name: &str) -> Result<INodeItem> {
         self.make_inode(name, FileType::Dir, |_| Ok(()))
     }
 
@@ -142,15 +142,11 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn fs(&self) -> Arc<dyn Filesystem> {
-        self.0.read().fs.upgrade().unwrap().clone()
+    fn fs(&self) -> Weak<dyn Filesystem> {
+        self.0.read().fs.clone()
     }
 
-    fn create(
-        &self,
-        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        name: &str,
-    ) -> Result<Arc<crate::kernel::fs::dirent::DirEntry>> {
+    fn create(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {
         Ok(super::dirent::DirEntry::new(
             parent.clone(),
             self.make_inode(name, FileType::File, |_| Ok(()))?,
@@ -158,7 +154,7 @@ impl INode for LockedRamINode {
         ))
     }
 
-    fn mknode(&self, name: &str, devid: usize) -> Result<Arc<dyn INode>> {
+    fn mknode(&self, name: &str, devid: usize) -> Result<INodeItem> {
         self.make_inode(name, FileType::DevNode, |inode| {
             inode.0.write().content = Content::DevNode(Some(
                 DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
@@ -182,11 +178,7 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn dir_ent(
-        &self,
-        parent: Arc<crate::kernel::fs::dirent::DirEntry>,
-        idx: usize,
-    ) -> Result<Option<Arc<crate::kernel::fs::dirent::DirEntry>>> {
+    fn dir_ent(&self, parent: DirEntryItem, idx: usize) -> Result<Option<DirEntryItem>> {
         let d = self.0.read();
 
         if d.typ != FileType::Dir {
@@ -235,8 +227,8 @@ impl LockedRamINode {
     fn setup(
         &self,
         name: &str,
-        parent: &Weak<LockedRamINode>,
-        this: &Weak<LockedRamINode>,
+        parent: &Weak<INodeItemInt>,
+        this: &Weak<INodeItemInt>,
         fs: &Weak<RamFS>,
     ) {
         let mut i = self.0.write();
@@ -252,36 +244,46 @@ impl LockedRamINode {
         &self,
         name: &str,
         typ: FileType,
-        init: impl Fn(&Arc<LockedRamINode>) -> Result<()>,
-    ) -> Result<Arc<dyn INode>> {
-        let mut this = self.0.write();
+        init: impl Fn(&LockedRamINode) -> Result<()>,
+    ) -> Result<INodeItem> {
+        let inode = {
+            let mut this = self.0.write();
 
-        if this.children.contains_key(&String::from(name)) || ["", ".", ".."].contains(&name) {
-            return Err(FsError::EntryExists);
-        }
+            if this.children.contains_key(&String::from(name)) || ["", ".", ".."].contains(&name) {
+                return Err(FsError::EntryExists);
+            }
 
-        let inode = this.fs.upgrade().unwrap().alloc_inode(typ);
+            let inode = this.fs.upgrade().unwrap().alloc_inode(typ);
 
-        inode.setup(name, &this.this, &Arc::downgrade(&inode), &this.fs);
+            let cache = crate::kernel::fs::icache::cache();
 
-        init(&inode)?;
+            let inode = cache.make_item_no_cache(INodeItemStruct::from(inode));
 
-        this.children.insert(String::from(name), inode.clone());
+            inode
+                .as_ramfs_inode()
+                .setup(name, &this.this, &Arc::downgrade(&inode), &this.fs);
 
-        let res: Result<Arc<dyn INode>> = Ok(inode.clone());
+            init(inode.as_ramfs_inode())?;
 
-        res
+            this.children.insert(String::from(name), inode.clone());
+
+            inode
+        };
+
+        crate::kernel::fs::icache::cache().make_cached(&inode);
+
+        Ok(inode)
     }
 }
 
 pub struct RamFS {
-    root: Arc<LockedRamINode>,
-    root_dentry: Arc<super::dirent::DirEntry>,
+    root: INodeItem,
+    root_dentry: DirEntryItem,
     next_id: AtomicUsize,
 }
 
 impl Filesystem for RamFS {
-    fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
+    fn root_dentry(&self) -> DirEntryItem {
         self.root_dentry.clone()
     }
 
@@ -292,7 +294,9 @@ impl Filesystem for RamFS {
 
 impl RamFS {
     pub fn new() -> Arc<RamFS> {
+        let cache = crate::kernel::fs::icache::cache();
         let root = Arc::new(LockedRamINode(RwSpin::new(RamINode::default())));
+        let root = cache.make_item_no_cache(INodeItemStruct::from(root));
 
         let root_de = super::dirent::DirEntry::new_root(root.clone(), String::from("/"));
 
@@ -306,19 +310,19 @@ impl RamFS {
 
         root_de.init_fs(Arc::downgrade(&cpy));
 
-        root.setup(
+        root.as_ramfs_inode().setup(
             "/",
             &Arc::downgrade(&fs.root),
             &Arc::downgrade(&root),
             &Arc::downgrade(&fs),
         );
-        root.0.write().typ = FileType::Dir;
+        root.as_ramfs_inode().0.write().typ = FileType::Dir;
 
         return fs;
     }
 
     fn alloc_inode(&self, typ: FileType) -> Arc<LockedRamINode> {
-        let inode = Arc::new(LockedRamINode(RwSpin::new(RamINode {
+        Arc::new(LockedRamINode(RwSpin::new(RamINode {
             id: self.alloc_id(),
             name: String::new(),
             typ,
@@ -332,12 +336,16 @@ impl RamFS {
                 FileType::Dir => Content::None,
                 FileType::Symlink => Content::None,
             },
-        })));
-
-        inode
+        })))
     }
 
     pub fn alloc_id(&self) -> usize {
         self.next_id.fetch_add(1, Ordering::SeqCst)
+    }
+}
+
+impl INodeItemStruct {
+    pub(in crate::kernel::fs::ramfs) fn as_ramfs_inode(&self) -> &LockedRamINode {
+        self.as_impl::<LockedRamINode>()
     }
 }

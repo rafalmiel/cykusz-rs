@@ -49,4 +49,13 @@ impl TaskContainer {
     pub fn register_task(&self, task: Arc<Task>) {
         self.tasks.lock().insert(task.id(), task);
     }
+
+    pub fn close_all_tasks(&self) {
+        let tasks = self.tasks.lock();
+
+        for (_, t) in tasks.iter() {
+            t.set_cwd(crate::kernel::fs::root_dentry().clone());
+            t.close_all_files();
+        }
+    }
 }

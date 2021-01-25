@@ -4,11 +4,12 @@ use alloc::sync::{Arc, Weak};
 use spin::Once;
 
 use crate::kernel::block::BlockDev;
-use crate::kernel::fs::dirent::DirEntry;
+use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::sync::Spin;
+use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
+
 use crate::kernel::utils::slice::ToBytesMut;
 
 mod blockgroup;
@@ -25,7 +26,6 @@ pub struct Ext2Filesystem {
     sectors_per_block: Once<usize>,
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
-    inode_cache: Spin<lru::LruCache<usize, Arc<inode::LockedExt2INode>>>,
 }
 
 impl Ext2Filesystem {
@@ -36,7 +36,6 @@ impl Ext2Filesystem {
             sectors_per_block: Once::new(),
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
-            inode_cache: Spin::new(lru::LruCache::new(256)),
         });
 
         if !a.init() {
@@ -83,29 +82,23 @@ impl Ext2Filesystem {
         &self.blockgroupdesc
     }
 
-    pub fn get_inode(&self, id: usize) -> Arc<LockedExt2INode> {
-        let mut cache = self.inode_cache.lock();
+    pub fn get_inode(&self, id: usize) -> INodeItem {
+        let el = inode::LockedExt2INode::new(self.self_ref.clone(), id);
 
-        if let Some(el) = cache.get(&id) {
-            el.clone()
-        } else {
-            let el = inode::LockedExt2INode::new(self.self_ref.clone(), id);
-
-            cache.put(id, el.clone());
-
-            el
-        }
+        el
     }
 
     pub fn drop_from_cache(&self, id: usize) {
         //println!("drop from ext2 cache: {}", id);
 
-        let mut cache = self.inode_cache.lock();
+        let cache = crate::kernel::fs::icache::cache();
 
-        cache.pop(&id);
+        let fs: Weak<dyn Filesystem> = self.self_ref.clone();
+
+        cache.remove(&INodeItemStruct::make_key(&fs, id));
     }
 
-    pub fn alloc_inode(&self, hint: usize) -> Option<Arc<LockedExt2INode>> {
+    pub fn alloc_inode(&self, hint: usize) -> Option<INodeItem> {
         if let Some(id) = self.group_descs().alloc_inode_id(hint) {
             let inode = self.get_inode(id);
 
@@ -116,6 +109,7 @@ impl Ext2Filesystem {
     }
 
     pub fn free_inode(&self, inode: &LockedExt2INode) {
+        //println!("Free inode: {}", inode.read().id());
         inode.write().free_blocks(self);
 
         let id = inode.read().id();
@@ -182,7 +176,9 @@ impl Ext2Filesystem {
 
         let i = self.get_inode(7);
 
-        let lock = i.read();
+        let imp = i.as_impl::<LockedExt2INode>();
+
+        let lock = imp.read();
 
         let d_inode = lock.d_inode();
 
@@ -210,12 +206,13 @@ impl Ext2Filesystem {
 
 impl Drop for Ext2Filesystem {
     fn drop(&mut self) {
-        self.sync();
+        //self.umount();
+        //println!("ext2 fs drop")
     }
 }
 
 impl Filesystem for Ext2Filesystem {
-    fn root_dentry(&self) -> Arc<super::dirent::DirEntry> {
+    fn root_dentry(&self) -> DirEntryItem {
         let e = DirEntry::new_root(self.get_inode(2), String::from("/"));
         e.init_fs(self.self_ref.clone());
         e
@@ -227,7 +224,24 @@ impl Filesystem for Ext2Filesystem {
         self.superblock.sync(self);
     }
 
+    fn umount(&self) {
+        println!("[ EXT2 ] Unmounting");
+        self.blockgroupdesc.umount();
+
+        self.sync();
+    }
+
     fn name(&self) -> &'static str {
         "ext2"
+    }
+}
+
+impl INodeItemStruct {
+    pub(in crate::kernel::fs::ext2) fn as_ext2_inode(&self) -> &LockedExt2INode {
+        self.as_impl::<LockedExt2INode>()
+    }
+
+    pub(in crate::kernel::fs::ext2) fn as_ext2_inode_arc(&self) -> Arc<LockedExt2INode> {
+        self.as_arc::<LockedExt2INode>()
     }
 }

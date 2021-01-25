@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use syscall_defs::{OpenFlags, SysDirEntry};
 
-use crate::kernel::fs::dirent::DirEntry;
+use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::vfs::{DirEntIter, Result};
 use crate::kernel::sync::{Mutex, RwSpin};
@@ -13,10 +13,10 @@ const FILE_NUM: usize = 256;
 
 pub struct FileHandle {
     pub fd: usize,
-    pub inode: Arc<DirEntry>,
+    pub inode: DirEntryItem,
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
-    pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<Arc<DirEntry>>)>,
+    pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
     #[allow(unused)]
     fs: Arc<dyn Filesystem>,
 }
@@ -34,6 +34,7 @@ impl FileHandle {
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
+        //println!("writing to inode handle");
         let wrote = self
             .inode
             .inode()
@@ -44,7 +45,7 @@ impl FileHandle {
         Ok(wrote)
     }
 
-    fn get_dir_iter(&self) -> (Option<Arc<dyn DirEntIter>>, Option<Arc<DirEntry>>) {
+    fn get_dir_iter(&self) -> (Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>) {
         let mut lock = self.dir_iter.lock();
 
         if self.offset.load(Ordering::SeqCst) == 0 && lock.0.is_none() {
@@ -148,32 +149,38 @@ impl FileTable {
         }
     }
 
-    pub fn open_file(&self, dentry: Arc<DirEntry>, flags: OpenFlags) -> Option<usize> {
+    pub fn open_file(&self, dentry: DirEntryItem, flags: OpenFlags) -> Option<usize> {
         let mut files = self.files.write();
 
-        let mk_handle = |fd: usize, inode: Arc<DirEntry>| {
+        let mk_handle = |fd: usize, inode: DirEntryItem| {
             Some(Arc::new(FileHandle {
                 fd,
                 inode: inode.clone(),
                 offset: AtomicUsize::new(0),
                 flags,
                 dir_iter: Mutex::new((None, None)),
-                fs: inode.inode().fs(),
+                fs: inode.inode().fs().upgrade()?,
             }))
         };
 
         if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
-            *f = mk_handle(idx, dentry);
+            if let Some(h) = mk_handle(idx, dentry) {
+                *f = Some(h);
 
-            return Some(idx);
+                Some(idx)
+            } else {
+                println!("[ WARN ] Failed to open file");
+
+                None
+            }
         } else if files.len() < FILE_NUM {
             let len = files.len();
             files.push(mk_handle(len, dentry));
 
-            return Some(len);
+            Some(len)
+        } else {
+            None
         }
-
-        None
     }
 
     pub fn close_file(&self, fd: usize) -> bool {
@@ -186,6 +193,18 @@ impl FileTable {
         }
 
         false
+    }
+
+    pub fn close_all_files(&self) {
+        let mut files = self.files.write();
+
+        for f in files.iter_mut() {
+            if let Some(file) = f {
+                file.inode.inode().close();
+
+                *f = None;
+            }
+        }
     }
 
     pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {

@@ -4,8 +4,10 @@ use core::ops::Index;
 
 use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::disk::inode::{FileType, INode};
-use crate::kernel::fs::ext2::inode::LockedExt2INode;
+
 use crate::kernel::fs::ext2::Ext2Filesystem;
+
+use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 use crate::kernel::utils::types::{Align, CeilDiv};
@@ -53,7 +55,7 @@ impl INodeData {
     }
 
     fn fs(&self) -> Arc<Ext2Filesystem> {
-        self.inode.fs()
+        self.inode.ext2_fs()
     }
 
     fn get_offsets(mut block_num: usize, block_size: usize) -> Offsets {
@@ -225,11 +227,7 @@ impl INodeData {
             } else {
                 if ptrs[o] == 0 {
                     if let Some(p) = {
-                        if i == 1 {
-                            None
-                        } else {
-                            fs.group_descs().alloc_block_ptr(inode_id)
-                        }
+                        fs.group_descs().alloc_block_ptr(inode_id)
                     } {
                         ptrs[o] = p as u32;
 

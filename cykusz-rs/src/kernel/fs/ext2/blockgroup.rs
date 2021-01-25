@@ -475,4 +475,8 @@ impl BlockGroupDescriptors {
             }
         }
     }
+
+    pub fn umount(&self) {
+        self.d_inodes.lock().clear();
+    }
 }

@@ -1,3 +1,4 @@
+use alloc::sync::Weak;
 use alloc::vec::Vec;
 
 use intrusive_collections::UnsafeRef;
@@ -6,12 +7,12 @@ use syscall_defs::{ConnectionFlags, FileType, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntry;
+use crate::kernel::fs::icache::INodeItemStruct;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
 use crate::kernel::utils::wait_queue::WaitQueue;
-use alloc::sync::Arc;
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
@@ -240,7 +241,7 @@ pub fn sys_link(target: u64, target_len: u64, linkpath: u64, linkpath_len: u64) 
         (lookup_by_path(dir, LookupMode::None)?.inode(), name)
     };
 
-    if Arc::as_ptr(&inode.fs()) != Arc::as_ptr(&target_entry.inode().fs()) {
+    if Weak::as_ptr(&inode.fs()) != Weak::as_ptr(&target_entry.inode().fs()) {
         return Err(SyscallError::Inval);
     }
 
@@ -286,7 +287,13 @@ pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
     if let Some(socket) = socket {
         let task = current_task();
 
-        if let Some(fd) = task.open_file(DirEntry::inode_wrap(socket), OpenFlags::RDWR) {
+        use crate::kernel::fs::icache;
+
+        let cache = icache::cache();
+
+        let item = cache.make_item_no_cache(INodeItemStruct::from(socket));
+
+        if let Some(fd) = task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR) {
             Ok(fd)
         } else {
             Err(SyscallError::Fault)
@@ -311,7 +318,13 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
     if let Some(socket) = socket {
         let task = current_task();
 
-        if let Some(fd) = task.open_file(DirEntry::inode_wrap(socket), OpenFlags::RDWR) {
+        use crate::kernel::fs::icache;
+
+        let cache = icache::cache();
+
+        let item = cache.make_item_no_cache(INodeItemStruct::from(socket));
+
+        if let Some(fd) = task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR) {
             Ok(fd)
         } else {
             Err(SyscallError::Fault)
@@ -450,6 +463,9 @@ pub fn sys_sleep(time_ns: u64) -> SyscallResult {
 }
 
 pub fn sys_poweroff() -> ! {
+    crate::kernel::sched::close_all_tasks();
+    crate::kernel::fs::dirent::cache().clear();
+    crate::kernel::fs::icache::cache().clear();
     crate::kernel::fs::mount::umount_all();
 
     crate::arch::acpi::power_off()

@@ -151,6 +151,18 @@ pub fn unlink(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_UNLINK, path.as_ptr() as usize, path.len()) }
 }
 
+pub fn rename(oldpath: &str, newpath: &str) -> SyscallResult {
+    unsafe {
+        syscall4(
+            SYS_RENAME,
+            oldpath.as_ptr() as usize,
+            oldpath.len(),
+            newpath.as_ptr() as usize,
+            newpath.len(),
+        )
+    }
+}
+
 pub fn bind(port: u32, flags: syscall_defs::ConnectionFlags) -> SyscallResult {
     unsafe { syscall2(SYS_BIND, port as usize, flags.bits()) }
 }

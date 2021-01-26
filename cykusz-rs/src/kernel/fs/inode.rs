@@ -80,6 +80,10 @@ pub trait INode: Send + Sync + DowncastSync {
         return Err(FsError::NotSupported);
     }
 
+    fn rename(&self, _old: DirEntryItem, _new_name: &str) -> Result<()> {
+        return Err(FsError::NotSupported);
+    }
+
     fn truncate(&self) -> Result<()> {
         return Err(FsError::NotSupported);
     }

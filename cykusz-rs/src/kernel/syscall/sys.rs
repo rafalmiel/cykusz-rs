@@ -1,3 +1,5 @@
+use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
@@ -250,6 +252,51 @@ pub fn sys_link(target: u64, target_len: u64, linkpath: u64, linkpath_len: u64) 
     } else {
         return Err(SyscallError::NotDir);
     }
+
+    Ok(0)
+}
+
+pub fn sys_rename(oldpath: u64, oldpath_len: u64, newpath: u64, newpath_len: u64) -> SyscallResult {
+    let old_path = Path::new(make_str(oldpath, oldpath_len));
+    let new_path = Path::new(make_str(newpath, newpath_len));
+
+    let old = lookup_by_real_path(old_path, LookupMode::None)?;
+
+    let (new, name) = {
+        let (dir, name) = new_path.containing_dir();
+
+        (lookup_by_real_path(dir, LookupMode::None)?, name)
+    };
+
+    if new.inode().fs().as_ptr() != old.inode().fs().as_ptr() {
+        return Err(SyscallError::Access);
+    }
+
+    if new.inode().ftype()? != FileType::Dir {
+        return Err(SyscallError::NotDir);
+    }
+
+    if old.inode().ftype()? == FileType::Dir {
+        // Check whether we are not moving directory to itself
+        let mut c = Some(new.clone());
+
+        while let Some(i) = c.clone() {
+            if Arc::downgrade(&i).as_ptr() == Arc::downgrade(&old).as_ptr() {
+                return Err(SyscallError::Inval);
+            }
+
+            c = i.parent();
+        }
+    }
+
+    new.inode().rename(old.clone(), name.str())?;
+
+    let cache = crate::kernel::fs::dirent::cache();
+
+    cache.rehash(&old, |e| {
+        e.update_parent(Some(new));
+        e.update_name(String::from(name.str()));
+    });
 
     Ok(0)
 }

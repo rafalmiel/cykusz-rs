@@ -155,6 +155,26 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
         }
     }
 
+    pub fn rehash(
+        &mut self,
+        item: &Arc<CacheItem<K, T>>,
+        update: impl FnOnce(&Arc<CacheItem<K, T>>),
+    ) {
+        let old_key = item.cache_key();
+
+        if let Some(v) = self.used.remove(&old_key) {
+            if v.as_ptr() != Arc::as_ptr(item) {
+                println!("[ WARN ] Rehash pointer mismatch.");
+            }
+
+            update(item);
+
+            let new_key = item.cache_key();
+
+            self.used.insert(new_key, Arc::downgrade(item));
+        }
+    }
+
     fn clear(&mut self) {
         self.used.clear();
         self.unused.clear();
@@ -236,6 +256,10 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
         });
 
         item
+    }
+
+    pub fn rehash(&self, item: &Arc<CacheItem<K, T>>, update: impl FnOnce(&Arc<CacheItem<K, T>>)) {
+        self.data.lock().rehash(item, update);
     }
 
     pub fn remove(&self, entry: &K) {

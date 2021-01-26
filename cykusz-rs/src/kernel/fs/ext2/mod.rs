@@ -114,10 +114,6 @@ impl Ext2Filesystem {
 
         let id = inode.read().id();
 
-        if inode.read().ftype() == syscall_defs::FileType::Dir {
-            self.group_descs().dec_dir_count(id)
-        }
-
         self.group_descs().free_inode_id(id);
     }
 

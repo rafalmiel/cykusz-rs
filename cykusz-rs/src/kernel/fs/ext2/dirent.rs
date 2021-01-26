@@ -76,6 +76,9 @@ impl<'a> DirEntIter<'a> {
 
     pub fn remove_dir_entry(&mut self, name: &str) -> Result<()> {
         if let Some(e) = self.find(|e| e.name() == name) {
+            let typ = e.ftype();
+            let id = e.inode();
+
             self.fs()
                 .get_inode(e.inode() as usize)
                 .as_impl::<LockedExt2INode>()
@@ -117,6 +120,10 @@ impl<'a> DirEntIter<'a> {
             }
 
             self.sync_current_buf();
+
+            if typ == DirEntTypeIndicator::Directory && ![".", ".."].contains(&name) {
+                fs.group_descs().dec_dir_count(id as usize);
+            }
 
             return Ok(());
         }

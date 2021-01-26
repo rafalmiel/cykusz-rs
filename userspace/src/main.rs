@@ -355,6 +355,15 @@ fn exec(cmd: &str) {
                 println!("unlink failed: {:?}", e);
             }
         }
+    } else if cmd.starts_with("mv ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        if let (Some(old), Some(new)) = (split.next(), split.next()) {
+            if let Err(e) = syscall::rename(old, new) {
+                println!("mv failed: {:?}", e);
+            }
+        }
     } else if cmd.is_empty() {
         return;
     } else {

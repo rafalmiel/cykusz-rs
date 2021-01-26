@@ -579,8 +579,6 @@ impl INode for LockedExt2INode {
             return Err(FsError::IsDir);
         }
 
-        let _me = self.self_ref();
-
         if DirEntIter::new(self.self_ref())
             .find(|e| e.name() == name)
             .is_some()
@@ -594,6 +592,45 @@ impl INode for LockedExt2INode {
             &self.ext2_fs().get_inode(target.id()?).as_ext2_inode(),
             name,
         )?;
+
+        Ok(())
+    }
+
+    fn rename(&self, old: DirEntryItem, new_name: &str) -> Result<()> {
+        if self.ftype()? != FileType::Dir {
+            return Err(FsError::NotDir);
+        }
+
+        if self.node.read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
+
+        if old.inode().as_ext2_inode().read().d_inode().hl_count() == 0 {
+            return Err(FsError::NotSupported);
+        }
+
+        if DirEntIter::new(self.self_ref())
+            .find(|e| e.name() == new_name)
+            .is_some()
+        {
+            return Err(FsError::EntryExists);
+        }
+
+        if let Some(old_parent) = old.parent() {
+            if old_parent.inode().ftype()? != FileType::Dir {
+                return Err(FsError::NotDir);
+            }
+
+            let mut iter = DirEntIter::new_no_skip(self.self_ref());
+
+            iter.add_dir_entry(old.inode().as_ext2_inode(), new_name)?;
+
+            iter = DirEntIter::new_no_skip(old_parent.inode().as_ext2_inode_arc());
+
+            iter.remove_dir_entry(old.name().as_str())?;
+        } else {
+            return Err(FsError::NotSupported);
+        }
 
         Ok(())
     }

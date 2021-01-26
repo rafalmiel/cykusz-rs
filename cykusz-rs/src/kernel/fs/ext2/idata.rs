@@ -226,9 +226,7 @@ impl INodeData {
                 i > 0
             } else {
                 if ptrs[o] == 0 {
-                    if let Some(p) = {
-                        fs.group_descs().alloc_block_ptr(inode_id)
-                    } {
+                    if let Some(p) = { fs.group_descs().alloc_block_ptr(inode_id) } {
                         ptrs[o] = p as u32;
 
                         new_blocks += 1;

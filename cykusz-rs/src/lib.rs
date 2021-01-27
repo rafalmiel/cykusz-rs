@@ -122,6 +122,8 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::block::init();
 
+    kernel::fs::mount_root();
+
     kernel::net::init();
 
     // Start test tasks on this cpu

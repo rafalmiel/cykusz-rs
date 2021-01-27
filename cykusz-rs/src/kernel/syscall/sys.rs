@@ -119,13 +119,15 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
 pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
     let buf = make_buf_mut(buf, len);
 
-    let pwd = current_task().get_pwd();
-
-    if pwd.len() > len as usize {
-        Err(SyscallError::IO)
+    if let Some(pwd) = current_task().get_pwd() {
+        if pwd.len() > len as usize {
+            Err(SyscallError::IO)
+        } else {
+            buf[..pwd.len()].copy_from_slice(pwd.as_bytes());
+            Ok(pwd.len())
+        }
     } else {
-        buf[..pwd.len()].copy_from_slice(pwd.as_bytes());
-        Ok(pwd.len())
+        Err(SyscallError::Inval)
     }
 }
 

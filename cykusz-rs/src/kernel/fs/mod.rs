@@ -7,11 +7,15 @@ use spin::Once;
 
 use syscall_defs::{FileType, OpenFlags};
 
+use crate::kernel::block::get_blkdev_by_id;
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::dirent::DirEntryItem;
+use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
+use crate::kernel::fs::icache::INodeItem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
+use crate::kernel::fs::ramfs::RamFS;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
 
@@ -31,60 +35,47 @@ pub mod vfs;
 static ROOT_MOUNT: Once<Arc<dyn Filesystem>> = Once::new();
 static ROOT_DENTRY: Once<DirEntryItem> = Once::new();
 
-pub fn root_dentry() -> &'static DirEntryItem {
-    ROOT_DENTRY.get().unwrap()
+pub fn root_dentry() -> Option<&'static DirEntryItem> {
+    ROOT_DENTRY.get()
 }
 
-struct DevListener {}
+struct DevListener {
+    devfs: Arc<RamFS>,
+}
+
+impl DevListener {
+    fn root_dentry(&self) -> DirEntryItem {
+        self.devfs.root_dentry()
+    }
+
+    fn dev_inode(&self) -> INodeItem {
+        self.devfs.root_dentry().inode().clone()
+    }
+}
 
 impl DeviceListener for DevListener {
     fn device_added(&self, dev: Arc<dyn Device>) {
-        if let Ok(dev_dir) = root_dentry().inode().lookup(root_dentry().clone(), "dev") {
-            dev_dir
-                .inode()
-                .mknode(dev.name().as_str(), dev.id())
-                .expect("Failed to mknode for device");
-        } else {
-            panic!("Failed to mknode for device {}", dev.name());
-        }
+        self.dev_inode()
+            .mknode(dev.name().as_str(), dev.id())
+            .expect("Failed to mknode for device");
     }
 }
 
 static DEV_LISTENER: Once<Arc<DevListener>> = Once::new();
+
+fn dev_listener() -> &'static Arc<DevListener> {
+    DEV_LISTENER.get().unwrap()
+}
 
 pub fn init() {
     icache::init();
     dirent::init();
     mount::init();
 
-    ROOT_DENTRY.call_once(|| {
-        let fs = ramfs::RamFS::new();
-
-        ROOT_MOUNT.call_once(|| fs.clone());
-
-        let root = fs.root_dentry();
-
-        root.inode()
-            .mkdir("dev")
-            .expect("Failed to create /dev directory");
-        root.inode()
-            .mkdir("etc")
-            .expect("Failed to create /etc directory");
-        root.inode()
-            .mkdir("home")
-            .expect("Failed to create /home directory");
-        root.inode()
-            .mkdir("var")
-            .expect("Failed to create /var directory");
-        root.inode()
-            .mkdir("tmp")
-            .expect("Failed to create /tmp directory");
-
-        root
-    });
-
     DEV_LISTENER.call_once(|| {
-        let dev = Arc::new(DevListener {});
+        let dev = Arc::new(DevListener {
+            devfs: RamFS::new(),
+        });
 
         register_device_listener(dev.clone());
 
@@ -92,6 +83,38 @@ pub fn init() {
     });
 
     stdio::init();
+}
+
+pub fn mount_root() {
+    let dev_ent = dev_listener().root_dentry();
+
+    let boot = dev_listener()
+        .dev_inode()
+        .lookup(dev_ent.clone(), "disk1.1")
+        .unwrap();
+    let root = dev_listener()
+        .dev_inode()
+        .lookup(dev_ent, "disk1.2")
+        .unwrap();
+
+    let boot_dev = get_blkdev_by_id(boot.inode().device().unwrap().id()).unwrap();
+    let root_dev = get_blkdev_by_id(root.inode().device().unwrap().id()).unwrap();
+
+    let boot_fs = Ext2Filesystem::new(boot_dev).expect("Invalid ext2 fs");
+    let root_fs = Ext2Filesystem::new(root_dev).expect("Invalid ext2 fs");
+
+    ROOT_MOUNT.call_once(|| root_fs.clone());
+    ROOT_DENTRY.call_once(|| root_fs.root_dentry());
+
+    let boot_entry =
+        lookup_by_path(Path::new("/boot"), LookupMode::None).expect("/boot dir not found");
+
+    mount::mount(boot_entry, boot_fs).expect("/boot mount failed");
+
+    let dev_entry =
+        lookup_by_path(Path::new("/dev"), LookupMode::None).expect("/dev dir not found");
+
+    mount::mount(dev_entry, dev_listener().devfs.clone()).expect("/dev mount faiiled");
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -189,7 +212,7 @@ fn lookup_by_path_from(
                                 if !is_absolute {
                                     cur.clone()
                                 } else {
-                                    root_dentry().clone()
+                                    root_dentry().unwrap().clone()
                                 },
                                 real_path,
                                 depth + 1,
@@ -228,21 +251,25 @@ fn lookup_by_path_from(
 }
 
 pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
-    let cur = if !path.is_absolute() {
+    if let Some(cur) = if !path.is_absolute() {
         current_task().get_dent()
     } else {
-        root_dentry().clone()
-    };
-
-    lookup_by_path_from(path, lookup_mode, cur, false, 0)
+        root_dentry().cloned()
+    } {
+        lookup_by_path_from(path, lookup_mode, cur, false, 0)
+    } else {
+        return Err(FsError::NotSupported);
+    }
 }
 
 pub fn lookup_by_real_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
-    let cur = if !path.is_absolute() {
+    if let Some(cur) = if !path.is_absolute() {
         current_task().get_dent()
     } else {
-        root_dentry().clone()
-    };
-
-    lookup_by_path_from(path, lookup_mode, cur, true, 0)
+        root_dentry().cloned()
+    } {
+        lookup_by_path_from(path, lookup_mode, cur, true, 0)
+    } else {
+        return Err(FsError::NotSupported);
+    }
 }

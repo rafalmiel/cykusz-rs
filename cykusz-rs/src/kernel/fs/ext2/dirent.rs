@@ -9,7 +9,6 @@ use crate::kernel::fs::ext2::disk::inode::FileType;
 use crate::kernel::fs::ext2::idata::INodeData;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::ext2::Ext2Filesystem;
-
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::Spin;

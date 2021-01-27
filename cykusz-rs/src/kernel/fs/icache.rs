@@ -1,11 +1,12 @@
-use crate::kernel::fs::cache::{Cache, CacheItem, Cacheable};
-use crate::kernel::fs::inode::INode;
 use alloc::sync::Arc;
 use core::ops::Deref;
+
+use downcast_rs::__alloc::sync::Weak;
 use spin::Once;
 
+use crate::kernel::fs::cache::{Cache, CacheItem, Cacheable};
 use crate::kernel::fs::filesystem::Filesystem;
-use downcast_rs::__alloc::sync::Weak;
+use crate::kernel::fs::inode::INode;
 
 type ICacheKey = (usize, usize);
 type ICache = Cache<ICacheKey, INodeItemStruct>;

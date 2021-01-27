@@ -1,17 +1,16 @@
 use alloc::sync::Arc;
+use alloc::sync::Weak;
+
+use downcast_rs::DowncastSync;
 
 use syscall_defs::FileType;
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
+use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Metadata, Result};
 use crate::kernel::syscall::sys::PollTable;
-
-use downcast_rs::DowncastSync;
-
-use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
-use alloc::sync::Weak;
 
 pub trait INode: Send + Sync + DowncastSync {
     fn id(&self) -> Result<usize> {

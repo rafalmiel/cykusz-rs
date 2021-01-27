@@ -10,9 +10,8 @@ use crate::kernel::fs::ext2::disk;
 use crate::kernel::fs::ext2::idata::INodeData;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::inode::INode;
-
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
+use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};

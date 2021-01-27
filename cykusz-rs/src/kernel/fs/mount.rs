@@ -2,6 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
 
+use downcast_rs::__alloc::vec::Vec;
 use spin::Once;
 
 use crate::kernel::fs::cache::Cacheable;
@@ -9,7 +10,6 @@ use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::RwSpin;
-use downcast_rs::__alloc::vec::Vec;
 
 #[derive(Clone)]
 pub struct Mountpoint {

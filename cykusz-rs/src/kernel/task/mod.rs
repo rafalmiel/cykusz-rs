@@ -52,7 +52,7 @@ pub struct Task {
     halted: AtomicBool,
     filetable: filetable::FileTable,
     pub sleep_until: AtomicUsize,
-    cwd: RwSpin<Cwd>,
+    cwd: RwSpin<Option<Cwd>>,
 }
 
 impl Default for Task {
@@ -68,7 +68,11 @@ impl Default for Task {
             halted: AtomicBool::new(false),
             filetable: filetable::FileTable::new(),
             sleep_until: AtomicUsize::new(0),
-            cwd: RwSpin::new(Cwd::new(root_dentry().clone())),
+            cwd: RwSpin::new(if let Some(e) = root_dentry() {
+                Cwd::new(e.clone())
+            } else {
+                None
+            }),
         }
     }
 }
@@ -109,12 +113,16 @@ impl Task {
         self.filetable.get_handle(fd)
     }
 
-    pub fn get_dent(&self) -> DirEntryItem {
-        self.cwd.read().dentry.clone()
+    pub fn get_dent(&self) -> Option<DirEntryItem> {
+        let cwd = self.cwd.read();
+
+        Some((*cwd).as_ref()?.dentry.clone())
     }
 
-    pub fn get_pwd(&self) -> String {
-        self.cwd.read().pwd()
+    pub fn get_pwd(&self) -> Option<String> {
+        let cwd = self.cwd.read();
+
+        Some((*cwd).as_ref()?.pwd())
     }
 
     pub fn open_file(&self, inode: DirEntryItem, flags: OpenFlags) -> Option<usize> {
@@ -132,11 +140,10 @@ impl Task {
     pub fn set_cwd(&self, dentry: DirEntryItem) {
         let mut cwd = self.cwd.write();
 
-        if let Some(fs) = dentry.inode().fs().upgrade() {
-            cwd.fs = fs;
-            cwd.dentry = dentry;
-        } else {
-            println!("[ WARN ] CWD failed");
+        *cwd = Cwd::new(dentry);
+
+        if cwd.is_none() {
+            println!("[ WARN ] Cwd failed");
         }
     }
 

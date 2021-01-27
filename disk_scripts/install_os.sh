@@ -7,8 +7,13 @@ mkdir -p mnt
 mount /dev/loop0p1 mnt
 
 cp -f build/isofiles/boot/kernel.bin mnt/
-cp -f build/isofiles/boot/program mnt/
 cp -f build/isofiles/boot/grub/grub.cfg mnt/grub/
 
 umount mnt
+
+mount /dev/loop0p2 mnt
+mkdir -p mnt/bin
+cp -f build/isofiles/boot/program mnt/bin/shell
+umount mnt
+
 losetup -D

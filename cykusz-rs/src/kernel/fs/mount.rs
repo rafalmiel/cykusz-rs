@@ -8,6 +8,7 @@ use spin::Once;
 use crate::kernel::fs::cache::Cacheable;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
+use crate::kernel::fs::root_dentry;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::RwSpin;
 
@@ -93,17 +94,17 @@ impl Mounts {
         let mut mounts = self.mounts.write();
 
         if let Some(ent) = mounts.get(&key) {
-            ent.orig_entry.set_is_mountpont(false);
-
             if Arc::strong_count(&ent.fs) > 1 {
                 return Err(FsError::Busy);
-            } else {
-                ent.fs.umount();
-
-                drop(ent);
-
-                mounts.remove(&key);
             }
+
+            ent.orig_entry.set_is_mountpont(false);
+
+            ent.fs.umount();
+
+            drop(ent);
+
+            mounts.remove(&key);
 
             Ok(())
         } else {
@@ -123,6 +124,14 @@ impl Mounts {
                 println!("Failed to unmount {:?}", key);
             }
         }
+
+        root_dentry()
+            .unwrap()
+            .inode()
+            .fs()
+            .upgrade()
+            .unwrap()
+            .umount();
     }
 }
 

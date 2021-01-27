@@ -54,9 +54,7 @@ impl TaskContainer {
         let tasks = self.tasks.lock();
 
         for (_, t) in tasks.iter() {
-            if let Some(root) = crate::kernel::fs::root_dentry() {
-                t.set_cwd(root.clone());
-            }
+            t.clear_cwd();
             t.close_all_files();
         }
     }

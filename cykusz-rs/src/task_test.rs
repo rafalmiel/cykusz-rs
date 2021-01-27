@@ -5,8 +5,14 @@ use core::sync::atomic::AtomicU64;
 
 use intrusive_collections::LinkedListLink;
 
+use crate::arch::raw::mm::MappedAddr;
+use crate::kernel::fs::path::Path;
+use crate::kernel::fs::{lookup_by_real_path, root_dentry, LookupMode};
+use crate::kernel::sched::current_task;
 use crate::kernel::syscall::sys::sys_sleep;
 use crate::kernel::timer::{create_timer, Timer, TimerObject};
+use downcast_rs::__alloc::vec::Vec;
+use syscall_defs::OpenFlags;
 
 //use core::sync::atomic::Ordering;
 
@@ -75,14 +81,58 @@ fn task() {
 //
 //intrusive_adapter!(ElementAdapter = Arc<Element>: Element {link: LinkedListLink});
 
+fn load_bin(path: &str) -> Option<Vec<u8>> {
+    let task = current_task();
+    task.set_cwd(root_dentry().unwrap().clone());
+
+    let shell = lookup_by_real_path(Path::new(path), LookupMode::None).expect("Shell not found");
+
+    if let Some(fd) = task.open_file(shell, OpenFlags::RDONLY) {
+        if let Some(handle) = task.get_handle(fd) {
+            let mut code = Vec::<u8>::new();
+            code.resize(1024, 0);
+            let mut size = 0;
+
+            while let Ok(read) = handle.read(&mut code.as_mut_slice()[size..size + 1024]) {
+                size += read;
+
+                if read < 1024 {
+                    code.resize(size, 0);
+                    break;
+                }
+
+                code.resize(size + 1024, 0);
+            }
+
+            task.close_file(fd);
+
+            return Some(code);
+        }
+
+        task.close_file(fd);
+    }
+
+    None
+}
+
 pub fn start() {
+    if let Some(code) = load_bin("/bin/shell") {
+        println!("Exec shell...");
+        crate::kernel::sched::create_user_task(
+            MappedAddr(code.as_ptr() as usize),
+            code.len() as u64,
+        );
+    } else {
+        println!("Failed to exec shell");
+    }
+
     //crate::kernel::sched::create_task(task2);
     //crate::kernel::sched::create_task(task);
     //crate::kernel::sched::create_task(task);
-    crate::kernel::sched::create_user_task(
-        crate::kernel::user::get_user_program(),
-        crate::kernel::user::get_user_program_size(),
-    );
+    //crate::kernel::sched::create_user_task(
+    //    crate::kernel::user::get_user_program(),
+    //    crate::kernel::user::get_user_program_size(),
+    //);
 
     //if cfg!(disabled) {
     //    unsafe {

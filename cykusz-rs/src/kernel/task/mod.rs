@@ -137,6 +137,12 @@ impl Task {
         self.filetable.close_all_files();
     }
 
+    pub fn clear_cwd(&self) {
+        let mut cwd = self.cwd.write();
+
+        *cwd = None;
+    }
+
     pub fn set_cwd(&self, dentry: DirEntryItem) {
         let mut cwd = self.cwd.write();
 

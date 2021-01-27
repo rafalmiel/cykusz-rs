@@ -92,6 +92,7 @@ pub fn mount_root() {
         .dev_inode()
         .lookup(dev_ent.clone(), "disk1.1")
         .unwrap();
+
     let root = dev_listener()
         .dev_inode()
         .lookup(dev_ent, "disk1.2")

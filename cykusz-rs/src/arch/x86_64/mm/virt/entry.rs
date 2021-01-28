@@ -83,8 +83,7 @@ impl Entry {
     }
 
     pub fn set_frame_flags(&mut self, frame: &Frame, flags: Entry) {
-        self.bits = frame.address().0;
-        self.insert(flags);
+        self.bits = frame.address().0 | (flags.bits & !ADDRESS_MASK);
     }
 
     pub fn set_frame(&mut self, frame: &Frame) {

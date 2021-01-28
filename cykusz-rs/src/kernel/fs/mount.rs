@@ -1,8 +1,8 @@
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
-use downcast_rs::__alloc::vec::Vec;
 use spin::Once;
 
 use crate::kernel::fs::cache::Cacheable;
@@ -19,6 +19,8 @@ pub struct Mountpoint {
     orig_entry: DirEntryItem,
 }
 
+type MountKey = (usize, String);
+
 impl Mountpoint {
     pub fn root_entry(&self) -> DirEntryItem {
         self.root_entry.clone()
@@ -26,7 +28,7 @@ impl Mountpoint {
 }
 
 struct Mounts {
-    mounts: RwSpin<BTreeMap<(usize, String), Mountpoint>>,
+    mounts: RwSpin<BTreeMap<MountKey, Mountpoint>>,
 }
 
 impl Mounts {
@@ -36,12 +38,19 @@ impl Mounts {
         }
     }
 
+    fn make_key(e: &DirEntryItem) -> MountKey {
+        let (i, s) = e.cache_key();
+
+        (i, s)
+    }
+
     fn mount(&self, dir: DirEntryItem, fs: Arc<dyn Filesystem>) -> Result<()> {
         if dir.is_mountpoint() {
             return Err(FsError::EntryNotFound);
         }
 
-        let key = dir.cache_key();
+        let key = Self::make_key(&dir);
+        //println!("mounting key: {:?}", key);
 
         let mut mounts = self.mounts.write();
 
@@ -69,29 +78,33 @@ impl Mounts {
     }
 
     fn umount(&self, dir: DirEntryItem) -> Result<()> {
-        let key = dir.cache_key();
+        let key = Self::make_key(&dir);
 
         self.unmount_by_key(&key)
     }
 
     fn find_mount(&self, dir: &DirEntryItem) -> Result<Mountpoint> {
         if !dir.is_mountpoint() {
+            //println!("is not mountpoint");
             return Err(FsError::EntryNotFound);
         }
 
-        let key = dir.cache_key();
+        let key = Self::make_key(dir);
+        //println!("find mountpoint: {:?}", key);
 
         let mounts = self.mounts.read();
 
         if let Some(m) = mounts.get(&key) {
+            //println!("found mount: {:?}", key);
             Ok(m.clone())
         } else {
             Err(FsError::EntryNotFound)
         }
     }
 
-    fn unmount_by_key(&self, key: &(usize, String)) -> Result<()> {
+    fn unmount_by_key(&self, key: &MountKey) -> Result<()> {
         let mut mounts = self.mounts.write();
+        //println!("umount: {:?}", key);
 
         if let Some(ent) = mounts.get(&key) {
             if Arc::strong_count(&ent.fs) > 1 {
@@ -115,7 +128,7 @@ impl Mounts {
     fn umount_all(&self) {
         let mounts = self.mounts.write();
 
-        let keys: Vec<(usize, String)> = mounts.iter().map(|e| e.0.clone()).collect();
+        let keys: Vec<MountKey> = mounts.iter().map(|e| e.0.clone()).collect();
 
         drop(mounts);
 

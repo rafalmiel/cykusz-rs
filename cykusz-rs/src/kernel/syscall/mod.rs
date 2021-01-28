@@ -36,6 +36,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_UNLINK => sys::sys_unlink(a, b),
         SYS_LINK => sys::sys_link(a, b, c, d),
         SYS_RENAME => sys::sys_rename(a, b, c, d),
+        SYS_FORK => sys::sys_fork(),
 
         _ => Err(SyscallError::Inval),
     }

@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
+use alloc::sync::Weak;
 use core::ops::Deref;
 
-use downcast_rs::__alloc::sync::Weak;
 use spin::Once;
 
 use crate::kernel::fs::cache::{Cache, CacheItem, Cacheable};

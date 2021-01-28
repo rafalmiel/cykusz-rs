@@ -67,6 +67,23 @@ fn dev_listener() -> &'static Arc<DevListener> {
     DEV_LISTENER.get().unwrap()
 }
 
+#[allow(dead_code)]
+fn init_cdboot() {
+    let rootfs = RamFS::new();
+
+    ROOT_MOUNT.call_once(|| rootfs.clone());
+
+    ROOT_DENTRY.call_once(|| rootfs.root_dentry());
+
+    root_dentry().unwrap().inode().mkdir("dev").unwrap();
+
+    crate::kernel::fs::mount::mount(
+        lookup_by_real_path(Path::new("/dev"), LookupMode::None).unwrap(),
+        dev_listener().devfs.clone(),
+    )
+    .expect("mount failed");
+}
+
 pub fn init() {
     icache::init();
     dirent::init();
@@ -81,6 +98,8 @@ pub fn init() {
 
         dev
     });
+
+    //init_cdboot();
 
     stdio::init();
 }
@@ -241,9 +260,13 @@ fn lookup_by_path_from(
                 }
             }
         }
+        //println!("is cur mountpoint? {}", cur.is_mountpoint());
         if cur.is_mountpoint() {
             if let Ok(mp) = mount::find_mount(&cur) {
                 cur = mp.root_entry();
+                //println!("is mountpoint");
+            } else {
+                panic!("No mountpoint?");
             }
         }
     }

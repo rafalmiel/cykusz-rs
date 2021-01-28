@@ -1,3 +1,4 @@
+use core::mem::size_of;
 use core::ptr::Unique;
 
 use crate::arch::gdt;
@@ -11,6 +12,9 @@ use crate::kernel::mm::heap::deallocate_align as heap_deallocate_align;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
 use crate::kernel::mm::VirtAddr;
+
+const USER_STACK_SIZE: usize = 0x4000;
+const KERN_STACK_SIZE: usize = 4096 * 4;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -39,9 +43,10 @@ pub struct Context {
 pub struct Task {
     pub ctx: Unique<Context>,
     //top of the stack, used to deallocate
+    pub cr3: usize,
     pub stack_top: usize,
     pub stack_size: usize,
-    pub is_user: bool,
+    pub user_stack: Option<usize>,
 }
 
 impl Context {
@@ -63,6 +68,11 @@ impl Context {
 
 fn task_finished() {
     crate::kernel::sched::task_finished();
+}
+
+#[no_mangle]
+pub extern "C" fn fork_get_pid() -> isize {
+    crate::kernel::sched::current_id() as isize
 }
 
 fn prepare_p4<'a>() -> &'a mut P4Table {
@@ -125,7 +135,9 @@ fn map_user(new_p4: &mut P4Table, elf_module: MappedAddr) -> (PhysAddr, VirtAddr
     }
 
     // Map stack
-    for a in (VirtAddr(0x7fffffffc000)..VirtAddr(0x800000000000)).step_by(PAGE_SIZE) {
+    for a in
+        (VirtAddr(0x8000_0000_0000 - USER_STACK_SIZE)..VirtAddr(0x800000000000)).step_by(PAGE_SIZE)
+    {
         new_p4.map_flags(
             a,
             virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,
@@ -160,7 +172,7 @@ struct IretqFrame {
 }
 
 #[repr(C, packed)]
-struct SysretqFrame {
+pub struct SysretqFrame {
     pub rflags: usize,
     pub rip: usize,
     pub stack: usize,
@@ -176,10 +188,15 @@ impl Task {
     pub const fn empty() -> Task {
         Task {
             ctx: Unique::dangling(),
+            cr3: 0,
             stack_top: 0,
             stack_size: 0,
-            is_user: false,
+            user_stack: None,
         }
+    }
+
+    pub fn is_user(&self) -> bool {
+        self.user_stack.is_some()
     }
 
     pub fn assure_empty(&self) {
@@ -253,6 +270,30 @@ impl Task {
         ctx
     }
 
+    unsafe fn fork_ctx(&self, sp: *mut u8, cr3: usize) -> Unique<Context> {
+        let parent_sys_frame =
+            VirtAddr(self.stack_top + self.stack_size - size_of::<SysretqFrame>())
+                .read_ref::<SysretqFrame>();
+
+        let frame: &mut SysretqFrame =
+            &mut *(sp.offset(-(size_of::<SysretqFrame>() as isize)) as *mut SysretqFrame);
+
+        frame.stack = parent_sys_frame.stack;
+        frame.rflags = parent_sys_frame.rflags;
+        frame.rip = parent_sys_frame.rip;
+
+        let mut ctx = Unique::new_unchecked(
+            sp.offset(-(size_of::<Context>() as isize + size_of::<SysretqFrame>() as isize))
+                as *mut Context,
+        );
+
+        ctx.as_ptr().write(Context::empty());
+        ctx.as_mut().rip = asm_sysretq_forkinit as usize;
+        ctx.as_mut().cr3 = cr3;
+
+        ctx
+    }
+
     fn new_sp(
         fun: usize,
         cs: SegmentSelector,
@@ -276,9 +317,10 @@ impl Task {
 
             Task {
                 ctx,
+                cr3: cr3.0,
                 stack_top: sp as usize - stack_size,
                 stack_size,
-                is_user: user_stack.is_some(),
+                user_stack,
             }
         }
     }
@@ -292,7 +334,7 @@ impl Task {
         user_stack: Option<usize>,
         param: usize,
     ) -> Task {
-        let sp = heap_allocate_align(4096 * 16, 4096).unwrap();
+        let sp = heap_allocate_align(KERN_STACK_SIZE, 4096).unwrap();
 
         Task::new_sp(
             fun,
@@ -300,7 +342,7 @@ impl Task {
             ds,
             int_enabled,
             sp as usize,
-            4096 * 16,
+            KERN_STACK_SIZE,
             cr3,
             user_stack,
             param,
@@ -359,10 +401,30 @@ impl Task {
         )
     }
 
+    pub fn fork(&self) -> Task {
+        let orig_p4 = P4Table::new_at_phys(PhysAddr(self.cr3));
+
+        let new_p4 = orig_p4.duplicate();
+
+        let sp_top = heap_allocate_align(KERN_STACK_SIZE, 4096).unwrap();
+
+        let sp = unsafe { sp_top.offset(KERN_STACK_SIZE as isize) };
+
+        let new_ctx = unsafe { self.fork_ctx(sp, new_p4.phys_addr().0) };
+
+        Task {
+            ctx: new_ctx,
+            cr3: new_p4.phys_addr().0,
+            stack_top: sp_top as usize,
+            stack_size: KERN_STACK_SIZE,
+            user_stack: self.user_stack,
+        }
+    }
+
     pub fn deallocate(&mut self) {
         let cr3 = unsafe { self.ctx.as_ref().cr3 };
 
-        if self.is_user {
+        if self.is_user() {
             let p4 = p4_table(PhysAddr(cr3));
             p4.deallocate_user();
         }
@@ -377,11 +439,12 @@ extern "C" {
     pub fn switch_to(old_ctx: &mut Unique<Context>, new_ctx: &Context);
     fn isr_return();
     fn asm_sysretq_userinit();
+    fn asm_sysretq_forkinit();
 }
 
 pub fn switch(from: &mut Task, to: &Task) {
     unsafe {
-        if to.is_user {
+        if to.is_user() {
             crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
         switch_to(&mut from.ctx, to.ctx.as_ref());

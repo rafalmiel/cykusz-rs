@@ -364,6 +364,19 @@ fn exec(cmd: &str) {
                 println!("mv failed: {:?}", e);
             }
         }
+    } else if cmd == "fork" {
+        if let Ok(id) = syscall::fork() {
+            if id != 0 {
+                println!("Forked task id: {}", id);
+                if let Err(e) = syscall::sleep(4000) {
+                    println!("sleep failed!!! {:?}", e);
+                }
+                println!("task {} exiting...", id);
+                syscall::exit();
+            }
+        } else {
+            println!("fork failed");
+        }
     } else if cmd.is_empty() {
         return;
     } else {

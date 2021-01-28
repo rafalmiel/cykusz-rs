@@ -501,13 +501,23 @@ pub fn sys_time() -> SyscallResult {
 }
 
 pub fn sys_exit() -> ! {
-    crate::task_test::start();
     crate::kernel::sched::task_finished()
 }
 
 pub fn sys_sleep(time_ns: u64) -> SyscallResult {
     let t = current_task();
     t.sleep(time_ns as usize);
+    Ok(0)
+}
+
+pub fn sys_fork() -> SyscallResult {
+    println!(
+        "free mem before fork: {}, used: {}",
+        crate::kernel::mm::free_mem(),
+        crate::kernel::mm::used_mem()
+    );
+    crate::kernel::sched::fork();
+
     Ok(0)
 }
 

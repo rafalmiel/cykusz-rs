@@ -247,6 +247,10 @@ pub fn sleep(time_ms: usize) -> SyscallResult {
     unsafe { syscall1(SYS_SLEEP, time_ms * 1_000_000) }
 }
 
+pub fn fork() -> SyscallResult {
+    unsafe { syscall0(SYS_FORK) }
+}
+
 pub fn poweroff() -> ! {
     unsafe {
         if let Err(e) = syscall0(SYS_POWEROFF) {

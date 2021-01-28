@@ -1,8 +1,10 @@
 global asm_syscall_handler
 global asm_sysretq
 global asm_sysretq_userinit
+global asm_sysretq_forkinit
 
 extern fast_syscall_handler
+extern fork_get_pid
 
 asm_syscall_handler:
     push rbx
@@ -73,9 +75,16 @@ asm_sysretq:
 
     o64 sysret
 
+asm_sysretq_forkinit:
+    call fork_get_pid
+
+    jmp asm_sysretq
+
 asm_sysretq_userinit:
     pop r11                 ; Restore rflags
     pop rcx                 ; Restore return value
     pop rsp                 ; Restore user stack
 
     o64 sysret
+
+

@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_imports)]
 
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::sync::atomic::AtomicU64;
 
 use intrusive_collections::LinkedListLink;
@@ -11,7 +12,6 @@ use crate::kernel::fs::{lookup_by_real_path, root_dentry, LookupMode};
 use crate::kernel::sched::current_task;
 use crate::kernel::syscall::sys::sys_sleep;
 use crate::kernel::timer::{create_timer, Timer, TimerObject};
-use downcast_rs::__alloc::vec::Vec;
 use syscall_defs::OpenFlags;
 
 //use core::sync::atomic::Ordering;

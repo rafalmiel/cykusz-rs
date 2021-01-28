@@ -109,6 +109,21 @@ impl Task {
         task
     }
 
+    pub fn fork(&self) -> Task {
+        let mut task = Task::default();
+
+        task.arch_task = UnsafeCell::new(unsafe { self.arch_task().fork() });
+
+        task.filetable = self.filetable.clone();
+        if let Some(e) = self.get_dent() {
+            self.set_cwd(e);
+        }
+        task.set_state(TaskState::Runnable);
+        task.locks.store(self.locks(), Ordering::SeqCst);
+
+        task
+    }
+
     pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {
         self.filetable.get_handle(fd)
     }

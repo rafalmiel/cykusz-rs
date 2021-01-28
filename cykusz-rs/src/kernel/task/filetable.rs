@@ -133,6 +133,14 @@ pub struct FileTable {
     files: RwSpin<Vec<Option<Arc<FileHandle>>>>,
 }
 
+impl Clone for FileTable {
+    fn clone(&self) -> FileTable {
+        FileTable {
+            files: RwSpin::new(self.files.read().clone()),
+        }
+    }
+}
+
 impl Default for FileTable {
     fn default() -> FileTable {
         FileTable::new()

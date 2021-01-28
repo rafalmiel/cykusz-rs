@@ -2,6 +2,7 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
 
 use crate::kernel::mm::MappedAddr;
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::task::Task;
 
@@ -36,6 +37,16 @@ impl TaskContainer {
 
     pub fn add_user_task(&self, fun: MappedAddr, code_size: usize) -> Arc<Task> {
         let task = Arc::new(Task::new_user(fun, code_size));
+
+        self.register_task(task.clone());
+
+        task
+    }
+
+    pub fn fork(&self) -> Arc<Task> {
+        let current = current_task();
+
+        let task = Arc::new(current.fork());
 
         self.register_task(task.clone());
 

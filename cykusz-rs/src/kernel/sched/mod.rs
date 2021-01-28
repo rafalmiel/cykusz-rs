@@ -134,6 +134,16 @@ impl Scheduler {
         self.tasks.close_all_tasks();
     }
 
+    fn fork(&self) -> Arc<Task> {
+        let _g = IrqGuard::new();
+
+        let task = self.tasks.fork();
+
+        self.cpu_queues.add_task(task.clone());
+
+        task
+    }
+
     fn init_tasks(&self) {
         self.cpu_queues.init_tasks();
     }
@@ -173,6 +183,10 @@ pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
 
 pub fn create_user_task(fun: MappedAddr, code_size: u64) -> Arc<Task> {
     scheduler().add_user_task(fun, code_size as usize)
+}
+
+pub fn fork() -> Arc<Task> {
+    scheduler().fork()
 }
 
 pub fn current_task() -> Arc<Task> {

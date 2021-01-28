@@ -78,6 +78,13 @@ where
         unsafe { frame.address_mapped().read_ref::<Table<L>>() }
     }
 
+    pub fn new_alloc<'a>() -> &'a mut Table<L> {
+        let mut frame = crate::kernel::mm::allocate().unwrap();
+        frame.clear();
+
+        Self::new_at_frame_mut(&frame)
+    }
+
     pub fn clear(&mut self) {
         for i in 0..ENTRIES_COUNT {
             self.entries[i].clear();
@@ -93,6 +100,16 @@ where
     }
 
     pub fn for_entries(&self, flags: Entry, fun: impl Fn(usize, &Entry)) {
+        self.entries
+            .iter()
+            .enumerate()
+            .filter(|e| e.1.contains(flags))
+            .for_each(|(idx, e)| {
+                fun(idx, e);
+            })
+    }
+
+    pub fn for_entries_mut(&self, flags: Entry, mut fun: impl FnMut(usize, &Entry)) {
         self.entries
             .iter()
             .enumerate()
@@ -316,6 +333,10 @@ impl Table<Level4> {
         }
     }
 
+    pub fn is_mapped(&self, addr: VirtAddr) -> bool {
+        self.to_phys(addr).is_some()
+    }
+
     pub fn update_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) -> Option<PhysAddr> {
         let _g = self.lock();
 
@@ -458,5 +479,47 @@ impl Table<Level4> {
         let frame = Frame::new(self.phys_addr());
 
         crate::kernel::mm::deallocate(&frame);
+    }
+
+    pub fn duplicate(&self) -> &P4Table {
+        let new = P4Table::new_alloc();
+
+        for e in 256..512 {
+            new.set_entry(e, self.entry_at(e));
+        }
+
+        let flags = Entry::PRESENT | Entry::USER;
+
+        self.for_entries_mut(flags, |idx3, _e3| {
+            let n3 = new.alloc_next_level(idx3, true);
+
+            let l3 = self.next_level(idx3).unwrap();
+
+            l3.for_entries_mut(flags, |idx2, _e2| {
+                let n2 = n3.alloc_next_level(idx2, true);
+
+                let l2 = l3.next_level(idx2).unwrap();
+
+                l2.for_entries_mut(flags, |idx1, _e1| {
+                    let n1 = n2.alloc_next_level(idx1, true);
+
+                    let l1 = l2.next_level(idx1).unwrap();
+
+                    l1.for_entries_mut(flags, |idx, e| {
+                        let page = crate::kernel::mm::allocate().unwrap();
+
+                        unsafe {
+                            page.address_mapped()
+                                .as_bytes_mut(PAGE_SIZE)
+                                .copy_from_slice(e.address().to_mapped().as_bytes(PAGE_SIZE));
+                        }
+
+                        n1.set_flags(idx, &page, *e);
+                    });
+                })
+            })
+        });
+
+        new
     }
 }

@@ -27,6 +27,7 @@ pub const SYS_RMDIR: usize = 20;
 pub const SYS_UNLINK: usize = 21;
 pub const SYS_LINK: usize = 22;
 pub const SYS_RENAME: usize = 23;
+pub const SYS_FORK: usize = 24;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

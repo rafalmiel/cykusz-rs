@@ -1,19 +1,18 @@
-use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 
-use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::task::Task;
 
 pub struct TaskContainer {
-    tasks: Spin<BTreeMap<usize, Arc<Task>>>,
+    tasks: Spin<hashbrown::HashMap<usize, Arc<Task>>>,
 }
 
 impl Default for TaskContainer {
     fn default() -> TaskContainer {
         TaskContainer {
-            tasks: Spin::new(BTreeMap::new()),
+            tasks: Spin::new(hashbrown::HashMap::new()),
         }
     }
 }
@@ -35,8 +34,8 @@ impl TaskContainer {
         task
     }
 
-    pub fn add_user_task(&self, fun: MappedAddr, code_size: usize) -> Arc<Task> {
-        let task = Arc::new(Task::new_user(fun, code_size));
+    pub fn add_user_task(&self, exe: &[u8]) -> Arc<Task> {
+        let task = Arc::new(Task::new_user(exe));
 
         self.register_task(task.clone());
 
@@ -53,8 +52,19 @@ impl TaskContainer {
         task
     }
 
+    pub fn exec(&self, exe: Vec<u8>) -> Arc<Task> {
+        let current = current_task();
+
+        let task = Arc::new(current.exec(exe));
+        drop(current);
+
+        self.register_task(task.clone());
+
+        task
+    }
+
     pub fn remove_task(&self, id: usize) {
-        self.tasks.lock().remove(&id);
+        self.tasks.lock().remove(&id).expect("not found");
     }
 
     pub fn register_task(&self, task: Arc<Task>) {

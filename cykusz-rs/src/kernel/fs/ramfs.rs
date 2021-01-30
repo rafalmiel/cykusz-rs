@@ -270,7 +270,7 @@ impl LockedRamINode {
             inode
         };
 
-        crate::kernel::fs::icache::cache().make_cached(&inode);
+        //crate::kernel::fs::icache::cache().make_cached(&inode);
 
         Ok(inode)
     }

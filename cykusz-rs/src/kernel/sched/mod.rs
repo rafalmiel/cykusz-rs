@@ -1,10 +1,10 @@
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::sync::atomic::Ordering;
 use core::sync::atomic::{AtomicBool, AtomicUsize};
 
 use spin::Once;
 
-use crate::kernel::mm::MappedAddr;
 use crate::kernel::sync::IrqGuard;
 use crate::kernel::task::Task;
 
@@ -81,10 +81,10 @@ impl Scheduler {
         task
     }
 
-    fn add_user_task(&self, fun: MappedAddr, code_size: usize) -> Arc<Task> {
+    fn add_user_task(&self, exe: &[u8]) -> Arc<Task> {
         let _g = IrqGuard::new();
 
-        let task = self.tasks.add_user_task(fun, code_size);
+        let task = self.tasks.add_user_task(exe);
 
         self.cpu_queues.add_task(task.clone());
 
@@ -99,6 +99,12 @@ impl Scheduler {
         let _g = IrqGuard::new();
 
         self.cpu_queues.reschedule()
+    }
+
+    fn activate_sched(&self) {
+        let _g = IrqGuard::new();
+
+        self.cpu_queues.activate_sched();
     }
 
     fn enter_critical_section(&self) {
@@ -117,6 +123,12 @@ impl Scheduler {
         let _g = IrqGuard::new();
 
         self.tasks.remove_task(current_id());
+        self.cpu_queues.current_task_finished()
+    }
+
+    fn execd_task_finished(&self) -> ! {
+        let _g = IrqGuard::new();
+
         self.cpu_queues.current_task_finished()
     }
 
@@ -144,6 +156,14 @@ impl Scheduler {
         task
     }
 
+    fn exec(&self, exe: Vec<u8>) {
+        let _g = IrqGuard::new();
+
+        let task = self.tasks.exec(exe);
+
+        self.cpu_queues.add_task(task);
+    }
+
     fn init_tasks(&self) {
         self.cpu_queues.init_tasks();
     }
@@ -169,6 +189,10 @@ pub fn reschedule() -> bool {
     scheduler().reschedule()
 }
 
+pub fn activate_sched() {
+    scheduler().activate_sched();
+}
+
 pub fn task_finished() -> ! {
     scheduler().current_task_finished()
 }
@@ -181,12 +205,18 @@ pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
     scheduler().add_param_task(fun, val)
 }
 
-pub fn create_user_task(fun: MappedAddr, code_size: u64) -> Arc<Task> {
-    scheduler().add_user_task(fun, code_size as usize)
+pub fn create_user_task(exe: &[u8]) -> Arc<Task> {
+    scheduler().add_user_task(exe)
 }
 
 pub fn fork() -> Arc<Task> {
     scheduler().fork()
+}
+
+pub fn exec(exe: Vec<u8>) -> ! {
+    scheduler().exec(exe);
+
+    scheduler().execd_task_finished();
 }
 
 pub fn current_task() -> Arc<Task> {

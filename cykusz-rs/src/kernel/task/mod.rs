@@ -1,5 +1,6 @@
 use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -8,7 +9,6 @@ use syscall_defs::OpenFlags;
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
-use crate::kernel::mm::MappedAddr;
 use crate::kernel::sched::new_task_id;
 use crate::kernel::sync::RwSpin;
 use crate::kernel::task::cwd::Cwd;
@@ -84,6 +84,26 @@ impl Task {
         Task::default()
     }
 
+    pub fn default_with_id(id: usize) -> Task {
+        Task {
+            arch_task: UnsafeCell::new(ArchTask::empty()),
+            id,
+            state: AtomicUsize::new(TaskState::Runnable as usize),
+            locks: AtomicUsize::new(0),
+            pending_io: AtomicBool::new(false),
+            to_resched: AtomicBool::new(false),
+            to_delete: AtomicBool::new(false),
+            halted: AtomicBool::new(false),
+            filetable: filetable::FileTable::new(),
+            sleep_until: AtomicUsize::new(0),
+            cwd: RwSpin::new(if let Some(e) = root_dentry() {
+                Cwd::new(e.clone())
+            } else {
+                None
+            }),
+        }
+    }
+
     pub fn new_sched(fun: fn()) -> Task {
         let mut task = Task::default();
         task.arch_task = UnsafeCell::new(ArchTask::new_sched(fun));
@@ -102,9 +122,9 @@ impl Task {
         task
     }
 
-    pub fn new_user(fun: MappedAddr, code_size: usize) -> Task {
+    pub fn new_user(exe: &[u8]) -> Task {
         let mut task = Task::default();
-        task.arch_task = UnsafeCell::new(ArchTask::new_user(fun, code_size));
+        task.arch_task = UnsafeCell::new(ArchTask::new_user(exe));
 
         task
     }
@@ -116,10 +136,23 @@ impl Task {
 
         task.filetable = self.filetable.clone();
         if let Some(e) = self.get_dent() {
-            self.set_cwd(e);
+            task.set_cwd(e);
         }
         task.set_state(TaskState::Runnable);
         task.locks.store(self.locks(), Ordering::SeqCst);
+
+        task
+    }
+
+    pub fn exec(&self, exe: Vec<u8>) -> Task {
+        //println!("execing id {}", self.id);
+        let mut task = Task::default_with_id(self.id);
+
+        task.arch_task = UnsafeCell::new(ArchTask::new_user(exe.as_slice()));
+        //task.filetable = self.filetable.clone();
+        if let Some(e) = self.get_dent() {
+            task.set_cwd(e);
+        }
 
         task
     }

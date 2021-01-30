@@ -6,7 +6,7 @@ use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::vfs::{DirEntIter, Result};
+use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
 use crate::kernel::sync::{Mutex, RwSpin};
 
 const FILE_NUM: usize = 256;
@@ -22,6 +22,17 @@ pub struct FileHandle {
 }
 
 impl FileHandle {
+    pub fn new(fd: usize, inode: DirEntryItem, flags: OpenFlags) -> Option<FileHandle> {
+        Some(FileHandle {
+            fd,
+            inode: inode.clone(),
+            offset: AtomicUsize::new(0),
+            flags,
+            dir_iter: Mutex::new((None, None)),
+            fs: inode.inode().fs().upgrade()?,
+        })
+    }
+
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let read = self
             .inode
@@ -31,6 +42,26 @@ impl FileHandle {
         self.offset.fetch_add(read, Ordering::SeqCst);
 
         Ok(read)
+    }
+
+    pub fn read_all(&self) -> Result<Vec<u8>> {
+        let mut res = Vec::<u8>::new();
+        res.resize(1024, 0);
+
+        let mut size = 0;
+
+        while let Ok(r) = self.read(&mut res.as_mut_slice()[size..size + 1024]) {
+            size += r;
+
+            if r < 1024 {
+                res.shrink_to_fit();
+                return Ok(res);
+            }
+
+            res.resize(size + 1024, 0);
+        }
+
+        Err(FsError::NotSupported)
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
@@ -213,6 +244,8 @@ impl FileTable {
                 *f = None;
             }
         }
+        files.clear();
+        files.shrink_to_fit();
     }
 
     pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {

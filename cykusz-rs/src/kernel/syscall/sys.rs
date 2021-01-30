@@ -14,6 +14,7 @@ use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
+use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
@@ -512,13 +513,30 @@ pub fn sys_sleep(time_ns: u64) -> SyscallResult {
 
 pub fn sys_fork() -> SyscallResult {
     println!(
-        "free mem before fork: {}, used: {}",
+        "free mem before fork: {}, used: {} heap: {}",
         crate::kernel::mm::free_mem(),
-        crate::kernel::mm::used_mem()
+        crate::kernel::mm::used_mem(),
+        crate::kernel::mm::heap::heap_mem(),
     );
     crate::kernel::sched::fork();
 
     Ok(0)
+}
+
+pub fn sys_exec(path: u64, path_len: u64) -> SyscallResult {
+    let path = Path::new(make_str(path, path_len));
+
+    let prog = lookup_by_path(path, LookupMode::None)?;
+
+    if let Some(fh) = FileHandle::new(0, prog, OpenFlags::RDONLY) {
+        if let Ok(exe) = fh.read_all() {
+            crate::kernel::sched::exec(exe);
+        } else {
+            Err(SyscallError::Fault)
+        }
+    } else {
+        Err(SyscallError::Inval)
+    }
 }
 
 pub fn sys_poweroff() -> ! {

@@ -446,6 +446,8 @@ impl Table<Level4> {
     }
 
     pub fn deallocate_user(&mut self) {
+        let _g = self.lock();
+
         let deallocate_entry = |e: &Entry| {
             let frame = Frame::new(e.address());
 
@@ -482,6 +484,8 @@ impl Table<Level4> {
     }
 
     pub fn duplicate(&self) -> &P4Table {
+        let _g = self.lock();
+
         let new = P4Table::new_alloc();
 
         for e in 256..512 {

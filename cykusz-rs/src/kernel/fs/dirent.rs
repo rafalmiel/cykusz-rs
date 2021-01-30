@@ -39,6 +39,13 @@ pub struct DirEntryData {
     pub inode: INodeItem,
 }
 
+impl Drop for DirEntryData {
+    fn drop(&mut self) {
+        self.name.clear();
+        self.name.shrink_to_fit();
+    }
+}
+
 pub struct DirEntry {
     data: RwSpin<DirEntryData>,
     mountpoint: AtomicBool,
@@ -203,7 +210,9 @@ pub fn get(parent: DirEntryItem, name: &String) -> Option<DirEntryItem> {
     let key = DirEntry::make_key(Some(&parent), &name);
 
     if let Some(e) = cache().get(key) {
-        e.update_parent(Some(parent));
+        if e.parent().is_none() {
+            e.update_parent(Some(parent));
+        }
 
         Some(e)
     } else {

@@ -367,11 +367,9 @@ fn exec(cmd: &str) {
     } else if cmd == "fork" {
         if let Ok(id) = syscall::fork() {
             if id != 0 {
-                println!("Forked task id: {}", id);
-                if let Err(e) = syscall::sleep(4000) {
-                    println!("sleep failed!!! {:?}", e);
-                }
-                println!("task {} exiting...", id);
+                println!("Forked shell id: {}", id);
+                syscall::exec("/bin/shell").expect("Failed to exec shell");
+            } else {
                 syscall::exit();
             }
         } else {

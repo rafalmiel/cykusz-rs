@@ -47,6 +47,7 @@ dependencies = [
  "bitflags",
  "chrono",
  "downcast-rs",
+ "hashbrown",
  "intrusive-collections",
  "lazy_static",
  "linked_list_allocator",
@@ -112,8 +113,7 @@ dependencies = [
 [[package]]
 name = "lru"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3aae342b73d57ad0b8b364bd12584819f2c1fe9114285dfcf8b0722607671635"
+source = "git+https://github.com/rafalmiel/lru-rs.git?branch=fix_pop_leak#ea64c8f932a45434cbc71d3843d28af7c1819864"
 dependencies = [
  "hashbrown",
 ]

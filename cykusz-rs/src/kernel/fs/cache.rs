@@ -1,4 +1,3 @@
-use alloc::collections::BTreeMap;
 use alloc::sync::{Arc, Weak};
 use core::borrow::Borrow;
 use core::fmt::Debug;
@@ -25,6 +24,35 @@ pub struct CacheItem<K: IsCacheKey, T: Cacheable<K>> {
     cache: Weak<Cache<K, T>>,
     used: AtomicBool,
     val: T,
+}
+
+impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
+    pub fn new(cache: &Weak<Cache<K, T>>, item: T) -> Arc<CacheItem<K, T>> {
+        let a = Arc::new(CacheItem::<K, T> {
+            cache: cache.clone(),
+            used: AtomicBool::new(false),
+            val: item,
+        });
+
+        //println!("new cache item {:p}", Arc::as_ptr(&a));
+
+        a
+    }
+
+    pub fn new_cyclic(
+        cache: &Weak<Cache<K, T>>,
+        factory: impl FnOnce(&Weak<CacheItem<K, T>>) -> T,
+    ) -> Arc<CacheItem<K, T>> {
+        let a = Arc::new_cyclic(|me| CacheItem::<K, T> {
+            cache: cache.clone(),
+            used: AtomicBool::new(false),
+            val: factory(me),
+        });
+
+        //println!("new cache item {:p}", Arc::as_ptr(&a));
+
+        a
+    }
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> Clone for CacheItem<K, T> {
@@ -54,7 +82,8 @@ impl<K: IsCacheKey, T: Cacheable<K>> DerefMut for CacheItem<K, T> {
 impl<K: IsCacheKey, T: Cacheable<K>> Drop for CacheItem<K, T> {
     fn drop(&mut self) {
         //println!(
-        //    "drop DirEntry {:?} is used {}",
+        //    "drop {:p} Item {:?} is used {}",
+        //    self as *mut _,
         //    self.cache_key(),
         //    self.is_used()
         //);
@@ -87,7 +116,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
 
 pub struct CacheData<K: IsCacheKey, T: Cacheable<K>> {
     unused: LruCache<K, Arc<CacheItem<K, T>>>,
-    used: BTreeMap<K, Weak<CacheItem<K, T>>>,
+    used: hashbrown::HashMap<K, Weak<CacheItem<K, T>>>,
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
@@ -97,21 +126,14 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
             //println!("get {:?} found some? {}", key, found.is_some());
             found
         } else {
-            if let Some(e) = self.unused.get(&key) {
-                //println!("get {:?} found unused", key);
-                let entry = e.clone();
+            if let Some(e) = self.unused.pop(&key) {
+                e.mark_used();
 
-                drop(e);
+                //println!("Insert into used {:?} vs {:?}", key, e.cache_key());
 
-                self.unused.pop(&key);
+                self.used.insert(key, Arc::downgrade(&e));
 
-                entry.mark_used();
-
-                //println!("Insert into used {:?} vs {:?}", key, entry.cache_key());
-
-                self.used.insert(key, Arc::downgrade(&entry));
-
-                Some(entry)
+                Some(e)
             } else {
                 //println!("get {:?} not found", key);
                 None
@@ -142,16 +164,22 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
     }
 
     fn move_to_unused(&mut self, ent: CacheItem<K, T>) {
-        let key = ent.cache_key();
+        let key = { ent.cache_key() };
+
+        //println!("move to unused {:?}", key);
 
         if let Some(_e) = self.used.remove(&key) {
-            let unused_ref = Arc::new(ent);
+            let unused_ref = {
+                let unused_ref = Arc::new(ent);
+
+                unused_ref
+            };
 
             unused_ref.make_unused(&Arc::downgrade(&unused_ref));
 
             self.unused.put(key, unused_ref);
         } else {
-            //println!("move_to_unused missing entry");
+            println!("move_to_unused missing entry");
         }
     }
 
@@ -191,7 +219,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
         Arc::new_cyclic(|me| Cache::<K, T> {
             data: Spin::new(CacheData::<K, T> {
                 unused: LruCache::new(capacity),
-                used: BTreeMap::new(),
+                used: hashbrown::HashMap::new(),
             }),
             sref: me.clone(),
         })
@@ -202,13 +230,9 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     }
 
     pub fn insert(&self, val: T) {
-        let v = CacheItem::<K, T> {
-            cache: self.sref.clone(),
-            used: AtomicBool::new(false),
-            val,
-        };
+        let v = CacheItem::<K, T>::new(&self.sref, val);
 
-        self.data.lock().insert(v.cache_key(), &Arc::new(v));
+        self.data.lock().insert(v.cache_key(), &v);
     }
 
     pub fn make_cached(&self, ent: &Arc<CacheItem<K, T>>) {
@@ -222,11 +246,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     }
 
     pub fn make_item(&self, item: T) -> Arc<CacheItem<K, T>> {
-        let item = Arc::new(CacheItem::<K, T> {
-            cache: self.sref.clone(),
-            used: AtomicBool::new(false),
-            val: item,
-        });
+        let item = CacheItem::<K, T>::new(&self.sref, item);
 
         self.data.lock().insert(item.cache_key(), &item);
 
@@ -237,11 +257,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
         &self,
         factory: impl FnOnce(&Weak<CacheItem<K, T>>) -> T,
     ) -> Arc<CacheItem<K, T>> {
-        let item = Arc::new_cyclic(|me| CacheItem::<K, T> {
-            cache: self.sref.clone(),
-            used: AtomicBool::new(false),
-            val: factory(&me),
-        });
+        let item = CacheItem::<K, T>::new_cyclic(&self.sref, factory);
 
         self.data.lock().insert(item.cache_key(), &item);
 
@@ -249,11 +265,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     }
 
     pub fn make_item_no_cache(&self, item: T) -> Arc<CacheItem<K, T>> {
-        let item = Arc::new(CacheItem::<K, T> {
-            cache: Weak::default(),
-            used: AtomicBool::new(false),
-            val: item,
-        });
+        let item = CacheItem::<K, T>::new(&Weak::default(), item);
 
         item
     }

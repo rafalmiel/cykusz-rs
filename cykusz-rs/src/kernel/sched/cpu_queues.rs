@@ -46,6 +46,14 @@ impl CpuQueues {
         unsafe { self.this_cpu_queue().reschedule(mutex) }
     }
 
+    pub fn activate_sched(&self) {
+        let mutex = self.cpu_queues_locks.this_cpu().lock_irq();
+
+        unsafe {
+            self.this_cpu_queue().activate_sched(mutex);
+        }
+    }
+
     pub fn enter_critical_section(&self) {
         let _mutex = self.cpu_queues_locks.this_cpu().lock_irq();
 

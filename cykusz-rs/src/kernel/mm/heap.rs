@@ -4,6 +4,7 @@ use core::ptr::NonNull;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use linked_list_allocator::{align_up, Heap};
+use spin::Once;
 
 use crate::arch::mm::heap::{HEAP_END, HEAP_SIZE, HEAP_START};
 use crate::kernel::mm::map;
@@ -13,6 +14,8 @@ use crate::kernel::sync::Spin;
 
 pub fn init() {
     use crate::HEAP;
+
+    LEAK_CATCHER.call_once(|| LeakCatcher::new());
 
     for addr in (HEAP_START..(HEAP_START + HEAP_SIZE)).step_by(PAGE_SIZE) {
         map(addr);
@@ -32,8 +35,91 @@ pub struct LockedHeap(pub Spin<Heap>);
 
 pub static ALLOCED_MEM: AtomicUsize = AtomicUsize::new(0);
 
+static LEAK_CATCHER: Once<LeakCatcher> = Once::new();
+
+pub fn leak_catcher() -> &'static LeakCatcher {
+    LEAK_CATCHER.get().unwrap()
+}
+
+pub struct LeakCatcher {
+    enabled: AtomicBool,
+    allocs: Spin<hashbrown::HashMap<usize, Layout>>,
+}
+
+impl LeakCatcher {
+    fn new() -> LeakCatcher {
+        LeakCatcher {
+            enabled: AtomicBool::new(false),
+            allocs: Spin::new(hashbrown::HashMap::new()),
+        }
+    }
+
+    pub fn track_alloc(&self, ptr: usize, layout: Layout) {
+        let enabled = self.is_enabled();
+
+        if !enabled {
+            return;
+        }
+
+        self.disable();
+
+        if let Some(p) = self.allocs.lock().insert(ptr, layout) {
+            println!("replacing 0x{:x} {} with {}", ptr, layout.size(), p.size());
+        }
+
+        if enabled {
+            self.enable();
+        }
+    }
+    pub fn track_dealloc(&self, ptr: usize) {
+        let enabled = self.is_enabled();
+
+        if !enabled {
+            return;
+        }
+
+        self.disable();
+
+        self.allocs.lock().remove(&ptr);
+
+        if enabled {
+            self.enable();
+        }
+    }
+
+    pub fn report(&self) {
+        let enabled = self.is_enabled();
+
+        self.disable();
+
+        let locks = self.allocs.lock();
+
+        for p in locks.iter() {
+            println!("unallocated ptr: 0x{:x} size: {}", p.0, p.1.size());
+        }
+
+        //locks.clear();
+
+        if enabled {
+            self.enable();
+        }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::SeqCst)
+    }
+
+    pub fn enable(&self) {
+        self.enabled.store(true, Ordering::SeqCst);
+    }
+
+    pub fn disable(&self) {
+        self.enabled.store(false, Ordering::SeqCst);
+    }
+}
+
 pub fn heap_mem() -> usize {
-    ALLOCED_MEM.load(Ordering::SeqCst)
+    unsafe { crate::HEAP.lock().used() }
 }
 
 impl LockedHeap {
@@ -94,6 +180,7 @@ unsafe impl GlobalAlloc for LockedHeap {
             .ok()
             .map_or(0 as *mut u8, |alloc| alloc.as_ptr());
 
+        //leak_catcher().track_alloc(ptr as usize, layout);
         if HEAP_DEBUG.load(Ordering::SeqCst) {
             println!("Alloc {:p} {}", ptr, layout.size());
         };
@@ -102,6 +189,7 @@ unsafe impl GlobalAlloc for LockedHeap {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        //leak_catcher().track_dealloc(ptr as usize);
         if HEAP_DEBUG.load(Ordering::SeqCst) {
             println!("Dealloc {:p} {}", ptr, layout.size());
         };

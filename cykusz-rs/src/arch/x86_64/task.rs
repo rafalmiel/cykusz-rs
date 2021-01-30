@@ -4,17 +4,17 @@ use core::ptr::Unique;
 use crate::arch::gdt;
 use crate::arch::mm::virt::p4_table_addr;
 use crate::arch::raw::segmentation::SegmentSelector;
+use crate::arch::x86_64::mm::phys::{allocate_order, deallocate_order};
 use crate::arch::x86_64::mm::virt::p4_table;
 use crate::arch::x86_64::mm::virt::table::P4Table;
 use crate::arch::x86_64::mm::PAGE_SIZE;
-use crate::kernel::mm::heap::allocate_align as heap_allocate_align;
-use crate::kernel::mm::heap::deallocate_align as heap_deallocate_align;
-use crate::kernel::mm::MappedAddr;
-use crate::kernel::mm::PhysAddr;
+use crate::arch::x86_64::raw::mm::MappedAddr;
 use crate::kernel::mm::VirtAddr;
+use crate::kernel::mm::{Frame, PhysAddr};
 
 const USER_STACK_SIZE: usize = 0x4000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
+const KERN_STACK_ORDER: usize = 2;
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -93,14 +93,16 @@ fn prepare_p4<'a>() -> &'a mut P4Table {
     new_p4
 }
 
-fn map_user(new_p4: &mut P4Table, elf_module: MappedAddr) -> (PhysAddr, VirtAddr, VirtAddr) {
+fn map_user(new_p4: &mut P4Table, exe: &[u8]) -> (PhysAddr, VirtAddr, VirtAddr) {
     use crate::drivers::elf::types::ProgramType;
     use crate::drivers::elf::ElfHeader;
     use crate::kernel::mm::allocate;
     use crate::kernel::mm::virt;
     use core::cmp::min;
 
-    let hdr = unsafe { ElfHeader::load(elf_module) };
+    let elf_module = VirtAddr(exe.as_ptr() as usize);
+
+    let hdr = unsafe { ElfHeader::load(exe) };
 
     for p in hdr.programs() {
         if p.p_type == ProgramType::Load {
@@ -151,13 +153,10 @@ fn map_user(new_p4: &mut P4Table, elf_module: MappedAddr) -> (PhysAddr, VirtAddr
     );
 }
 
-fn allocate_page_table(
-    elf_module: MappedAddr,
-    _code_size: usize,
-) -> (PhysAddr, VirtAddr, VirtAddr) {
+fn allocate_page_table(exe: &[u8]) -> (PhysAddr, VirtAddr, VirtAddr) {
     let new_p4 = prepare_p4();
 
-    map_user(new_p4, elf_module)
+    map_user(new_p4, exe)
 }
 
 #[repr(C, packed)]
@@ -193,6 +192,14 @@ impl Task {
             stack_size: 0,
             user_stack: None,
         }
+    }
+
+    pub fn swap(&mut self, other: Task) -> Task {
+        let me = *self;
+
+        *self = other;
+
+        me
     }
 
     pub fn is_user(&self) -> bool {
@@ -334,7 +341,7 @@ impl Task {
         user_stack: Option<usize>,
         param: usize,
     ) -> Task {
-        let sp = heap_allocate_align(KERN_STACK_SIZE, 4096).unwrap();
+        let sp = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0 as *mut u8;
 
         Task::new_sp(
             fun,
@@ -385,8 +392,8 @@ impl Task {
         )
     }
 
-    pub fn new_user(elf: MappedAddr, code_size: usize) -> Task {
-        let (new_p4, entry, stack) = allocate_page_table(elf, code_size);
+    pub fn new_user(exe: &[u8]) -> Task {
+        let (new_p4, entry, stack) = allocate_page_table(exe);
 
         let f = unsafe { ::core::mem::transmute::<usize, fn()>(entry.0) };
 
@@ -406,7 +413,7 @@ impl Task {
 
         let new_p4 = orig_p4.duplicate();
 
-        let sp_top = heap_allocate_align(KERN_STACK_SIZE, 4096).unwrap();
+        let sp_top = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0 as *mut u8;
 
         let sp = unsafe { sp_top.offset(KERN_STACK_SIZE as isize) };
 
@@ -430,16 +437,29 @@ impl Task {
         }
 
         self.ctx = Unique::dangling();
-        heap_deallocate_align(self.stack_top as *mut u8, self.stack_size, 4096);
+        deallocate_order(
+            &Frame::new(MappedAddr(self.stack_top).to_phys()),
+            KERN_STACK_ORDER,
+        );
         self.stack_top = 0;
     }
 }
 
 extern "C" {
     pub fn switch_to(old_ctx: &mut Unique<Context>, new_ctx: &Context);
+    pub fn activate_to(new_ctx: &Context);
     fn isr_return();
     fn asm_sysretq_userinit();
     fn asm_sysretq_forkinit();
+}
+
+pub fn activate_task(to: &Task) {
+    unsafe {
+        if to.is_user() {
+            crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
+        }
+        activate_to(to.ctx.as_ref());
+    }
 }
 
 pub fn switch(from: &mut Task, to: &Task) {

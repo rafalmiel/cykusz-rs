@@ -251,6 +251,10 @@ pub fn fork() -> SyscallResult {
     unsafe { syscall0(SYS_FORK) }
 }
 
+pub fn exec(path: &str) -> SyscallResult {
+    unsafe { syscall2(SYS_EXEC, path.as_ptr() as usize, path.len()) }
+}
+
 pub fn poweroff() -> ! {
     unsafe {
         if let Err(e) = syscall0(SYS_POWEROFF) {

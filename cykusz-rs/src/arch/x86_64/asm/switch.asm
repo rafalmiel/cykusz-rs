@@ -35,6 +35,22 @@ switch_to:
 
     ret
 
+activate_to:
+    mov rsp, rsi	; switch to new stack
+
+    pop rax         ; Restore CR3
+    mov cr3, rax
+
+    popfq
+    pop rbp
+    pop rbx
+    pop r12
+    pop r13
+    pop r14
+    pop r15
+
+    ret
+
 isr_return:
     pop rdi         ; Param passed to the function
     iretq

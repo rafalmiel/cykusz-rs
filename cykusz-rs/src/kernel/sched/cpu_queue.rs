@@ -74,6 +74,12 @@ impl CpuQueue {
         }
     }
 
+    fn _activate_sched(&self, lock: SpinGuard<()>) {
+        drop(lock);
+
+        unsafe { activate_task!(&self.sched_task) }
+    }
+
     fn finalize(&self) {
         crate::kernel::int::finish();
         crate::kernel::timer::reset_counter();
@@ -168,6 +174,10 @@ impl CpuQueue {
         return self.current != self.previous;
     }
 
+    pub fn activate_sched(&mut self, sched_lock: SpinGuard<()>) {
+        self._activate_sched(sched_lock);
+    }
+
     pub fn enter_critical_section(&mut self) {
         self.tasks[self.current].locks_inc();
     }
@@ -203,7 +213,11 @@ impl CpuQueue {
         let _lock_protect = RecursiveLockProtection::new();
 
         if Arc::strong_count(&self.tasks[idx]) != 1 {
-            panic!("Deallocating task with alive references");
+            println!(
+                "Deallocating task with {} alive references, id {}",
+                Arc::strong_count(&self.tasks[idx]),
+                self.tasks[idx].id()
+            );
         }
 
         self.tasks.remove(idx);

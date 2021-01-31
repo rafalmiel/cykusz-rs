@@ -149,7 +149,7 @@ impl Task {
         let mut task = Task::default_with_id(self.id);
 
         task.arch_task = UnsafeCell::new(ArchTask::new_user(exe.as_slice()));
-        //task.filetable = self.filetable.clone();
+        task.filetable = self.filetable.clone();
         if let Some(e) = self.get_dent() {
             task.set_cwd(e);
         }

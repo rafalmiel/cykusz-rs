@@ -29,6 +29,7 @@ pub const SYS_LINK: usize = 22;
 pub const SYS_RENAME: usize = 23;
 pub const SYS_FORK: usize = 24;
 pub const SYS_EXEC: usize = 25;
+pub const SYS_FCNTL: usize = 26;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {
@@ -63,6 +64,21 @@ bitflags! {
     pub struct ConnectionFlags: usize {
         const UDP   = (1usize << 0);
         const TCP   = (1usize << 1);
+    }
+}
+
+#[repr(i64)]
+pub enum FcntlCmd {
+    GetFL = 1,
+    Inval = -1,
+}
+
+impl From<u64> for FcntlCmd {
+    fn from(v: u64) -> Self {
+        match v {
+            1 => FcntlCmd::GetFL,
+            _ => FcntlCmd::Inval,
+        }
     }
 }
 

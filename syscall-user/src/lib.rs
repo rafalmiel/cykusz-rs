@@ -107,6 +107,25 @@ pub fn close(fd: usize) -> SyscallResult {
     unsafe { syscall1(SYS_CLOSE, fd) }
 }
 
+pub fn _fcntl(fd: usize, cmd: FcntlCmd) -> SyscallResult {
+    unsafe { syscall2(SYS_FCNTL, fd, cmd as usize) }
+}
+
+pub fn fcntl(fd: usize, cmd: FcntlCmd) -> Result<OpenFlags, SyscallError> {
+    let res = _fcntl(fd, cmd);
+
+    match res {
+        Ok(r) => {
+            if let Some(fl) = OpenFlags::from_bits(r) {
+                Ok(fl)
+            } else {
+                Err(SyscallError::Inval)
+            }
+        }
+        Err(e) => Err(e),
+    }
+}
+
 pub fn chdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_CHDIR, path.as_ptr() as usize, path.len()) }
 }

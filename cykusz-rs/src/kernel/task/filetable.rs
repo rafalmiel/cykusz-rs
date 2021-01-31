@@ -76,6 +76,10 @@ impl FileHandle {
         Ok(wrote)
     }
 
+    pub fn flags(&self) -> OpenFlags {
+        self.flags
+    }
+
     fn get_dir_iter(&self) -> (Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>) {
         let mut lock = self.dir_iter.lock();
 
@@ -188,8 +192,11 @@ impl FileTable {
         }
     }
 
-    pub fn open_file(&self, dentry: DirEntryItem, flags: OpenFlags) -> Option<usize> {
+    pub fn open_file(&self, dentry: DirEntryItem, mut flags: OpenFlags) -> Option<usize> {
         let mut files = self.files.write();
+
+        flags.remove(OpenFlags::CREAT);
+        flags.remove(OpenFlags::DIRECTORY);
 
         let mk_handle = |fd: usize, inode: DirEntryItem| {
             Some(Arc::new(FileHandle {

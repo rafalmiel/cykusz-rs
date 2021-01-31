@@ -27,11 +27,11 @@ extern crate alloc;
 #[macro_use]
 extern crate bitflags;
 #[macro_use]
+extern crate downcast_rs;
+#[macro_use]
 extern crate intrusive_collections;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate downcast_rs;
 
 use crate::kernel::mm::VirtAddr;
 

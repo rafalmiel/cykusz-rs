@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use intrusive_collections::UnsafeRef;
 
-use syscall_defs::{ConnectionFlags, FileType, SyscallResult};
+use syscall_defs::{ConnectionFlags, FcntlCmd, FileType, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntry;
@@ -97,6 +97,23 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     } else {
         Err(SyscallError::BadFD)
     };
+}
+
+pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
+    let cmd = FcntlCmd::from(cmd);
+
+    match cmd {
+        FcntlCmd::GetFL => {
+            let task = current_task();
+
+            if let Some(handle) = task.get_handle(fd as usize) {
+                Ok(handle.flags().bits())
+            } else {
+                Err(SyscallError::BadFD)
+            }
+        }
+        FcntlCmd::Inval => Err(SyscallError::Inval),
+    }
 }
 
 pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {

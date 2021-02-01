@@ -166,6 +166,7 @@ dependencies = [
  "rlibc",
  "syscall-defs",
  "syscall-user",
+ "user_alloc",
 ]
 
 [[package]]
@@ -222,4 +223,15 @@ name = "syscall-user"
 version = "0.1.0"
 dependencies = [
  "syscall-defs",
+]
+
+[[package]]
+name = "user_alloc"
+version = "0.1.0"
+dependencies = [
+ "linked_list_allocator",
+ "rlibc",
+ "spin 0.5.2",
+ "syscall-defs",
+ "syscall-user",
 ]

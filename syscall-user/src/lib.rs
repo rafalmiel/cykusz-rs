@@ -107,7 +107,7 @@ pub fn close(fd: usize) -> SyscallResult {
     unsafe { syscall1(SYS_CLOSE, fd) }
 }
 
-pub fn _fcntl(fd: usize, cmd: FcntlCmd) -> SyscallResult {
+fn _fcntl(fd: usize, cmd: FcntlCmd) -> SyscallResult {
     unsafe { syscall2(SYS_FCNTL, fd, cmd as usize) }
 }
 
@@ -124,6 +124,10 @@ pub fn fcntl(fd: usize, cmd: FcntlCmd) -> Result<OpenFlags, SyscallError> {
         }
         Err(e) => Err(e),
     }
+}
+
+pub fn mmap(addr: usize, size: usize) -> SyscallResult {
+    unsafe { syscall2(SYS_MMAP, addr, size) }
 }
 
 pub fn chdir(path: &str) -> SyscallResult {

@@ -194,14 +194,6 @@ impl Task {
         }
     }
 
-    pub fn swap(&mut self, other: Task) -> Task {
-        let me = *self;
-
-        *self = other;
-
-        me
-    }
-
     pub fn is_user(&self) -> bool {
         self.user_stack.is_some()
     }
@@ -397,7 +389,7 @@ impl Task {
 
         let f = unsafe { ::core::mem::transmute::<usize, fn()>(entry.0) };
 
-        Task::new(
+        let t = Task::new(
             f as usize,
             gdt::ring3_cs(),
             gdt::ring3_ds(),
@@ -405,7 +397,9 @@ impl Task {
             new_p4,
             Some(stack.0),
             0,
-        )
+        );
+
+        t
     }
 
     pub fn fork(&self) -> Task {

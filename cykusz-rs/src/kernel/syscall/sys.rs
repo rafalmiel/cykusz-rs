@@ -12,9 +12,13 @@ use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::icache::INodeItemStruct;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
+use crate::kernel::mm::virt::PageFlags;
+use crate::kernel::mm::VirtAddr;
+use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
 use crate::kernel::task::filetable::FileHandle;
+use crate::kernel::utils::types::Align;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
@@ -114,6 +118,17 @@ pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
         }
         FcntlCmd::Inval => Err(SyscallError::Inval),
     }
+}
+
+pub fn sys_mmap(addr: u64, size: u64) -> SyscallResult {
+    let size = size.align_up(PAGE_SIZE as u64);
+    let addr = addr.align(PAGE_SIZE as u64);
+
+    for a in (addr..addr + size).step_by(PAGE_SIZE) {
+        crate::kernel::mm::map_flags(VirtAddr(a as usize), PageFlags::USER | PageFlags::WRITABLE);
+    }
+
+    Ok(0)
 }
 
 pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {

@@ -1,3 +1,4 @@
+use core::alloc::Layout;
 use core::panic::PanicInfo;
 
 use syscall_defs::{FcntlCmd, OpenFlags, SyscallError};
@@ -21,6 +22,8 @@ pub extern "C" fn _start() -> ! {
         syscall::open("/dev/stdin", OpenFlags::RDONLY).expect("Failed to open /dev/stdin");
     }
 
+    user_alloc::init();
+
     super::main_cd()
 }
 
@@ -40,3 +43,9 @@ pub extern "C" fn _Unwind_Resume() -> ! {
 #[cfg(not(test))]
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
+
+#[lang = "oom"]
+fn oom(layout: Layout) -> ! {
+    println!("Out of memory! {:?}", layout);
+    loop {}
+}

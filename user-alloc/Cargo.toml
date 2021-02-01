@@ -1,18 +1,16 @@
 [package]
-name = "program"
+name = "user_alloc"
 version = "0.1.0"
 authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 rlibc = "*"
+spin = "*"
 
-[dependencies.chrono]
-default-features = false
+[dependencies.linked_list_allocator]
 version = "*"
 
-[dependencies.user_alloc]
-path = "../user-alloc"
 [dependencies.syscall-defs]
 path = "../syscall-defs"
 [dependencies.syscall-user]

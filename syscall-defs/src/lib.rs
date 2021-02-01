@@ -30,6 +30,7 @@ pub const SYS_RENAME: usize = 23;
 pub const SYS_FORK: usize = 24;
 pub const SYS_EXEC: usize = 25;
 pub const SYS_FCNTL: usize = 26;
+pub const SYS_MMAP: usize = 27;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

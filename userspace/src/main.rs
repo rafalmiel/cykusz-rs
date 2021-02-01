@@ -3,14 +3,18 @@
 #![feature(llvm_asm)]
 #![feature(lang_items)]
 
+extern crate alloc;
 extern crate rlibc;
 extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
+extern crate user_alloc;
+
+use chrono::{Datelike, Timelike};
+
+use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::file::File;
-use chrono::{Datelike, Timelike};
-use syscall_defs::{OpenFlags, SysDirEntry};
 
 pub mod file;
 pub mod lang;

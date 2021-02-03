@@ -9,6 +9,7 @@ use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
+use crate::kernel::fs::pcache::CachedAccess;
 use crate::kernel::utils::slice::ToBytesMut;
 
 mod blockgroup;
@@ -66,11 +67,11 @@ impl Ext2Filesystem {
     }
 
     pub fn read_block(&self, block: usize, dest: &mut [u8]) -> Option<usize> {
-        self.dev.read(block * self.sectors_per_block(), dest)
+        self.dev.read_cached(block * self.sectors_per_block(), dest)
     }
 
     pub fn write_block(&self, block: usize, buf: &[u8]) -> Option<usize> {
-        self.dev.write(block * self.sectors_per_block(), buf)
+        self.dev.write_cached(block * self.sectors_per_block(), buf)
     }
 
     pub fn superblock(&self) -> &superblock::Superblock {

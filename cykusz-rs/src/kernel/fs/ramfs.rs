@@ -37,6 +37,7 @@ impl Default for Content {
 #[derive(Default)]
 struct RamINode {
     id: usize,
+    #[allow(unused)]
     name: String,
     typ: FileType,
     parent: Weak<INodeItemInt>,
@@ -190,12 +191,12 @@ impl INode for LockedRamINode {
         let dir = match idx {
             0 => Some(crate::kernel::fs::dirent::DirEntry::new(
                 parent,
-                d.this.upgrade().unwrap(),
+                d.this.upgrade().unwrap().into(),
                 String::from("."),
             )),
             1 => Some(crate::kernel::fs::dirent::DirEntry::new(
                 parent,
-                d.parent.upgrade().unwrap(),
+                d.parent.upgrade().unwrap().into(),
                 String::from(".."),
             )),
             idx => {

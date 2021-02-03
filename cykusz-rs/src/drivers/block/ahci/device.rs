@@ -21,8 +21,9 @@ pub struct AhciDevice {
 
 impl AhciDevice {
     pub fn new() -> AhciDevice {
+        const EMPTY: Option<Arc<Port>> = None;
         AhciDevice {
-            ports: [None; 32],
+            ports: [EMPTY; 32],
             hba: VirtAddr(0),
         }
     }

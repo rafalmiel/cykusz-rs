@@ -28,6 +28,7 @@ pub mod icache;
 pub mod inode;
 pub mod mount;
 pub mod path;
+pub mod pcache;
 pub mod ramfs;
 pub mod stdio;
 pub mod vfs;
@@ -85,6 +86,7 @@ fn init_cdboot() {
 }
 
 pub fn init() {
+    pcache::init();
     icache::init();
     dirent::init();
     mount::init();

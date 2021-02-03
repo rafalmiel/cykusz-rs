@@ -4,7 +4,7 @@ use core::ops::Deref;
 
 use spin::Once;
 
-use crate::kernel::fs::cache::{Cache, CacheItem, Cacheable};
+use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 
@@ -12,7 +12,7 @@ type ICacheKey = (usize, usize);
 type ICache = Cache<ICacheKey, INodeItemStruct>;
 
 pub type INodeItemInt = CacheItem<ICacheKey, INodeItemStruct>;
-pub type INodeItem = Arc<INodeItemInt>;
+pub type INodeItem = ArcWrap<INodeItemInt>;
 
 #[derive(Clone)]
 pub struct INodeItemStruct {

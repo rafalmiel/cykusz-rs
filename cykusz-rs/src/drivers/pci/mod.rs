@@ -258,6 +258,7 @@ impl PciHeader0 {
 
 struct PciDevice {
     handle: Arc<dyn PciDeviceHandle>,
+    #[allow(unused)]
     found: bool,
     data: PciHeader,
 }

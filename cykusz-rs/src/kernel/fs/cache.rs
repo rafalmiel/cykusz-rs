@@ -10,14 +10,68 @@ use lru::LruCache;
 
 use crate::kernel::sync::Spin;
 
+pub trait DropHandler {
+    fn handle_drop(&self, arc: Arc<Self>);
+
+    fn debug(&self) {}
+}
+
+pub struct ArcWrap<T: DropHandler>(Arc<T>);
+
+impl<T: DropHandler> Clone for ArcWrap<T> {
+    fn clone(&self) -> Self {
+        ArcWrap(self.0.clone())
+    }
+}
+
+impl<T: DropHandler> Deref for ArcWrap<T> {
+    type Target = Arc<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: DropHandler> ArcWrap<T> {
+    fn from_arc(arc: Arc<T>) -> ArcWrap<T> {
+        ArcWrap(arc)
+    }
+
+    pub fn strong_count(&self) -> usize {
+        Arc::strong_count(&self.0)
+    }
+
+    pub fn address(&self) -> usize {
+        Arc::as_ptr(&self.0) as *const u8 as usize
+    }
+}
+
+impl<T: DropHandler> From<Arc<T>> for ArcWrap<T> {
+    fn from(t: Arc<T>) -> Self {
+        ArcWrap::from_arc(t)
+    }
+}
+
+impl<T: DropHandler> Drop for ArcWrap<T> {
+    fn drop(&mut self) {
+        let sc = Arc::strong_count(&self.0);
+
+        if sc == 1 {
+            self.handle_drop(self.0.clone());
+        }
+    }
+}
+
 pub trait IsCacheKey: Eq + Hash + Ord + Borrow<Self> + Debug {}
 
 impl<T> IsCacheKey for T where T: Eq + Hash + Ord + Borrow<Self> + Debug {}
 
-pub trait Cacheable<K: IsCacheKey>: Clone {
+pub trait Cacheable<K: IsCacheKey>: Sized {
     fn cache_key(&self) -> K;
 
     fn make_unused(&self, _new_ref: &Weak<CacheItem<K, Self>>) {}
+
+    fn deallocate(&self) {}
 }
 
 pub struct CacheItem<K: IsCacheKey, T: Cacheable<K>> {
@@ -27,7 +81,7 @@ pub struct CacheItem<K: IsCacheKey, T: Cacheable<K>> {
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
-    pub fn new(cache: &Weak<Cache<K, T>>, item: T) -> Arc<CacheItem<K, T>> {
+    pub fn new(cache: &Weak<Cache<K, T>>, item: T) -> ArcWrap<CacheItem<K, T>> {
         let a = Arc::new(CacheItem::<K, T> {
             cache: cache.clone(),
             used: AtomicBool::new(false),
@@ -36,32 +90,23 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
 
         //println!("new cache item {:p}", Arc::as_ptr(&a));
 
-        a
+        a.into()
     }
 
     pub fn new_cyclic(
         cache: &Weak<Cache<K, T>>,
         factory: impl FnOnce(&Weak<CacheItem<K, T>>) -> T,
-    ) -> Arc<CacheItem<K, T>> {
+    ) -> ArcWrap<CacheItem<K, T>> {
         let a = Arc::new_cyclic(|me| CacheItem::<K, T> {
             cache: cache.clone(),
             used: AtomicBool::new(false),
             val: factory(me),
-        });
+        })
+        .into();
 
         //println!("new cache item {:p}", Arc::as_ptr(&a));
 
         a
-    }
-}
-
-impl<K: IsCacheKey, T: Cacheable<K>> Clone for CacheItem<K, T> {
-    fn clone(&self) -> CacheItem<K, T> {
-        CacheItem::<K, T> {
-            cache: self.cache.clone(),
-            used: AtomicBool::new(self.used.load(Ordering::SeqCst)),
-            val: self.val.clone(),
-        }
     }
 }
 
@@ -79,24 +124,25 @@ impl<K: IsCacheKey, T: Cacheable<K>> DerefMut for CacheItem<K, T> {
     }
 }
 
-impl<K: IsCacheKey, T: Cacheable<K>> Drop for CacheItem<K, T> {
-    fn drop(&mut self) {
-        //println!(
-        //    "drop {:p} Item {:?} is used {}",
-        //    self as *mut _,
-        //    self.cache_key(),
-        //    self.is_used()
-        //);
+impl<K: IsCacheKey, T: Cacheable<K>> DropHandler for CacheItem<K, T> {
+    fn handle_drop(&self, arc: Arc<Self>) {
         if let Some(cache) = self.cache.upgrade() {
             if self.is_used() {
                 self.mark_unused();
 
-                cache.move_to_unused(self.clone());
-
-                //println!("moved to unused {:?}", self.cache_key());
-            } else {
+                cache.move_to_unused(arc.into());
             }
         }
+    }
+
+    fn debug(&self) {
+        println!("{:?}", self.cache_key());
+    }
+}
+
+impl<K: IsCacheKey, T: Cacheable<K>> Drop for CacheItem<K, T> {
+    fn drop(&mut self) {
+        self.deallocate();
     }
 }
 
@@ -120,66 +166,55 @@ pub struct CacheData<K: IsCacheKey, T: Cacheable<K>> {
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
-    fn get(&mut self, key: K) -> Option<Arc<CacheItem<K, T>>> {
+    fn get(&mut self, key: K) -> Option<ArcWrap<CacheItem<K, T>>> {
         if let Some(e) = self.used.get(&key) {
             let found = e.clone().upgrade();
-            //println!("get {:?} found some? {}", key, found.is_some());
-            found
+
+            if let Some(f) = found {
+                Some(ArcWrap::from_arc(f))
+            } else {
+                None
+            }
         } else {
             if let Some(e) = self.unused.pop(&key) {
                 e.mark_used();
 
-                //println!("Insert into used {:?} vs {:?}", key, e.cache_key());
-
                 self.used.insert(key, Arc::downgrade(&e));
 
-                Some(e)
+                Some(e.into())
             } else {
-                //println!("get {:?} not found", key);
                 None
             }
         }
     }
 
-    fn insert(&mut self, key: K, entry: &Arc<CacheItem<K, T>>) {
+    fn insert(&mut self, key: K, entry: &ArcWrap<CacheItem<K, T>>) {
         entry.mark_used();
 
-        //println!("insert to used {:?}", key);
-
-        self.used.insert(key, Arc::downgrade(entry));
+        self.used.insert(key, Arc::downgrade(&entry.0));
     }
 
     fn remove(&mut self, key: &K) {
-        //println!("drop_from_cache: {:?}", key);
-
         if let Some(e) = self.used.get(&key) {
             if let Some(e) = e.upgrade() {
-                //println!("drop_from_cache sc: {}", Arc::strong_count(&e));
                 e.mark_unused();
             }
         } else {
-            //println!("drop_from_cache unused: {:?}", key);
             self.unused.pop(key);
         }
     }
 
-    fn move_to_unused(&mut self, ent: CacheItem<K, T>) {
+    fn move_to_unused(&mut self, ent: ArcWrap<CacheItem<K, T>>) -> bool {
         let key = { ent.cache_key() };
 
-        //println!("move to unused {:?}", key);
-
         if let Some(_e) = self.used.remove(&key) {
-            let unused_ref = {
-                let unused_ref = Arc::new(ent);
+            self.unused.put(key, ent.0.clone());
 
-                unused_ref
-            };
-
-            unused_ref.make_unused(&Arc::downgrade(&unused_ref));
-
-            self.unused.put(key, unused_ref);
+            true
         } else {
             println!("move_to_unused missing entry");
+
+            false
         }
     }
 
@@ -207,6 +242,18 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
         self.used.clear();
         self.unused.clear();
     }
+
+    fn print_stats(&self) {
+        println!("Cache usage:");
+        println!("Used count:   {}", self.used.len());
+        for e in self.used.iter() {
+            println!("{:?} sc {}", e.0, e.1.strong_count());
+        }
+        println!("Unused count: {}", self.unused.len());
+        for e in self.unused.iter() {
+            println!("{:?} sc {}", e.0, Arc::strong_count(&e.1));
+        }
+    }
 }
 
 pub struct Cache<K: IsCacheKey, T: Cacheable<K>> {
@@ -225,7 +272,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
         })
     }
 
-    pub fn get(&self, key: K) -> Option<Arc<CacheItem<K, T>>> {
+    pub fn get(&self, key: K) -> Option<ArcWrap<CacheItem<K, T>>> {
         self.data.lock().get(key)
     }
 
@@ -235,17 +282,19 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
         self.data.lock().insert(v.cache_key(), &v);
     }
 
-    pub fn make_cached(&self, ent: &Arc<CacheItem<K, T>>) {
+    pub fn make_cached(&self, ent: &ArcWrap<CacheItem<K, T>>) {
         ent.mark_used();
 
         self.data.lock().insert(ent.cache_key(), &ent);
     }
 
-    pub fn move_to_unused(&self, ent: CacheItem<K, T>) {
-        self.data.lock().move_to_unused(ent);
+    pub fn move_to_unused(&self, ent: ArcWrap<CacheItem<K, T>>) {
+        if self.data.lock().move_to_unused(ent.clone()) {
+            ent.make_unused(&Arc::downgrade(&ent));
+        }
     }
 
-    pub fn make_item(&self, item: T) -> Arc<CacheItem<K, T>> {
+    pub fn make_item(&self, item: T) -> ArcWrap<CacheItem<K, T>> {
         let item = CacheItem::<K, T>::new(&self.sref, item);
 
         self.data.lock().insert(item.cache_key(), &item);
@@ -256,7 +305,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     pub fn make_item_cyclic(
         &self,
         factory: impl FnOnce(&Weak<CacheItem<K, T>>) -> T,
-    ) -> Arc<CacheItem<K, T>> {
+    ) -> ArcWrap<CacheItem<K, T>> {
         let item = CacheItem::<K, T>::new_cyclic(&self.sref, factory);
 
         self.data.lock().insert(item.cache_key(), &item);
@@ -264,7 +313,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
         item
     }
 
-    pub fn make_item_no_cache(&self, item: T) -> Arc<CacheItem<K, T>> {
+    pub fn make_item_no_cache(&self, item: T) -> ArcWrap<CacheItem<K, T>> {
         let item = CacheItem::<K, T>::new(&Weak::default(), item);
 
         item
@@ -280,5 +329,9 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
 
     pub fn clear(&self) {
         self.data.lock().clear();
+    }
+
+    pub fn print_stats(&self) {
+        self.data.lock().print_stats();
     }
 }

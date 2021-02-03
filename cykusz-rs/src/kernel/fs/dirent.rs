@@ -6,7 +6,7 @@ use core::sync::atomic::Ordering;
 
 use spin::Once;
 
-use crate::kernel::fs::cache::{Cache, CacheItem, Cacheable};
+use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::INodeItem;
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
@@ -24,7 +24,7 @@ impl Cacheable<CacheKey> for DirEntry {
     }
 }
 
-pub type DirEntryItem = Arc<CacheItem<CacheKey, DirEntry>>;
+pub type DirEntryItem = ArcWrap<CacheItem<CacheKey, DirEntry>>;
 
 static CACHE_MARKER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

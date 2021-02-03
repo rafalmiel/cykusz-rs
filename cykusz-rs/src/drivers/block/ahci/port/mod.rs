@@ -111,9 +111,10 @@ impl PortData {
 
 impl Port {
     pub fn new(addr: VirtAddr) -> Port {
+        const EMPTY: Option<Cmd> = None;
         Port {
             data: Spin::new(PortData {
-                cmds: [None; 32],
+                cmds: [EMPTY; 32],
                 port: addr,
                 free_cmds: 32,
             }),

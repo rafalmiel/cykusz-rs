@@ -4,6 +4,8 @@ use core::sync::atomic::Ordering;
 use spin::Once;
 
 use crate::drivers::multiboot2;
+use crate::kernel::fs::cache::{ArcWrap, WeakWrap};
+use crate::kernel::fs::pcache::{PageItem, PageItemWeak};
 use crate::kernel::mm::{PhysAddr, PAGE_SIZE};
 use crate::kernel::sync::{Spin, SpinGuard};
 
@@ -22,6 +24,7 @@ mod iter;
 #[repr(C)]
 pub struct PhysPage {
     pt_lock: Spin<()>,
+    p_cache: PageItemWeak,
 }
 
 impl PhysPage {
@@ -40,12 +43,37 @@ impl PhysPage {
     pub fn lock_pt(&self) -> SpinGuard<()> {
         self.pt_lock.lock()
     }
+
+    pub fn unlink_page_cache(&self) {
+        unsafe {
+            let _lock = self.pt_lock.lock();
+
+            let this = &mut *(self as *const _ as *mut PhysPage);
+            this.p_cache = WeakWrap::empty();
+        }
+    }
+
+    pub fn link_page_cache(&self, page: &PageItem) {
+        unsafe {
+            let _lock = self.pt_lock.lock();
+
+            let this = &mut *(self as *const _ as *mut PhysPage);
+            this.p_cache = ArcWrap::downgrade(&page);
+        }
+    }
+
+    pub fn page_item(&self) -> Option<PageItem> {
+        let _lock = self.pt_lock.lock();
+
+        self.p_cache.upgrade()
+    }
 }
 
 impl Default for PhysPage {
     fn default() -> Self {
         PhysPage {
             pt_lock: Spin::new(()),
+            p_cache: PageItemWeak::empty(),
         }
     }
 }
@@ -62,6 +90,12 @@ pub fn init_pages() {
         v.resize_with(
             alloc::NUM_PAGES.load(Ordering::SeqCst) as usize,
             Default::default,
+        );
+
+        println!(
+            "PhysPage size: {} num {}",
+            core::mem::size_of::<PhysPage>(),
+            v.len()
         );
         v
     });

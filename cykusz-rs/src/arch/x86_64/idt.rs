@@ -5,6 +5,7 @@ use spin::RwLock;
 
 use crate::arch::raw::idt;
 use crate::arch::x86_64::int::end_of_int;
+use crate::kernel::mm::VirtAddr;
 use crate::kernel::sync::Spin;
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
@@ -316,6 +317,23 @@ extern "x86-interrupt" fn general_protection_fault(
 }
 
 extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+    if err == 0x3 {
+        // page fault caused by write access and page was present
+        // try to notify cache to mark page dirty and enable writeable flag
+
+        let virt = VirtAddr(unsafe { crate::arch::raw::ctrlregs::cr2() });
+
+        if let Some(p) = virt.to_phys_pagewalk() {
+            if let Some(i) = p.to_phys_page() {
+                if let Some(h) = i.page_item() {
+                    h.notify_dirty(&h);
+
+                    return;
+                }
+            }
+        }
+    }
+
     crate::bochs();
     println!(
         "PAGE FAULT! 0x{:x} CPU: {}, rip: {:?}",

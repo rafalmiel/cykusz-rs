@@ -23,9 +23,7 @@ impl Cacheable<CacheKey> for DirEntry {
         self.data.write().parent = None;
     }
 
-    fn deallocate(&self) {
-        println!("Deallocate {:?}", self.cache_key());
-    }
+    fn deallocate(&self) {}
 }
 
 pub type DirEntryItem = ArcWrap<CacheItem<CacheKey, DirEntry>>;

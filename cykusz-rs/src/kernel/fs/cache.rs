@@ -52,8 +52,16 @@ impl<T: DropHandler> ArcWrap<T> {
 }
 
 impl<T: DropHandler> WeakWrap<T> {
+    pub fn empty() -> WeakWrap<T> {
+        WeakWrap(Weak::new())
+    }
+
     pub fn upgrade(&self) -> Option<ArcWrap<T>> {
         Some(self.0.upgrade()?.into())
+    }
+
+    pub fn strong_count(&self) -> usize {
+        self.0.strong_count()
     }
 }
 

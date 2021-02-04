@@ -3,24 +3,23 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
-use downcast_rs::DowncastSync;
-
 use crate::kernel::device;
 use crate::kernel::device::{alloc_id, register_device, Device};
+use crate::kernel::fs::cache::{ArcWrap, Cacheable};
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::pcache::{cache, CachedAccess, PageItemStruct};
-use crate::kernel::mm::PAGE_SIZE;
-use crate::kernel::sync::RwSpin;
-use crate::kernel::utils::types::{Align, CeilDiv};
+use crate::kernel::fs::pcache::{
+    CachedAccess, PageCacheKey, PageItem, PageItemStruct, PageItemWeak, RawAccess,
+};
+use crate::kernel::sync::{RwSpin, Spin};
+use crate::kernel::timer::{create_timer, Timer, TimerCallback};
+use crate::kernel::utils::types::CeilDiv;
 
 mod mbr;
 
-pub trait BlockDev: DowncastSync {
+pub trait BlockDev: Send + Sync {
     fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize>;
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize>;
 }
-
-impl_downcast!(sync BlockDev);
 
 static BLK_DEVS: RwSpin<BTreeMap<usize, Arc<BlockDevice>>> = RwSpin::new(BTreeMap::new());
 
@@ -36,7 +35,7 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
     Ok(())
 }
 
-pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn BlockDev>> {
+pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn CachedAccess>> {
     let devs = BLK_DEVS.read();
 
     if let Some(d) = devs.get(&id) {
@@ -51,6 +50,8 @@ pub struct BlockDevice {
     name: String,
     dev: Arc<dyn BlockDev>,
     self_ref: Weak<BlockDevice>,
+    dirty_pages: Spin<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
+    cleanup_timer: Arc<Timer>,
 }
 
 pub struct PartitionBlockDev {
@@ -106,6 +107,8 @@ impl BlockDevice {
             name,
             dev: imp,
             self_ref: me.clone(),
+            dirty_pages: Spin::new(hashbrown::HashMap::new()),
+            cleanup_timer: create_timer(TimerCallback::new(me.clone(), BlockDevice::sync_all)),
         })
     }
 }
@@ -126,95 +129,60 @@ impl Device for BlockDevice {
     }
 }
 
-impl BlockDev for BlockDevice {
+impl<T: RawAccess> BlockDev for T {
     fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
-        self.dev.read(sector, dest)
+        self.read_direct(sector, dest)
     }
 
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize> {
+        self.write_direct(sector, buf)
+    }
+}
+
+impl RawAccess for BlockDevice {
+    fn read_direct(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
+        self.dev.read(sector, dest)
+    }
+
+    fn write_direct(&self, sector: usize, buf: &[u8]) -> Option<usize> {
         self.dev.write(sector, buf)
     }
 }
 
-impl CachedAccess for Arc<dyn BlockDev> {
-    fn read_cached(&self, mut sector: usize, dest: &mut [u8]) -> Option<usize> {
-        let page_cache = cache();
-
-        let dev = Arc::downgrade(&self.clone().into_any_arc());
-
-        let mut dest_offset = 0;
-
-        while dest_offset < dest.len() {
-            let cache_offset = sector / 8;
-
-            if let Some(page) =
-                if let Some(page) = page_cache.get(PageItemStruct::make_key(&dev, cache_offset)) {
-                    Some(page)
-                } else {
-                    let new_page = PageItemStruct::new(dev.clone(), cache_offset);
-
-                    self.read(sector.align(8), new_page.data_mut());
-
-                    Some(page_cache.make_item(new_page))
-                }
-            {
-                use core::cmp::min;
-
-                let page_offset = (sector % 8) * 512;
-                let to_copy = min(PAGE_SIZE - page_offset, dest.len() - dest_offset);
-
-                dest[dest_offset..dest_offset + to_copy]
-                    .copy_from_slice(&page.data()[page_offset..page_offset + to_copy]);
-
-                dest_offset += to_copy;
-                sector = (sector + 8).align(8);
-            } else {
-                break;
-            }
-        }
-
-        Some(dest_offset)
+impl CachedAccess for BlockDevice {
+    fn this(&self) -> Weak<dyn CachedAccess> {
+        self.self_ref.clone()
     }
 
-    fn write_cached(&self, mut sector: usize, buf: &[u8]) -> Option<usize> {
-        self.write(sector, buf);
+    fn notify_dirty(&self, page: &PageItem) {
+        self.write_direct(page.offset() * 8, page.data());
 
-        let page_cache = cache();
+        let mut dirty = self.dirty_pages.lock();
 
-        let dev = Arc::downgrade(&self.clone().into_any_arc());
+        dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
 
-        let mut copied = 0;
+        if !self.cleanup_timer.enabled() {
+            self.cleanup_timer.start_with_timeout(10_000);
+        }
+    }
 
-        while copied < buf.len() {
-            let cache_offset = sector / 8;
+    fn sync_page(&self, page: &PageItemStruct) {
+        self.write_direct(page.offset() * 8, page.data());
 
-            if let Some(page) =
-                if let Some(page) = page_cache.get(PageItemStruct::make_key(&dev, cache_offset)) {
-                    Some(page)
-                } else {
-                    let new_page = PageItemStruct::new(dev.clone(), cache_offset);
+        let mut dirty = self.dirty_pages.lock();
+        dirty.remove(&page.cache_key());
+    }
 
-                    self.read(sector.align(8), new_page.data_mut());
+    fn sync_all(&self) {
+        let mut dirty = self.dirty_pages.lock();
 
-                    Some(page_cache.make_item(new_page))
-                }
-            {
-                use core::cmp::min;
-
-                let page_offset = (sector % 8) * 512;
-                let to_copy = min(PAGE_SIZE - page_offset, buf.len() - copied);
-
-                page.data_mut()[page_offset..page_offset + to_copy]
-                    .copy_from_slice(&buf[copied..copied + to_copy]);
-
-                copied += to_copy;
-                sector = (sector + 8).align(8);
-            } else {
-                break;
+        for (_, p) in dirty.iter() {
+            if let Some(a) = p.upgrade() {
+                self.write_direct(a.offset() * 8, a.data());
             }
         }
 
-        Some(copied)
+        dirty.clear();
     }
 }
 

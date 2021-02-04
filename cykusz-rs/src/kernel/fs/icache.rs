@@ -14,7 +14,6 @@ type ICache = Cache<ICacheKey, INodeItemStruct>;
 pub type INodeItemInt = CacheItem<ICacheKey, INodeItemStruct>;
 pub type INodeItem = ArcWrap<INodeItemInt>;
 
-#[derive(Clone)]
 pub struct INodeItemStruct {
     inode: Arc<dyn INode>,
 }

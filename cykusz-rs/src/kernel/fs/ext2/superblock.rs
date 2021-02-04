@@ -33,7 +33,7 @@ impl Superblock {
 
         let dev = fs.dev();
 
-        dev.read(2, sb.as_bytes_mut())
+        dev.read_cached(2, sb.as_bytes_mut())
             .expect("Failed to get ext2 superblock");
 
         sb.ext_sig() == 0xef53
@@ -73,7 +73,7 @@ impl Superblock {
     pub fn sync(&self, fs: &Ext2Filesystem) {
         let sb = self.read_inner();
 
-        fs.dev.write(2, sb.as_bytes());
+        fs.dev.write_cached(2, sb.as_bytes());
     }
 
     pub fn debug(&self) {

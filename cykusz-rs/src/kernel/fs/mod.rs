@@ -266,7 +266,7 @@ fn lookup_by_path_from(
         if cur.is_mountpoint() {
             if let Ok(mp) = mount::find_mount(&cur) {
                 cur = mp.root_entry();
-                //println!("is mountpoint");
+            //println!("is mountpoint");
             } else {
                 panic!("No mountpoint?");
             }

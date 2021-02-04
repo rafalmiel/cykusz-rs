@@ -112,8 +112,9 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.6.3"
-source = "git+https://github.com/rafalmiel/lru-rs.git?branch=fix_pop_leak#ea64c8f932a45434cbc71d3843d28af7c1819864"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe2382d8ed3918ea4ba70d98d5b74e47a168e0331965f3f17cdbc748bdebc5a3"
 dependencies = [
  "hashbrown",
 ]
@@ -231,7 +232,7 @@ version = "0.1.0"
 dependencies = [
  "linked_list_allocator",
  "rlibc",
- "spin 0.5.2",
+ "spin 0.7.1",
  "syscall-defs",
  "syscall-user",
 ]

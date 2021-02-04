@@ -3,7 +3,6 @@ use alloc::sync::{Arc, Weak};
 
 use spin::Once;
 
-use crate::kernel::block::BlockDev;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
@@ -22,14 +21,14 @@ mod superblock;
 
 pub struct Ext2Filesystem {
     self_ref: Weak<Ext2Filesystem>,
-    dev: Arc<dyn BlockDev>,
+    dev: Arc<dyn CachedAccess>,
     sectors_per_block: Once<usize>,
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
 }
 
 impl Ext2Filesystem {
-    pub fn new(dev: Arc<dyn BlockDev>) -> Option<Arc<dyn Filesystem>> {
+    pub fn new(dev: Arc<dyn CachedAccess>) -> Option<Arc<dyn Filesystem>> {
         let a = Arc::new_cyclic(|me| Ext2Filesystem {
             self_ref: me.clone(),
             dev,
@@ -45,7 +44,7 @@ impl Ext2Filesystem {
         }
     }
 
-    fn dev(&self) -> &Arc<dyn BlockDev> {
+    fn dev(&self) -> &Arc<dyn CachedAccess> {
         &self.dev
     }
 
@@ -218,6 +217,8 @@ impl Filesystem for Ext2Filesystem {
         println!("[ EXT2 ] Syncing...");
         self.blockgroupdesc.sync(self);
         self.superblock.sync(self);
+
+        self.dev.sync_all();
     }
 
     fn umount(&self) {

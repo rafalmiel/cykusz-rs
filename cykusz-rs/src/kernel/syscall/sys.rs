@@ -554,8 +554,8 @@ pub fn sys_fork() -> SyscallResult {
     //crate::kernel::fs::icache::cache().print_stats();
     //println!("dir entry stats");
     //crate::kernel::fs::dirent::cache().print_stats();
-    //println!("page cache stats");
-    //crate::kernel::fs::pcache::cache().print_stats();
+    println!("page cache stats");
+    crate::kernel::fs::pcache::cache().print_stats();
     crate::kernel::sched::fork();
 
     Ok(0)

@@ -8,7 +8,7 @@ use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait}
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::syscall::sys::PollTable;
-use crate::kernel::timer::{create_timer, current_ns, Timer, TimerObject};
+use crate::kernel::timer::{create_timer, current_ns, Timer, TimerCallback};
 use crate::kernel::utils::buffer::{Buffer, BufferQueue};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -124,28 +124,6 @@ struct SocketData {
     send_queue: WaitQueue,
 }
 
-struct TimerCallback {
-    sock: Weak<Socket>,
-    fun: fn(&Socket),
-}
-
-impl TimerObject for TimerCallback {
-    fn call(&self) {
-        if let Some(s) = self.sock.upgrade() {
-            (self.fun)(&s)
-        }
-    }
-}
-
-impl TimerCallback {
-    fn new(sock: Arc<Socket>, cb: fn(&Socket)) -> Arc<TimerCallback> {
-        Arc::new(TimerCallback {
-            sock: Arc::downgrade(&sock),
-            fun: cb,
-        })
-    }
-}
-
 impl SocketData {
     pub fn new(port: u16) -> SocketData {
         SocketData {
@@ -162,19 +140,22 @@ impl SocketData {
             timeout_count: 0,
             timeout: 1000,
             conn_timer: Some(create_timer(TimerCallback::new(
-                obj.clone(),
+                Arc::downgrade(&obj),
                 Socket::conn_timeout,
             ))),
         };
         self.rx_timer = Some(create_timer(TimerCallback::new(
-            obj.clone(),
+            Arc::downgrade(&obj),
             Socket::rx_timeout,
         )));
         self.tx_timer = Some(create_timer(TimerCallback::new(
-            obj.clone(),
+            Arc::downgrade(&obj),
             Socket::tx_timeout,
         )));
-        self.dc_timer = Some(create_timer(TimerCallback::new(obj, Socket::dc_timeout)));
+        self.dc_timer = Some(create_timer(TimerCallback::new(
+            Arc::downgrade(&obj),
+            Socket::dc_timeout,
+        )));
     }
 
     fn stop_timers(&mut self) {
@@ -805,16 +786,16 @@ impl INode for Socket {
                 data.proxy_buffer.append_data(buf);
 
                 data.proxy_buffer.wait_queue().remove_task(task);
-                //data.send_queue.add_task(task.clone());
+            //data.send_queue.add_task(task.clone());
 
-                //while data.ctl.available_window() < buf.len() && data.state == State::Established {
-                //    //println!("[ TCP ] Awaiting available window {} {}", data.ctl.available_window(), buf.len());
-                //    WaitQueue::wait_lock(data);
+            //while data.ctl.available_window() < buf.len() && data.state == State::Established {
+            //    //println!("[ TCP ] Awaiting available window {} {}", data.ctl.available_window(), buf.len());
+            //    WaitQueue::wait_lock(data);
 
-                //    data = self.data.lock();
-                //}
+            //    data = self.data.lock();
+            //}
 
-                //data.send_queue.remove_task(task);
+            //data.send_queue.remove_task(task);
             } else {
                 for o in (0..buf.len()).step_by(1460) {
                     let len = core::cmp::min(1460, buf.len() - o);

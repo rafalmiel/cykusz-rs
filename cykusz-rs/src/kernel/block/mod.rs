@@ -155,8 +155,6 @@ impl CachedAccess for BlockDevice {
     }
 
     fn notify_dirty(&self, page: &PageItem) {
-        self.write_direct(page.offset() * 8, page.data());
-
         let mut dirty = self.dirty_pages.lock();
 
         dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
@@ -169,16 +167,21 @@ impl CachedAccess for BlockDevice {
     fn sync_page(&self, page: &PageItemStruct) {
         self.write_direct(page.offset() * 8, page.data());
 
+        page.notify_clean();
+
         let mut dirty = self.dirty_pages.lock();
         dirty.remove(&page.cache_key());
     }
 
     fn sync_all(&self) {
+        println!("Syncing...");
         let mut dirty = self.dirty_pages.lock();
 
         for (_, p) in dirty.iter() {
             if let Some(a) = p.upgrade() {
                 self.write_direct(a.offset() * 8, a.data());
+
+                a.notify_clean();
             }
         }
 

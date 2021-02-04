@@ -160,18 +160,20 @@ where
         )))
     }
 
-    pub fn alloc_next_level(&mut self, idx: usize, user: bool) -> &mut Table<L::NextLevel> {
+    pub fn alloc_next_level(&mut self, idx: usize, user: bool) -> (bool, &mut Table<L::NextLevel>) {
         let entry = &mut self.entries[idx];
 
-        if !entry.contains(Entry::PRESENT) {
+        let was_alloc = if !entry.contains(Entry::PRESENT) {
             let frame = crate::arch::mm::phys::allocate().expect("Out of memory!");
 
             Table::<L::NextLevel>::new_at_frame_mut(&frame).clear();
 
             entry.set_frame(&frame);
 
-            entry.inc_entry_count();
-        }
+            true
+        } else {
+            false
+        };
 
         let mut flags = Entry::PRESENT | Entry::WRITABLE;
 
@@ -181,7 +183,10 @@ where
 
         entry.set_flags(flags);
 
-        Table::<L::NextLevel>::new_at_frame_mut(&Frame::new(entry.address()))
+        (
+            was_alloc,
+            Table::<L::NextLevel>::new_at_frame_mut(&Frame::new(entry.address())),
+        )
     }
 
     pub fn new_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
@@ -208,9 +213,9 @@ where
         if entry.get_entry_count() == 0 {
             let frame = Frame::new(entry.address());
 
-            crate::arch::mm::phys::deallocate(&frame);
-
             entry.clear();
+
+            crate::arch::mm::phys::deallocate(&frame);
 
             return true;
         }
@@ -253,7 +258,7 @@ impl Table<Level1> {
         }
     }
 
-    pub fn alloc_set_flags(&mut self, idx: usize, flags: Entry) {
+    pub fn alloc_set_flags(&mut self, idx: usize, flags: Entry) -> bool {
         let entry = &mut self.entries[idx];
 
         if !entry.contains(Entry::PRESENT) {
@@ -262,17 +267,25 @@ impl Table<Level1> {
             Self::new_at_frame_mut(&frame).clear();
 
             entry.set_frame_flags(&frame, flags | Entry::PRESENT);
+
+            true
         } else {
             let frame = Frame::new(entry.address());
             entry.set_frame_flags(&frame, flags | Entry::PRESENT);
+
+            false
         }
     }
 
-    pub fn set_flags(&mut self, idx: usize, frame: &Frame, flags: Entry) {
+    pub fn set_flags(&mut self, idx: usize, frame: &Frame, flags: Entry) -> bool {
         let entry = &mut self.entries[idx];
 
         if !entry.contains(Entry::PRESENT) {
             entry.set_frame_flags(&frame, Entry::PRESENT | flags);
+
+            true
+        } else {
+            false
         }
     }
 
@@ -379,10 +392,23 @@ impl Table<Level4> {
 
         let user = page.p4_index() < 256;
 
-        self.alloc_next_level(page.p4_index(), user)
-            .alloc_next_level(page.p3_index(), user)
-            .alloc_next_level(page.p2_index(), user)
-            .alloc_set_flags(page.p1_index(), Entry::from_kernel_flags(flags));
+        let (_, l3) = self.alloc_next_level(page.p4_index(), user);
+
+        let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
+
+        let (was_alloc_2, l1) = l2.alloc_next_level(page.p2_index(), user);
+
+        if l1.alloc_set_flags(page.p1_index(), Entry::from_kernel_flags(flags)) {
+            l2.entries[page.p2_index()].inc_entry_count();
+        }
+
+        if was_alloc_2 {
+            l3.entries[page.p3_index()].inc_entry_count();
+        }
+
+        if was_alloc_3 {
+            self.entries[page.p4_index()].inc_entry_count();
+        }
     }
 
     pub fn map_to_flags(&mut self, virt: VirtAddr, phys: PhysAddr, flags: virt::PageFlags) {
@@ -392,14 +418,27 @@ impl Table<Level4> {
 
         let user = page.p4_index() < 256;
 
-        self.alloc_next_level(page.p4_index(), user)
-            .alloc_next_level(page.p3_index(), user)
-            .alloc_next_level(page.p2_index(), user)
-            .set_flags(
-                page.p1_index(),
-                &Frame::new(phys),
-                Entry::from_kernel_flags(flags),
-            );
+        let (_, l3) = self.alloc_next_level(page.p4_index(), user);
+
+        let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
+
+        let (was_alloc_2, l1) = l2.alloc_next_level(page.p2_index(), user);
+
+        if l1.set_flags(
+            page.p1_index(),
+            &Frame::new(phys),
+            Entry::from_kernel_flags(flags),
+        ) {
+            l2.entries[page.p2_index()].inc_entry_count();
+        }
+
+        if was_alloc_2 {
+            l3.entries[page.p3_index()].inc_entry_count();
+        }
+
+        if was_alloc_3 {
+            self.entries[page.p4_index()].inc_entry_count();
+        }
     }
 
     pub fn map_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
@@ -409,10 +448,21 @@ impl Table<Level4> {
 
         let user = page.p4_index() < 256;
 
-        self.alloc_next_level(page.p4_index(), user)
-            .alloc_next_level(page.p3_index(), user)
-            .alloc_next_level(page.p2_index(), user)
-            .set(page.p1_index(), &Frame::new(phys));
+        let (_, l3) = self.alloc_next_level(page.p4_index(), user);
+
+        let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
+
+        let (was_alloc_2, l1) = l2.alloc_next_level(page.p2_index(), user);
+
+        l1.set(page.p1_index(), &Frame::new(phys));
+
+        if was_alloc_2 {
+            l3.entries[page.p3_index()].inc_entry_count();
+        }
+
+        if was_alloc_3 {
+            self.entries[page.p4_index()].inc_entry_count();
+        }
     }
 
     pub fn map_hugepage_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
@@ -422,9 +472,15 @@ impl Table<Level4> {
 
         let user = page.p4_index() < 256;
 
-        self.alloc_next_level(page.p4_index(), user)
-            .alloc_next_level(page.p3_index(), user)
-            .set_hugepage(page.p2_index(), &Frame::new(phys));
+        let (_, l3) = self.alloc_next_level(page.p4_index(), user);
+
+        let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
+
+        l2.set_hugepage(page.p2_index(), &Frame::new(phys));
+
+        if was_alloc_3 {
+            self.entries[page.p4_index()].inc_entry_count();
+        }
     }
 
     pub fn unmap(&mut self, virt: VirtAddr) {
@@ -494,34 +550,56 @@ impl Table<Level4> {
 
         let flags = Entry::PRESENT | Entry::USER;
 
-        self.for_entries_mut(flags, |idx3, _e3| {
-            let n3 = new.alloc_next_level(idx3, true);
+        self.for_entries_mut(flags, |idx4, _e4| {
+            let n3 = new.alloc_next_level(idx4, true).1;
 
-            let l3 = self.next_level(idx3).unwrap();
+            let l3 = self.next_level(idx4).unwrap();
 
-            l3.for_entries_mut(flags, |idx2, _e2| {
-                let n2 = n3.alloc_next_level(idx2, true);
+            let mut count_3 = 0;
 
-                let l2 = l3.next_level(idx2).unwrap();
+            l3.for_entries_mut(flags, |idx3, _e3| {
+                let (w2, n2) = n3.alloc_next_level(idx3, true);
 
-                l2.for_entries_mut(flags, |idx1, _e1| {
-                    let n1 = n2.alloc_next_level(idx1, true);
+                if w2 {
+                    count_3 += 1;
+                }
 
-                    let l1 = l2.next_level(idx1).unwrap();
+                let l2 = l3.next_level(idx3).unwrap();
 
-                    l1.for_entries_mut(flags, |idx, e| {
+                let mut count_2 = 0;
+
+                l2.for_entries_mut(flags, |idx2, _e2| {
+                    let (w1, n1) = n2.alloc_next_level(idx2, true);
+
+                    if w1 {
+                        count_2 += 1;
+                    }
+
+                    let l1 = l2.next_level(idx2).unwrap();
+
+                    let mut count_1 = 0;
+
+                    l1.for_entries_mut(flags, |idx1, e1| {
                         let page = crate::kernel::mm::allocate().unwrap();
 
                         unsafe {
                             page.address_mapped()
                                 .as_bytes_mut(PAGE_SIZE)
-                                .copy_from_slice(e.address().to_mapped().as_bytes(PAGE_SIZE));
+                                .copy_from_slice(e1.address().to_mapped().as_bytes(PAGE_SIZE));
                         }
 
-                        n1.set_flags(idx, &page, *e);
+                        n1.set_flags(idx1, &page, *e1);
+
+                        count_1 += 1;
                     });
-                })
-            })
+
+                    n2.entries[idx2].set_entry_count(count_1);
+                });
+
+                n3.entries[idx3].set_entry_count(count_2);
+            });
+
+            new.entries[idx4].set_entry_count(count_3);
         });
 
         new

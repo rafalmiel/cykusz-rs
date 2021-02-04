@@ -4,7 +4,8 @@ use alloc::sync::Weak;
 use spin::Once;
 
 use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable, WeakWrap};
-use crate::kernel::mm::{allocate_order, deallocate_order, Frame, PhysAddr, PAGE_SIZE};
+use crate::kernel::mm::virt::PageFlags;
+use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, unmap, PhysAddr, PAGE_SIZE};
 use crate::kernel::utils::types::Align;
 
 pub type PageCacheKey = (usize, usize);
@@ -19,7 +20,8 @@ impl Cacheable<PageCacheKey> for PageItemStruct {
         if let Some(cached) = self.fs.upgrade() {
             cached.sync_page(self);
         }
-        deallocate_order(&Frame::new(self.page), 0);
+        self.page.to_phys_page().unwrap().unlink_page_cache();
+        unmap(self.page.to_virt());
     }
 }
 
@@ -43,6 +45,8 @@ impl PageItemStruct {
     pub fn new(fs: Weak<dyn CachedAccess>, offset: usize) -> PageItemStruct {
         let page = allocate_order(0).unwrap().address();
 
+        map_to_flags(page.to_virt(), page, PageFlags::WRITABLE);
+
         PageItemStruct { fs, offset, page }
     }
 
@@ -50,12 +54,38 @@ impl PageItemStruct {
         self.offset
     }
 
+    pub fn page(&self) -> PhysAddr {
+        self.page
+    }
+
     pub fn data(&self) -> &[u8] {
-        unsafe { self.page.to_mapped().as_bytes(PAGE_SIZE) }
+        unsafe { self.page.to_virt().as_bytes(PAGE_SIZE) }
     }
 
     pub fn data_mut(&self) -> &mut [u8] {
-        unsafe { self.page.to_mapped().as_bytes_mut(PAGE_SIZE) }
+        unsafe { self.page.to_virt().as_bytes_mut(PAGE_SIZE) }
+    }
+
+    pub fn notify_dirty(&self, page: &PageItem) {
+        map_flags(page.page.to_virt(), PageFlags::WRITABLE);
+
+        if let Some(h) = self.fs.upgrade() {
+            h.notify_dirty(page)
+        }
+    }
+
+    pub fn notify_clean(&self) {
+        map_flags(self.page.to_virt(), PageFlags::empty());
+    }
+}
+
+impl PageItem {
+    fn link_with_page(&self) {
+        let page = self.page.to_phys_page().unwrap();
+
+        page.link_page_cache(self);
+
+        self.notify_clean();
     }
 }
 
@@ -92,7 +122,11 @@ pub trait CachedAccess: RawAccess {
 
                     self.read_direct(sector.align(8), new_page.data_mut());
 
-                    Some(page_cache.make_item(new_page))
+                    let page = page_cache.make_item(new_page);
+
+                    page.link_with_page();
+
+                    Some(page)
                 }
             {
                 use core::cmp::min;
@@ -113,7 +147,6 @@ pub trait CachedAccess: RawAccess {
         Some(dest_offset)
     }
     fn write_cached(&self, mut sector: usize, buf: &[u8]) -> Option<usize> {
-        //self.write_direct(sector, buf);
         let page_cache = cache();
 
         let dev = self.this();
@@ -131,7 +164,11 @@ pub trait CachedAccess: RawAccess {
 
                     self.read_direct(sector.align(8), new_page.data_mut());
 
-                    Some(page_cache.make_item(new_page))
+                    let page = page_cache.make_item(new_page);
+
+                    page.link_with_page();
+
+                    Some(page)
                 }
             {
                 use core::cmp::min;
@@ -144,8 +181,6 @@ pub trait CachedAccess: RawAccess {
 
                 copied += to_copy;
                 sector = (sector + 8).align(8);
-
-                self.notify_dirty(&page);
             } else {
                 break;
             }

@@ -73,7 +73,7 @@ impl GroupDescriptors {
             .resize(sb.group_count(), BlockGroupDescriptor::default());
 
         fs.dev()
-            .read(
+            .read_cached(
                 sb.block_groups_sector(),
                 self.vec.as_mut_slice().to_bytes_mut(),
             )
@@ -91,16 +91,16 @@ impl GroupDescriptors {
             vec.resize(aligned_count, BlockGroupDescriptor::default());
 
             fs.dev()
-                .read(sb.block_groups_sector(), vec.as_mut_slice().to_bytes_mut());
+                .read_cached(sb.block_groups_sector(), vec.as_mut_slice().to_bytes_mut());
 
             vec[..actual_len].copy_from_slice(&self.vec[..actual_len]);
 
             fs.dev()
-                .write(sb.block_groups_sector(), vec.as_slice().to_bytes())
+                .write_cached(sb.block_groups_sector(), vec.as_slice().to_bytes())
                 .expect("Failed to sync GroupDescriptors");
         } else {
             fs.dev()
-                .write(sb.block_groups_sector(), self.vec.as_slice().to_bytes())
+                .write_cached(sb.block_groups_sector(), self.vec.as_slice().to_bytes())
                 .expect("Failed to sync GroupDescriptors");
         }
     }

@@ -88,6 +88,10 @@ impl Timer {
             .store(current_ns() + val * 1_000_000, Ordering::SeqCst);
     }
 
+    pub fn enabled(&self) -> bool {
+        self.link.is_linked()
+    }
+
     pub fn start_with_timeout(&self, timeout: u64) {
         let mut timers = TIMERS.lock();
 
@@ -138,6 +142,25 @@ fn timer_fun() {
 
         // check timers every 100 ms
         task.sleep(100_000_000);
+    }
+}
+
+pub struct TimerCallback<T: Send + Sync> {
+    obj: Weak<T>,
+    fun: fn(&T),
+}
+
+impl<T: Send + Sync> TimerObject for TimerCallback<T> {
+    fn call(&self) {
+        if let Some(s) = self.obj.upgrade() {
+            (self.fun)(&s)
+        }
+    }
+}
+
+impl<T: Send + Sync> TimerCallback<T> {
+    pub fn new(sock: Weak<T>, cb: fn(&T)) -> Arc<TimerCallback<T>> {
+        Arc::new(TimerCallback { obj: sock, fun: cb })
     }
 }
 

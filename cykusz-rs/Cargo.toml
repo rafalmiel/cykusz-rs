@@ -15,9 +15,9 @@ bit_field = "*"
 intrusive-collections = "*"
 paste = "*"
 mmio = "*"
-downcast-rs = { version = "1.2.0", default-features = false }
+downcast-rs = { version = "*", default-features = false }
 hashbrown = "*"
-lru = { git = "https://github.com/rafalmiel/lru-rs.git", branch = "fix_pop_leak" }
+lru = "*"
 
 [dependencies.chrono]
 default-features = false

@@ -22,6 +22,10 @@ impl Cacheable<CacheKey> for DirEntry {
     fn make_unused(&self, _new_ref: &Weak<CacheItem<CacheKey, DirEntry>>) {
         self.data.write().parent = None;
     }
+
+    fn deallocate(&self) {
+        println!("Deallocate {:?}", self.cache_key());
+    }
 }
 
 pub type DirEntryItem = ArcWrap<CacheItem<CacheKey, DirEntry>>;
@@ -32,7 +36,6 @@ fn new_cache_marker() -> usize {
     CACHE_MARKER_COUNTER.fetch_add(1, Ordering::SeqCst)
 }
 
-#[derive(Clone)]
 pub struct DirEntryData {
     pub parent: Option<DirEntryItem>,
     pub name: String,
@@ -81,7 +84,7 @@ impl DirEntry {
                 }),
                 mountpoint: AtomicBool::new(false),
                 fs: Once::initialized(inode.fs()),
-                cache_marker: new_cache_marker(),
+                cache_marker: if do_cache { new_cache_marker() } else { 0 },
             };
 
             let res = if do_cache {
@@ -183,20 +186,6 @@ impl DirEntry {
     pub fn drop_from_cache(&self) {
         cache().remove(&self.cache_key());
         crate::kernel::fs::icache::cache().remove(&self.inode().cache_key());
-    }
-}
-
-impl Clone for DirEntry {
-    fn clone(&self) -> Self {
-        let ret = DirEntry {
-            data: RwSpin::new(self.data.read().clone()),
-            mountpoint: AtomicBool::new(self.mountpoint.load(Ordering::SeqCst)),
-            fs: Once::initialized(self.fs.get().unwrap().clone()),
-            cache_marker: self.cache_marker,
-        };
-        //println!("Clone DirEntry {:?} -> {:?}", self.cache_key(), ret.cache_key());
-
-        ret
     }
 }
 

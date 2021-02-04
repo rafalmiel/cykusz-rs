@@ -17,6 +17,7 @@ pub trait DropHandler {
 }
 
 pub struct ArcWrap<T: DropHandler>(Arc<T>);
+pub struct WeakWrap<T: DropHandler>(Weak<T>);
 
 impl<T: DropHandler> Clone for ArcWrap<T> {
     fn clone(&self) -> Self {
@@ -44,6 +45,16 @@ impl<T: DropHandler> ArcWrap<T> {
     pub fn address(&self) -> usize {
         Arc::as_ptr(&self.0) as *const u8 as usize
     }
+
+    pub fn downgrade(ptr: &ArcWrap<T>) -> WeakWrap<T> {
+        WeakWrap(Arc::downgrade(&ptr.0))
+    }
+}
+
+impl<T: DropHandler> WeakWrap<T> {
+    pub fn upgrade(&self) -> Option<ArcWrap<T>> {
+        Some(self.0.upgrade()?.into())
+    }
 }
 
 impl<T: DropHandler> From<Arc<T>> for ArcWrap<T> {
@@ -62,9 +73,9 @@ impl<T: DropHandler> Drop for ArcWrap<T> {
     }
 }
 
-pub trait IsCacheKey: Eq + Hash + Ord + Borrow<Self> + Debug {}
+pub trait IsCacheKey: Hash + Ord + Borrow<Self> + Debug {}
 
-impl<T> IsCacheKey for T where T: Eq + Hash + Ord + Borrow<Self> + Debug {}
+impl<T> IsCacheKey for T where T: Hash + Ord + Borrow<Self> + Debug {}
 
 pub trait Cacheable<K: IsCacheKey>: Sized {
     fn cache_key(&self) -> K;
@@ -77,36 +88,29 @@ pub trait Cacheable<K: IsCacheKey>: Sized {
 pub struct CacheItem<K: IsCacheKey, T: Cacheable<K>> {
     cache: Weak<Cache<K, T>>,
     used: AtomicBool,
-    val: T,
+    pub val: T,
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
     pub fn new(cache: &Weak<Cache<K, T>>, item: T) -> ArcWrap<CacheItem<K, T>> {
-        let a = Arc::new(CacheItem::<K, T> {
+        Arc::new(CacheItem::<K, T> {
             cache: cache.clone(),
             used: AtomicBool::new(false),
             val: item,
-        });
-
-        //println!("new cache item {:p}", Arc::as_ptr(&a));
-
-        a.into()
+        })
+        .into()
     }
 
     pub fn new_cyclic(
         cache: &Weak<Cache<K, T>>,
         factory: impl FnOnce(&Weak<CacheItem<K, T>>) -> T,
     ) -> ArcWrap<CacheItem<K, T>> {
-        let a = Arc::new_cyclic(|me| CacheItem::<K, T> {
+        Arc::new_cyclic(|me| CacheItem::<K, T> {
             cache: cache.clone(),
             used: AtomicBool::new(false),
             val: factory(me),
         })
-        .into();
-
-        //println!("new cache item {:p}", Arc::as_ptr(&a));
-
-        a
+        .into()
     }
 }
 

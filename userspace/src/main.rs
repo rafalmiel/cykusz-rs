@@ -309,17 +309,17 @@ fn exec(cmd: &str) {
                                 println!("Disk full?");
                                 break;
                             }
-                            //loop {
-                            //    let bigbuf = ['L' as u8; 786];
-                            //    let written = file.write(&bigbuf);
+                        //loop {
+                        //    let bigbuf = ['L' as u8; 786];
+                        //    let written = file.write(&bigbuf);
 
-                            //    if written < 768 {
-                            //        break;
-                            //    }
+                        //    if written < 768 {
+                        //        break;
+                        //    }
 
-                            //    //println!("written: {}", written);
-                            //}
-                            //println!("no space");
+                        //    //println!("written: {}", written);
+                        //}
+                        //println!("no space");
                         } else {
                             break;
                         }

@@ -159,8 +159,8 @@ impl<T: Send + Sync> TimerObject for TimerCallback<T> {
 }
 
 impl<T: Send + Sync> TimerCallback<T> {
-    pub fn new(sock: Weak<T>, cb: fn(&T)) -> Arc<TimerCallback<T>> {
-        Arc::new(TimerCallback { obj: sock, fun: cb })
+    pub fn new(obj: Weak<T>, fun: fn(&T)) -> Arc<TimerCallback<T>> {
+        Arc::new(TimerCallback { obj, fun })
     }
 }
 

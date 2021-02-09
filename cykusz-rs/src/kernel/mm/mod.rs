@@ -4,6 +4,7 @@ pub use crate::arch::mm::phys::deallocate;
 pub use crate::arch::mm::phys::deallocate_order;
 pub use crate::arch::mm::phys::free_mem;
 pub use crate::arch::mm::phys::used_mem;
+pub use crate::arch::mm::virt::get_flags;
 pub use crate::arch::mm::virt::map;
 pub use crate::arch::mm::virt::map_flags;
 pub use crate::arch::mm::virt::map_to;

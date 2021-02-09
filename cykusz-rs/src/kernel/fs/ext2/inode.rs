@@ -4,6 +4,8 @@ use core::ops::{Deref, DerefMut};
 
 use syscall_defs::FileType;
 
+use crate::arch::mm::PAGE_SIZE;
+use crate::kernel::fs::cache::Cacheable;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
@@ -12,8 +14,10 @@ use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::pcache::{CachedAccess, PageItem, PageItemInt, RawAccess};
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
+use crate::kernel::mm::get_flags;
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
 use crate::kernel::utils::slice::ToBytes;
 
@@ -143,6 +147,16 @@ impl LockedExt2INode {
 
     fn self_ref(&self) -> Arc<LockedExt2INode> {
         self.self_ref.upgrade().unwrap()
+    }
+
+    fn update_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+        if self.ftype()? != FileType::File && self.ftype()? != FileType::Symlink {
+            return Err(FsError::NotFile);
+        }
+
+        let mut writer = INodeData::new(self.self_ref(), offset);
+
+        Ok(writer.write(buf, false)?)
     }
 }
 
@@ -336,6 +350,44 @@ impl Ext2INode {
     }
 }
 
+impl RawAccess for LockedExt2INode {
+    fn read_direct(&self, addr: usize, dest: &mut [u8]) -> Option<usize> {
+        if let Ok(read) = self.read_at(addr, dest) {
+            Some(read)
+        } else {
+            None
+        }
+    }
+
+    fn write_direct(&self, addr: usize, buf: &[u8]) -> Option<usize> {
+        if let Ok(written) = self.write_at(addr, buf) {
+            Some(written)
+        } else {
+            None
+        }
+    }
+}
+
+impl CachedAccess for LockedExt2INode {
+    fn this(&self) -> Weak<dyn CachedAccess> {
+        self.self_ref.clone()
+    }
+
+    fn notify_dirty(&self, page: &PageItem) {
+        self.ext2_fs().dev().notify_dirty_inode(page);
+    }
+
+    fn sync_page(&self, page: &PageItemInt) {
+        println!(
+            "sync inode page flags {:?}",
+            get_flags(page.page().to_virt())
+        );
+        if let Err(e) = self.update_at(page.offset() * PAGE_SIZE, page.data()) {
+            panic!("Page {:?} sync failed {:?}", page.cache_key(), e);
+        }
+    }
+}
+
 impl INode for LockedExt2INode {
     fn metadata(&self) -> Result<Metadata> {
         let inode = self.read();
@@ -492,7 +544,7 @@ impl INode for LockedExt2INode {
 
         let mut writer = INodeData::new(self.self_ref(), offset);
 
-        Ok(writer.write(buf)?)
+        Ok(writer.write(buf, true)?)
     }
 
     fn fs(&self) -> Weak<dyn Filesystem> {
@@ -672,5 +724,13 @@ impl INode for LockedExt2INode {
         }
 
         Some(Arc::new(SysDirEntIter::new(parent, self.self_ref())))
+    }
+
+    fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {
+        if self.ftype().unwrap() == FileType::File {
+            Some(self.self_ref())
+        } else {
+            None
+        }
     }
 }

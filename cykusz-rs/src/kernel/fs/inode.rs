@@ -9,6 +9,7 @@ use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
+use crate::kernel::fs::pcache::CachedAccess;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Metadata, Result};
 use crate::kernel::syscall::sys::PollTable;
 
@@ -100,6 +101,10 @@ pub trait INode: Send + Sync + DowncastSync {
     }
 
     fn ref_update(&self, _new_ref: Weak<INodeItemInt>) {}
+
+    fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {
+        None
+    }
 }
 
 impl_downcast!(sync INode);

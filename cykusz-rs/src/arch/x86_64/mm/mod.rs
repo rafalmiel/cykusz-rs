@@ -7,6 +7,7 @@ pub mod virt;
 
 const VIRT: VirtAddr = VirtAddr(0xFFFFFF0000000000);
 const MAPPED: MappedAddr = MappedAddr(0xFFFF800000000000);
+pub const MAX_USER_ADDR: VirtAddr = VirtAddr(0x8000_0000_0000);
 
 pub const PAGE_SIZE: usize = 4096;
 
@@ -39,6 +40,10 @@ impl VirtAddr {
 
     pub fn to_phys_pagewalk(&self) -> Option<PhysAddr> {
         crate::kernel::mm::to_phys(*self)
+    }
+
+    pub fn is_user(&self) -> bool {
+        *self < MAX_USER_ADDR
     }
 }
 

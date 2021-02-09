@@ -6,7 +6,9 @@ use spin::RwLock;
 use crate::arch::raw::idt;
 use crate::arch::x86_64::int::end_of_int;
 use crate::kernel::mm::VirtAddr;
+use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
+use crate::kernel::task::vm::PageFaultReason;
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
 
@@ -271,9 +273,12 @@ extern "x86-interrupt" fn bound_range_exceeded(_frame: &mut idt::ExceptionStackF
 }
 
 extern "x86-interrupt" fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) {
-    println!("Invalid Opcode error! {:?} {}", _frame, unsafe {
-        crate::CPU_ID
-    });
+    println!(
+        "Invalid Opcode error! task {} {:?} {}",
+        crate::kernel::sched::current_id(),
+        _frame,
+        unsafe { crate::CPU_ID }
+    );
     loop {}
 }
 
@@ -317,11 +322,24 @@ extern "x86-interrupt" fn general_protection_fault(
 }
 
 extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
-    if err == 0x3 {
+    let virt = VirtAddr(unsafe { crate::arch::raw::ctrlregs::cr2() });
+
+    let reason = PageFaultReason::from_bits_truncate(err as usize);
+
+    if virt.is_user() {
+        // page fault originated in userspace
+        // let the task try handle it
+
+        let task = current_task();
+
+        //println!("user pagefault {} {:?}", virt, reason);
+        if task.handle_pagefault(reason, virt) {
+            return;
+        }
+    //println!("user pagefault failed");
+    } else if reason.contains(PageFaultReason::PRESENT | PageFaultReason::WRITE) {
         // page fault caused by write access and page was present
         // try to notify cache to mark page dirty and enable writeable flag
-
-        let virt = VirtAddr(unsafe { crate::arch::raw::ctrlregs::cr2() });
 
         if let Some(p) = virt.to_phys_pagewalk() {
             if let Some(i) = p.to_phys_page() {

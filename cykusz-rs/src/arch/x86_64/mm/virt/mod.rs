@@ -47,6 +47,10 @@ pub fn map_to_flags(virt: VirtAddr, phys: PhysAddr, flags: virt::PageFlags) {
     flush(virt);
 }
 
+pub fn get_flags(virt: VirtAddr) -> Option<crate::arch::mm::virt::entry::Entry> {
+    current_p4_table().get_flags(virt)
+}
+
 pub fn update_flags(virt: VirtAddr, flags: virt::PageFlags) -> bool {
     let res = current_p4_table().update_flags(virt, flags);
 

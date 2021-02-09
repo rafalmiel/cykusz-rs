@@ -1,7 +1,11 @@
-pub trait Align {
-    fn align(self, align: Self) -> Self;
+pub trait Align: Sized {
+    fn align(self, align: Self) -> Self {
+        self.align_down(align)
+    }
 
     fn align_up(self, align: Self) -> Self;
+
+    fn align_down(self, align: Self) -> Self;
 }
 
 pub trait CeilDiv {
@@ -11,7 +15,7 @@ pub trait CeilDiv {
 macro_rules! align_impl {
     ($($t:ty)*) => ($(
         impl Align for $t {
-            fn align(self, align: $t) -> $t {
+            fn align_down(self, align: $t) -> $t {
                 if (align as usize).is_power_of_two() {
                     self & (!(align - 1))
                 } else if align == 0 {

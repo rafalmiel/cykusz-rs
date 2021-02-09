@@ -6,9 +6,10 @@ use core::ops::Deref;
 use core::ops::DerefMut;
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use intrusive_collections::{LinkedList, LinkedListLink};
 use lru::LruCache;
 
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{Spin, SpinGuard};
 
 pub trait DropHandler {
     fn handle_drop(&self, arc: Arc<Self>);
@@ -48,6 +49,10 @@ impl<T: DropHandler> ArcWrap<T> {
 
     pub fn downgrade(ptr: &ArcWrap<T>) -> WeakWrap<T> {
         WeakWrap(Arc::downgrade(&ptr.0))
+    }
+
+    pub fn arc(&self) -> Arc<T> {
+        self.0.clone()
     }
 }
 
@@ -90,13 +95,15 @@ pub trait Cacheable<K: IsCacheKey>: Sized {
 
     fn make_unused(&self, _new_ref: &Weak<CacheItem<K, Self>>) {}
 
-    fn deallocate(&self) {}
+    fn deallocate(&self, _me: &CacheItem<K, Self>) {}
 }
 
 pub struct CacheItem<K: IsCacheKey, T: Cacheable<K>> {
     cache: Weak<Cache<K, T>>,
     used: AtomicBool,
     pub val: T,
+    link_lock: Spin<()>,
+    link: LinkedListLink,
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
@@ -105,6 +112,9 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
             cache: cache.clone(),
             used: AtomicBool::new(false),
             val: item,
+
+            link_lock: Spin::new(()),
+            link: LinkedListLink::new(),
         })
         .into()
     }
@@ -117,10 +127,53 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
             cache: cache.clone(),
             used: AtomicBool::new(false),
             val: factory(me),
+
+            link_lock: Spin::new(()),
+            link: LinkedListLink::new(),
         })
         .into()
     }
+
+    pub fn unlink_from_list(
+        &self,
+        list: &mut LinkedList<CacheItemAdapter<K, T>>,
+    ) -> Option<ArcWrap<CacheItem<K, T>>> {
+        let _link_lock = self.link_lock.lock();
+
+        if self.link.is_linked() {
+            let mut cur = unsafe { list.cursor_mut_from_ptr(self as *const CacheItem<K, T>) };
+
+            if let Some(ptr) = cur.remove() {
+                return Some(ptr.into());
+            }
+        }
+
+        None
+    }
 }
+
+impl<K: IsCacheKey, T: Cacheable<K>> ArcWrap<CacheItem<K, T>> {
+    pub fn link_to_list(&self, mut list: SpinGuard<LinkedList<CacheItemAdapter<K, T>>>) {
+        let _link_lock = self.link_lock.lock();
+
+        if self.link.is_linked() {
+            panic!("linking linked list");
+        }
+
+        list.push_back(self.0.clone());
+    }
+
+    pub fn unlink_from_list(
+        &self,
+        list: &mut LinkedList<CacheItemAdapter<K, T>>,
+    ) -> Option<ArcWrap<CacheItem<K, T>>> {
+        CacheItem::<K, T>::unlink_from_list(self, list)
+    }
+}
+
+unsafe impl<K: IsCacheKey, T: Cacheable<K>> Sync for CacheItem<K, T> {}
+
+intrusive_adapter!(pub CacheItemAdapter<K, T> = Arc<CacheItem<K, T>> : CacheItem<K, T> { link: LinkedListLink } where K: IsCacheKey, T: Cacheable<K> );
 
 impl<K: IsCacheKey, T: Cacheable<K>> Deref for CacheItem<K, T> {
     type Target = T;
@@ -154,7 +207,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> DropHandler for CacheItem<K, T> {
 
 impl<K: IsCacheKey, T: Cacheable<K>> Drop for CacheItem<K, T> {
     fn drop(&mut self) {
-        self.deallocate();
+        self.val.deallocate(self);
     }
 }
 

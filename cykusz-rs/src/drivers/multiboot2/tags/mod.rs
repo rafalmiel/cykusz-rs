@@ -23,7 +23,7 @@ impl Iterator for TagIter {
             &Tag { typ: 0, size: 8 } => None,
             tag => {
                 self.current = (PhysAddr(self.current as usize) + tag.size as usize)
-                    .align(8)
+                    .align_up(8)
                     .0 as *const _;
 
                 Some(tag)

@@ -372,8 +372,20 @@ fn exec(cmd: &str) {
         if let Ok(id) = syscall::fork() {
             if id != 0 {
                 println!("Forked shell id: {}", id);
+            } else {
+                //syscall::sleep(100);
+                syscall::exit();
+            }
+        } else {
+            println!("fork failed");
+        }
+    } else if cmd == "exec" {
+        if let Ok(id) = syscall::fork() {
+            if id != 0 {
+                println!("Exec new shell with id: {}", id);
                 syscall::exec("/bin/shell").expect("Failed to exec shell");
             } else {
+                //syscall::sleep(100);
                 syscall::exit();
             }
         } else {

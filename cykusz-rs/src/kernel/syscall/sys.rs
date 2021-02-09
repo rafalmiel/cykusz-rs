@@ -12,12 +12,13 @@ use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::icache::INodeItemStruct;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
-use crate::kernel::mm::virt::PageFlags;
+
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
-use crate::kernel::task::filetable::FileHandle;
+
+use crate::kernel::task::vm::{Flags, Prot};
 use crate::kernel::utils::types::Align;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -124,9 +125,16 @@ pub fn sys_mmap(addr: u64, size: u64) -> SyscallResult {
     let size = size.align_up(PAGE_SIZE as u64);
     let addr = addr.align(PAGE_SIZE as u64);
 
-    for a in (addr..addr + size).step_by(PAGE_SIZE) {
-        crate::kernel::mm::map_flags(VirtAddr(a as usize), PageFlags::USER | PageFlags::WRITABLE);
-    }
+    let task = current_task();
+
+    task.vm().mmap_vm(
+        Some(VirtAddr(addr as usize)),
+        size as usize,
+        Prot::PROT_READ | Prot::PROT_WRITE,
+        Flags::MAP_FIXED | Flags::MAP_ANONYOMUS | Flags::MAP_PRIVATE,
+        None,
+        0,
+    );
 
     Ok(0)
 }
@@ -554,8 +562,8 @@ pub fn sys_fork() -> SyscallResult {
     //crate::kernel::fs::icache::cache().print_stats();
     //println!("dir entry stats");
     //crate::kernel::fs::dirent::cache().print_stats();
-    println!("page cache stats");
-    crate::kernel::fs::pcache::cache().print_stats();
+    //println!("page cache stats");
+    //crate::kernel::fs::pcache::cache().print_stats();
     crate::kernel::sched::fork();
 
     Ok(0)
@@ -566,25 +574,18 @@ pub fn sys_exec(path: u64, path_len: u64) -> SyscallResult {
 
     let prog = lookup_by_path(path, LookupMode::None)?;
 
-    if let Some(fh) = FileHandle::new(0, prog, OpenFlags::RDONLY) {
-        if let Ok(exe) = fh.read_all() {
-            drop(fh);
-
-            crate::kernel::sched::exec(exe);
-        } else {
-            Err(SyscallError::Fault)
-        }
-    } else {
-        Err(SyscallError::Inval)
-    }
+    crate::kernel::sched::exec(prog);
 }
 
 pub fn sys_poweroff() -> ! {
     crate::kernel::sched::close_all_tasks();
+    println!("[ SHUTDOWN ] Closed all tasks");
     crate::kernel::fs::dirent::cache().clear();
+    println!("[ SHUTDOWN ] Cleared dir cache");
     crate::kernel::fs::icache::cache().clear();
-    crate::kernel::fs::pcache::cache().clear();
+    println!("[ SHUTDOWN ] Cleared inode cache");
     crate::kernel::fs::mount::umount_all();
+    println!("[ SHUTDOWN ] Unmounted fs");
 
     crate::arch::acpi::power_off()
 }

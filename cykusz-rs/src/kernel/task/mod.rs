@@ -1,11 +1,12 @@
 use alloc::string::String;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
+
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use syscall_defs::OpenFlags;
 
+use crate::arch::mm::VirtAddr;
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
@@ -13,9 +14,11 @@ use crate::kernel::sched::new_task_id;
 use crate::kernel::sync::RwSpin;
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
+use crate::kernel::task::vm::{PageFaultReason, VM};
 
 pub mod cwd;
 pub mod filetable;
+pub mod vm;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
@@ -51,6 +54,7 @@ pub struct Task {
     to_delete: AtomicBool,
     halted: AtomicBool,
     filetable: filetable::FileTable,
+    vm: VM,
     pub sleep_until: AtomicUsize,
     cwd: RwSpin<Option<Cwd>>,
 }
@@ -67,6 +71,7 @@ impl Default for Task {
             to_delete: AtomicBool::new(false),
             halted: AtomicBool::new(false),
             filetable: filetable::FileTable::new(),
+            vm: VM::new(),
             sleep_until: AtomicUsize::new(0),
             cwd: RwSpin::new(if let Some(e) = root_dentry() {
                 Cwd::new(e.clone())
@@ -95,6 +100,7 @@ impl Task {
             to_delete: AtomicBool::new(false),
             halted: AtomicBool::new(false),
             filetable: filetable::FileTable::new(),
+            vm: VM::new(),
             sleep_until: AtomicUsize::new(0),
             cwd: RwSpin::new(if let Some(e) = root_dentry() {
                 Cwd::new(e.clone())
@@ -122,11 +128,18 @@ impl Task {
         task
     }
 
-    pub fn new_user(exe: &[u8]) -> Task {
+    pub fn new_user(exe: DirEntryItem) -> Task {
         let mut task = Task::default();
-        task.arch_task = UnsafeCell::new(ArchTask::new_user(exe));
 
-        task
+        let vm = task.vm();
+
+        if let Some(entry) = vm.load_bin(exe) {
+            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, vm));
+
+            task
+        } else {
+            panic!("Failed to exec task")
+        }
     }
 
     pub fn fork(&self) -> Task {
@@ -134,27 +147,35 @@ impl Task {
 
         task.arch_task = UnsafeCell::new(unsafe { self.arch_task().fork() });
 
+        task.vm().fork(self.vm());
         task.filetable = self.filetable.clone();
         if let Some(e) = self.get_dent() {
             task.set_cwd(e);
         }
         task.set_state(TaskState::Runnable);
-        task.locks.store(self.locks(), Ordering::SeqCst);
+        task.set_locks(self.locks());
 
         task
     }
 
-    pub fn exec(&self, exe: Vec<u8>) -> Task {
+    pub fn exec(&self, exe: DirEntryItem) -> Task {
         //println!("execing id {}", self.id);
         let mut task = Task::default_with_id(self.id);
 
-        task.arch_task = UnsafeCell::new(ArchTask::new_user(exe.as_slice()));
-        task.filetable = self.filetable.clone();
-        if let Some(e) = self.get_dent() {
-            task.set_cwd(e);
-        }
+        let vm = task.vm();
 
-        task
+        if let Some(entry) = vm.load_bin(exe) {
+            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, vm));
+
+            task.filetable = self.filetable.clone();
+            if let Some(e) = self.get_dent() {
+                task.set_cwd(e);
+            }
+
+            task
+        } else {
+            panic!("Failed to exec task")
+        }
     }
 
     pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {
@@ -237,12 +258,16 @@ impl Task {
         }
     }
 
-    pub fn locks_inc(&self) {
+    pub fn inc_locks(&self) {
         self.locks.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn locks_dec(&self) {
+    pub fn dec_locks(&self) {
         self.locks.fetch_sub(1, Ordering::SeqCst);
+    }
+
+    pub fn set_locks(&self, locks: usize) {
+        self.locks.store(locks, Ordering::SeqCst);
     }
 
     pub fn locks(&self) -> usize {
@@ -298,6 +323,14 @@ impl Task {
             .store(current_ns() as usize + time_ns, Ordering::SeqCst);
         self.set_state(TaskState::AwaitingIo);
         crate::kernel::sched::reschedule();
+    }
+
+    pub fn handle_pagefault(&self, reason: PageFaultReason, addr: VirtAddr) -> bool {
+        self.vm.handle_pagefault(reason, addr)
+    }
+
+    pub fn vm(&self) -> &VM {
+        &self.vm
     }
 }
 

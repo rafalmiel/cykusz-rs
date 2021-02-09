@@ -7,10 +7,11 @@ use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::x86_64::mm::phys::{allocate_order, deallocate_order};
 use crate::arch::x86_64::mm::virt::p4_table;
 use crate::arch::x86_64::mm::virt::table::P4Table;
-use crate::arch::x86_64::mm::PAGE_SIZE;
+
 use crate::arch::x86_64::raw::mm::MappedAddr;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::mm::{Frame, PhysAddr};
+use crate::kernel::task::vm::{Flags, Prot, VM};
 
 const USER_STACK_SIZE: usize = 0x4000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
@@ -91,72 +92,6 @@ fn prepare_p4<'a>() -> &'a mut P4Table {
     }
 
     new_p4
-}
-
-fn map_user(new_p4: &mut P4Table, exe: &[u8]) -> (PhysAddr, VirtAddr, VirtAddr) {
-    use crate::drivers::elf::types::ProgramType;
-    use crate::drivers::elf::ElfHeader;
-    use crate::kernel::mm::allocate;
-    use crate::kernel::mm::virt;
-    use core::cmp::min;
-
-    let elf_module = VirtAddr(exe.as_ptr() as usize);
-
-    let hdr = unsafe { ElfHeader::load(exe) };
-
-    for p in hdr.programs() {
-        if p.p_type == ProgramType::Load {
-            let flags = virt::PageFlags::USER | virt::PageFlags::from(p.p_flags);
-
-            let virt_begin = VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);
-            let virt_end = VirtAddr(p.p_vaddr as usize + p.p_memsz as usize);
-
-            let mut page_offset = p.p_vaddr as usize - virt_begin.0;
-            let mut code_addr = elf_module + p.p_offset as usize;
-
-            //This should be done in a page fault in future
-            for VirtAddr(virt_addr) in (virt_begin..virt_end).step_by(PAGE_SIZE) {
-                let code_page = allocate().expect("Out of mem!");
-
-                let to_copy = PAGE_SIZE - page_offset;
-
-                unsafe {
-                    code_addr.copy_to(
-                        code_page.address_mapped().0 + page_offset,
-                        min(to_copy, virt_end.0 - virt_addr),
-                    );
-                }
-
-                code_addr += to_copy;
-                page_offset = 0;
-
-                // Map user program to the location indicated by Elf Program Section
-                new_p4.map_to_flags(VirtAddr(virt_addr as usize), code_page.address(), flags);
-            }
-        }
-    }
-
-    // Map stack
-    for a in
-        (VirtAddr(0x8000_0000_0000 - USER_STACK_SIZE)..VirtAddr(0x800000000000)).step_by(PAGE_SIZE)
-    {
-        new_p4.map_flags(
-            a,
-            virt::PageFlags::USER | virt::PageFlags::WRITABLE | virt::PageFlags::NO_EXECUTE,
-        );
-    }
-
-    return (
-        new_p4.phys_addr(),             // page table root address
-        VirtAddr(hdr.e_entry as usize), // entry point to the program
-        VirtAddr(0x800000000000),       // stack pointer (4KB for now)
-    );
-}
-
-fn allocate_page_table(exe: &[u8]) -> (PhysAddr, VirtAddr, VirtAddr) {
-    let new_p4 = prepare_p4();
-
-    map_user(new_p4, exe)
 }
 
 #[repr(C, packed)]
@@ -384,8 +319,17 @@ impl Task {
         )
     }
 
-    pub fn new_user(exe: &[u8]) -> Task {
-        let (new_p4, entry, stack) = allocate_page_table(exe);
+    pub fn new_user(entry: VirtAddr, vm: &VM) -> Task {
+        let p_table = prepare_p4();
+
+        vm.mmap_vm(
+            Some(VirtAddr(0x8000_0000_0000 - USER_STACK_SIZE)),
+            USER_STACK_SIZE,
+            Prot::PROT_WRITE | Prot::PROT_READ,
+            Flags::MAP_FIXED | Flags::MAP_PRIVATE | Flags::MAP_ANONYOMUS,
+            None,
+            0,
+        );
 
         let f = unsafe { ::core::mem::transmute::<usize, fn()>(entry.0) };
 
@@ -394,8 +338,8 @@ impl Task {
             gdt::ring3_cs(),
             gdt::ring3_ds(),
             true,
-            new_p4,
-            Some(stack.0),
+            p_table.phys_addr(),
+            Some(0x8000_0000_0000),
             0,
         );
 
@@ -403,9 +347,13 @@ impl Task {
     }
 
     pub fn fork(&self) -> Task {
-        let orig_p4 = P4Table::new_at_phys(PhysAddr(self.cr3));
+        let orig_p4 = P4Table::new_mut_at_phys(PhysAddr(self.cr3));
 
         let new_p4 = orig_p4.duplicate();
+
+        // We marked writable entries in parent and child process as readonly to enable COW
+        // Flush the pagetable of the current process
+        crate::arch::mm::virt::flush_all();
 
         let sp_top = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0 as *mut u8;
 
@@ -425,12 +373,11 @@ impl Task {
     pub fn deallocate(&mut self) {
         let cr3 = unsafe { self.ctx.as_ref().cr3 };
 
+        self.ctx = Unique::dangling();
         if self.is_user() {
             let p4 = p4_table(PhysAddr(cr3));
             p4.deallocate_user();
         }
-
-        self.ctx = Unique::dangling();
         deallocate_order(
             &Frame::new(MappedAddr(self.stack_top).to_phys()),
             KERN_STACK_ORDER,

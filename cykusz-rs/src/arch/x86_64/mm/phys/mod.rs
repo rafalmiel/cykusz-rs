@@ -25,6 +25,7 @@ mod iter;
 pub struct PhysPage {
     pt_lock: Spin<()>,
     p_cache: PageItemWeak,
+    vm_use_count: u32,
 }
 
 impl PhysPage {
@@ -53,19 +54,47 @@ impl PhysPage {
         }
     }
 
-    pub fn link_page_cache(&self, page: &PageItem) {
-        unsafe {
-            let _lock = self.pt_lock.lock();
+    fn this(&self) -> &mut PhysPage {
+        unsafe { &mut *(self as *const _ as *mut PhysPage) }
+    }
 
-            let this = &mut *(self as *const _ as *mut PhysPage);
-            this.p_cache = ArcWrap::downgrade(&page);
-        }
+    pub fn link_page_cache(&self, page: &PageItem) {
+        let _lock = self.pt_lock.lock();
+
+        let this = self.this();
+        this.p_cache = ArcWrap::downgrade(&page);
     }
 
     pub fn page_item(&self) -> Option<PageItem> {
         let _lock = self.pt_lock.lock();
 
         self.p_cache.upgrade()
+    }
+
+    pub fn inc_vm_use_count(&self) {
+        let _lock = self.pt_lock.lock();
+
+        let this = self.this();
+
+        this.vm_use_count += 1;
+    }
+
+    pub fn dec_vm_use_count(&self) -> usize {
+        let _lock = self.pt_lock.lock();
+
+        let this = self.this();
+
+        if this.vm_use_count > 0 {
+            this.vm_use_count -= 1;
+        }
+
+        this.vm_use_count as usize
+    }
+
+    pub fn vm_use_count(&self) -> usize {
+        let _lock = self.pt_lock.lock();
+
+        self.vm_use_count as usize
     }
 }
 
@@ -74,6 +103,7 @@ impl Default for PhysPage {
         PhysPage {
             pt_lock: Spin::new(()),
             p_cache: PageItemWeak::empty(),
+            vm_use_count: 0,
         }
     }
 }

@@ -1,7 +1,7 @@
-use crate::kernel::mm::virt;
 use crate::kernel::mm::Frame;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
+use crate::kernel::mm::{deallocate_order, virt};
 
 bitflags! {
     pub struct Entry: usize {
@@ -19,7 +19,8 @@ bitflags! {
 }
 
 pub const ADDRESS_MASK: usize = 0x000f_ffff_ffff_f000;
-pub const COUNTER_MASK: usize = 0x3ff0_0000_0000_0000;
+pub const COUNTER_MASK: usize = 0x7ff0_0000_0000_0000;
+pub const FLAG_MASK: usize = 0x80000000000001FF;
 
 impl Entry {
     pub fn new_empty() -> Entry {
@@ -83,15 +84,55 @@ impl Entry {
     }
 
     pub fn set_frame_flags(&mut self, frame: &Frame, flags: Entry) {
-        self.bits = frame.address().0 | (flags.bits & !ADDRESS_MASK);
+        //println!("set frame flags {} {:?}", frame.address(), flags);
+        self.set_frame(frame);
+        self.set_flags(flags);
+    }
+
+    pub fn unref_phys_page(&self) -> bool {
+        if self.address() != PhysAddr(0) {
+            if let Some(page) = self.address().to_phys_page() {
+                let cnt = page.dec_vm_use_count();
+                if cnt == 0 {
+                    //println!("unref phys page dealloc {}", self.address());
+                    deallocate_order(&Frame::new(self.address()), 0);
+
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    pub fn ref_phys_page(&self) {
+        if self.address() != PhysAddr(0) {
+            if let Some(page) = self.address().to_phys_page() {
+                page.inc_vm_use_count();
+            }
+        }
     }
 
     pub fn set_frame(&mut self, frame: &Frame) {
-        self.bits = frame.address().0;
+        let ref_page = self.address() != frame.address();
+        //println!("set frame {} do ref page? {}", frame.address(), ref_page);
+
+        if ref_page {
+            self.unref_phys_page();
+        }
+
+        self.bits &= !ADDRESS_MASK;
+        self.bits |= frame.address().0;
+
+        if ref_page {
+            self.ref_phys_page();
+        }
     }
 
     pub fn set_flags(&mut self, flags: Entry) {
-        self.insert(flags);
+        //println!("set flags {} {:?}", self.address(), flags);
+        self.bits &= !FLAG_MASK;
+        self.insert(Entry::from_bits(flags.bits & FLAG_MASK).unwrap());
     }
 
     pub fn get_entry_count(&self) -> usize {

@@ -1,5 +1,6 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
 use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
@@ -23,7 +24,7 @@ impl Cacheable<CacheKey> for DirEntry {
         self.data.write().parent = None;
     }
 
-    fn deallocate(&self) {}
+    fn deallocate(&self, _me: &CacheItem<CacheKey, DirEntry>) {}
 }
 
 pub type DirEntryItem = ArcWrap<CacheItem<CacheKey, DirEntry>>;
@@ -52,6 +53,31 @@ pub struct DirEntry {
     mountpoint: AtomicBool,
     fs: Once<Weak<dyn Filesystem>>,
     cache_marker: usize,
+}
+
+impl DirEntryItem {
+    pub fn full_path(&self) -> String {
+        let mut stack = Vec::<String>::new();
+
+        let mut e = Some(self.clone());
+
+        while let Some(el) = e {
+            stack.push(el.name());
+
+            e = el.read().parent.clone();
+        }
+
+        let mut res = String::new();
+
+        for (i, s) in stack.iter().rev().enumerate() {
+            if i > 1 {
+                res += "/";
+            }
+            res += s.as_str();
+        }
+
+        res
+    }
 }
 
 impl DirEntry {

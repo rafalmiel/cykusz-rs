@@ -8,7 +8,7 @@ use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
-use crate::kernel::fs::pcache::CachedAccess;
+use crate::kernel::fs::pcache::CachedBlockDev;
 use crate::kernel::utils::slice::ToBytesMut;
 
 mod blockgroup;
@@ -21,14 +21,14 @@ mod superblock;
 
 pub struct Ext2Filesystem {
     self_ref: Weak<Ext2Filesystem>,
-    dev: Arc<dyn CachedAccess>,
+    dev: Arc<dyn CachedBlockDev>,
     sectors_per_block: Once<usize>,
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
 }
 
 impl Ext2Filesystem {
-    pub fn new(dev: Arc<dyn CachedAccess>) -> Option<Arc<dyn Filesystem>> {
+    pub fn new(dev: Arc<dyn CachedBlockDev>) -> Option<Arc<dyn Filesystem>> {
         let a = Arc::new_cyclic(|me| Ext2Filesystem {
             self_ref: me.clone(),
             dev,
@@ -44,7 +44,7 @@ impl Ext2Filesystem {
         }
     }
 
-    fn dev(&self) -> &Arc<dyn CachedAccess> {
+    fn dev(&self) -> &Arc<dyn CachedBlockDev> {
         &self.dev
     }
 
@@ -66,11 +66,13 @@ impl Ext2Filesystem {
     }
 
     pub fn read_block(&self, block: usize, dest: &mut [u8]) -> Option<usize> {
-        self.dev.read_cached(block * self.sectors_per_block(), dest)
+        self.dev
+            .read_cached(block * self.sectors_per_block() * 512, dest)
     }
 
     pub fn write_block(&self, block: usize, buf: &[u8]) -> Option<usize> {
-        self.dev.write_cached(block * self.sectors_per_block(), buf)
+        self.dev
+            .write_cached(block * self.sectors_per_block() * 512, buf)
     }
 
     pub fn superblock(&self) -> &superblock::Superblock {
@@ -88,8 +90,6 @@ impl Ext2Filesystem {
     }
 
     pub fn drop_from_cache(&self, id: usize) {
-        //println!("drop from ext2 cache: {}", id);
-
         let cache = crate::kernel::fs::icache::cache();
 
         let fs: Weak<dyn Filesystem> = self.self_ref.clone();

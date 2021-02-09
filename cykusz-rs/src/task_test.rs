@@ -15,7 +15,7 @@ use crate::kernel::fs::cache::Cacheable;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_real_path, root_dentry, LookupMode};
 use crate::kernel::mm::heap::{leak_catcher, HeapDebug};
-use crate::kernel::sched::current_task;
+use crate::kernel::sched::{create_user_task, current_task};
 use crate::kernel::syscall::sys::sys_sleep;
 use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::timer::{create_timer, Timer, TimerObject};
@@ -103,12 +103,19 @@ fn load_bin(path: &str) -> Option<Vec<u8>> {
 }
 
 pub fn start() {
-    if let Some(code) = load_bin("/bin/shell") {
-        println!("Exec shell...");
-        crate::kernel::sched::create_user_task(code.as_slice());
-    } else {
-        println!("Failed to exec shell");
-    }
+    //if let Some(code) = load_bin("/bin/shell") {
+    //    println!("Exec shell...");
+    //    crate::kernel::sched::create_user_task(code.as_slice());
+    //} else {
+    //    println!("Failed to exec shell");
+    //}
+    let task = current_task();
+    task.set_cwd(root_dentry().unwrap().clone());
+
+    let shell =
+        lookup_by_real_path(Path::new("/bin/shell"), LookupMode::None).expect("Shell not found");
+
+    create_user_task(shell);
 
     //crate::kernel::sched::create_task(task2);
     //crate::kernel::sched::create_task(task);

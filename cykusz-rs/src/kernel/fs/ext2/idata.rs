@@ -398,7 +398,7 @@ impl INodeData {
         buffer_size - rem
     }
 
-    pub fn write(&mut self, data: &[u8]) -> Result<usize> {
+    pub fn write(&mut self, mut data: &[u8], allow_grow: bool) -> Result<usize> {
         let linode = self.inode.read();
         let inode = linode.d_inode();
 
@@ -422,6 +422,13 @@ impl INodeData {
         if self.offset > file_size {
             return Err(FsError::InvalidParam);
         }
+
+        data = if !allow_grow && self.offset + data.len() > file_size {
+            // we just update the file content so write up to the size of the file
+            &data[..file_size - self.offset]
+        } else {
+            data
+        };
 
         let fs = self.fs();
         let block_size = fs.superblock().block_size();

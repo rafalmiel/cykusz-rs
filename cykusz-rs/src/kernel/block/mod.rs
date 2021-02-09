@@ -8,9 +8,9 @@ use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::cache::{ArcWrap, Cacheable};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{
-    CachedAccess, PageCacheKey, PageItem, PageItemStruct, PageItemWeak, RawAccess,
+    CachedAccess, CachedBlockDev, PageCacheKey, PageItem, PageItemInt, PageItemWeak, RawAccess,
 };
-use crate::kernel::sync::{RwSpin, Spin};
+use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
 use crate::kernel::timer::{create_timer, Timer, TimerCallback};
 use crate::kernel::utils::types::CeilDiv;
 
@@ -35,7 +35,7 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
     Ok(())
 }
 
-pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn CachedAccess>> {
+pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn CachedBlockDev>> {
     let devs = BLK_DEVS.read();
 
     if let Some(d) = devs.get(&id) {
@@ -50,6 +50,7 @@ pub struct BlockDevice {
     name: String,
     dev: Arc<dyn BlockDev>,
     self_ref: Weak<BlockDevice>,
+    dirty_inode_pages: Spin<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
     dirty_pages: Spin<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
     cleanup_timer: Arc<Timer>,
 }
@@ -107,9 +108,21 @@ impl BlockDevice {
             name,
             dev: imp,
             self_ref: me.clone(),
+            dirty_inode_pages: Spin::new(hashbrown::HashMap::new()),
             dirty_pages: Spin::new(hashbrown::HashMap::new()),
             cleanup_timer: create_timer(TimerCallback::new(me.clone(), BlockDevice::sync_all)),
         })
+    }
+
+    fn sync_cache(&self, mut cache: SpinGuard<hashbrown::HashMap<PageCacheKey, PageItemWeak>>) {
+        for (_, a) in cache.iter() {
+            if let Some(up) = a.upgrade() {
+                up.sync_to_storage();
+
+                up.notify_clean();
+            }
+        }
+        cache.clear();
     }
 }
 
@@ -131,21 +144,23 @@ impl Device for BlockDevice {
 
 impl<T: RawAccess> BlockDev for T {
     fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
-        self.read_direct(sector, dest)
+        self.read_direct(sector * 512, dest)
     }
 
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize> {
-        self.write_direct(sector, buf)
+        self.write_direct(sector * 512, buf)
     }
 }
 
 impl RawAccess for BlockDevice {
-    fn read_direct(&self, sector: usize, dest: &mut [u8]) -> Option<usize> {
-        self.dev.read(sector, dest)
+    fn read_direct(&self, offset: usize, dest: &mut [u8]) -> Option<usize> {
+        assert_eq!(offset % 512, 0);
+        self.dev.read(offset / 512, dest)
     }
 
-    fn write_direct(&self, sector: usize, buf: &[u8]) -> Option<usize> {
-        self.dev.write(sector, buf)
+    fn write_direct(&self, offset: usize, buf: &[u8]) -> Option<usize> {
+        assert_eq!(offset % 512, 0);
+        self.dev.write(offset / 512, buf)
     }
 }
 
@@ -164,28 +179,43 @@ impl CachedAccess for BlockDevice {
         }
     }
 
-    fn sync_page(&self, page: &PageItemStruct) {
-        self.write_direct(page.offset() * 8, page.data());
-
+    fn sync_page(&self, page: &PageItemInt) {
+        page.sync_to_storage();
         page.notify_clean();
 
+        let key = page.cache_key();
+
         let mut dirty = self.dirty_pages.lock();
-        dirty.remove(&page.cache_key());
+        if dirty.contains_key(&key) {
+            dirty.remove(&key);
+
+            return;
+        }
+
+        dirty = self.dirty_inode_pages.lock();
+        dirty.remove(&key);
+    }
+}
+
+impl CachedBlockDev for BlockDevice {
+    fn notify_dirty_inode(&self, page: &PageItem) {
+        let mut dirty = self.dirty_inode_pages.lock();
+
+        dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
+
+        if !self.cleanup_timer.enabled() {
+            self.cleanup_timer.start_with_timeout(10_000);
+        }
     }
 
     fn sync_all(&self) {
-        println!("Syncing...");
-        let mut dirty = self.dirty_pages.lock();
-
-        for (_, p) in dirty.iter() {
-            if let Some(a) = p.upgrade() {
-                self.write_direct(a.offset() * 8, a.data());
-
-                a.notify_clean();
-            }
-        }
-
-        dirty.clear();
+        println!(
+            "Syncing... inodes {}, pages {}",
+            self.dirty_inode_pages.lock().len(),
+            self.dirty_pages.lock().len(),
+        );
+        self.sync_cache(self.dirty_inode_pages.lock());
+        self.sync_cache(self.dirty_pages.lock());
     }
 }
 

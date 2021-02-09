@@ -133,7 +133,7 @@ macro_rules! enable_unsigned_ops {
             }
 
             pub fn align(self, align: usize) -> $type_ {
-                self.align_up(align)
+                self.align_down(align)
             }
         }
 
@@ -164,6 +164,10 @@ macro_rules! enable_unsigned_ops {
 
             pub unsafe fn copy_to(self, to: usize, count: usize) {
                 (self.0 as *const u8).copy_to(to as *mut u8, count);
+            }
+
+            pub unsafe fn copy_page_from(self, src: $type_) {
+                self.align_down(PAGE_SIZE).as_bytes_mut(PAGE_SIZE).copy_from_slice(src.align_down(PAGE_SIZE).as_bytes(PAGE_SIZE));
             }
 
             pub unsafe fn as_bytes<'a>(self, size: usize) -> &'a [u8] {

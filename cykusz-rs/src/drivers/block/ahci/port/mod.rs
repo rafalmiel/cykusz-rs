@@ -6,12 +6,12 @@ use crate::drivers::block::ahci::reg::HbaPort;
 use crate::drivers::block::ahci::request::DmaRequest;
 use crate::kernel::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::sched::current_task;
+
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::CeilDiv;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
-mod hba;
+pub mod hba;
 
 struct Cmd {
     req: Arc<DmaRequest>,
@@ -133,6 +133,12 @@ impl Port {
     }
 
     fn run_request(&self, request: Arc<DmaRequest>) -> Option<usize> {
+        let is_int = crate::kernel::int::is_enabled();
+
+        if !is_int {
+            crate::kernel::int::enable();
+        }
+
         let mut off = 0;
         // post request and wait for completion.....
         while off < request.count() {
@@ -143,9 +149,11 @@ impl Port {
             off = data.run_request(request.clone(), off);
         }
 
-        let _task = current_task();
-
         request.wait_queue().wait_for(|| request.is_complete());
+
+        if !is_int {
+            crate::kernel::int::disable();
+        }
 
         Some(request.count() * 512)
     }

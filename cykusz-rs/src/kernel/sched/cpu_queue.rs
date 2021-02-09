@@ -179,13 +179,13 @@ impl CpuQueue {
     }
 
     pub fn enter_critical_section(&mut self) {
-        self.tasks[self.current].locks_inc();
+        self.tasks[self.current].inc_locks();
     }
 
     pub fn leave_critical_section(&mut self, mutex: SpinGuard<()>) {
         let t = &self.tasks[self.current];
 
-        t.locks_dec();
+        t.dec_locks();
 
         if t.locks() == 0 && t.to_reschedule() {
             t.set_to_reschedule(false);

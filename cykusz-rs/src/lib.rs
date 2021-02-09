@@ -21,6 +21,7 @@
 #![feature(try_blocks)]
 #![feature(try_trait)]
 #![feature(new_uninit)]
+#![feature(linked_list_cursors)]
 
 extern crate alloc;
 #[macro_use]

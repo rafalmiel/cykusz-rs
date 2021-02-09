@@ -24,6 +24,10 @@ impl PhysAddr {
         if let Some(pages) = crate::arch::mm::phys::pages() {
             let idx = self.align_down(PAGE_SIZE).0 / PAGE_SIZE;
 
+            if idx >= pages.len() {
+                return None;
+            }
+
             return Some(&pages[idx]);
         }
 

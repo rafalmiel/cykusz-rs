@@ -344,7 +344,7 @@ extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err:
         if let Some(p) = virt.to_phys_pagewalk() {
             if let Some(i) = p.to_phys_page() {
                 if let Some(h) = i.page_item() {
-                    h.notify_dirty(&h);
+                    h.notify_dirty(&h, None);
 
                     return;
                 }
@@ -354,10 +354,11 @@ extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err:
 
     crate::bochs();
     println!(
-        "PAGE FAULT! 0x{:x} CPU: {}, rip: {:?}",
+        "PAGE FAULT! 0x{:x} CPU: {}, rip: {:?} virt: {}",
         err,
         unsafe { crate::CPU_ID },
-        _frame
+        _frame,
+        virt
     );
     loop {}
 }

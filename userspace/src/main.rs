@@ -12,7 +12,7 @@ extern crate user_alloc;
 
 use chrono::{Datelike, Timelike};
 
-use syscall_defs::{OpenFlags, SysDirEntry};
+use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry};
 
 use crate::file::File;
 
@@ -390,6 +390,57 @@ fn exec(cmd: &str) {
             }
         } else {
             println!("fork failed");
+        }
+    } else if cmd == "mmap" {
+        if let Ok(file) = syscall::open("/home/mmap.bin", OpenFlags::RDWR) {
+            if let Ok(addr) = syscall::mmap(
+                Some(0x5000_0000),
+                4096,
+                MMapProt::PROT_READ | MMapProt::PROT_WRITE,
+                MMapFlags::MAP_FIXED | MMapFlags::MAP_SHARED,
+                Some(file),
+                0,
+            ) {
+                let ptr = addr as *mut u8;
+
+                for i in (0..4096).step_by(4) {
+                    unsafe {
+                        ptr.offset(i).write('W' as u8);
+                    }
+                }
+            } else {
+                println!("mmap faileld");
+            }
+        } else {
+            println!("file open failed");
+        }
+    } else if cmd == "mmap_read" {
+        if let Ok(file) = syscall::open("/home/mmap.bin", OpenFlags::RDWR) {
+            if let Ok(addr) = syscall::mmap(
+                Some(0x5000_0000),
+                4096,
+                MMapProt::PROT_READ | MMapProt::PROT_WRITE,
+                MMapFlags::MAP_FIXED | MMapFlags::MAP_SHARED,
+                Some(file),
+                0,
+            ) {
+                let ptr = addr as *mut u8;
+
+                for i in (0..4096).step_by(4) {
+                    println!("{}", unsafe { ptr.offset(i).read() });
+                }
+            } else {
+                println!("mmap faileld");
+            }
+        } else {
+            println!("file open failed");
+        }
+    } else if cmd == "mmap_cont" {
+        let ptr = 0x5000_0000 as *mut u8;
+        for i in (0..4096).step_by(6) {
+            unsafe {
+                ptr.offset(i).write('A' as u8);
+            }
         }
     } else if cmd.is_empty() {
         return;

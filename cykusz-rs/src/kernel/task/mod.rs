@@ -53,7 +53,7 @@ pub struct Task {
     to_delete: AtomicBool,
     halted: AtomicBool,
     filetable: filetable::FileTable,
-    vm: VM,
+    vm: Arc<VM>,
     pub sleep_until: AtomicUsize,
     cwd: RwSpin<Option<Cwd>>,
 }
@@ -70,7 +70,7 @@ impl Default for Task {
             to_delete: AtomicBool::new(false),
             halted: AtomicBool::new(false),
             filetable: filetable::FileTable::new(),
-            vm: VM::new(),
+            vm: Arc::new(VM::new()),
             sleep_until: AtomicUsize::new(0),
             cwd: RwSpin::new(if let Some(e) = root_dentry() {
                 Cwd::new(e.clone())
@@ -99,7 +99,7 @@ impl Task {
             to_delete: AtomicBool::new(false),
             halted: AtomicBool::new(false),
             filetable: filetable::FileTable::new(),
-            vm: VM::new(),
+            vm: Arc::new(VM::new()),
             sleep_until: AtomicUsize::new(0),
             cwd: RwSpin::new(if let Some(e) = root_dentry() {
                 Cwd::new(e.clone())
@@ -328,7 +328,7 @@ impl Task {
         self.vm.handle_pagefault(reason, addr)
     }
 
-    pub fn vm(&self) -> &VM {
+    pub fn vm(&self) -> &Arc<VM> {
         &self.vm
     }
 }

@@ -5,6 +5,7 @@ use alloc::string::String;
 use syscall_defs::{MMapFlags, MMapProt};
 
 use crate::arch::mm::PAGE_SIZE;
+use crate::arch::raw::mm::UserAddr;
 use crate::drivers::elf::types::{ProgramFlags, ProgramType};
 use crate::drivers::elf::ElfHeader;
 use crate::kernel::fs::cache::Cacheable;
@@ -54,18 +55,32 @@ impl From<ProgramFlags> for MMapProt {
 #[derive(Clone)]
 struct MMapedFile {
     file: DirEntryItem,
+    addr: VirtAddr,
     length: usize,
     starting_offset: usize,
     active_mappings: hashbrown::HashMap<PageCacheKey, PageItem>,
 }
 
 impl MMapedFile {
-    fn new(file: DirEntryItem, offset: usize, len: usize) -> MMapedFile {
+    fn new(file: DirEntryItem, addr: VirtAddr, offset: usize, len: usize) -> MMapedFile {
         MMapedFile {
             file,
+            addr,
             length: len,
             starting_offset: offset,
             active_mappings: hashbrown::HashMap::new(),
+        }
+    }
+}
+
+impl Drop for MMapedFile {
+    fn drop(&mut self) {
+        for (_, mapping) in self.active_mappings.iter() {
+            let real_offset = self.starting_offset + mapping.offset();
+
+            let uaddr: UserAddr = (self.addr + real_offset).into();
+
+            mapping.drop_user_addr(&uaddr);
         }
     }
 }
@@ -89,7 +104,7 @@ impl Mapping {
         offset: usize,
     ) -> Mapping {
         Mapping {
-            mmaped_file: file.map(|e| MMapedFile::new(e, offset, len)),
+            mmaped_file: file.map(|e| MMapedFile::new(e, addr, offset, len)),
             prot,
             flags,
             start: addr,
@@ -149,7 +164,10 @@ impl Mapping {
                     // Page is not present and we are reading from it, so map it readable
                     f.active_mappings.insert(p.cache_key(), p.clone());
 
-                    map_to_flags(addr.align_down(PAGE_SIZE), p.page(), PageFlags::USER);
+                    let mut flags: PageFlags = PageFlags::USER | self.prot.into();
+                    flags.remove(PageFlags::WRITABLE);
+
+                    map_to_flags(addr.align_down(PAGE_SIZE), p.page(), flags);
                 } else if reason.contains(PageFaultReason::WRITE) {
                     // We are writing to private file mapping so copy the content of the page.
                     // Changes made to private mapping should not be persistent
@@ -158,6 +176,50 @@ impl Mapping {
                     f.active_mappings.remove(&p.cache_key());
                 } else {
                     return false;
+                }
+
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    fn handle_pf_shared_file(&mut self, reason: PageFaultReason, addr: VirtAddr) -> bool {
+        if let Some(f) = self.mmaped_file.as_mut() {
+            let offset = (addr - self.start).0 + f.starting_offset;
+
+            if let Some(p) = f.file.inode().as_cacheable().unwrap().get_mmap_page(offset) {
+                let is_present = reason.contains(PageFaultReason::PRESENT);
+                let is_write = reason.contains(PageFaultReason::WRITE);
+
+                if is_present && !is_write {
+                    // We want to read present page, this page fault should not happen so return false..
+
+                    return false;
+                }
+
+                let mut flags: PageFlags = PageFlags::from(self.prot) | PageFlags::USER;
+
+                let addr_aligned = addr.align_down(PAGE_SIZE);
+
+                if !is_present {
+                    // Insert page to the list of active mappings if not present
+                    f.active_mappings.insert(p.cache_key(), p.clone());
+                }
+
+                if is_write {
+                    // We want to write so make the page writable and send notify
+                    map_to_flags(addr_aligned, p.page(), flags);
+
+                    p.notify_dirty(&p, Some(addr_aligned.into()));
+                } else {
+                    // Page is not present and we are reading, so map it readable
+                    flags.remove(PageFlags::WRITABLE);
+
+                    map_to_flags(addr_aligned, p.page(), flags);
                 }
 
                 true
@@ -267,10 +329,10 @@ impl VMData {
             let is_private = map.flags.contains(MMapFlags::MAP_PRIVATE);
             let is_anonymous = map.flags.contains(MMapFlags::MAP_ANONYOMUS);
 
-            //println!(
-            //    "page fault {} p {} a {} r {:?}",
-            //    addr, is_private, is_anonymous, reason
-            //);
+            println!(
+                "page fault {} p {} a {} r {:?}",
+                addr, is_private, is_anonymous, reason
+            );
 
             return match (is_private, is_anonymous) {
                 (false, _) => {
@@ -278,7 +340,7 @@ impl VMData {
                         panic!("Invalid mapping? shared and anonymous");
                     }
 
-                    false
+                    map.handle_pf_shared_file(reason, addr)
                 }
                 (true, false) => map.handle_pf_private_file(reason, addr),
                 (true, true) => map.handle_pf_private_anon(reason, addr),

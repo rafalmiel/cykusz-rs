@@ -18,7 +18,6 @@ pub mod syscall;
 pub mod time;
 pub mod timer;
 pub mod tls;
-pub mod user;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr) {
@@ -46,8 +45,6 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
     acpi::init();
 
     dev::init();
-
-    user::init(mboot);
 
     crate::rust_main(stack_top);
 }

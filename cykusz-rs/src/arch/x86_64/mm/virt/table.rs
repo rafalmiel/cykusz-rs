@@ -369,7 +369,11 @@ impl Table<Level4> {
         self.to_phys(addr).is_some()
     }
 
-    pub fn update_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) -> Option<PhysAddr> {
+    fn change_entry(
+        &mut self,
+        addr: VirtAddr,
+        mut fun: impl FnMut(&mut Entry),
+    ) -> Option<PhysAddr> {
         let _g = self.lock();
 
         let page = page::Page::new(addr);
@@ -378,7 +382,7 @@ impl Table<Level4> {
         let entry3 = l3.entry_at_mut(page.p3_index());
 
         let l2 = if entry3.contains(Entry::HUGE_PAGE | Entry::PRESENT) {
-            entry3.set_flags(Entry::from_kernel_flags(flags));
+            fun(entry3);
             return Some(entry3.address() + (addr.0 & 0x3FFFFFFF));
         } else {
             l3.next_level_mut(page.p3_index())?
@@ -387,7 +391,7 @@ impl Table<Level4> {
         let entry2 = l2.entry_at_mut(page.p2_index());
 
         let l1 = if entry2.contains(Entry::HUGE_PAGE | Entry::PRESENT) {
-            entry2.set_flags(Entry::from_kernel_flags(flags));
+            fun(entry2);
 
             return Some(entry2.address() + (addr.0 & 0x1FFFFF));
         } else {
@@ -397,11 +401,29 @@ impl Table<Level4> {
         let entry = l1.entry_at_mut(page.p1_index());
 
         return if entry.contains(Entry::PRESENT) {
-            entry.set_flags(Entry::PRESENT | Entry::from_kernel_flags(flags));
+            fun(entry);
             Some(entry.address() + (addr.0 & 0xFFF))
         } else {
             None
         };
+    }
+
+    pub fn update_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) -> Option<PhysAddr> {
+        self.change_entry(addr, |e| {
+            e.set_flags(Entry::PRESENT | Entry::from_kernel_flags(flags));
+        })
+    }
+
+    pub fn remove_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) -> Option<PhysAddr> {
+        self.change_entry(addr, |e| {
+            e.remove(Entry::from_kernel_flags(flags));
+        })
+    }
+
+    pub fn insert_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) -> Option<PhysAddr> {
+        self.change_entry(addr, |e| {
+            e.insert(Entry::from_kernel_flags(flags));
+        })
     }
 
     pub fn get_flags(&self, addr: VirtAddr) -> Option<Entry> {
@@ -608,10 +630,8 @@ impl Table<Level4> {
 
                     l1.for_entries_mut(flags, |idx1, e1| {
                         // Setup copy on write page
-                        //println!("flags before setup {:?}", e1);
                         e1.remove(Entry::WRITABLE);
                         n1.set_flags(idx1, &Frame::new(e1.address()), *e1);
-                        //println!("flags after setup {:?}", e1);
 
                         count_1 += 1;
                     });

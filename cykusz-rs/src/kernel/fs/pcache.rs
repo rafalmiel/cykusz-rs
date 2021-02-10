@@ -4,9 +4,11 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use spin::Once;
 
+use crate::arch::raw::mm::UserAddr;
 use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, CacheItemAdapter, Cacheable, WeakWrap};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, unmap, PhysAddr, PAGE_SIZE};
+use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 
 pub type PageCacheKey = (usize, usize);
@@ -38,6 +40,7 @@ pub struct PageItemStruct {
     offset: usize,
     is_dirty: AtomicBool,
     page: PhysAddr,
+    user_dirty_mappings: Spin<hashbrown::HashSet<UserAddr>>,
 }
 
 unsafe impl Sync for PageItemStruct {}
@@ -57,6 +60,7 @@ impl PageItemStruct {
             offset,
             page,
             is_dirty: AtomicBool::new(false),
+            user_dirty_mappings: Spin::new(hashbrown::HashSet::new()),
         }
     }
 
@@ -92,20 +96,42 @@ impl PageItemStruct {
         unsafe { self.page.to_virt().as_bytes_mut(PAGE_SIZE) }
     }
 
-    pub fn notify_dirty(&self, page: &PageItem) {
-        map_flags(page.page.to_virt(), PageFlags::WRITABLE);
+    pub fn notify_dirty(&self, page: &PageItem, mapping: Option<UserAddr>) {
+        if !page.is_dirty() {
+            map_flags(page.page.to_virt(), PageFlags::WRITABLE);
 
-        self.mark_dirty(true);
+            self.mark_dirty(true);
 
-        if let Some(h) = self.fs.upgrade() {
-            h.notify_dirty(page)
+            if let Some(h) = self.fs.upgrade() {
+                h.notify_dirty(page)
+            }
+        }
+
+        if let Some(mapping) = mapping {
+            let mut umaps = self.user_dirty_mappings.lock();
+
+            umaps.insert(mapping);
         }
     }
 
     pub fn notify_clean(&self) {
         self.mark_dirty(false);
 
+        {
+            let umaps = self.user_dirty_mappings.lock();
+
+            for map in umaps.iter() {
+                map.remove_flags(PageFlags::WRITABLE);
+            }
+        }
+
         map_flags(self.page.to_virt(), PageFlags::empty());
+    }
+
+    pub fn drop_user_addr(&self, mapping: &UserAddr) {
+        let mut umaps = self.user_dirty_mappings.lock();
+
+        umaps.remove(&mapping);
     }
 }
 

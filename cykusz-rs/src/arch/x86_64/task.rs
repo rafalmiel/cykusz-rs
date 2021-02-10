@@ -1,17 +1,18 @@
 use core::mem::size_of;
 use core::ptr::Unique;
 
+use syscall_defs::{MMapFlags, MMapProt};
+
 use crate::arch::gdt;
 use crate::arch::mm::virt::p4_table_addr;
 use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::x86_64::mm::phys::{allocate_order, deallocate_order};
 use crate::arch::x86_64::mm::virt::p4_table;
 use crate::arch::x86_64::mm::virt::table::P4Table;
-
 use crate::arch::x86_64::raw::mm::MappedAddr;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::mm::{Frame, PhysAddr};
-use crate::kernel::task::vm::{Flags, Prot, VM};
+use crate::kernel::task::vm::VM;
 
 const USER_STACK_SIZE: usize = 0x4000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
@@ -325,8 +326,8 @@ impl Task {
         vm.mmap_vm(
             Some(VirtAddr(0x8000_0000_0000 - USER_STACK_SIZE)),
             USER_STACK_SIZE,
-            Prot::PROT_WRITE | Prot::PROT_READ,
-            Flags::MAP_FIXED | Flags::MAP_PRIVATE | Flags::MAP_ANONYOMUS,
+            MMapProt::PROT_WRITE | MMapProt::PROT_READ,
+            MMapFlags::MAP_FIXED | MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS,
             None,
             0,
         );

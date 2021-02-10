@@ -107,6 +107,24 @@ pub struct SysDirEntry {
     pub name: [u8; 0],
 }
 
+bitflags! {
+    pub struct MMapProt: usize {
+        const PROT_READ = 0x1;
+        const PROT_WRITE = 0x2;
+        const PROT_EXEC = 0x4;
+        const PROT_NONE = 0x0;
+    }
+}
+
+bitflags! {
+    pub struct MMapFlags: usize {
+        const MAP_SHARED = 0x1;
+        const MAP_PRIVATE = 0x2;
+        const MAP_FIXED = 0x10;
+        const MAP_ANONYOMUS = 0x20;
+    }
+}
+
 pub type SyscallResult = Result<usize, SyscallError>;
 
 pub trait SyscallFrom<T> {

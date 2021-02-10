@@ -2,6 +2,8 @@ use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
 use alloc::string::String;
 
+use syscall_defs::{MMapFlags, MMapProt};
+
 use crate::arch::mm::PAGE_SIZE;
 use crate::drivers::elf::types::{ProgramFlags, ProgramType};
 use crate::drivers::elf::ElfHeader;
@@ -13,24 +15,15 @@ use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, update_flags, V
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 
-bitflags! {
-    pub struct Prot: usize {
-        const PROT_READ = 0x1;
-        const PROT_WRITE = 0x2;
-        const PROT_EXEC = 0x4;
-        const PROT_NONE = 0x0;
-    }
-}
-
-impl From<Prot> for PageFlags {
-    fn from(e: Prot) -> Self {
+impl From<MMapProt> for PageFlags {
+    fn from(e: MMapProt) -> Self {
         let mut res = PageFlags::empty();
 
-        if !e.contains(Prot::PROT_EXEC) {
+        if !e.contains(MMapProt::PROT_EXEC) {
             res.insert(PageFlags::NO_EXECUTE);
         }
 
-        if e.contains(Prot::PROT_WRITE) {
+        if e.contains(MMapProt::PROT_WRITE) {
             res.insert(PageFlags::WRITABLE);
         }
 
@@ -38,32 +31,23 @@ impl From<Prot> for PageFlags {
     }
 }
 
-impl From<ProgramFlags> for Prot {
+impl From<ProgramFlags> for MMapProt {
     fn from(f: ProgramFlags) -> Self {
-        let mut prot = Prot::empty();
+        let mut prot = MMapProt::empty();
 
         if f.contains(ProgramFlags::READABLE) {
-            prot.insert(Prot::PROT_READ);
+            prot.insert(MMapProt::PROT_READ);
         }
 
         if f.contains(ProgramFlags::WRITABLE) {
-            prot.insert(Prot::PROT_WRITE);
+            prot.insert(MMapProt::PROT_WRITE);
         }
 
         if f.contains(ProgramFlags::EXECUTABLE) {
-            prot.insert(Prot::PROT_EXEC);
+            prot.insert(MMapProt::PROT_EXEC);
         }
 
         prot
-    }
-}
-
-bitflags! {
-    pub struct Flags: usize {
-        const MAP_SHARED = 0x1;
-        const MAP_PRIVATE = 0x2;
-        const MAP_FIXED = 0x10;
-        const MAP_ANONYOMUS = 0x20;
     }
 }
 
@@ -89,8 +73,8 @@ impl MMapedFile {
 #[derive(Clone)]
 pub struct Mapping {
     mmaped_file: Option<MMapedFile>,
-    prot: Prot,
-    flags: Flags,
+    prot: MMapProt,
+    flags: MMapFlags,
     start: VirtAddr,
     end: VirtAddr,
 }
@@ -99,8 +83,8 @@ impl Mapping {
     fn new(
         addr: VirtAddr,
         len: usize,
-        prot: Prot,
-        flags: Flags,
+        prot: MMapProt,
+        flags: MMapFlags,
         file: Option<DirEntryItem>,
         offset: usize,
     ) -> Mapping {
@@ -113,7 +97,7 @@ impl Mapping {
         }
     }
 
-    fn map_copy(addr: VirtAddr, src: VirtAddr, prot: Prot) {
+    fn map_copy(addr: VirtAddr, src: VirtAddr, prot: MMapProt) {
         let new_page = allocate_order(0).unwrap();
 
         unsafe {
@@ -202,13 +186,13 @@ impl VMData {
         &mut self,
         addr: Option<VirtAddr>,
         len: usize,
-        prot: Prot,
-        flags: Flags,
+        prot: MMapProt,
+        flags: MMapFlags,
         file: Option<DirEntryItem>,
         offset: usize,
     ) -> Option<VirtAddr> {
         // support only fixed mappings for now
-        if !flags.contains(Flags::MAP_FIXED) || addr.is_none() {
+        if !flags.contains(MMapFlags::MAP_FIXED) || addr.is_none() {
             return None;
         }
 
@@ -219,7 +203,7 @@ impl VMData {
 
         if let Some(a) = addr {
             // Address should be multiple of PAGE_SIZE if we request fixed mapping
-            if flags.contains(Flags::MAP_FIXED) && a.0 % PAGE_SIZE != 0 {
+            if flags.contains(MMapFlags::MAP_FIXED) && a.0 % PAGE_SIZE != 0 {
                 return None;
             }
         }
@@ -272,15 +256,16 @@ impl VMData {
             if map.prot.is_empty() {
                 return false;
             }
-            if reason.contains(PageFaultReason::WRITE) && !map.prot.contains(Prot::PROT_WRITE) {
+            if reason.contains(PageFaultReason::WRITE) && !map.prot.contains(MMapProt::PROT_WRITE) {
                 return false;
             }
-            if reason.contains(PageFaultReason::I_FETCH) && !map.prot.contains(Prot::PROT_EXEC) {
+            if reason.contains(PageFaultReason::I_FETCH) && !map.prot.contains(MMapProt::PROT_EXEC)
+            {
                 return false;
             }
 
-            let is_private = map.flags.contains(Flags::MAP_PRIVATE);
-            let is_anonymous = map.flags.contains(Flags::MAP_ANONYOMUS);
+            let is_private = map.flags.contains(MMapFlags::MAP_PRIVATE);
+            let is_anonymous = map.flags.contains(MMapFlags::MAP_ANONYOMUS);
 
             //println!(
             //    "page fault {} p {} a {} r {:?}",
@@ -318,7 +303,7 @@ impl VMData {
                     Some(virt_begin),
                     virt_end.0 - virt_begin.0,
                     p.p_flags.into(),
-                    Flags::MAP_PRIVATE | Flags::MAP_FIXED,
+                    MMapFlags::MAP_PRIVATE | MMapFlags::MAP_FIXED,
                     Some(exe.clone()),
                     file_offset as usize,
                 )
@@ -384,8 +369,8 @@ impl VM {
         &self,
         addr: Option<VirtAddr>,
         len: usize,
-        prot: Prot,
-        flags: Flags,
+        prot: MMapProt,
+        flags: MMapFlags,
         file: Option<DirEntryItem>,
         offset: usize,
     ) -> Option<VirtAddr> {

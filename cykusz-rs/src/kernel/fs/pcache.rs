@@ -212,5 +212,5 @@ pub trait RawAccess: Send + Sync {
 }
 
 pub fn init() {
-    PAGE_CACHE.call_once(|| PageCache::new(0));
+    PAGE_CACHE.call_once(|| PageCache::new(256));
 }

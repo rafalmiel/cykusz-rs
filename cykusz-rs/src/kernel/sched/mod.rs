@@ -1,5 +1,4 @@
 use alloc::sync::Arc;
-
 use core::sync::atomic::Ordering;
 use core::sync::atomic::{AtomicBool, AtomicUsize};
 

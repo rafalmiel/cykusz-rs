@@ -126,8 +126,25 @@ pub fn fcntl(fd: usize, cmd: FcntlCmd) -> Result<OpenFlags, SyscallError> {
     }
 }
 
-pub fn mmap(addr: usize, size: usize) -> SyscallResult {
-    unsafe { syscall2(SYS_MMAP, addr, size) }
+pub fn mmap(
+    addr: Option<usize>,
+    size: usize,
+    prot: MMapProt,
+    flags: MMapFlags,
+    fd: Option<usize>,
+    offset: usize,
+) -> SyscallResult {
+    unsafe {
+        syscall6(
+            SYS_MMAP,
+            addr.unwrap_or(0),
+            size,
+            prot.bits(),
+            flags.bits(),
+            fd.unwrap_or(usize::MAX),
+            offset,
+        )
+    }
 }
 
 pub fn chdir(path: &str) -> SyscallResult {

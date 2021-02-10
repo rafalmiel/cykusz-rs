@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use intrusive_collections::UnsafeRef;
 
-use syscall_defs::{ConnectionFlags, FcntlCmd, FileType, SyscallResult};
+use syscall_defs::{ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntry;
@@ -14,12 +14,10 @@ use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::mm::PAGE_SIZE;
+
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
 
-use crate::kernel::task::vm::{Flags, Prot};
-use crate::kernel::utils::types::Align;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
@@ -121,22 +119,41 @@ pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
     }
 }
 
-pub fn sys_mmap(addr: u64, size: u64) -> SyscallResult {
-    let size = size.align_up(PAGE_SIZE as u64);
-    let addr = addr.align(PAGE_SIZE as u64);
-
+pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) -> SyscallResult {
     let task = current_task();
 
-    task.vm().mmap_vm(
-        Some(VirtAddr(addr as usize)),
-        size as usize,
-        Prot::PROT_READ | Prot::PROT_WRITE,
-        Flags::MAP_FIXED | Flags::MAP_ANONYOMUS | Flags::MAP_PRIVATE,
-        None,
-        0,
-    );
+    let addr = if addr != 0 {
+        Some(VirtAddr(addr as usize))
+    } else {
+        None
+    };
+    let len = len as usize;
+    let prot = if let Some(prot) = MMapProt::from_bits(prot as usize) {
+        prot
+    } else {
+        return Err(SyscallError::Inval);
+    };
+    let flags = if let Some(flags) = MMapFlags::from_bits(flags as usize) {
+        flags
+    } else {
+        return Err(SyscallError::Inval);
+    };
+    let file = if !flags.contains(MMapFlags::MAP_ANONYOMUS) {
+        if let Some(file) = task.get_handle(fd as usize) {
+            Some(file.inode.clone())
+        } else {
+            return Err(SyscallError::Inval);
+        }
+    } else {
+        None
+    };
+    let offset = offset as usize;
 
-    Ok(0)
+    if let Some(res) = task.vm().mmap_vm(addr, len, prot, flags, file, offset) {
+        Ok(res.0)
+    } else {
+        Err(SyscallError::Fault)
+    }
 }
 
 pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {

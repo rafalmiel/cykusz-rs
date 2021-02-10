@@ -9,6 +9,7 @@ extern crate syscall_user as syscall;
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::NonNull;
 
+use syscall_defs::{MMapFlags, MMapProt};
 use types::Align;
 
 const HEAP_START: usize = 0x1000_0000;
@@ -30,7 +31,14 @@ impl Heap {
 
     fn init(&mut self) {
         if self.heap.size() == 0 {
-            if let Err(e) = syscall::mmap(self.heap_start, 4096) {
+            if let Err(e) = syscall::mmap(
+                Some(self.heap_start),
+                4096,
+                MMapProt::PROT_WRITE | MMapProt::PROT_READ,
+                MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS | MMapFlags::MAP_FIXED,
+                None,
+                0,
+            ) {
                 panic!("mmap failed {:?}", e);
             }
             unsafe {
@@ -58,7 +66,14 @@ impl Heap {
     fn extend_by(&mut self, size: usize) {
         let size = size.align_up(4096);
 
-        if let Ok(_) = syscall::mmap(self.heap_end, size) {
+        if let Ok(_) = syscall::mmap(
+            Some(self.heap_end),
+            size,
+            MMapProt::PROT_WRITE | MMapProt::PROT_READ,
+            MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS | MMapFlags::MAP_FIXED,
+            None,
+            0,
+        ) {
             self.heap_end += size;
 
             unsafe { self.heap.extend(size) }

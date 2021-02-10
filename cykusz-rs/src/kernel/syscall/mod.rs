@@ -39,7 +39,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_FORK => sys::sys_fork(),
         SYS_EXEC => sys::sys_exec(a, b),
         SYS_FCNTL => sys::sys_fcntl(a, b),
-        SYS_MMAP => sys::sys_mmap(a, b),
+        SYS_MMAP => sys::sys_mmap(a, b, c, d, e, f),
 
         _ => Err(SyscallError::Inval),
     }

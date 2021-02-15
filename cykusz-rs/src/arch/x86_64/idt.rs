@@ -1,19 +1,19 @@
 use alloc::vec::Vec;
 
 use paste::paste;
-use spin::RwLock;
 
 use crate::arch::raw::idt;
 use crate::arch::x86_64::int::end_of_int;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task;
+use crate::kernel::sync::RwSpin;
 use crate::kernel::sync::Spin;
 use crate::kernel::task::vm::PageFaultReason;
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
 
 struct SharedIrq {
-    irqs: [Vec<fn() -> bool>; 32],
+    irqs: [RwSpin<Vec<fn() -> bool>>; 32],
 }
 
 pub fn init() {
@@ -93,9 +93,7 @@ pub fn has_handler(num: usize) -> bool {
 
         idt.has_handler(num)
     } else {
-        let sh = SHARED_IRQS.read();
-
-        return !sh.irqs[num - 32].is_empty();
+        !SHARED_IRQS.irqs[num - 32].read().is_empty()
     }
 }
 
@@ -114,80 +112,82 @@ pub fn set_user_handler(num: usize, f: idt::ExceptionHandlerFn) {
     }
 }
 
-static SHARED_IRQS: RwLock<SharedIrq> = RwLock::new(SharedIrq {
+static SHARED_IRQS: SharedIrq = SharedIrq {
     irqs: [
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
+        RwSpin::new(Vec::new()),
     ],
-});
+};
 
 fn handle_shared_irq(irq: u32) {
     let idx = irq - 32;
 
-    let sh = SHARED_IRQS.read();
+    let sh = SHARED_IRQS.irqs[idx as usize].read();
 
-    for h in sh.irqs[idx as usize].iter() {
+    for h in sh.iter() {
         h();
     }
+
+    drop(sh);
 
     end_of_int();
 }
 
 pub fn add_shared_irq_handler(irq: usize, handler: fn() -> bool) {
-    let mut sh = SHARED_IRQS.write();
+    let idx = irq - 32;
 
     assert!(irq >= 32 && irq < 64, "invalid shared irq nr");
 
-    let idx = irq - 32;
+    let mut sh = SHARED_IRQS.irqs[idx].write();
 
-    sh.irqs[idx].push(handler);
+    sh.push(handler);
 }
 
 pub fn remove_shared_irq_handler(irq: usize, handler: fn() -> bool) {
-    let mut sh = SHARED_IRQS.write();
-
     assert!(irq >= 32 && irq < 64, "invalid shared irq nr");
 
     let idx = irq - 32;
 
-    if let Some(i) = sh.irqs[idx].iter().enumerate().find_map(|(i, e)| {
+    let mut sh = SHARED_IRQS.irqs[idx].write();
+
+    if let Some(i) = sh.iter().enumerate().find_map(|(i, e)| {
         if *e == handler {
             return Some(i);
         } else {
             None
         }
     }) {
-        sh.irqs[idx].remove(i);
+        sh.remove(i);
     }
 }
 

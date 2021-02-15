@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::sync::atomic::AtomicUsize;
 
-use crate::drivers::block::ahci::reg::AtaCommand;
+use crate::drivers::block::ata::AtaCommand;
 use crate::kernel::mm::Frame;
 use crate::kernel::mm::PhysAddr;
 use crate::kernel::mm::{allocate_order, deallocate_order};
@@ -11,6 +11,19 @@ use crate::kernel::utils::wait_queue::WaitQueue;
 pub struct DmaBuf {
     pub buf: PhysAddr,
     pub order: usize,
+    pub data_size: usize,
+}
+
+impl DmaBuf {
+    pub fn sectors(&self) -> usize {
+        self.data_size.ceil_div(512)
+    }
+}
+
+impl Drop for DmaBuf {
+    fn drop(&mut self) {
+        deallocate_order(&Frame::new(self.buf), self.order);
+    }
 }
 
 #[derive(PartialOrd, PartialEq)]
@@ -37,12 +50,15 @@ impl DmaRequest {
         while size > 0 {
             let order = if size > 0x1000 { 1 } else { 0 };
 
+            let data_size = core::cmp::min(size, 0x2000);
+
             dma.push(DmaBuf {
                 buf: allocate_order(order).unwrap().address(),
                 order,
+                data_size,
             });
 
-            size -= core::cmp::min(size, 0x2000);
+            size -= data_size;
         }
 
         DmaRequest {
@@ -140,17 +156,22 @@ impl DmaRequest {
     }
 
     pub fn ata_command(&self) -> AtaCommand {
+        let lba48 = self.sector > 0x0FFF_FFFF;
         match self.command {
-            DmaCommand::Read => AtaCommand::AtaCommandReadDmaExt,
-            DmaCommand::Write => AtaCommand::AtaCommandWriteDmaExt,
-        }
-    }
-}
-
-impl Drop for DmaRequest {
-    fn drop(&mut self) {
-        for buf in self.buf_vec.iter() {
-            deallocate_order(&Frame::new(buf.buf), buf.order);
+            DmaCommand::Read => {
+                if lba48 {
+                    AtaCommand::AtaCommandReadDmaExt
+                } else {
+                    AtaCommand::AtaCommandReadDma
+                }
+            }
+            DmaCommand::Write => {
+                if lba48 {
+                    AtaCommand::AtaCommandWriteDmaExt
+                } else {
+                    AtaCommand::AtaCommandWriteDma
+                }
+            }
         }
     }
 }

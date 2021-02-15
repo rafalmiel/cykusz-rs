@@ -12,12 +12,16 @@ pub fn init() {
     let _guard = IrqGuard::new();
     unsafe {
         assert_eq!(AcpiInitializeSubsystem(), AE_OK);
+        println!("Acpi Subsystem Initialized");
         assert_eq!(
             AcpiInitializeTables(core::ptr::null_mut(), 16, false),
             AE_OK
         );
+        println!("acpi Tables initialized");
         assert_eq!(AcpiLoadTables(), AE_OK);
+        println!("Acpi tables loaded");
         assert_eq!(AcpiEnableSubsystem(0), AE_OK);
+        println!("Acpi subsystem enabled");
 
         assert_eq!(
             AcpiInstallAddressSpaceHandler(
@@ -29,10 +33,15 @@ pub fn init() {
             ),
             AE_OK
         );
+        println!("Acpi Installed Address Space Handlers");
 
         assert_eq!(AcpiInitializeObjects(0), AE_OK);
 
+        println!("Acpi Initialized Objects");
+
         assert_eq!(AcpiEnable(), AE_OK);
+
+        println!("Acpi Enabled");
     }
 
     pci_map::init();

@@ -3,15 +3,14 @@ use alloc::sync::Arc;
 use bit_field::BitField;
 
 use crate::drivers::block::ahci::reg::HbaPort;
-use crate::drivers::block::ahci::request::DmaRequest;
+use crate::drivers::block::ata::request::DmaRequest;
 use crate::kernel::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
-
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::CeilDiv;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
-pub mod hba;
+mod hba;
 
 struct Cmd {
     req: Arc<DmaRequest>,
@@ -133,11 +132,11 @@ impl Port {
     }
 
     fn run_request(&self, request: Arc<DmaRequest>) -> Option<usize> {
-        let is_int = crate::kernel::int::is_enabled();
+        //let is_int = crate::kernel::int::is_enabled();
 
-        if !is_int {
-            crate::kernel::int::enable();
-        }
+        //if !is_int {
+        //    crate::kernel::int::enable();
+        //}
 
         let mut off = 0;
         // post request and wait for completion.....
@@ -151,9 +150,9 @@ impl Port {
 
         request.wait_queue().wait_for(|| request.is_complete());
 
-        if !is_int {
-            crate::kernel::int::disable();
-        }
+        //if !is_int {
+        //    crate::kernel::int::disable();
+        //}
 
         Some(request.count() * 512)
     }

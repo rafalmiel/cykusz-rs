@@ -22,7 +22,7 @@ Currently implemented:
 - [x] Preemptive per-cpu scheduler
 - [x] PS2/Keyboard driver + basic TTY
 - [x] Virtual File System
-- [x] Storage (ahci)
+- [x] Storage (ide, ahci)
 - [x] Filesystem (ext2)
 - [x] Network Stack (e1000, ETH, ARP, IP, UDP, TCP, ICMP, DHCP, DNS)
 - [x] Userspace support

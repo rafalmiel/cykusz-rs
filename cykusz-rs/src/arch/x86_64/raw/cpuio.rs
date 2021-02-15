@@ -56,6 +56,25 @@ impl<T: InOut> Port<T> {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct PortBase {
+    base: u16,
+}
+
+impl PortBase {
+    pub fn new(base: u16) -> PortBase {
+        PortBase { base }
+    }
+
+    pub fn read_offset<V: InOut>(&self, offset: u16) -> V {
+        unsafe { V::port_in(self.base + offset) }
+    }
+
+    pub fn write_offset<V: InOut>(&mut self, offset: u16, value: V) {
+        unsafe { V::port_out(self.base + offset, value) }
+    }
+}
+
 pub struct UnsafePort<T: InOut> {
     port: u16,
     phantom: PhantomData<T>,

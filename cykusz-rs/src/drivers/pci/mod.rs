@@ -94,6 +94,16 @@ impl PciHeader {
     }
 }
 
+bitflags! {
+    pub struct ProgInterface: u8 {
+        const PRIMARY_PCI_NATIVE = 0b0000_0001;
+        const PRIMARY_CAN_SWITCH = 0b0000_0010;
+        const SECONDARY_PCI_NATIVE = 0b0000_0100;
+        const SECONDARY_CAN_SWITCH = 0b0000_1000;
+        const DMA_CAPABLE = 0b1000_0000;
+    }
+}
+
 #[allow(dead_code)]
 impl PciData {
     pub fn debug(&self) {
@@ -160,8 +170,8 @@ impl PciData {
         self.read(0x08, 8) as u8
     }
 
-    pub fn prog_if(&self) -> u8 {
-        self.read(0x09, 8) as u8
+    pub fn prog_if(&self) -> ProgInterface {
+        ProgInterface::from_bits_truncate(self.read(0x09, 8) as u8)
     }
 
     pub fn subclass(&self) -> u8 {

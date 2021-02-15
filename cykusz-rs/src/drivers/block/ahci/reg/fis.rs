@@ -1,7 +1,7 @@
 use bit_field::BitField;
 use mmio::VCell;
 
-use crate::drivers::block::ahci::reg::ata::AtaCommand;
+use crate::drivers::block::ata::AtaCommand;
 use crate::kernel::mm::PhysAddr;
 use crate::kernel::utils::slice::ToBytesMut;
 

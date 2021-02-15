@@ -1,6 +1,7 @@
 use crate::arch::mm::virt::map_to_flags;
 use crate::drivers::block::ahci::reg::*;
-use crate::drivers::block::ahci::request::DmaBuf;
+use crate::drivers::block::ata::request::DmaBuf;
+use crate::drivers::block::ata::AtaCommand;
 use crate::kernel::mm::allocate_order;
 use crate::kernel::mm::virt::PageFlags;
 
@@ -16,7 +17,7 @@ impl HbaPort {
         let hdr = self.cmd_header_at(slot);
 
         let mut flags = hdr.flags();
-        if cmd == AtaCommand::AtaCommandWriteDmaExt {
+        if cmd == AtaCommand::AtaCommandWriteDmaExt || cmd == AtaCommand::AtaCommandWriteDma {
             flags.insert(HbaCmdHeaderFlags::W);
         } else {
             flags.remove(HbaCmdHeaderFlags::W);
@@ -31,22 +32,13 @@ impl HbaPort {
 
         let tbl = hdr.cmd_tbl();
 
-        let mut cnt = count;
-        for pri in 0..l - 1 {
+        for pri in 0..l {
             let prdt = tbl.prdt_entry_mut(pri);
 
             prdt.set_database_address(buf[pri].buf);
-            prdt.set_data_byte_count(8192 - 1);
-            prdt.set_interrupt_on_completion(true);
-
-            cnt -= 16;
+            prdt.set_data_byte_count(buf[pri].data_size - 1);
+            prdt.set_interrupt_on_completion(pri == l - 1);
         }
-
-        let prdt = tbl.prdt_entry_mut(l - 1);
-
-        prdt.set_data_byte_count((cnt * 512) - 1);
-        prdt.set_interrupt_on_completion(true);
-        prdt.set_database_address(buf[l - 1].buf);
 
         let fis = tbl.cfis_as_h2d_mut();
         fis.reset();

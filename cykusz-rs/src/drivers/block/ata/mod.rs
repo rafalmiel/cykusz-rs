@@ -1,5 +1,8 @@
+pub mod request;
+
 #[repr(u8)]
-#[derive(Copy, Clone, PartialOrd, PartialEq)]
+#[derive(Copy, Clone, PartialOrd, PartialEq, Debug)]
+#[allow(dead_code)]
 pub enum AtaCommand {
     AtaCommandWriteDma = 0xCA,
     AtaCommandWriteDmaQueued = 0xCC,
@@ -45,4 +48,20 @@ pub enum AtaCommand {
     AtaCommandSetFeaturesEnableServiceInt = 0x5E,
     AtaCommandSetFeaturesDisableReleaseInt = 0xDD,
     AtaCommandSetFeaturesDisableServiceInt = 0xDE,
+}
+
+impl AtaCommand {
+    pub fn is_lba48(&self) -> bool {
+        match self {
+            AtaCommand::AtaCommandReadDmaExt | AtaCommand::AtaCommandWriteDmaExt => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_write(&self) -> bool {
+        match self {
+            AtaCommand::AtaCommandWriteDmaExt | AtaCommand::AtaCommandWriteDma => true,
+            _ => false,
+        }
+    }
 }

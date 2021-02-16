@@ -303,7 +303,7 @@ pub fn sys_link(target: u64, target_len: u64, linkpath: u64, linkpath_len: u64) 
         (lookup_by_path(dir, LookupMode::None)?.inode(), name)
     };
 
-    if Weak::as_ptr(&inode.fs()) != Weak::as_ptr(&target_entry.inode().fs()) {
+    if Weak::as_ptr(&inode.fs().unwrap()) != Weak::as_ptr(&target_entry.inode().fs().unwrap()) {
         return Err(SyscallError::Inval);
     }
 
@@ -328,7 +328,7 @@ pub fn sys_rename(oldpath: u64, oldpath_len: u64, newpath: u64, newpath_len: u64
         (lookup_by_real_path(dir, LookupMode::None)?, name)
     };
 
-    if new.inode().fs().as_ptr() != old.inode().fs().as_ptr() {
+    if new.inode().fs().unwrap().as_ptr() != old.inode().fs().unwrap().as_ptr() {
         return Err(SyscallError::Access);
     }
 

@@ -143,8 +143,8 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn fs(&self) -> Weak<dyn Filesystem> {
-        self.0.read().fs.clone()
+    fn fs(&self) -> Option<Weak<dyn Filesystem>> {
+        Some(self.0.read().fs.clone())
     }
 
     fn create(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {

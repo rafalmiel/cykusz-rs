@@ -142,6 +142,7 @@ impl Mounts {
             .unwrap()
             .inode()
             .fs()
+            .unwrap()
             .upgrade()
             .unwrap()
             .umount();

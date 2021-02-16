@@ -7,7 +7,6 @@ use crate::arch::int::{mask_int, set_irq_dest};
 use crate::kernel::sync::Spin;
 
 fn acpi_irq() -> bool {
-    println!("ACPI INT");
     let c = CTX.lock();
     let ctx = c.as_ref().unwrap();
 

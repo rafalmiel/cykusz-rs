@@ -52,7 +52,7 @@ impl Deref for INodeItemStruct {
 
 impl Cacheable<ICacheKey> for INodeItemStruct {
     fn cache_key(&self) -> (usize, usize) {
-        INodeItemStruct::make_key(&self.fs(), self.id().unwrap())
+        INodeItemStruct::make_key(&self.fs().unwrap(), self.id().unwrap())
     }
 
     fn make_unused(&self, new_ref: &Weak<INodeItemInt>) {

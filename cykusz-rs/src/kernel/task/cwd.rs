@@ -11,7 +11,7 @@ pub struct Cwd {
 
 impl Cwd {
     pub fn new(dentry: DirEntryItem) -> Option<Cwd> {
-        if let Some(fs) = dentry.inode().fs().upgrade() {
+        if let Some(fs) = dentry.inode().fs().unwrap().upgrade() {
             Some(Cwd {
                 dentry: dentry.clone(),
                 fs,

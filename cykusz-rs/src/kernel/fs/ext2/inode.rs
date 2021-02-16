@@ -547,8 +547,8 @@ impl INode for LockedExt2INode {
         Ok(writer.write(buf, true)?)
     }
 
-    fn fs(&self) -> Weak<dyn Filesystem> {
-        self.fs()
+    fn fs(&self) -> Option<Weak<dyn Filesystem>> {
+        Some(self.fs())
     }
 
     fn create(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {

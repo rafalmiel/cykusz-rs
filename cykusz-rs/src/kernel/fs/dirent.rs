@@ -107,7 +107,11 @@ impl DirEntry {
                     inode: inode.clone(),
                 }),
                 mountpoint: AtomicBool::new(false),
-                fs: Once::initialized(inode.fs()),
+                fs: if let Some(fs) = inode.fs() {
+                    Once::initialized(fs)
+                } else {
+                    Once::new()
+                },
                 cache_marker: if do_cache { new_cache_marker() } else { 0 },
             };
 
@@ -129,7 +133,11 @@ impl DirEntry {
                 inode: inode.clone(),
             }),
             mountpoint: AtomicBool::new(false),
-            fs: Once::initialized(inode.fs()),
+            fs: if let Some(fs) = inode.fs() {
+                Once::initialized(fs)
+            } else {
+                Once::new()
+            },
             cache_marker: 0,
         })
     }
@@ -142,7 +150,11 @@ impl DirEntry {
                 inode: inode.clone(),
             }),
             mountpoint: AtomicBool::new(false),
-            fs: Once::initialized(inode.fs()),
+            fs: if let Some(fs) = inode.fs() {
+                Once::initialized(fs)
+            } else {
+                Once::new()
+            },
             cache_marker: 0,
         })
     }

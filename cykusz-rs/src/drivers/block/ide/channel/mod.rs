@@ -255,7 +255,8 @@ impl IdeChannelData {
             //(0x69, 0x96) => {
             //    //println!("ATADEV_SATAPI");
             //}
-            (0x0, 0x0) => { // Support only PATA for now
+            (0x0, 0x0) => {
+                // Support only PATA for now
                 //println!("ATADEV_PATA");
                 return true;
             }

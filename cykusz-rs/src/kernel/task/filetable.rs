@@ -18,7 +18,7 @@ pub struct FileHandle {
     pub flags: OpenFlags,
     pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
     #[allow(unused)]
-    fs: Arc<dyn Filesystem>,
+    fs: Option<Arc<dyn Filesystem>>,
 }
 
 impl FileHandle {
@@ -29,7 +29,11 @@ impl FileHandle {
             offset: AtomicUsize::new(0),
             flags,
             dir_iter: Mutex::new((None, None)),
-            fs: inode.inode().fs().upgrade()?,
+            fs: if let Some(fs) = inode.inode().fs() {
+                fs.upgrade()
+            } else {
+                None
+            },
         })
     }
 
@@ -205,7 +209,11 @@ impl FileTable {
                 offset: AtomicUsize::new(0),
                 flags,
                 dir_iter: Mutex::new((None, None)),
-                fs: inode.inode().fs().upgrade()?,
+                fs: if let Some(fs) = inode.inode().fs() {
+                    fs.upgrade()
+                } else {
+                    None
+                },
             }))
         };
 

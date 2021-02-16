@@ -58,8 +58,8 @@ pub trait INode: Send + Sync + DowncastSync {
         Err(FsError::NotSupported)
     }
 
-    fn fs(&self) -> Weak<dyn Filesystem> {
-        unimplemented!()
+    fn fs(&self) -> Option<Weak<dyn Filesystem>> {
+        None
     }
 
     fn create(&self, _parent: DirEntryItem, _name: &str) -> Result<DirEntryItem> {

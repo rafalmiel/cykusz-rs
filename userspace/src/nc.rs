@@ -30,18 +30,18 @@ fn recv(fd: usize) -> bool {
 
     match res {
         Ok(len) if len > 1 => {
-            //let s = unsafe { core::str::from_utf8_unchecked(&buf[..len]) };
+            let s = unsafe { core::str::from_utf8_unchecked(&RECV_BUF[..len]) };
 
-            //print!("{}", s);
+            print!("{}", s);
             //println!("Sending {} bytes", len);
             //if unsafe {SENT} < 5 * 1024 * 1024 && false {
-            if let Err(e) = unsafe { syscall::write(fd, &RECV_BUF[..len]) } {
-                println!("Send failed: {:?}", e);
-            }
+            //if let Err(e) = unsafe { syscall::write(fd, &RECV_BUF[..len]) } {
+            //    println!("Send failed: {:?}", e);
+            //}
 
-            unsafe {
-                SENT += len;
-            }
+            //unsafe {
+            //    SENT += len;
+            //}
             //}
 
             true

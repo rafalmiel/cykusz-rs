@@ -394,8 +394,8 @@ fn exec(cmd: &str) {
     } else if cmd == "mmap" {
         if let Ok(file) = syscall::open("/home/mmap.bin", OpenFlags::RDWR) {
             if let Ok(addr) = syscall::mmap(
-                Some(0x5000_0000),
-                4096,
+                Some(0x5000_0000 - 0x1000),
+                4096 * 3,
                 MMapProt::PROT_READ | MMapProt::PROT_WRITE,
                 MMapFlags::MAP_FIXED | MMapFlags::MAP_SHARED,
                 Some(file),
@@ -441,6 +441,16 @@ fn exec(cmd: &str) {
             unsafe {
                 ptr.offset(i).write('A' as u8);
             }
+        }
+    } else if cmd == "munmap" {
+        let addr = 0x5000_0000;
+
+        if let Err(e) = syscall::munmap(addr, 0x1000) {
+            println!("munmap failed: {:?}", e);
+        }
+    } else if cmd == "maps" {
+        if let Err(e) = syscall::maps() {
+            println!("maps failed {:?}", e);
         }
     } else if cmd.is_empty() {
         return;

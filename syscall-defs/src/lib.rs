@@ -31,6 +31,8 @@ pub const SYS_FORK: usize = 24;
 pub const SYS_EXEC: usize = 25;
 pub const SYS_FCNTL: usize = 26;
 pub const SYS_MMAP: usize = 27;
+pub const SYS_MUNMAP: usize = 28;
+pub const SYS_MAPS: usize = 29;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

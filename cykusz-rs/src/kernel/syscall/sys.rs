@@ -156,6 +156,24 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
     }
 }
 
+pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
+    let addr = VirtAddr(addr as usize);
+
+    let task = current_task();
+
+    if task.vm().munmap_vm(addr, len as usize) {
+        Ok(0)
+    } else {
+        Err(SyscallError::Fault)
+    }
+}
+
+pub fn sys_maps() -> SyscallResult {
+    current_task().vm().print_vm();
+
+    Ok(0)
+}
+
 pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
         if let Ok(dentry) = lookup_by_path(Path::new(path), LookupMode::None) {

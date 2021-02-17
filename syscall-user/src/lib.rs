@@ -147,6 +147,14 @@ pub fn mmap(
     }
 }
 
+pub fn munmap(addr: usize, len: usize) -> SyscallResult {
+    unsafe { syscall2(SYS_MUNMAP, addr, len) }
+}
+
+pub fn maps() -> SyscallResult {
+    unsafe { syscall0(SYS_MAPS) }
+}
+
 pub fn chdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_CHDIR, path.as_ptr() as usize, path.len()) }
 }

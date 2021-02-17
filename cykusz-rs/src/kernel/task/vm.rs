@@ -1,18 +1,21 @@
 use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
 use alloc::string::String;
+use core::ops::Range;
 
 use syscall_defs::{MMapFlags, MMapProt};
 
-use crate::arch::mm::PAGE_SIZE;
+use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
 use crate::drivers::elf::types::{ProgramFlags, ProgramType};
 use crate::drivers::elf::ElfHeader;
-use crate::kernel::fs::cache::Cacheable;
+
 use crate::kernel::fs::dirent::DirEntryItem;
-use crate::kernel::fs::pcache::{PageCacheKey, PageItem};
+use crate::kernel::fs::pcache::PageItem;
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, update_flags, VirtAddr};
+use crate::kernel::mm::{
+    allocate_order, map_flags, map_to_flags, unmap, update_flags, VirtAddr, MAX_USER_ADDR,
+};
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 
@@ -55,34 +58,59 @@ impl From<ProgramFlags> for MMapProt {
 #[derive(Clone)]
 struct MMapedFile {
     file: DirEntryItem,
-    addr: VirtAddr,
-    length: usize,
     starting_offset: usize,
-    active_mappings: hashbrown::HashMap<PageCacheKey, PageItem>,
+    active_mappings: hashbrown::HashMap<VirtAddr, PageItem>,
 }
 
 impl MMapedFile {
-    fn new(file: DirEntryItem, addr: VirtAddr, offset: usize, len: usize) -> MMapedFile {
+    fn new(file: DirEntryItem, offset: usize) -> MMapedFile {
         MMapedFile {
             file,
-            addr,
-            length: len,
             starting_offset: offset,
             active_mappings: hashbrown::HashMap::new(),
         }
+    }
+
+    fn unmap(&mut self, addr: VirtAddr) {
+        let addr = addr.align_down(PAGE_SIZE);
+        let uaddr: UserAddr = addr.into();
+
+        if let Some(m) = self.active_mappings.get(&addr) {
+            m.drop_user_addr(&uaddr);
+
+            self.active_mappings.remove(&addr);
+        }
+    }
+
+    fn split_from(&mut self, start: VirtAddr, end: VirtAddr, new_offset: usize) -> MMapedFile {
+        let mut new = MMapedFile::new(self.file.clone(), new_offset);
+
+        for a in (start..end).step_by(PAGE_SIZE) {
+            if let Some(pg) = self.active_mappings.remove(&a) {
+                new.active_mappings.insert(a, pg);
+            }
+        }
+
+        new
     }
 }
 
 impl Drop for MMapedFile {
     fn drop(&mut self) {
-        for (_, mapping) in self.active_mappings.iter() {
-            let real_offset = self.starting_offset + mapping.offset();
-
-            let uaddr: UserAddr = (self.addr + real_offset).into();
+        for (&addr, mapping) in self.active_mappings.iter() {
+            let uaddr: UserAddr = addr.into();
 
             mapping.drop_user_addr(&uaddr);
         }
     }
+}
+
+enum UnmapResult {
+    None,
+    Full,
+    Begin,
+    Mid(Mapping),
+    End,
 }
 
 #[derive(Clone)]
@@ -104,7 +132,23 @@ impl Mapping {
         offset: usize,
     ) -> Mapping {
         Mapping {
-            mmaped_file: file.map(|e| MMapedFile::new(e, addr, offset, len)),
+            mmaped_file: file.map(|e| MMapedFile::new(e, offset)),
+            prot,
+            flags,
+            start: addr,
+            end: addr + len,
+        }
+    }
+
+    fn new_split(
+        addr: VirtAddr,
+        len: usize,
+        prot: MMapProt,
+        flags: MMapFlags,
+        file: Option<MMapedFile>,
+    ) -> Mapping {
+        Mapping {
+            mmaped_file: file,
             prot,
             flags,
             start: addr,
@@ -157,12 +201,14 @@ impl Mapping {
         if let Some(f) = self.mmaped_file.as_mut() {
             let offset = (addr - self.start).0 + f.starting_offset;
 
+            let addr_aligned = addr.align_down(PAGE_SIZE);
+
             if let Some(p) = f.file.inode().as_cacheable().unwrap().get_mmap_page(offset) {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
                 {
                     // Page is not present and we are reading from it, so map it readable
-                    f.active_mappings.insert(p.cache_key(), p.clone());
+                    f.active_mappings.insert(addr_aligned, p.clone());
 
                     let mut flags: PageFlags = PageFlags::USER | self.prot.into();
                     flags.remove(PageFlags::WRITABLE);
@@ -173,7 +219,7 @@ impl Mapping {
                     // Changes made to private mapping should not be persistent
                     Self::map_copy(addr.align_down(PAGE_SIZE), p.page().to_virt(), self.prot);
 
-                    f.active_mappings.remove(&p.cache_key());
+                    f.active_mappings.remove(&addr_aligned);
                 } else {
                     return false;
                 }
@@ -207,7 +253,7 @@ impl Mapping {
 
                 if !is_present {
                     // Insert page to the list of active mappings if not present
-                    f.active_mappings.insert(p.cache_key(), p.clone());
+                    f.active_mappings.insert(addr_aligned, p.clone());
                 }
 
                 if is_write {
@@ -230,6 +276,96 @@ impl Mapping {
             false
         }
     }
+
+    fn split_from(&mut self, addr: VirtAddr) -> Mapping {
+        assert!(addr > self.start && addr < self.end);
+        let new_f = if let Some(f) = &mut self.mmaped_file {
+            Some(f.split_from(addr, self.end, f.starting_offset + (addr - self.start).0))
+        } else {
+            None
+        };
+
+        Mapping::new_split(addr, (self.end - addr).0, self.prot, self.flags, new_f)
+    }
+
+    fn update_start(&mut self, new_start: VirtAddr) {
+        assert!(new_start > self.start && new_start < self.end);
+
+        let offset = (new_start - self.start).0;
+
+        if let Some(f) = &mut self.mmaped_file {
+            f.starting_offset += offset;
+        }
+
+        self.start = new_start;
+    }
+
+    fn update_end(&mut self, new_end: VirtAddr) {
+        assert!(new_end > self.start && new_end < self.end);
+
+        self.end = new_end;
+    }
+
+    fn unmap(&mut self, start: VirtAddr, end: VirtAddr) -> UnmapResult {
+        assert_eq!(start.0 % PAGE_SIZE, 0);
+        assert_eq!(end.0 % PAGE_SIZE, 0);
+
+        let unmap_range = |range: Range<VirtAddr>, f: &mut Option<MMapedFile>| {
+            for v in range.step_by(PAGE_SIZE) {
+                if let Some(f) = f {
+                    f.unmap(v);
+                }
+
+                unmap(v);
+            }
+        };
+
+        //....>--<..############..>--<
+        if end <= self.start || start >= self.end {
+            return UnmapResult::None;
+        }
+
+        //..........###>----<###......
+        if start > self.start && end < self.end {
+            unmap_range(start..end, &mut self.mmaped_file);
+
+            let split = self.split_from(end);
+            //MID
+            self.update_end(start);
+
+            return UnmapResult::Mid(split);
+        }
+
+        //..........>----------<.....
+        if start <= self.start && end >= self.end {
+            //FULL
+            unmap_range(self.start..self.end, &mut self.mmaped_file);
+
+            return UnmapResult::Full;
+        }
+
+        //..........>--------<###......
+        if start <= self.start && end < self.end {
+            //BEGIN
+            unmap_range(self.start..end, &mut self.mmaped_file);
+
+            self.update_start(end);
+
+            return UnmapResult::Begin;
+        }
+
+        //..........###>--------<......
+        if start > self.start && end >= self.end {
+            unmap_range(start..self.end, &mut self.mmaped_file);
+
+            self.update_end(start);
+
+            return UnmapResult::End;
+            //END
+        }
+
+        unreachable!()
+    }
 }
 
 #[derive(Clone)]
@@ -244,6 +380,34 @@ impl VMData {
         }
     }
 
+    fn find_fixed(&mut self, addr: VirtAddr, len: usize) -> Option<(VirtAddr, CursorMut<Mapping>)> {
+        let mut cur = self.maps.cursor_front_mut();
+
+        while let Some(c) = cur.current() {
+            if c.start <= addr && c.end > addr {
+                return None;
+            } else if c.start < addr {
+                cur.move_next();
+            } else {
+                if addr + len > c.start {
+                    return None;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        return Some((addr, cur));
+    }
+
+    fn find_any_above(
+        &mut self,
+        _addr: VirtAddr,
+        _len: usize,
+    ) -> Option<(VirtAddr, CursorMut<Mapping>)> {
+        None
+    }
+
     fn mmap_vm(
         &mut self,
         addr: Option<VirtAddr>,
@@ -253,60 +417,66 @@ impl VMData {
         file: Option<DirEntryItem>,
         offset: usize,
     ) -> Option<VirtAddr> {
-        // support only fixed mappings for now
-        if !flags.contains(MMapFlags::MAP_FIXED) || addr.is_none() {
-            return None;
-        }
-
         // Offset should be multiple of PAGE_SIZE
         if offset % PAGE_SIZE != 0 {
             return None;
         }
 
+        if len == 0 {
+            return None;
+        }
+
+        let len = len.align_up(PAGE_SIZE);
+
         if let Some(a) = addr {
             // Address should be multiple of PAGE_SIZE if we request fixed mapping
-            if flags.contains(MMapFlags::MAP_FIXED) && a.0 % PAGE_SIZE != 0 {
+            if flags.contains(MMapFlags::MAP_FIXED) && (a.0 % PAGE_SIZE != 0 || a >= MAX_USER_ADDR)
+            {
                 return None;
             }
         }
 
         if let Some(f) = &file {
+            // Can't mmap file with anonymous flag
+            if flags.contains(MMapFlags::MAP_ANONYOMUS) {
+                return None;
+            }
+
             // Check whether file supports mmaped access
             if f.inode().as_cacheable().is_none() {
                 return None;
             }
-        }
-
-        let mut cur = self.maps.cursor_front_mut();
-
-        let addr = addr.unwrap();
-
-        // Find slot for the new mapping
-        while let Some(c) = cur.current() {
-            if c.start > addr {
-                break;
-            } else {
-                cur.move_next();
-            }
-        }
-
-        let map = move |mut cur: CursorMut<Mapping>| {
-            cur.insert_before(Mapping::new(addr, len, prot, flags, file, offset));
-        };
-
-        return if let Some(c) = cur.current() {
-            if addr + len <= c.start {
-                map(cur);
-
-                Some(addr)
-            } else {
-                None
-            }
         } else {
-            map(cur);
+            // Mappings not backed by the file must be anonymous
+            if !flags.contains(MMapFlags::MAP_ANONYOMUS) {
+                return None;
+            }
+
+            // Can't have shared anonymous mapping
+            if flags.contains(MMapFlags::MAP_SHARED) {
+                return None;
+            }
+        }
+
+        match addr {
+            Some(addr) => {
+                if flags.contains(MMapFlags::MAP_FIXED) {
+                    if let Some(c) = self.find_fixed(addr, len) {
+                        Some(c)
+                    } else {
+                        None
+                    }
+                } else {
+                    self.find_any_above(addr, len)
+                }
+            }
+            None => self.find_any_above(MMAP_USER_ADDR, len),
+        }
+        .and_then(|(addr, mut cur)| {
+            cur.insert_before(Mapping::new(addr, len, prot, flags, file, offset));
 
             Some(addr)
-        };
+        })
     }
 
     fn handle_pagefault(&mut self, reason: PageFaultReason, addr: VirtAddr) -> bool {
@@ -400,6 +570,47 @@ impl VMData {
 
         self.maps = other.maps.clone();
     }
+
+    fn unmap(&mut self, addr: VirtAddr, len: usize) -> bool {
+        let start = addr.align_up(PAGE_SIZE);
+        let end = (addr + len).align_up(PAGE_SIZE);
+
+        let mut cursor = self.maps.cursor_front_mut();
+
+        let mut success = false;
+
+        while let Some(c) = cursor.current() {
+            if c.end < start {
+                cursor.move_next();
+            } else {
+                match c.unmap(start, end) {
+                    UnmapResult::None => {
+                        return success;
+                    }
+                    UnmapResult::Full => {
+                        success = true;
+
+                        cursor.remove_current();
+                    }
+                    UnmapResult::Begin => {
+                        return true;
+                    }
+                    UnmapResult::End => {
+                        success = true;
+
+                        cursor.move_next();
+                    }
+                    UnmapResult::Mid(new_mapping) => {
+                        cursor.insert_after(new_mapping);
+
+                        return true;
+                    }
+                }
+            }
+        }
+
+        success
+    }
 }
 
 pub struct VM {
@@ -439,6 +650,12 @@ impl VM {
         let mut data = self.data.lock();
 
         data.mmap_vm(addr, len, prot, flags, file, offset)
+    }
+
+    pub fn munmap_vm(&self, addr: VirtAddr, len: usize) -> bool {
+        let mut data = self.data.lock();
+
+        data.unmap(addr, len)
     }
 
     pub fn handle_pagefault(&self, reason: PageFaultReason, addr: VirtAddr) -> bool {

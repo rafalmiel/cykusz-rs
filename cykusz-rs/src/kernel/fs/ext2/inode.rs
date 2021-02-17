@@ -360,7 +360,7 @@ impl RawAccess for LockedExt2INode {
     }
 
     fn write_direct(&self, addr: usize, buf: &[u8]) -> Option<usize> {
-        if let Ok(written) = self.write_at(addr, buf) {
+        if let Ok(written) = self.update_at(addr, buf) {
             Some(written)
         } else {
             None

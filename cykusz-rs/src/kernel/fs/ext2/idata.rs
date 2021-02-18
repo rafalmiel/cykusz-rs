@@ -122,22 +122,17 @@ impl INodeData {
         (inode.size_lower() as usize).ceil_div(block_size)
     }
 
-    pub fn append_block(&mut self, inc_size: usize) -> Option<BufBlock> {
+    pub fn alloc_block_at(&mut self, block_num: usize) -> Option<BufBlock> {
         let fs = self.fs();
         let sb = fs.superblock();
 
         let mut inode = self.inode.d_inode_writer();
         let id = inode.id();
 
-        let block_size = sb.block_size();
-
-        let next_block_num = (inode.size_lower() as usize).ceil_div(block_size);
-
         if let Some(new_block) = fs.alloc_block(id) {
             if let Some(new_blocks) =
-                self.set_block(next_block_num, new_block.block(), id, &mut inode)
+                self.set_block(block_num, new_block.block(), id, &mut inode)
             {
-                inode.inc_size_lower(inc_size as u32);
                 inode.inc_sector_count(new_blocks as u32 * sb.sectors_per_block() as u32);
 
                 drop(inode);
@@ -150,6 +145,29 @@ impl INodeData {
 
                 None
             }
+        } else {
+            None
+        }
+
+    }
+
+    pub fn append_block(&mut self, inc_size: usize) -> Option<BufBlock> {
+        let fs = self.fs();
+        let sb = fs.superblock();
+
+        let size = self.inode.read().d_inode().size_lower();
+
+        let block_size = sb.block_size();
+
+        let next_block_num = (size as usize).ceil_div(block_size);
+
+        if let Some(new_block) = self.alloc_block_at(next_block_num) {
+            let mut inode = self.inode.d_inode_writer();
+            inode.inc_size_lower(inc_size as u32);
+
+            drop(inode);
+
+            Some(new_block)
         } else {
             None
         }
@@ -217,6 +235,7 @@ impl INodeData {
             };
 
             let sync = if last == i {
+                assert_eq!(ptrs[o], 0);
                 ptrs[o] = val as u32;
 
                 new_blocks += 1;
@@ -374,25 +393,23 @@ impl INodeData {
             let block_num = self.offset / block_size;
             let block_offset = self.offset % block_size;
 
+            let mut buf = Vec::<u8>::new();
+            buf.resize(block_size, 0);
+
             if let Some(block) = self.get_block(block_num, inode) {
-                let mut buf = Vec::<u8>::new();
-                buf.resize(block_size, 0);
-
-                if let Some(read) = fs.read_block(block, buf.as_mut_slice()) {
-                    let to_copy = min(rem, read - block_offset);
-
-                    dest[dest_off..dest_off + to_copy]
-                        .copy_from_slice(&buf.as_slice()[block_offset..block_offset + to_copy]);
-
-                    self.offset += to_copy;
-                    rem -= to_copy;
-                    dest_off += to_copy;
-                } else {
+                if let None = fs.read_block(block, buf.as_mut_slice()) {
                     break;
                 }
-            } else {
-                break;
             }
+
+            let to_copy = min(rem, block_size - block_offset);
+
+            dest[dest_off..dest_off + to_copy]
+                .copy_from_slice(&buf.as_slice()[block_offset..block_offset + to_copy]);
+
+            self.offset += to_copy;
+            rem -= to_copy;
+            dest_off += to_copy;
         }
 
         buffer_size - rem
@@ -424,7 +441,7 @@ impl INodeData {
         }
 
         data = if !allow_grow && self.offset + data.len() > file_size {
-            // we just update the file content so write up to the size of the file
+            // we just update the file content so write up to the size of it
             &data[..file_size - self.offset]
         } else {
             data
@@ -442,7 +459,11 @@ impl INodeData {
             if let Some(mut block) = if block_offset == 0 && file_size == self.offset {
                 self.append_block(core::cmp::min(block_size, rem))
             } else {
-                self.read_block_at(block_num)
+                if let Some(block) = self.read_block_at(block_num) {
+                    Some(block)
+                } else {
+                    self.alloc_block_at(block_num)
+                }
             } {
                 let to_write = core::cmp::min(block_size - block_offset, rem);
                 let data_offset = data.len() - rem;

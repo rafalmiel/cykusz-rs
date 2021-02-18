@@ -93,7 +93,9 @@ impl<T> IsCacheKey for T where T: Hash + Ord + Borrow<Self> + Debug {}
 pub trait Cacheable<K: IsCacheKey>: Sized {
     fn cache_key(&self) -> K;
 
-    fn make_unused(&self, _new_ref: &Weak<CacheItem<K, Self>>) {}
+    fn notify_unused(&self, _new_ref: &Weak<CacheItem<K, Self>>) {}
+
+    fn notify_used(&self) {}
 
     fn deallocate(&self, _me: &CacheItem<K, Self>) {}
 }
@@ -214,6 +216,8 @@ impl<K: IsCacheKey, T: Cacheable<K>> Drop for CacheItem<K, T> {
 impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
     pub fn mark_used(&self) {
         self.used.store(true, Ordering::SeqCst);
+
+        self.notify_used();
     }
 
     pub fn mark_unused(&self) {
@@ -280,7 +284,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
 
             true
         } else {
-            println!("move_to_unused missing entry");
+            //println!("move_to_unused missing entry");
 
             false
         }
@@ -358,7 +362,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
 
     pub fn move_to_unused(&self, ent: ArcWrap<CacheItem<K, T>>) {
         if self.data.lock().move_to_unused(ent.clone()) {
-            ent.make_unused(&Arc::downgrade(&ent));
+            ent.notify_unused(&Arc::downgrade(&ent));
         }
     }
 
@@ -366,6 +370,8 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
         let item = CacheItem::<K, T>::new(&self.sref, item);
 
         self.data.lock().insert(item.cache_key(), &item);
+
+        item.notify_used();
 
         item
     }

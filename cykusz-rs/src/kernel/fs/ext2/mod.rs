@@ -72,7 +72,7 @@ impl Ext2Filesystem {
 
     pub fn write_block(&self, block: usize, buf: &[u8]) -> Option<usize> {
         self.dev
-            .write_cached(block * self.sectors_per_block() * 512, buf)
+            .update_cached(block * self.sectors_per_block() * 512, buf)
     }
 
     pub fn superblock(&self) -> &superblock::Superblock {

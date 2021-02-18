@@ -377,6 +377,10 @@ impl CachedAccess for LockedExt2INode {
         self.ext2_fs().dev().notify_dirty_inode(page);
     }
 
+    fn notify_clean(&self, page: &PageItemInt) {
+        self.ext2_fs().dev().notify_clean_inode(page);
+    }
+
     fn sync_page(&self, page: &PageItemInt) {
         println!(
             "sync inode page flags {:?}",
@@ -385,6 +389,19 @@ impl CachedAccess for LockedExt2INode {
         if let Err(e) = self.update_at(page.offset() * PAGE_SIZE, page.data()) {
             panic!("Page {:?} sync failed {:?}", page.cache_key(), e);
         }
+    }
+
+    fn write_cached(&self, offset: usize, buf: &[u8]) -> Option<usize> {
+        let cur_size = self.node.read().d_inode().size_lower() as usize;
+
+        if cur_size < offset + buf.len() {
+            if let Err(e) = self.truncate(offset + buf.len()) {
+                println!("[ EXT2 ] truncate failed {:?}", e);
+                return None;
+            }
+        }
+
+        self.update_cached_synced(offset, buf, true)
     }
 }
 
@@ -686,19 +703,33 @@ impl INode for LockedExt2INode {
         Ok(())
     }
 
-    fn truncate(&self) -> Result<()> {
+    fn truncate(&self, size: usize) -> Result<()> {
         if self.ftype()? != FileType::File {
             return Err(FsError::NotFile);
         }
 
-        self.node.write().free_blocks(&self.ext2_fs());
+        if size == 0 {
+            self.node.write().free_blocks(&self.ext2_fs());
 
-        let mut node = self.d_inode_writer();
+            let mut node = self.d_inode_writer();
 
-        node.set_size_lower(0);
-        node.set_sector_count(0);
+            node.set_size_lower(0);
+            node.set_sector_count(0);
 
-        Ok(())
+            Ok(())
+        } else {
+            let current_size = self.node.read().d_inode().size_lower() as usize;
+
+            if size > current_size {
+                let mut node = self.d_inode_writer();
+
+                node.set_size_lower(size as u32);
+
+                Ok(())
+            } else {
+                Err(FsError::NotSupported)
+            }
+        }
     }
 
     fn dir_ent(&self, parent: DirEntryItem, idx: usize) -> Result<Option<DirEntryItem>> {

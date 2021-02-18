@@ -117,9 +117,7 @@ impl BlockDevice {
     fn sync_cache(&self, mut cache: SpinGuard<hashbrown::HashMap<PageCacheKey, PageItemWeak>>) {
         for (_, a) in cache.iter() {
             if let Some(up) = a.upgrade() {
-                up.sync_to_storage();
-
-                up.notify_clean();
+                up.sync_to_storage(&up);
             }
         }
         cache.clear();
@@ -179,9 +177,15 @@ impl CachedAccess for BlockDevice {
         }
     }
 
+    fn notify_clean(&self, page: &PageItemInt) {
+        let mut dirty = self.dirty_pages.lock();
+
+        dirty.remove(&page.cache_key());
+    }
+
     fn sync_page(&self, page: &PageItemInt) {
-        page.sync_to_storage();
-        page.notify_clean();
+        page.sync_to_storage(page);
+        page.notify_clean(page);
 
         let key = page.cache_key();
 
@@ -206,6 +210,12 @@ impl CachedBlockDev for BlockDevice {
         if !self.cleanup_timer.enabled() {
             self.cleanup_timer.start_with_timeout(10_000);
         }
+    }
+
+    fn notify_clean_inode(&self, page: &PageItemInt) {
+        let mut dirty = self.dirty_inode_pages.lock();
+
+        dirty.remove(&page.cache_key());
     }
 
     fn sync_all(&self) {

@@ -76,7 +76,7 @@ impl PageItemStruct {
         self.is_dirty.load(Ordering::SeqCst)
     }
 
-    pub fn sync_to_storage(&self) {
+    pub fn sync_to_storage(&self, _page: &PageItemInt) {
         if self.is_dirty() {
             if let Some(cache) = self.fs.upgrade() {
                 cache.write_direct(self.offset() * PAGE_SIZE, self.data());
@@ -118,7 +118,7 @@ impl PageItemStruct {
         }
     }
 
-    pub fn notify_clean(&self) {
+    pub fn notify_clean(&self, page: &PageItemInt) {
         self.mark_dirty(false);
 
         {
@@ -130,6 +130,10 @@ impl PageItemStruct {
         }
 
         map_flags(self.page.to_virt(), PageFlags::empty());
+
+        if let Some(h) = self.fs.upgrade() {
+            h.notify_clean(page)
+        }
     }
 
     pub fn drop_user_addr(&self, mapping: &UserAddr) {
@@ -155,6 +159,7 @@ pub fn cache() -> &'static Arc<PageCache> {
 
 pub trait CachedBlockDev: CachedAccess {
     fn notify_dirty_inode(&self, _page: &PageItem);
+    fn notify_clean_inode(&self, _page: &PageItemInt);
     fn sync_all(&self);
 }
 
@@ -162,6 +167,8 @@ pub trait CachedAccess: RawAccess {
     fn this(&self) -> Weak<dyn CachedAccess>;
 
     fn notify_dirty(&self, _page: &PageItem);
+
+    fn notify_clean(&self, _page: &PageItemInt);
 
     fn sync_page(&self, page: &PageItemInt);
 
@@ -177,15 +184,21 @@ pub trait CachedAccess: RawAccess {
         } else {
             let new_page = PageItemStruct::new(dev.clone(), cache_offset);
 
-            self.read_direct(offset.align(PAGE_SIZE), new_page.data_mut());
+            if let Some(read) = self.read_direct(offset.align(PAGE_SIZE), new_page.data_mut()) {
+                if read == 0 {
+                    None
+                } else {
+                    let page = page_cache.make_item(new_page);
 
-            let page = page_cache.make_item(new_page);
+                    page.link_with_page();
 
-            page.link_with_page();
+                    page.notify_clean(&page);
 
-            page.notify_clean();
-
-            Some(page)
+                    Some(page)
+                }
+            } else {
+                None
+            }
         }
     }
 
@@ -212,7 +225,15 @@ pub trait CachedAccess: RawAccess {
         Some(dest_offset)
     }
 
-    fn write_cached(&self, mut offset: usize, buf: &[u8]) -> Option<usize> {
+    fn write_cached(&self, offset: usize, buf: &[u8]) -> Option<usize> {
+        self.update_cached(offset, buf)
+    }
+
+    fn update_cached(&self, offset: usize, buf: &[u8]) -> Option<usize> {
+        self.update_cached_synced(offset, buf, false)
+    }
+
+    fn update_cached_synced(&self, mut offset: usize, buf: &[u8], sync: bool) -> Option<usize> {
         let mut copied = 0;
 
         while copied < buf.len() {
@@ -227,6 +248,11 @@ pub trait CachedAccess: RawAccess {
 
                 copied += to_copy;
                 offset = (offset + PAGE_SIZE).align(PAGE_SIZE);
+
+                if sync {
+                    page.sync_to_storage(&page);
+                    page.notify_clean(&page);
+                }
             } else {
                 break;
             }

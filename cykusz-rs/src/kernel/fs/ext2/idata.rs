@@ -130,9 +130,7 @@ impl INodeData {
         let id = inode.id();
 
         if let Some(new_block) = fs.alloc_block(id) {
-            if let Some(new_blocks) =
-                self.set_block(block_num, new_block.block(), id, &mut inode)
-            {
+            if let Some(new_blocks) = self.set_block(block_num, new_block.block(), id, &mut inode) {
                 inode.inc_sector_count(new_blocks as u32 * sb.sectors_per_block() as u32);
 
                 drop(inode);
@@ -148,7 +146,6 @@ impl INodeData {
         } else {
             None
         }
-
     }
 
     pub fn append_block(&mut self, inc_size: usize) -> Option<BufBlock> {

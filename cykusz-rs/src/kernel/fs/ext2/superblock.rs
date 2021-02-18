@@ -73,7 +73,7 @@ impl Superblock {
     pub fn sync(&self, fs: &Ext2Filesystem) {
         let sb = self.read_inner();
 
-        fs.dev.write_cached(2 * 512, sb.as_bytes());
+        fs.dev.update_cached(2 * 512, sb.as_bytes());
     }
 
     pub fn debug(&self) {

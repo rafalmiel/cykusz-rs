@@ -84,7 +84,7 @@ pub trait INode: Send + Sync + DowncastSync {
         return Err(FsError::NotSupported);
     }
 
-    fn truncate(&self) -> Result<()> {
+    fn truncate(&self, _size: usize) -> Result<()> {
         return Err(FsError::NotSupported);
     }
 

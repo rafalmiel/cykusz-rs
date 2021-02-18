@@ -55,6 +55,10 @@ impl PageItemStruct {
 
         map_to_flags(page.to_virt(), page, PageFlags::WRITABLE);
 
+        unsafe {
+            page.to_virt().as_bytes_mut(PAGE_SIZE).fill(0);
+        }
+
         PageItemStruct {
             fs,
             offset,

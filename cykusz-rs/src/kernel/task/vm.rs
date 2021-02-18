@@ -430,7 +430,8 @@ impl VMData {
 
         if let Some(a) = addr {
             // Address should be multiple of PAGE_SIZE if we request fixed mapping
-            if flags.contains(MMapFlags::MAP_FIXED) && (a.0 % PAGE_SIZE != 0 || a >= MAX_USER_ADDR)
+            // and should not extend beyond max user addr
+            if flags.contains(MMapFlags::MAP_FIXED) && (a.0 % PAGE_SIZE != 0 || a + len > MAX_USER_ADDR)
             {
                 return None;
             }
@@ -461,6 +462,9 @@ impl VMData {
         match addr {
             Some(addr) => {
                 if flags.contains(MMapFlags::MAP_FIXED) {
+                    // Remove any existing mappings
+                    self.unmap(addr, len);
+
                     if let Some(c) = self.find_fixed(addr, len) {
                         Some(c)
                     } else {

@@ -260,13 +260,16 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
     }
 
     fn remove(&mut self, key: &K) {
-        if let Some(e) = self.used.get(&key) {
-            if let Some(e) = e.upgrade() {
-                e.mark_unused();
-            }
-        } else {
+        if let None = self.used.remove(key) {
             self.unused.pop(key);
         }
+        //if let Some(e) = self.used.get(&key) {
+        //    if let Some(e) = e.upgrade() {
+        //        e.mark_unused();
+        //    }
+        //} else {
+        //    self.unused.pop(key);
+        //}
     }
 
     fn move_to_unused(&mut self, ent: ArcWrap<CacheItem<K, T>>) -> bool {

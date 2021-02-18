@@ -81,6 +81,7 @@ impl TaskContainer {
 
         for (_, t) in tasks.iter() {
             t.clear_cwd();
+            t.vm().clear();
             t.close_all_files();
         }
     }

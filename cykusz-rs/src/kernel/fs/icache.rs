@@ -55,7 +55,7 @@ impl Cacheable<ICacheKey> for INodeItemStruct {
         INodeItemStruct::make_key(&self.fs().unwrap(), self.id().unwrap())
     }
 
-    fn make_unused(&self, new_ref: &Weak<INodeItemInt>) {
+    fn notify_unused(&self, new_ref: &Weak<INodeItemInt>) {
         self.inode.ref_update(new_ref.clone());
     }
 }

@@ -98,11 +98,11 @@ impl GroupDescriptors {
             vec[..actual_len].copy_from_slice(&self.vec[..actual_len]);
 
             fs.dev()
-                .write_cached(sb.block_groups_sector() * 512, vec.as_slice().to_bytes())
+                .update_cached(sb.block_groups_sector() * 512, vec.as_slice().to_bytes())
                 .expect("Failed to sync GroupDescriptors");
         } else {
             fs.dev()
-                .write_cached(
+                .update_cached(
                     sb.block_groups_sector() * 512,
                     self.vec.as_slice().to_bytes(),
                 )

@@ -47,7 +47,7 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
         }
 
         if flags.contains(OpenFlags::CREAT) {
-            if let Err(e) = inode.inode().truncate() {
+            if let Err(e) = inode.inode().truncate(0) {
                 println!("Truncate failed: {:?}", e);
             }
         }

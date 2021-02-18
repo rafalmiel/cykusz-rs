@@ -164,14 +164,14 @@ impl INode for LockedRamINode {
         })
     }
 
-    fn truncate(&self) -> Result<()> {
+    fn truncate(&self, size: usize) -> Result<()> {
         let node = self.0.write();
 
         match &node.content {
             Content::Bytes(vec) => {
                 let mut v = vec.lock();
 
-                v.clear();
+                v.resize(size, 0);
 
                 return Ok(());
             }

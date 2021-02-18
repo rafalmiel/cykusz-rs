@@ -411,6 +411,7 @@ fn exec(cmd: &str) {
             } else {
                 println!("mmap faileld");
             }
+            syscall::close(file);
         } else {
             println!("file open failed");
         }
@@ -432,6 +433,7 @@ fn exec(cmd: &str) {
             } else {
                 println!("mmap faileld");
             }
+            syscall::close(file);
         } else {
             println!("file open failed");
         }

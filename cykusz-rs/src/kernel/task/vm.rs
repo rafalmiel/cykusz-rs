@@ -9,7 +9,6 @@ use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
 use crate::drivers::elf::types::{ProgramFlags, ProgramType};
 use crate::drivers::elf::ElfHeader;
-
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::pcache::PageItem;
 use crate::kernel::mm::virt::PageFlags;
@@ -431,7 +430,8 @@ impl VMData {
         if let Some(a) = addr {
             // Address should be multiple of PAGE_SIZE if we request fixed mapping
             // and should not extend beyond max user addr
-            if flags.contains(MMapFlags::MAP_FIXED) && (a.0 % PAGE_SIZE != 0 || a + len > MAX_USER_ADDR)
+            if flags.contains(MMapFlags::MAP_FIXED)
+                && (a.0 % PAGE_SIZE != 0 || a + len > MAX_USER_ADDR)
             {
                 return None;
             }

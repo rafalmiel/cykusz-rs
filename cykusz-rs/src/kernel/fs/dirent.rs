@@ -20,8 +20,20 @@ impl Cacheable<CacheKey> for DirEntry {
         Self::make_key(data.parent.as_ref(), &data.name)
     }
 
-    fn make_unused(&self, _new_ref: &Weak<CacheItem<CacheKey, DirEntry>>) {
-        self.data.write().parent = None;
+    fn notify_unused(&self, _new_ref: &Weak<CacheItem<CacheKey, DirEntry>>) {
+        let mut data = self.data.write();
+        data.fs_ref = None;
+        data.parent = None;
+    }
+
+    fn notify_used(&self) {
+        let mut data = self.data.write();
+
+        data.fs_ref = if let Some(fs) = self.fs.get() {
+            fs.upgrade()
+        } else {
+            None
+        }
     }
 
     fn deallocate(&self, _me: &CacheItem<CacheKey, DirEntry>) {}
@@ -37,6 +49,7 @@ fn new_cache_marker() -> usize {
 
 pub struct DirEntryData {
     pub parent: Option<DirEntryItem>,
+    fs_ref: Option<Arc<dyn Filesystem>>,
     pub name: String,
     pub inode: INodeItem,
 }
@@ -85,6 +98,7 @@ impl DirEntry {
         cache().make_item_no_cache(DirEntry {
             data: RwSpin::new(DirEntryData {
                 parent: None,
+                fs_ref: None,
                 name,
                 inode: inode.clone(),
             }),
@@ -103,6 +117,7 @@ impl DirEntry {
             let e = DirEntry {
                 data: RwSpin::new(DirEntryData {
                     parent: Some(parent.clone()),
+                    fs_ref: None,
                     name,
                     inode: inode.clone(),
                 }),
@@ -129,6 +144,7 @@ impl DirEntry {
         cache().make_item_no_cache(DirEntry {
             data: RwSpin::new(DirEntryData {
                 parent: Some(parent),
+                fs_ref: None,
                 name,
                 inode: inode.clone(),
             }),
@@ -146,6 +162,15 @@ impl DirEntry {
         cache().make_item_no_cache(DirEntry {
             data: RwSpin::new(DirEntryData {
                 parent: None,
+                fs_ref: if let Some(fs) = inode.fs() {
+                    if let Some(fs) = fs.upgrade() {
+                        Some(fs)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                },
                 name: String::new(),
                 inode: inode.clone(),
             }),

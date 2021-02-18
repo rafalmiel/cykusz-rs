@@ -5,7 +5,6 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::dirent::DirEntryItem;
-use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
 use crate::kernel::sync::{Mutex, RwSpin};
 
@@ -17,8 +16,8 @@ pub struct FileHandle {
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
     pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
-    #[allow(unused)]
-    fs: Option<Arc<dyn Filesystem>>,
+    //#[allow(unused)]
+    //fs: Option<Arc<dyn Filesystem>>,
 }
 
 impl FileHandle {
@@ -29,19 +28,18 @@ impl FileHandle {
             offset: AtomicUsize::new(0),
             flags,
             dir_iter: Mutex::new((None, None)),
-            fs: if let Some(fs) = inode.inode().fs() {
-                fs.upgrade()
-            } else {
-                None
-            },
+            //fs: if let Some(fs) = inode.inode().fs() {
+            //    fs.upgrade()
+            //} else {
+            //    None
+            //},
         })
     }
 
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        let read = self
-            .inode
-            .inode()
-            .read_at(self.offset.load(Ordering::SeqCst), buf)?;
+        let offset = self.offset.load(Ordering::SeqCst);
+
+        let read = self.inode.inode().read_at(offset, buf)?;
 
         self.offset.fetch_add(read, Ordering::SeqCst);
 
@@ -69,11 +67,19 @@ impl FileHandle {
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
+        let offset = self.offset.load(Ordering::SeqCst);
+
         //println!("writing to inode handle");
-        let wrote = self
-            .inode
-            .inode()
-            .write_at(self.offset.load(Ordering::SeqCst), buf)?;
+        let wrote = match self.inode.inode().as_cacheable() {
+            Some(cacheable) => {
+                if let Some(w) = cacheable.write_cached(offset, buf) {
+                    w
+                } else {
+                    return Err(FsError::NotSupported);
+                }
+            }
+            None => self.inode.inode().write_at(offset, buf)?,
+        };
 
         self.offset.fetch_add(wrote, Ordering::SeqCst);
 
@@ -209,11 +215,11 @@ impl FileTable {
                 offset: AtomicUsize::new(0),
                 flags,
                 dir_iter: Mutex::new((None, None)),
-                fs: if let Some(fs) = inode.inode().fs() {
-                    fs.upgrade()
-                } else {
-                    None
-                },
+                //fs: if let Some(fs) = inode.inode().fs() {
+                //    fs.upgrade()
+                //} else {
+                //    None
+                //},
             }))
         };
 

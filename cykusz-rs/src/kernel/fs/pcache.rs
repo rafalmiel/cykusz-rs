@@ -76,10 +76,11 @@ impl PageItemStruct {
         self.is_dirty.load(Ordering::SeqCst)
     }
 
-    pub fn sync_to_storage(&self, _page: &PageItemInt) {
+    pub fn sync_to_storage(&self, page: &PageItemInt) {
         if self.is_dirty() {
             if let Some(cache) = self.fs.upgrade() {
                 cache.write_direct(self.offset() * PAGE_SIZE, self.data());
+                page.notify_clean(page);
             }
         }
     }
@@ -251,7 +252,6 @@ pub trait CachedAccess: RawAccess {
 
                 if sync {
                     page.sync_to_storage(&page);
-                    page.notify_clean(&page);
                 }
             } else {
                 break;

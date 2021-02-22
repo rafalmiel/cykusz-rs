@@ -394,14 +394,14 @@ fn exec(cmd: &str) {
     } else if cmd == "mmap" {
         if let Ok(file) = syscall::open("/home/mmap.bin", OpenFlags::RDWR) {
             if let Ok(addr) = syscall::mmap(
-                Some(0x5000_0000),
+                None,
                 4096,
                 MMapProt::PROT_READ | MMapProt::PROT_WRITE,
-                MMapFlags::MAP_FIXED | MMapFlags::MAP_SHARED,
+                MMapFlags::MAP_SHARED,
                 Some(file),
                 0,
             ) {
-                let ptr = 0x5000_0000 as *mut u8;
+                let ptr = addr as *mut u8;
 
                 for i in (0..4096).step_by(4) {
                     unsafe {

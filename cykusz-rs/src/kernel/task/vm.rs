@@ -401,9 +401,56 @@ impl VMData {
 
     fn find_any_above(
         &mut self,
-        _addr: VirtAddr,
-        _len: usize,
+        addr: VirtAddr,
+        len: usize,
     ) -> Option<(VirtAddr, CursorMut<Mapping>)> {
+        use core::cmp::max;
+
+        if self.maps.is_empty() {
+            return Some((addr, self.maps.cursor_front_mut()));
+        }
+
+        let mut cur = self.maps.cursor_front_mut();
+
+        while let Some(c) = cur.current() {
+            let c_start = c.start;
+
+            if c_start < addr {
+                cur.move_next();
+            } else {
+                if let Some(p) = cur.peek_prev() {
+                    let start = max(addr, p.end);
+                    let hole = c_start.0 - start.0;
+
+                    if len <= hole {
+                        return Some((start, cur));
+                    } else {
+                        cur.move_next();
+                    }
+                } else {
+                    let start = addr;
+
+                    let hole = c_start.0 - addr.0;
+
+                    return if len <= hole {
+                        Some((start, cur))
+                    } else {
+                        None
+                    };
+                }
+            }
+        }
+
+        if let Some(p) = cur.peek_prev() {
+            let start = max(p.end, addr);
+
+            let hole = MAX_USER_ADDR.0 - start.0;
+
+            if hole >= len {
+                return Some((start, cur));
+            }
+        }
+
         None
     }
 
@@ -433,6 +480,10 @@ impl VMData {
             if flags.contains(MMapFlags::MAP_FIXED)
                 && (a.0 % PAGE_SIZE != 0 || a + len > MAX_USER_ADDR)
             {
+                return None;
+            }
+
+            if !a.is_user() {
                 return None;
             }
         }

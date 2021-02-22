@@ -2,6 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::kernel::device;
 use crate::kernel::device::{alloc_id, register_device, Device};
@@ -53,6 +54,7 @@ pub struct BlockDevice {
     dirty_inode_pages: Spin<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
     dirty_pages: Spin<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
     cleanup_timer: Arc<Timer>,
+    sync_all_altive: AtomicBool,
 }
 
 pub struct PartitionBlockDev {
@@ -101,6 +103,24 @@ impl PartitionBlockDev {
     }
 }
 
+struct SyncAllGuard<'a> {
+    blk_dev: &'a BlockDevice,
+}
+
+impl<'a> SyncAllGuard<'a> {
+    fn new(blk: &'a BlockDevice) -> SyncAllGuard<'a> {
+        blk.set_sync_all_active(true);
+
+        SyncAllGuard::<'a> { blk_dev: blk }
+    }
+}
+
+impl<'a> Drop for SyncAllGuard<'a> {
+    fn drop(&mut self) {
+        self.blk_dev.set_sync_all_active(false);
+    }
+}
+
 impl BlockDevice {
     pub fn new(name: String, imp: Arc<dyn BlockDev>) -> Arc<BlockDevice> {
         Arc::new_cyclic(|me| BlockDevice {
@@ -111,6 +131,7 @@ impl BlockDevice {
             dirty_inode_pages: Spin::new(hashbrown::HashMap::new()),
             dirty_pages: Spin::new(hashbrown::HashMap::new()),
             cleanup_timer: create_timer(TimerCallback::new(me.clone(), BlockDevice::sync_all)),
+            sync_all_altive: AtomicBool::new(false),
         })
     }
 
@@ -121,6 +142,14 @@ impl BlockDevice {
             }
         }
         cache.clear();
+    }
+
+    fn is_sync_all_active(&self) -> bool {
+        self.sync_all_altive.load(Ordering::SeqCst)
+    }
+
+    fn set_sync_all_active(&self, active: bool) {
+        self.sync_all_altive.store(active, Ordering::SeqCst);
     }
 }
 
@@ -172,20 +201,21 @@ impl CachedAccess for BlockDevice {
 
         dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
 
-        if !self.cleanup_timer.enabled() {
+        if !self.cleanup_timer.enabled() && !self.is_sync_all_active() {
             self.cleanup_timer.start_with_timeout(10_000);
         }
     }
 
     fn notify_clean(&self, page: &PageItemInt) {
-        let mut dirty = self.dirty_pages.lock();
+        if !self.is_sync_all_active() {
+            let mut dirty = self.dirty_pages.lock();
 
-        dirty.remove(&page.cache_key());
+            dirty.remove(&page.cache_key());
+        }
     }
 
     fn sync_page(&self, page: &PageItemInt) {
         page.sync_to_storage(page);
-        page.notify_clean(page);
 
         let key = page.cache_key();
 
@@ -207,15 +237,17 @@ impl CachedBlockDev for BlockDevice {
 
         dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
 
-        if !self.cleanup_timer.enabled() {
+        if !self.cleanup_timer.enabled() && !self.is_sync_all_active() {
             self.cleanup_timer.start_with_timeout(10_000);
         }
     }
 
     fn notify_clean_inode(&self, page: &PageItemInt) {
-        let mut dirty = self.dirty_inode_pages.lock();
+        if !self.is_sync_all_active() {
+            let mut dirty = self.dirty_inode_pages.lock();
 
-        dirty.remove(&page.cache_key());
+            dirty.remove(&page.cache_key());
+        }
     }
 
     fn sync_all(&self) {
@@ -224,6 +256,11 @@ impl CachedBlockDev for BlockDevice {
             self.dirty_inode_pages.lock().len(),
             self.dirty_pages.lock().len(),
         );
+
+        let _guard = SyncAllGuard::new(self);
+
+        //self.cleanup_timer.disable();
+
         self.sync_cache(self.dirty_inode_pages.lock());
         self.sync_cache(self.dirty_pages.lock());
     }

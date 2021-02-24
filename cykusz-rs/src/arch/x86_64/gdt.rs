@@ -77,9 +77,10 @@ pub fn update_tss_rps0(new_rsp: usize) {
     }
 }
 
-fn init_tss(stack_top: VirtAddr) {
+fn init_tss(stack_top: VirtAddr, fs_base: u64) {
     unsafe {
         TSS.rsp[0] = stack_top.0 as u64;
+        TSS.kern_fs_base = fs_base;
 
         {
             let gdt_low = &mut GDT[5];
@@ -98,7 +99,7 @@ fn init_tss(stack_top: VirtAddr) {
 }
 
 //TLS available
-pub fn init(stack_top: VirtAddr) {
+pub fn init(stack_top: VirtAddr, fs_base: u64) {
     unsafe {
         GDTR.init(&GDT[..]);
         dsc::lgdt(&GDTR);
@@ -110,7 +111,7 @@ pub fn init(stack_top: VirtAddr) {
         sgm::load_ss(ring0_ds());
 
         if stack_top != VirtAddr(0) {
-            init_tss(stack_top);
+            init_tss(stack_top, fs_base);
         }
     }
 }

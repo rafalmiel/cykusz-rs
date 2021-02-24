@@ -714,7 +714,9 @@ impl VM {
     }
 
     pub fn handle_pagefault(&self, reason: PageFaultReason, addr: VirtAddr) -> bool {
-        self.data.lock().handle_pagefault(reason, addr)
+        let res = self.data.lock().handle_pagefault(reason, addr);
+
+        res
     }
 
     pub fn load_bin(&self, exe: DirEntryItem) -> Option<VirtAddr> {

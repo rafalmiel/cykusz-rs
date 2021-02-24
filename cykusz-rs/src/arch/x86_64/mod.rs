@@ -54,7 +54,7 @@ pub extern "C" fn x86_64_rust_main_ap() {
     crate::arch::raw::mm::enable_nxe_bit();
 
     gdt::early_init();
-    idt::init();
+    idt::init_ap();
 
     dev::init_ap();
 

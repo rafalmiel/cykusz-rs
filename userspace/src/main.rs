@@ -2,6 +2,7 @@
 #![no_main]
 #![feature(llvm_asm)]
 #![feature(lang_items)]
+#![feature(thread_local)]
 
 extern crate alloc;
 extern crate rlibc;
@@ -19,6 +20,8 @@ use crate::file::File;
 pub mod file;
 pub mod lang;
 pub mod nc;
+
+pub static mut TEST: usize = 33;
 
 fn make_str(buf: &[u8]) -> &str {
     core::str::from_utf8(&buf)
@@ -465,6 +468,7 @@ fn exec(cmd: &str) {
 }
 
 fn main_cd() -> ! {
+    println!("{}", unsafe { TEST });
     loop {
         let mut buf = [0u8; 256];
         let mut pwd = [0u8; 1024];

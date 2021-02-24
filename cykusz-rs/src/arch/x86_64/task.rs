@@ -49,6 +49,7 @@ pub struct Task {
     pub stack_top: usize,
     pub stack_size: usize,
     pub user_stack: Option<usize>,
+    pub user_fs_base: usize,
 }
 
 impl Context {
@@ -120,13 +121,14 @@ impl Default for Task {
 }
 
 impl Task {
-    pub const fn empty() -> Task {
+    pub fn empty() -> Task {
         Task {
             ctx: Unique::dangling(),
             cr3: 0,
             stack_top: 0,
             stack_size: 0,
             user_stack: None,
+            user_fs_base: 0,
         }
     }
 
@@ -256,6 +258,7 @@ impl Task {
                 stack_top: sp as usize - stack_size,
                 stack_size,
                 user_stack,
+                user_fs_base: 0,
             }
         }
     }
@@ -368,6 +371,7 @@ impl Task {
             stack_top: sp_top as usize,
             stack_size: KERN_STACK_SIZE,
             user_stack: self.user_stack,
+            user_fs_base: self.user_fs_base,
         }
     }
 
@@ -400,6 +404,7 @@ pub fn activate_task(to: &Task) {
         if to.is_user() {
             crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
+
         activate_to(to.ctx.as_ref());
     }
 }
@@ -409,6 +414,7 @@ pub fn switch(from: &mut Task, to: &Task) {
         if to.is_user() {
             crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
+
         switch_to(&mut from.ctx, to.ctx.as_ref());
     }
 }

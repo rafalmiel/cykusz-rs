@@ -11,6 +11,7 @@ pub struct TaskStateSegment {
     pub reserved4: u16,
     /// The 16-bit offset to the I/O permission bit map from the 64-bit TSS base.
     pub iomap_base: u16,
+    pub kern_fs_base: u64,
 }
 
 impl TaskStateSegment {
@@ -23,6 +24,7 @@ impl TaskStateSegment {
             reserved3: 0,
             reserved4: 0,
             iomap_base: 0,
+            kern_fs_base: 0,
         }
     }
 }

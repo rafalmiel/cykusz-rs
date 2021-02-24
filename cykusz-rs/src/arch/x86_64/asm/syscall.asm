@@ -5,6 +5,46 @@ global asm_sysretq_forkinit
 
 extern fast_syscall_handler
 extern fork_get_pid
+extern restore_user_fs
+
+global asm_update_kern_fs_base
+
+update_kern_fs_base_locked:
+    push rbx
+    push rdx
+    push rcx
+    push rax
+
+    mov rbx, qword [gs:104] ; Offset into TSS holding FS_BASE for this cpu
+    mov ecx, 0xC0000100     ; IA32_FS_BASE msr
+    mov eax, ebx
+    shr rbx, 32
+    mov edx, ebx
+
+    wrmsr
+
+    pop rax
+    pop rcx
+    pop rdx
+    pop rbx
+
+    ret
+
+
+asm_update_kern_fs_base:
+    pushfq
+
+    cli
+
+    swapgs
+
+    call update_kern_fs_base_locked
+
+    swapgs
+
+    popfq
+
+    ret
 
 asm_syscall_handler:
     push rbx
@@ -22,6 +62,8 @@ asm_syscall_handler:
     mov r12, qword [gs:28]
     mov qword [gs:28], 0
 
+    call update_kern_fs_base_locked
+
     swapgs
 
     sti
@@ -29,8 +71,6 @@ asm_syscall_handler:
     push r12                ; Push user stack
     push rcx                ; Push return value
     push r11                ; Push rflags
-
-    cld
 
     push r9
     push r8
@@ -42,6 +82,7 @@ asm_syscall_handler:
 
     mov rdi, rsp
 
+    cld
     call fast_syscall_handler
 
     add rsp, 8              ; Preserve syscall return value in rax
@@ -54,6 +95,10 @@ asm_syscall_handler:
 
 asm_sysretq:
     cli
+
+    push rax                ; Preserve syscall return value
+    call restore_user_fs    ; Set this tasks fs base
+    pop rax
 
     pop r11                 ; Restore rflags
     pop rcx                 ; Restore return value
@@ -81,6 +126,8 @@ asm_sysretq_forkinit:
     jmp asm_sysretq
 
 asm_sysretq_userinit:
+    call restore_user_fs    ; Switch to user fs base
+
     pop r11                 ; Restore rflags
     pop rcx                 ; Restore return value
     pop rsp                 ; Restore user stack

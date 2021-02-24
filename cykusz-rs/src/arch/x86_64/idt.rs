@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
-use paste::paste;
-
 use crate::arch::raw::idt;
+use crate::arch::raw::idt::ExceptionStackFrame;
+use crate::arch::tls::restore_user_fs;
 use crate::arch::x86_64::int::end_of_int;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task;
@@ -12,267 +12,325 @@ use crate::kernel::task::vm::PageFaultReason;
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
 
-struct SharedIrq {
-    irqs: [RwSpin<Vec<fn() -> bool>>; 32],
+pub type ExceptionFn = fn(&mut ExceptionStackFrame);
+pub type ExceptionErrFn = fn(&mut ExceptionStackFrame, u64);
+pub type InterruptFn = fn();
+pub type SharedInterruptFn = fn() -> bool;
+
+enum IrqHandler {
+    Missing,
+    Exception(ExceptionFn),
+    ExceptionErr(ExceptionErrFn),
+    Interrupt(InterruptFn),
+    SharedInterrupt(Vec<SharedInterruptFn>),
 }
 
-pub fn init() {
-    let mut idt = IDT.lock();
-    //Initialise exception handler routines
-    idt.set_divide_by_zero(divide_by_zero);
-    idt.set_debug(debug);
-    idt.set_non_maskable_interrupt(non_maskable_interrupt);
-    idt.set_breakpoint(breakpoint);
-    idt.set_overflow(overflow);
-    idt.set_bound_range_exceeded(bound_range_exceeded);
-    idt.set_invalid_opcode(invalid_opcode);
-    idt.set_device_not_available(device_not_available);
-    idt.set_double_fault(double_fault);
-    idt.set_invalid_tss(invalid_tss);
-    idt.set_segment_not_present(segment_not_present);
-    idt.set_stack_segment_fault(stack_segment_fault);
-    idt.set_general_protection_fault(general_protection_fault);
-    idt.set_page_fault(page_fault);
-    idt.set_x87_floating_point_exception(x87_floating_point_exception);
-    idt.set_alignment_check(alignment_check);
-    idt.set_machine_check(machine_check);
-    idt.set_simd_floating_point_exception(simd_floating_point_exception);
-    idt.set_virtualisation_exception(virtualisation_exception);
-    idt.set_security_exception(security_exception);
+struct Irqs {
+    irqs: RwSpin<[IrqHandler; 256]>,
+}
 
-    unsafe {
-        idt.set_handler(32, shared_32);
-        idt.set_handler(33, shared_33);
-        idt.set_handler(34, shared_34);
-        idt.set_handler(35, shared_35);
-        idt.set_handler(36, shared_36);
-        idt.set_handler(37, shared_37);
-        idt.set_handler(38, shared_38);
-        idt.set_handler(39, shared_39);
-        idt.set_handler(40, shared_40);
-        idt.set_handler(41, shared_41);
-        idt.set_handler(42, shared_42);
-        idt.set_handler(43, shared_43);
-        idt.set_handler(44, shared_44);
-        idt.set_handler(45, shared_45);
-        idt.set_handler(46, shared_46);
-        idt.set_handler(47, shared_47);
-        idt.set_handler(48, shared_48);
-        idt.set_handler(49, shared_49);
-        idt.set_handler(50, shared_50);
-        idt.set_handler(51, shared_51);
-        idt.set_handler(52, shared_52);
-        idt.set_handler(53, shared_53);
-        idt.set_handler(54, shared_54);
-        idt.set_handler(55, shared_55);
-        idt.set_handler(56, shared_56);
-        idt.set_handler(57, shared_57);
-        idt.set_handler(58, shared_58);
-        idt.set_handler(59, shared_59);
-        idt.set_handler(60, shared_60);
-        idt.set_handler(61, shared_61);
-        idt.set_handler(62, shared_62);
-        idt.set_handler(63, shared_63);
+impl Irqs {
+    fn set_exception_handler(&self, idx: usize, f: ExceptionFn) {
+        let mut irqs = self.irqs.write_irq();
+
+        match irqs[idx] {
+            IrqHandler::Missing => {
+                irqs[idx] = IrqHandler::Exception(f);
+            }
+            _ => {
+                panic!("Exception handler already exists");
+            }
+        }
     }
 
-    idt.load();
-}
+    fn set_exception_err_handler(&self, idx: usize, f: ExceptionErrFn) {
+        let mut irqs = self.irqs.write_irq();
 
-pub fn set_handler(num: usize, f: idt::ExceptionHandlerFn) {
-    assert!(num < 32 || num >= 64);
-    unsafe {
-        let mut idt = IDT.lock();
-        idt.set_handler(num, f);
+        match irqs[idx] {
+            IrqHandler::Missing => {
+                irqs[idx] = IrqHandler::ExceptionErr(f);
+            }
+            _ => {
+                panic!("ExceptionErr handler already exists");
+            }
+        }
+    }
+
+    fn set_int_handler(&self, idx: usize, f: InterruptFn) {
+        let mut irqs = self.irqs.write_irq();
+
+        match irqs[idx] {
+            IrqHandler::Missing => {
+                irqs[idx] = IrqHandler::Interrupt(f);
+            }
+            _ => {
+                panic!("Interrupt handler already exists");
+            }
+        }
+    }
+
+    fn set_shared_int_handler(&self, idx: usize, f: SharedInterruptFn) {
+        let mut irqs = self.irqs.write_irq();
+
+        match &mut irqs[idx] {
+            IrqHandler::Missing => {
+                let mut v = Vec::<SharedInterruptFn>::new();
+                v.push(f);
+                irqs[idx] = IrqHandler::SharedInterrupt(v);
+            }
+            IrqHandler::SharedInterrupt(v) => {
+                v.push(f);
+            }
+            _ => {
+                panic!("Not a shared interrupt handler");
+            }
+        }
+    }
+
+    fn remove_shared_int_handler(&self, idx: usize, handler: SharedInterruptFn) {
+        let mut irqs = self.irqs.write_irq();
+
+        if let IrqHandler::SharedInterrupt(h) = &mut irqs[idx] {
+            if let Some(i) = h.iter().enumerate().find_map(|(i, e)| {
+                if *e == handler {
+                    return Some(i);
+                } else {
+                    None
+                }
+            }) {
+                h.remove(i);
+            }
+        }
+    }
+
+    pub fn set_divide_by_zero(&self, f: ExceptionFn) {
+        self.set_exception_handler(0, f);
+    }
+    pub fn set_debug(&self, f: ExceptionFn) {
+        self.set_exception_handler(1, f);
+    }
+    pub fn set_non_maskable_interrupt(&self, f: ExceptionFn) {
+        self.set_exception_handler(2, f);
+    }
+    pub fn set_breakpoint(&self, f: ExceptionFn) {
+        self.set_exception_handler(3, f);
+    }
+    pub fn set_overflow(&self, f: ExceptionFn) {
+        self.set_exception_handler(4, f);
+    }
+    pub fn set_bound_range_exceeded(&self, f: ExceptionFn) {
+        self.set_exception_handler(5, f);
+    }
+    pub fn set_invalid_opcode(&self, f: ExceptionFn) {
+        self.set_exception_handler(6, f);
+    }
+    pub fn set_device_not_available(&self, f: ExceptionFn) {
+        self.set_exception_handler(7, f);
+    }
+    pub fn set_double_fault(&self, f: ExceptionErrFn) {
+        self.set_exception_err_handler(8, f);
+    }
+    pub fn set_invalid_tss(&self, f: ExceptionErrFn) {
+        self.set_exception_err_handler(10, f);
+    }
+    pub fn set_segment_not_present(&self, f: ExceptionErrFn) {
+        self.set_exception_err_handler(11, f);
+    }
+    pub fn set_stack_segment_fault(&self, f: ExceptionErrFn) {
+        self.set_exception_err_handler(12, f);
+    }
+    pub fn set_general_protection_fault(&self, f: ExceptionErrFn) {
+        self.set_exception_err_handler(13, f);
+    }
+    pub fn set_page_fault(&self, f: ExceptionErrFn) {
+        self.set_exception_err_handler(14, f);
+    }
+    pub fn set_x87_floating_point_exception(&self, f: ExceptionFn) {
+        self.set_exception_handler(16, f);
+    }
+    pub fn set_alignment_check(&self, f: ExceptionErrFn) {
+        self.set_exception_err_handler(17, f);
+    }
+    pub fn set_machine_check(&self, f: ExceptionFn) {
+        self.set_exception_handler(18, f);
+    }
+    pub fn set_simd_floating_point_exception(&self, f: ExceptionFn) {
+        self.set_exception_handler(19, f);
+    }
+    pub fn set_virtualisation_exception(&self, f: ExceptionFn) {
+        self.set_exception_handler(20, f);
+    }
+    pub fn set_security_exception(&self, f: ExceptionErrFn) {
+        self.set_exception_err_handler(30, f);
     }
 }
 
-pub fn has_handler(num: usize) -> bool {
-    assert!(num <= 255);
-    if num < 32 || num >= 64 {
-        let idt = IDT.lock();
-
-        idt.has_handler(num)
-    } else {
-        !SHARED_IRQS.irqs[num - 32].read().is_empty()
-    }
+extern "C" {
+    static interrupt_handlers: [*const u8; 256];
 }
 
-pub fn remove_handler(num: usize) {
-    assert!(num <= 255);
-    let mut idt = IDT.lock();
+#[no_mangle]
+pub extern "C" fn isr_handler(int: usize, err: usize, frame: &mut ExceptionStackFrame) {
+    let irqs = SHARED_IRQS.irqs.read();
 
-    idt.remove_handler(num);
-}
-
-pub fn set_user_handler(num: usize, f: idt::ExceptionHandlerFn) {
-    assert!(num <= 255);
-    unsafe {
-        let mut idt = IDT.lock();
-        idt.set_user_handler(num, f);
-    }
-}
-
-static SHARED_IRQS: SharedIrq = SharedIrq {
-    irqs: [
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-        RwSpin::new(Vec::new()),
-    ],
-};
-
-fn handle_shared_irq(irq: u32) {
-    let idx = irq - 32;
-
-    let sh = SHARED_IRQS.irqs[idx as usize].read();
-
-    for h in sh.iter() {
-        h();
+    match &irqs[int] {
+        IrqHandler::Exception(e) => {
+            e(frame);
+        }
+        IrqHandler::ExceptionErr(e) => {
+            e(frame, err as u64);
+        }
+        IrqHandler::Interrupt(e) => {
+            e();
+        }
+        IrqHandler::SharedInterrupt(e) => {
+            for h in e.iter() {
+                h();
+            }
+        }
+        IrqHandler::Missing => {}
     }
 
-    drop(sh);
+    drop(irqs);
+
+    let ret_addr = VirtAddr(frame.ip as usize);
+
+    if ret_addr.is_user() {
+        restore_user_fs();
+    }
 
     end_of_int();
 }
 
-pub fn add_shared_irq_handler(irq: usize, handler: fn() -> bool) {
-    let idx = irq - 32;
+pub fn init() {
+    let mut idt = IDT.lock();
 
-    assert!(irq >= 32 && irq < 64, "invalid shared irq nr");
+    unsafe {
+        for (i, &h) in interrupt_handlers.iter().enumerate() {
+            if h != core::ptr::null() {
+                idt.set_handler(i, h as usize);
+            }
+        }
+    }
 
-    let mut sh = SHARED_IRQS.irqs[idx].write();
+    //Initialise exception handler routines
+    SHARED_IRQS.set_divide_by_zero(divide_by_zero);
+    SHARED_IRQS.set_debug(debug);
+    SHARED_IRQS.set_non_maskable_interrupt(non_maskable_interrupt);
+    SHARED_IRQS.set_breakpoint(breakpoint);
+    SHARED_IRQS.set_overflow(overflow);
+    SHARED_IRQS.set_bound_range_exceeded(bound_range_exceeded);
+    SHARED_IRQS.set_invalid_opcode(invalid_opcode);
+    SHARED_IRQS.set_device_not_available(device_not_available);
+    SHARED_IRQS.set_double_fault(double_fault);
+    SHARED_IRQS.set_invalid_tss(invalid_tss);
+    SHARED_IRQS.set_segment_not_present(segment_not_present);
+    SHARED_IRQS.set_stack_segment_fault(stack_segment_fault);
+    SHARED_IRQS.set_general_protection_fault(general_protection_fault);
+    SHARED_IRQS.set_page_fault(page_fault);
+    SHARED_IRQS.set_x87_floating_point_exception(x87_floating_point_exception);
+    SHARED_IRQS.set_alignment_check(alignment_check);
+    SHARED_IRQS.set_machine_check(machine_check);
+    SHARED_IRQS.set_simd_floating_point_exception(simd_floating_point_exception);
+    SHARED_IRQS.set_virtualisation_exception(virtualisation_exception);
+    SHARED_IRQS.set_security_exception(security_exception);
 
-    sh.push(handler);
+    idt.load();
 }
 
-pub fn remove_shared_irq_handler(irq: usize, handler: fn() -> bool) {
-    assert!(irq >= 32 && irq < 64, "invalid shared irq nr");
+pub fn init_ap() {
+    let idt = IDT.lock();
+    idt.load();
+}
 
-    let idx = irq - 32;
+pub fn has_handler(num: usize) -> bool {
+    assert!(num <= 255);
 
-    let mut sh = SHARED_IRQS.irqs[idx].write();
+    let irqs = SHARED_IRQS.irqs.read();
 
-    if let Some(i) = sh.iter().enumerate().find_map(|(i, e)| {
-        if *e == handler {
-            return Some(i);
-        } else {
-            None
-        }
-    }) {
-        sh.remove(i);
+    if let IrqHandler::Missing = irqs[num] {
+        false
+    } else {
+        true
     }
 }
 
-macro_rules! def_shared {
-    ($num:expr) => {
-        paste! {
-            extern "x86-interrupt" fn [<shared_ $num>](_frame: &mut idt::ExceptionStackFrame) {
-                handle_shared_irq($num);
-            }
+pub fn remove_handler(num: usize) -> bool {
+    assert!(num <= 255);
+    let mut irqs = SHARED_IRQS.irqs.write_irq();
+
+    match &irqs[num] {
+        IrqHandler::Interrupt(_) | IrqHandler::ExceptionErr(_) | IrqHandler::Exception(_) => {
+            irqs[num] = IrqHandler::Missing;
+
+            true
         }
-    };
+        _ => false,
+    }
 }
 
-def_shared!(32);
-def_shared!(33);
-def_shared!(34);
-def_shared!(35);
-def_shared!(36);
-def_shared!(37);
-def_shared!(38);
-def_shared!(39);
-def_shared!(40);
-def_shared!(41);
-def_shared!(42);
-def_shared!(43);
-def_shared!(44);
-def_shared!(45);
-def_shared!(46);
-def_shared!(47);
-def_shared!(48);
-def_shared!(49);
-def_shared!(50);
-def_shared!(51);
-def_shared!(52);
-def_shared!(53);
-def_shared!(54);
-def_shared!(55);
-def_shared!(56);
-def_shared!(57);
-def_shared!(58);
-def_shared!(59);
-def_shared!(60);
-def_shared!(61);
-def_shared!(62);
-def_shared!(63);
+pub fn set_user_handler(num: usize, f: InterruptFn) {
+    assert!(num <= 255);
 
-#[allow(unused)]
-extern "x86-interrupt" fn dummy(_frame: &mut idt::ExceptionStackFrame) {
-    println!("Dummy int");
-    crate::arch::int::end_of_int();
+    unsafe {
+        IDT.lock_irq().set_user(num, true);
+    }
+
+    SHARED_IRQS.set_int_handler(num, f);
 }
 
-extern "x86-interrupt" fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {
+static SHARED_IRQS: Irqs = {
+    const MISSING: IrqHandler = IrqHandler::Missing;
+    Irqs {
+        irqs: RwSpin::new([MISSING; 256]),
+    }
+};
+
+pub fn add_shared_irq_handler(irq: usize, handler: SharedInterruptFn) {
+    assert!(irq >= 32 && irq < 64, "invalid shared irq nr");
+
+    SHARED_IRQS.set_shared_int_handler(irq, handler);
+}
+
+pub fn remove_shared_irq_handler(irq: usize, handler: SharedInterruptFn) {
+    assert!(irq >= 32 && irq < 64, "invalid shared irq nr");
+
+    SHARED_IRQS.remove_shared_int_handler(irq, handler);
+}
+
+fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {
     println!("Divide By Zero error!");
     loop {}
 }
 
-extern "x86-interrupt" fn debug(_frame: &mut idt::ExceptionStackFrame) {
+fn debug(_frame: &mut idt::ExceptionStackFrame) {
     unsafe {
         println!("INT: Debug exception! CPU: {}", crate::CPU_ID);
     }
     loop {}
 }
 
-extern "x86-interrupt" fn non_maskable_interrupt(_frame: &mut idt::ExceptionStackFrame) {
+fn non_maskable_interrupt(_frame: &mut idt::ExceptionStackFrame) {
     println!("INT: Non Maskable Interrupt");
     loop {}
 }
 
-extern "x86-interrupt" fn breakpoint(_frame: &mut idt::ExceptionStackFrame) {
+fn breakpoint(_frame: &mut idt::ExceptionStackFrame) {
     println!("INT: Breakpoint!");
     loop {}
 }
 
-extern "x86-interrupt" fn overflow(_frame: &mut idt::ExceptionStackFrame) {
+fn overflow(_frame: &mut idt::ExceptionStackFrame) {
     println!("Overflow error!");
     loop {}
 }
 
-extern "x86-interrupt" fn bound_range_exceeded(_frame: &mut idt::ExceptionStackFrame) {
+fn bound_range_exceeded(_frame: &mut idt::ExceptionStackFrame) {
     println!("Bound Range Exceeded error!");
     loop {}
 }
 
-extern "x86-interrupt" fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) {
+fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) {
     println!(
         "Invalid Opcode error! task {} {:?} {}",
         crate::kernel::sched::current_id(),
@@ -282,35 +340,32 @@ extern "x86-interrupt" fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) 
     loop {}
 }
 
-extern "x86-interrupt" fn device_not_available(_frame: &mut idt::ExceptionStackFrame) {
+fn device_not_available(_frame: &mut idt::ExceptionStackFrame) {
     println!("Device Not Available error!");
     loop {}
 }
 
-extern "x86-interrupt" fn double_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn double_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Double Fault error! 0x{:x}", err);
     loop {}
 }
 
-extern "x86-interrupt" fn invalid_tss(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn invalid_tss(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Invalid TSS error! 0x{:x}", err);
     loop {}
 }
 
-extern "x86-interrupt" fn segment_not_present(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn segment_not_present(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Segment Not Present error 0x{:x}", err);
     loop {}
 }
 
-extern "x86-interrupt" fn stack_segment_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn stack_segment_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Stack Segment Failt error! 0x{:x}", err);
     loop {}
 }
 
-extern "x86-interrupt" fn general_protection_fault(
-    _frame: &mut idt::ExceptionStackFrame,
-    err: u64,
-) {
+fn general_protection_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     unsafe {
         println!(
             "General Protection Fault error! 0x{:x} CPU: {}",
@@ -321,7 +376,7 @@ extern "x86-interrupt" fn general_protection_fault(
     loop {}
 }
 
-extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     let virt = VirtAddr(unsafe { crate::arch::raw::ctrlregs::cr2() });
 
     let reason = PageFaultReason::from_bits_truncate(err as usize);
@@ -363,32 +418,32 @@ extern "x86-interrupt" fn page_fault(_frame: &mut idt::ExceptionStackFrame, err:
     loop {}
 }
 
-extern "x86-interrupt" fn x87_floating_point_exception(_frame: &mut idt::ExceptionStackFrame) {
+fn x87_floating_point_exception(_frame: &mut idt::ExceptionStackFrame) {
     println!("x87 Floating Point Exception!");
     loop {}
 }
 
-extern "x86-interrupt" fn alignment_check(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn alignment_check(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Alignment Check error! 0x{:x}", err);
     loop {}
 }
 
-extern "x86-interrupt" fn machine_check(_frame: &mut idt::ExceptionStackFrame) {
+fn machine_check(_frame: &mut idt::ExceptionStackFrame) {
     println!("Machine Check error");
     loop {}
 }
 
-extern "x86-interrupt" fn simd_floating_point_exception(_frame: &mut idt::ExceptionStackFrame) {
+fn simd_floating_point_exception(_frame: &mut idt::ExceptionStackFrame) {
     println!("SIMD Floating Point Exception!");
     loop {}
 }
 
-extern "x86-interrupt" fn virtualisation_exception(_frame: &mut idt::ExceptionStackFrame) {
+fn virtualisation_exception(_frame: &mut idt::ExceptionStackFrame) {
     println!("Virtualisation Exception!");
     loop {}
 }
 
-extern "x86-interrupt" fn security_exception(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn security_exception(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     println!("Security Exception! 0x{:x}", err);
     loop {}
 }

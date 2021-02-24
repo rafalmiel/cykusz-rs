@@ -1,6 +1,3 @@
-use crate::arch::idt;
-use crate::arch::raw::idt as ridt;
-
 extern "C" {
     fn asm_syscall_handler();
 }
@@ -22,8 +19,6 @@ fn enable_syscall_extension() {
 
 pub fn init() {
     enable_syscall_extension();
-
-    idt::set_user_handler(80, syscall_handler);
 }
 
 pub fn init_ap() {
@@ -46,8 +41,4 @@ pub extern "C" fn fast_syscall_handler(frame: &SyscallFrame) -> isize {
     crate::kernel::syscall::syscall_handler(
         frame.rax, frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
     )
-}
-
-extern "x86-interrupt" fn syscall_handler(_frame: &mut ridt::ExceptionStackFrame) {
-    crate::kernel::syscall::syscall_handler(0, 0, 0, 0, 0, 0, 0);
 }

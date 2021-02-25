@@ -372,6 +372,14 @@ struct VMData {
     maps: LinkedList<Mapping>,
 }
 
+pub struct TlsVmInfo {
+    pub file: DirEntryItem,
+    pub file_offset: usize,
+    pub file_size: usize,
+    pub mem_size: usize,
+    pub mmap_addr_hint: VirtAddr,
+}
+
 impl VMData {
     fn new() -> VMData {
         VMData {
@@ -575,29 +583,55 @@ impl VMData {
         }
     }
 
-    fn load_bin(&mut self, exe: DirEntryItem) -> Option<VirtAddr> {
+    fn load_bin(&mut self, exe: DirEntryItem) -> Option<(VirtAddr, Option<TlsVmInfo>)> {
         if let Some(elf_page) = exe.inode().as_cacheable().unwrap().get_mmap_page(0) {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
 
-            for p in hdr.programs().filter(|p| p.p_type == ProgramType::Load) {
-                let virt_begin = VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);
-                let virt_end =
-                    VirtAddr(p.p_vaddr as usize + p.p_memsz as usize).align_up(PAGE_SIZE);
+            let mut last_mmap_end = VirtAddr(0);
+            let mut tls_vm_info = None;
 
-                let file_offset = p.p_offset.align(PAGE_SIZE as u64);
+            for p in hdr
+                .programs()
+                .filter(|p| p.p_type == ProgramType::Load || p.p_type == ProgramType::TLS)
+            {
+                if p.p_type == ProgramType::Load {
+                    let virt_begin = VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);
+                    let virt_end =
+                        VirtAddr(p.p_vaddr as usize + p.p_memsz as usize).align_up(PAGE_SIZE);
+                    let len = virt_end - virt_begin;
 
-                self.mmap_vm(
-                    Some(virt_begin),
-                    virt_end.0 - virt_begin.0,
-                    p.p_flags.into(),
-                    MMapFlags::MAP_PRIVATE | MMapFlags::MAP_FIXED,
-                    Some(exe.clone()),
-                    file_offset as usize,
-                )
-                .expect("Failed to mmap");
+                    let file_offset = p.p_offset.align(PAGE_SIZE as u64);
+
+                    last_mmap_end = self
+                        .mmap_vm(
+                            Some(virt_begin),
+                            virt_end.0 - virt_begin.0,
+                            p.p_flags.into(),
+                            MMapFlags::MAP_PRIVATE | MMapFlags::MAP_FIXED,
+                            Some(exe.clone()),
+                            file_offset as usize,
+                        )
+                        .expect("Failed to mmap")
+                        + len;
+                } else {
+                    if tls_vm_info.is_some() {
+                        panic!("TLS already setup");
+                    }
+                    let tls_mem_size = p.p_memsz as usize;
+                    let tls_file_size = p.p_filesz as usize;
+                    let tls_file_offset = p.p_offset as usize;
+
+                    tls_vm_info = Some(TlsVmInfo {
+                        file: exe.clone(),
+                        file_offset: tls_file_offset,
+                        file_size: tls_file_size,
+                        mem_size: tls_mem_size,
+                        mmap_addr_hint: last_mmap_end,
+                    });
+                }
             }
 
-            return Some(VirtAddr(hdr.e_entry as usize));
+            return Some((VirtAddr(hdr.e_entry as usize), tls_vm_info));
         }
 
         None
@@ -719,7 +753,7 @@ impl VM {
         res
     }
 
-    pub fn load_bin(&self, exe: DirEntryItem) -> Option<VirtAddr> {
+    pub fn load_bin(&self, exe: DirEntryItem) -> Option<(VirtAddr, Option<TlsVmInfo>)> {
         self.data.lock().load_bin(exe)
     }
 

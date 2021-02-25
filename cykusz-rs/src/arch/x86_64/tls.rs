@@ -38,7 +38,8 @@ pub fn update_fs_base(ptr: usize) {
     }
 }
 
-pub fn update_kern_fs_base() {
+#[no_mangle]
+pub extern "C" fn update_kern_fs_base() {
     if crate::kernel::tls::is_ready() {
         unsafe {
             asm_update_kern_fs_base();

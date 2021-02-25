@@ -132,8 +132,8 @@ impl Task {
 
         let vm = task.vm();
 
-        if let Some(entry) = vm.load_bin(exe) {
-            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, vm));
+        if let Some((entry, tls_vm)) = vm.load_bin(exe) {
+            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, vm, tls_vm));
 
             task
         } else {
@@ -163,8 +163,8 @@ impl Task {
 
         let vm = task.vm();
 
-        if let Some(entry) = vm.load_bin(exe) {
-            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, vm));
+        if let Some((entry, tls_vm)) = vm.load_bin(exe) {
+            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, vm, tls_vm));
 
             task.filetable = self.filetable.clone();
             if let Some(e) = self.get_dent() {

@@ -21,6 +21,7 @@ pub mod file;
 pub mod lang;
 pub mod nc;
 
+#[thread_local]
 pub static mut TEST: usize = 33;
 
 fn make_str(buf: &[u8]) -> &str {
@@ -468,7 +469,7 @@ fn exec(cmd: &str) {
 }
 
 fn main_cd() -> ! {
-    println!("{}", unsafe { TEST });
+    println!("{}", unsafe { (&TEST as *const usize).read_volatile() });
     loop {
         let mut buf = [0u8; 256];
         let mut pwd = [0u8; 1024];

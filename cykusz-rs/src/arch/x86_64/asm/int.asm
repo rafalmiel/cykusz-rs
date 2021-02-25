@@ -1,6 +1,6 @@
 global interrupt_handlers
 
-extern asm_update_kern_fs_base
+extern update_kern_fs_base
 
 section .text
 bits 64
@@ -80,7 +80,7 @@ extern isr_handler
 isr_common:
     pushAll
 
-    call asm_update_kern_fs_base
+    call update_kern_fs_base
 
     ; prepare parameters
     mov rdi, qword [rsp + 72] ; int num value

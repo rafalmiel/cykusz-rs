@@ -157,6 +157,14 @@ impl Deref for LockedHeap {
 
 pub static HEAP_DEBUG: AtomicBool = AtomicBool::new(false);
 
+pub fn enable_heap_debug() {
+    HEAP_DEBUG.store(true, Ordering::SeqCst);
+}
+
+pub fn disable_heap_debug() {
+    HEAP_DEBUG.store(false, Ordering::SeqCst);
+}
+
 pub struct HeapDebug {}
 
 impl HeapDebug {

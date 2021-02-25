@@ -10,9 +10,10 @@ use crate::arch::x86_64::mm::phys::{allocate_order, deallocate_order};
 use crate::arch::x86_64::mm::virt::p4_table;
 use crate::arch::x86_64::mm::virt::table::P4Table;
 use crate::arch::x86_64::raw::mm::MappedAddr;
-use crate::kernel::mm::VirtAddr;
+use crate::kernel::mm::virt::PageFlags;
+use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};
-use crate::kernel::task::vm::VM;
+use crate::kernel::task::vm::{TlsVmInfo, VM};
 
 const USER_STACK_SIZE: usize = 0x4000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
@@ -80,7 +81,6 @@ pub extern "C" fn fork_get_pid() -> isize {
 
 fn prepare_p4<'a>() -> &'a mut P4Table {
     use crate::arch::mm::virt::current_p4_table;
-    use crate::kernel::mm::allocate;
 
     let current_p4 = current_p4_table();
     let frame = allocate().expect("Out of mem!");
@@ -94,6 +94,51 @@ fn prepare_p4<'a>() -> &'a mut P4Table {
     }
 
     new_p4
+}
+
+fn prepare_tls(vm: &VM, p_table: &mut P4Table, tls: &TlsVmInfo) -> VirtAddr {
+    let mmap = vm
+        .mmap_vm(
+            Some(tls.mmap_addr_hint),
+            tls.mem_size + 8,
+            MMapProt::PROT_READ | MMapProt::PROT_WRITE,
+            MMapFlags::MAP_ANONYOMUS | MMapFlags::MAP_PRIVATE,
+            None,
+            0,
+        )
+        .expect("Failed to mmap tls");
+
+    for (num, m) in (mmap..(mmap + VirtAddr(tls.mem_size + 8)).align_up(PAGE_SIZE))
+        .step_by(PAGE_SIZE)
+        .enumerate()
+    {
+        let frame = allocate().expect("Failed to allocate tls frame");
+
+        let offset = num * PAGE_SIZE;
+        if offset < tls.file_size {
+            let rem = tls.file_size - offset;
+            let to_read = core::cmp::min(PAGE_SIZE, rem);
+
+            if let Ok(r) = tls.file.inode().read_at(tls.file_offset + offset, unsafe {
+                frame.address_mapped().as_bytes_mut(to_read)
+            }) {
+                if r != to_read {
+                    panic!("Failed to read tls data");
+                }
+            } else {
+                panic!("Failed to read tls data");
+            }
+        }
+
+        p_table.map_to_flags(m, frame.address(), PageFlags::USER | PageFlags::WRITABLE);
+    }
+
+    let phys = p_table.to_phys(mmap + tls.mem_size).unwrap();
+    unsafe {
+        phys.to_mapped().store(mmap + tls.mem_size);
+    }
+
+    mmap + tls.mem_size
 }
 
 #[repr(C, packed)]
@@ -323,7 +368,7 @@ impl Task {
         )
     }
 
-    pub fn new_user(entry: VirtAddr, vm: &VM) -> Task {
+    pub fn new_user(entry: VirtAddr, vm: &VM, tls_vm: Option<TlsVmInfo>) -> Task {
         let p_table = prepare_p4();
 
         vm.mmap_vm(
@@ -335,9 +380,15 @@ impl Task {
             0,
         );
 
+        let tls_ptr = if let Some(tls) = &tls_vm {
+            prepare_tls(vm, p_table, tls)
+        } else {
+            VirtAddr(0)
+        };
+
         let f = unsafe { ::core::mem::transmute::<usize, fn()>(entry.0) };
 
-        let t = Task::new(
+        let mut t = Task::new(
             f as usize,
             gdt::ring3_cs(),
             gdt::ring3_ds(),
@@ -346,6 +397,8 @@ impl Task {
             Some(0x8000_0000_0000),
             0,
         );
+
+        t.user_fs_base = tls_ptr.0;
 
         t
     }

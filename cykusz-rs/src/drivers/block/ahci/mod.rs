@@ -30,6 +30,7 @@ impl PciDeviceHandle for Ahci {
     fn handles(&self, pci_vendor_id: u64, pci_dev_id: u64) -> bool {
         match (pci_vendor_id, pci_dev_id) {
             (0x8086, 0x2922) => true,
+            (0x8086, 0x2829) => true,
             _ => false,
         }
     }

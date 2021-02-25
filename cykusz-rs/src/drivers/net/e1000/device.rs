@@ -198,9 +198,8 @@ impl E1000Data {
     }
 
     pub fn wait_link_up(&self) {
-        while self.addr.read(Regs::Status) & 2 != 2 {
-            println!("Waiting for link up : {:X}", self.addr.read(Regs::Status));
-        }
+        println!("[ E1000 ] Waiting for link up...");
+        while self.addr.read(Regs::Status) & 2 != 2 {}
     }
 
     pub fn clear_filters(&self) {

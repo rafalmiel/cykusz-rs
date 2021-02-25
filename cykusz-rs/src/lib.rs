@@ -143,13 +143,13 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
     println!("[ OK ] CPU {} Initialised", unsafe { crate::CPU_ID });
 
-    kernel::smp::notify_ap_ready();
-
     kernel::syscall::init_ap();
 
     kernel::timer::setup();
 
     kernel::timer::start();
+
+    kernel::smp::notify_ap_ready();
 
     // Start test tasks on this cpu
     //task_test::start();

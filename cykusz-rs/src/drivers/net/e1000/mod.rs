@@ -87,6 +87,8 @@ impl NetDriver for E1000 {
 
         data.enable_interrupt();
 
+        data.link_up();
+
         data.wait_link_up();
     }
 }

@@ -365,14 +365,12 @@ fn stack_segment_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     loop {}
 }
 
-fn general_protection_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
-    unsafe {
-        println!(
-            "General Protection Fault error! 0x{:x} CPU: {}",
-            err,
-            crate::CPU_ID
-        );
-    }
+fn general_protection_fault(frame: &mut idt::ExceptionStackFrame, err: u64) {
+    println!(
+        "General Protection Fault error! 0x{:x} frame: {:?}",
+        err,
+        frame //unsafe { crate::CPU_ID }
+    );
     loop {}
 }
 

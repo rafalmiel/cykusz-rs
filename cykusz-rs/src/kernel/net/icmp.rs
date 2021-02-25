@@ -122,11 +122,7 @@ fn process_echo(packet: Packet<Icmp>) {
         icmp_hdr.calc_checksum(packet.len());
     }
 
-    println!("[ ICMP ] Sending Echo Reply");
-
     crate::kernel::net::ip::send_packet(out_packet.downgrade());
-
-    out_packet.deallocate();
 }
 
 pub fn process_dest_unreachable(packet: Packet<Icmp>) {

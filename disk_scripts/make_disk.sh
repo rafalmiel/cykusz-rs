@@ -3,6 +3,7 @@
 set -e
 
 dd if=/dev/zero of=disk.img count=192 bs=$((1024*1024))
+chown $1:$1 disk.img
 
 parted disk.img mktable msdos -s
 parted disk.img mkpart primary ext2 2048s 32767s

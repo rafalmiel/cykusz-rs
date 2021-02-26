@@ -34,12 +34,34 @@ You will need following packages to compile and run the os:
 * nasm
 * qemu
 
-Steps:
+Building:
 ```bash
+git clone https://github.com/rafalmiel/cykusz-rs.git
+git submodule update --init --recursive
+
 rustup override set nightly
 rustup component add rust-src
 cargo install xargo
 make
 
+./create_disk.sh
+```
+
+Running on qemu:
+```bash
 make run
 ```
+
+Running on bochs:
+```bash
+make bochs
+```
+
+Running on VirtualBox:
+```bash
+# Run only once to import the image into VirtualBox
+./create_vbox_image.sh
+
+make vbox
+```
+

@@ -1,6 +1,7 @@
 arch ?= x86_64
 iso := build/os-$(arch).iso
 disk := disk.img
+vdi := disk.vdi
 
 linker_script := cykusz-rs/src/arch/$(arch)/asm/linker.ld
 grub_cfg := cykusz-rs/src/arch/$(arch)/asm/grub.cfg
@@ -39,6 +40,9 @@ run_ata: $(iso) $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -m 512 -smp cpus=4  -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
 	qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -hda disk.img -rtc base=utc,clock=host
 
+vbox: $(iso) $(vdi)
+	VBoxManage startvm cykusz
+
 debug: $(iso) $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -s -S -smp cpus=1 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
 	qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 512 -smp cpus=1 -no-shutdown -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -monitor /dev/stdout
@@ -64,6 +68,10 @@ $(iso): $(kernel) $(grub_cfg) $(user)
 
 $(disk): $(iso)
 	sudo disk_scripts/install_os.sh
+
+$(vdi): $(disk)
+	disk_scripts/make_vdi.sh
+	disk_scripts/attach_vdi.sh
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
 	ld -n --whole-archive --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)

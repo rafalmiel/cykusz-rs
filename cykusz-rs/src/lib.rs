@@ -147,9 +147,9 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
     kernel::timer::setup();
 
-    kernel::timer::start();
-
     kernel::smp::notify_ap_ready();
+
+    kernel::timer::start();
 
     // Start test tasks on this cpu
     //task_test::start();

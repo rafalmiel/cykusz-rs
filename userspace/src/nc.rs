@@ -3,7 +3,7 @@ use syscall_defs::ConnectionFlags;
 fn send(fd: usize) -> bool {
     let mut buf = [0u8; 1300];
 
-    if let Ok(read) = syscall::read(1, &mut buf) {
+    if let Ok(read) = syscall::read(0, &mut buf) {
         if read == 1 {
             return false;
         }
@@ -61,9 +61,9 @@ fn start(fd: usize) {
     }
 
     loop {
-        if let Ok(ready) = syscall::select(&[1, fd as u8]) {
+        if let Ok(ready) = syscall::select(&[0, fd as u8]) {
             match ready {
-                1 => {
+                0 => {
                     if !send(fd) {
                         break;
                     }

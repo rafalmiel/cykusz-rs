@@ -170,6 +170,10 @@ macro_rules! enable_unsigned_ops {
                 self.align_down(PAGE_SIZE).as_bytes_mut(PAGE_SIZE).copy_from_slice(src.align_down(PAGE_SIZE).as_bytes(PAGE_SIZE));
             }
 
+            pub unsafe fn copy_page_from_bytes(self, src: $type_, bytes: usize) {
+                self.align_down(PAGE_SIZE).as_bytes_mut(bytes).copy_from_slice(src.align_down(PAGE_SIZE).as_bytes(bytes));
+            }
+
             pub unsafe fn as_bytes<'a>(self, size: usize) -> &'a [u8] {
                 core::slice::from_raw_parts(self.0 as *const u8, size)
             }

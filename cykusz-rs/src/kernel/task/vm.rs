@@ -58,14 +58,16 @@ impl From<ProgramFlags> for MMapProt {
 struct MMapedFile {
     file: DirEntryItem,
     starting_offset: usize,
+    len: usize,
     active_mappings: hashbrown::HashMap<VirtAddr, PageItem>,
 }
 
 impl MMapedFile {
-    fn new(file: DirEntryItem, offset: usize) -> MMapedFile {
+    fn new(file: DirEntryItem, len: usize, offset: usize) -> MMapedFile {
         MMapedFile {
             file,
             starting_offset: offset,
+            len,
             active_mappings: hashbrown::HashMap::new(),
         }
     }
@@ -82,7 +84,11 @@ impl MMapedFile {
     }
 
     fn split_from(&mut self, start: VirtAddr, end: VirtAddr, new_offset: usize) -> MMapedFile {
-        let mut new = MMapedFile::new(self.file.clone(), new_offset);
+        assert!(self.len > new_offset  - self.starting_offset);
+
+        let new_len = self.len - (new_offset - self.starting_offset);
+
+        let mut new = MMapedFile::new(self.file.clone(), new_len, new_offset);
 
         for a in (start..end).step_by(PAGE_SIZE) {
             if let Some(pg) = self.active_mappings.remove(&a) {
@@ -131,11 +137,11 @@ impl Mapping {
         offset: usize,
     ) -> Mapping {
         Mapping {
-            mmaped_file: file.map(|e| MMapedFile::new(e, offset)),
+            mmaped_file: file.map(|e| MMapedFile::new(e, len, offset)),
             prot,
             flags,
             start: addr,
-            end: addr + len,
+            end: addr + len.align_up(PAGE_SIZE),
         }
     }
 
@@ -155,11 +161,12 @@ impl Mapping {
         }
     }
 
-    fn map_copy(addr: VirtAddr, src: VirtAddr, prot: MMapProt) {
-        let new_page = allocate_order(0).unwrap();
+    fn map_copy(addr: VirtAddr, src: VirtAddr, bytes: usize, prot: MMapProt) {
+        let mut new_page = allocate_order(0).unwrap();
+        new_page.clear();
 
         unsafe {
-            new_page.address_mapped().as_virt().copy_page_from(src);
+            new_page.address_mapped().as_virt().copy_page_from_bytes(src, bytes);
         }
 
         map_to_flags(addr, new_page.address(), PageFlags::USER | prot.into());
@@ -179,7 +186,7 @@ impl Mapping {
                     // If there is more than one process mapping this page, make a private copy
                     // Otherwise, this page is not shared with anyone, so just make it writable
                     if phys_page.vm_use_count() > 1 {
-                        Self::map_copy(addr_aligned, addr_aligned, self.prot);
+                        Self::map_copy(addr_aligned, addr_aligned, PAGE_SIZE, self.prot);
                     } else {
                         if !update_flags(addr_aligned, PageFlags::USER | self.prot.into()) {
                             panic!("Update flags failed");
@@ -202,21 +209,35 @@ impl Mapping {
 
             let addr_aligned = addr.align_down(PAGE_SIZE);
 
+            let addr_offset = (addr_aligned - self.start).0;
+            let bytes = core::cmp::min(PAGE_SIZE, f.len - addr_offset);
+
             if let Some(p) = f.file.inode().as_cacheable().unwrap().get_mmap_page(offset) {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
                 {
-                    // Page is not present and we are reading from it, so map it readable
-                    f.active_mappings.insert(addr_aligned, p.clone());
+                    if bytes == PAGE_SIZE {
+                        // Page is not present and we are reading from it, so map it readable
+                        f.active_mappings.insert(addr_aligned, p.clone());
 
-                    let mut flags: PageFlags = PageFlags::USER | self.prot.into();
-                    flags.remove(PageFlags::WRITABLE);
+                        let mut flags: PageFlags = PageFlags::USER | self.prot.into();
+                        flags.remove(PageFlags::WRITABLE);
 
-                    map_to_flags(addr.align_down(PAGE_SIZE), p.page(), flags);
+                        map_to_flags(addr_aligned, p.page(), flags);
+                    } else {
+                        //println!("map read copy {} {}", addr_aligned, bytes);
+
+                        Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
+
+                        f.active_mappings.remove(&addr_aligned);
+                    }
                 } else if reason.contains(PageFaultReason::WRITE) {
                     // We are writing to private file mapping so copy the content of the page.
                     // Changes made to private mapping should not be persistent
-                    Self::map_copy(addr.align_down(PAGE_SIZE), p.page().to_virt(), self.prot);
+
+                    //println!("map copy {} {}", addr_aligned, bytes);
+
+                    Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
 
                     f.active_mappings.remove(&addr_aligned);
                 } else {
@@ -225,6 +246,8 @@ impl Mapping {
 
                 true
             } else {
+                //println!("failed to get mmap page");
+                //map_flags(addr.align_down(PAGE_SIZE), PageFlags::USER | self.prot.into());
                 false
             }
         } else {
@@ -480,8 +503,6 @@ impl VMData {
             return None;
         }
 
-        let len = len.align_up(PAGE_SIZE);
-
         if let Some(a) = addr {
             // Address should be multiple of PAGE_SIZE if we request fixed mapping
             // and should not extend beyond max user addr
@@ -522,9 +543,9 @@ impl VMData {
             Some(addr) => {
                 if flags.contains(MMapFlags::MAP_FIXED) {
                     // Remove any existing mappings
-                    self.unmap(addr, len);
+                    self.unmap(addr, len.align_up(PAGE_SIZE));
 
-                    if let Some(c) = self.find_fixed(addr, len) {
+                    if let Some(c) = self.find_fixed(addr, len.align_up(PAGE_SIZE)) {
                         Some(c)
                     } else {
                         None
@@ -533,7 +554,7 @@ impl VMData {
                     self.find_any_above(addr, len)
                 }
             }
-            None => self.find_any_above(MMAP_USER_ADDR, len),
+            None => self.find_any_above(MMAP_USER_ADDR, len.align_up(PAGE_SIZE)),
         }
         .and_then(|(addr, mut cur)| {
             cur.insert_before(Mapping::new(addr, len, prot, flags, file, offset));
@@ -562,10 +583,10 @@ impl VMData {
             let is_private = map.flags.contains(MMapFlags::MAP_PRIVATE);
             let is_anonymous = map.flags.contains(MMapFlags::MAP_ANONYOMUS);
 
-            println!(
-                "page fault {} p {} a {} r {:?}",
-                addr, is_private, is_anonymous, reason
-            );
+            //println!(
+            //    "page fault {} p {} a {} r {:?}",
+            //    addr, is_private, is_anonymous, reason
+            //);
 
             return match (is_private, is_anonymous) {
                 (false, _) => {
@@ -596,23 +617,49 @@ impl VMData {
             {
                 if p.p_type == ProgramType::Load {
                     let virt_begin = VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);
+
+                    let virt_fend =
+                        VirtAddr(p.p_vaddr as usize + p.p_filesz as usize);
+
                     let virt_end =
                         VirtAddr(p.p_vaddr as usize + p.p_memsz as usize).align_up(PAGE_SIZE);
-                    let len = virt_end - virt_begin;
+
+                    let len = (virt_fend - virt_begin).0;
 
                     let file_offset = p.p_offset.align(PAGE_SIZE as u64);
+
+                    println!("mmap {} - {} offset {:#x}", virt_begin, virt_fend, file_offset);
 
                     last_mmap_end = self
                         .mmap_vm(
                             Some(virt_begin),
-                            virt_end.0 - virt_begin.0,
+                            len,
                             p.p_flags.into(),
                             MMapFlags::MAP_PRIVATE | MMapFlags::MAP_FIXED,
                             Some(exe.clone()),
                             file_offset as usize,
                         )
                         .expect("Failed to mmap")
-                        + len;
+                        + len.align_up(PAGE_SIZE);
+
+                    let virt_fend = last_mmap_end;
+
+                    if virt_fend < virt_end {
+                        println!("mmap {} - {} offset {:#x}", virt_fend, virt_end, 0);
+                        let len = (virt_end - virt_fend).0;
+
+                        last_mmap_end = self
+                            .mmap_vm(
+                                Some(virt_fend),
+                                virt_end.0 - virt_fend.0,
+                                p.p_flags.into(),
+                                MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS | MMapFlags::MAP_FIXED,
+                                None,
+                                0,
+                            )
+                            .expect("Failed to mmap")
+                            + len;
+                    }
                 } else {
                     if tls_vm_info.is_some() {
                         panic!("TLS already setup");

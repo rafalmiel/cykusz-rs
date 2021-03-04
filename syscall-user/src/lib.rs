@@ -318,5 +318,5 @@ pub fn reboot() -> SyscallResult {
 }
 
 pub fn print(v: &str) {
-    write(0, v.as_bytes()).unwrap();
+    write(1, v.as_bytes()).unwrap();
 }

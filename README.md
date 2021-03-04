@@ -33,6 +33,8 @@ You will need following packages to compile and run the os:
 * rust ([rustup](https://rustup.rs/))
 * nasm
 * qemu
+* grub2
+* parted
 
 Building:
 ```bash

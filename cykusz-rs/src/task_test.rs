@@ -115,7 +115,14 @@ pub fn start() {
     let shell =
         lookup_by_real_path(Path::new("/bin/shell"), LookupMode::None).expect("Shell not found");
 
-    create_user_task(shell);
+    let task = create_user_task(shell);
+
+    task.open_file(lookup_by_real_path(Path::new("/dev/stdin"), LookupMode::None).expect("stdin open failed"), OpenFlags::RDONLY);
+
+    let stdout = lookup_by_real_path(Path::new("/dev/stdout"), LookupMode::None).expect("stdout open failed");
+
+    task.open_file(stdout.clone(), OpenFlags::WRONLY);
+    task.open_file(stdout, OpenFlags::WRONLY);
 
     //crate::kernel::sched::create_task(task2);
     //crate::kernel::sched::create_task(task);

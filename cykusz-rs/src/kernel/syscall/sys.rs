@@ -577,6 +577,7 @@ pub fn sys_time() -> SyscallResult {
 }
 
 pub fn sys_exit() -> ! {
+    println!("SYS_EXIT");
     crate::kernel::sched::task_finished()
 }
 

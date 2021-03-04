@@ -305,7 +305,7 @@ fn exec(cmd: &str) {
             if let Some(file) = File::new(path, OpenFlags::RDWR) {
                 let mut buf = [0u8; 64];
                 loop {
-                    if let Ok(r) = syscall::read(1, &mut buf) {
+                    if let Ok(r) = syscall::read(0, &mut buf) {
                         if r > 1 {
                             let w = file.write(&buf[..r]);
 
@@ -469,7 +469,7 @@ fn exec(cmd: &str) {
 }
 
 fn main_cd() -> ! {
-    println!("{}", unsafe { (&TEST as *const usize).read_volatile() });
+    //println!("{}", unsafe { (&TEST as *const usize).read_volatile() });
     loop {
         let mut buf = [0u8; 256];
         let mut pwd = [0u8; 1024];
@@ -481,7 +481,7 @@ fn main_cd() -> ! {
 
         print!("[root {}]# ", to_p);
 
-        let r = syscall::read(1, &mut buf).unwrap();
+        let r = syscall::read(0, &mut buf).unwrap();
 
         let cmd = make_str(&buf[..r]).trim();
 

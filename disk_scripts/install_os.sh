@@ -13,7 +13,7 @@ umount mnt
 
 mount /dev/loop0p2 mnt
 mkdir -p mnt/bin
-cp -f build/isofiles/boot/program mnt/bin/shell
+cp -f build/isofiles/boot/program2 mnt/bin/shell
 umount mnt
 
 losetup -D

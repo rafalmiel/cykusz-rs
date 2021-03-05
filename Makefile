@@ -20,6 +20,7 @@ user := target/$(target)/release/program
 kernel := build/kernel-$(arch).bin
 endif
 cross_gcc := sysroot/cross/bin/x86_64-cykusz-g++
+cross_strip := sysroot/cross/bin/x86_64-cykusz-strip
 cross_hello := sysroot/build/hello
 
 .PHONY: all clean run ata bochs iso toolchain
@@ -92,6 +93,7 @@ $(cross_gcc): toolchain
 
 hello: $(cross_gcc) sysroot/hello.cpp
 	$(cross_gcc) sysroot/hello.cpp -o $(cross_hello)
+	$(cross_strip) $(cross_hello)
 
 # compile assembly files
 build/arch/$(arch)/asm/%.o: cykusz-rs/src/arch/$(arch)/asm/%.asm

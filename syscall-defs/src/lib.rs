@@ -125,10 +125,10 @@ bitflags! {
 
 bitflags! {
     pub struct MMapFlags: usize {
-        const MAP_SHARED = 0x1;
-        const MAP_PRIVATE = 0x2;
-        const MAP_FIXED = 0x10;
-        const MAP_ANONYOMUS = 0x20;
+        const MAP_PRIVATE = 0x1;
+        const MAP_SHARED = 0x2;
+        const MAP_FIXED = 0x4;
+        const MAP_ANONYOMUS = 0x8;
     }
 }
 

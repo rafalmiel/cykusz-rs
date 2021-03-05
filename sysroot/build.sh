@@ -93,7 +93,7 @@ function _mlibc {
 	rm -rf $MLIBC_BUILD_DIR
 	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
-	meson compile -C $MLIBC_BUILD_DIR
+	ninja -C $MLIBC_BUILD_DIR
 	meson install -C $MLIBC_BUILD_DIR
 
 	export PATH=$OLDPATH

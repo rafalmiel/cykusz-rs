@@ -52,14 +52,8 @@ function _sysroot {
 	mkdir -p $BUILD_DIR
 
 	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross=$SPATH/cross-file.ini -Dheaders_only=true -Dstatic=true $MLIBC_SRC_DIR $MLIBC_BUILD_DIR --prefix=$SYSROOT/usr
-	
-	pushd .
-
-	cd $MLIBC_BUILD_DIR
-	meson install
-
-	popd
+	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+	meson install -C $MLIBC_BUILD_DIR
 }
 
 function _binutils {
@@ -97,15 +91,10 @@ function _mlibc {
 	export PATH=$CROSS/bin:$PATH 
 
 	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross=$SPATH/cross-file.ini -Dheaders_only=false -Dstatic=true $MLIBC_SRC_DIR $MLIBC_BUILD_DIR --prefix=$SYSROOT/usr
-	
-	pushd .
+	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
-	cd $MLIBC_BUILD_DIR
-	meson compile
-	meson install
-
-	popd
+	meson compile -C $MLIBC_BUILD_DIR
+	meson install -C $MLIBC_BUILD_DIR
 
 	export PATH=$OLDPATH
 }
@@ -139,8 +128,14 @@ function _clean {
 	rm -rf $SYSROOT	
 }
 
+function _check_build {
+	if [ ! -f $CROSS/bin/x86_64-cykusz-gcc ]; then
+		_all
+	fi
+}
+
 if [ -z "$1" ]; then
-	echo "Usage: $0 (clean/prepare/binutils/gcc/mlibc/build/all)"
+	echo "Usage: $0 (clean/prepare/binutils/gcc/mlibc/check_build/build/all)"
 else
 	cd $SPATH
 	_$1

@@ -1,13 +1,13 @@
 language: rust
 
+dist: focal
+
 rust:
   - nightly
 
 before_script:
   - rustup component add rust-src
   - (test -x $HOME/.cargo/bin/xargo || cargo install xargo)
-
-sudo: false
 
 notifications:
   email:
@@ -18,7 +18,17 @@ addons:
   apt:
     packages:
       - nasm
+      - meson
+      - ninja-build
+      - bison
+      - flex
+      - libgmp3-dev
+      - libmpc-dev
+      - libmpfr-dev
+      - texinfo
+      - xorriso
 
 script:
   - make clean
   - make iso
+  - make hello

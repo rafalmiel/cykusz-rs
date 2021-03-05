@@ -19,8 +19,10 @@ rust_os := target/$(target)/release/libcykusz_rs.a
 user := target/$(target)/release/program
 kernel := build/kernel-$(arch).bin
 endif
+cross_gcc := sysroot/cross/bin/x86_64-cykusz-g++
+cross_hello := sysroot/build/hello
 
-.PHONY: all clean run ata bochs iso
+.PHONY: all clean run ata bochs iso toolchain
 
 all: $(kernel) $(user)
 
@@ -66,7 +68,7 @@ $(iso): $(kernel) $(grub_cfg) $(user)
 	cp $(user) build/isofiles/boot/program
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
-$(disk): $(iso)
+$(disk): $(iso) hello
 	sudo disk_scripts/install_os.sh
 
 $(vdi): $(disk)
@@ -82,6 +84,14 @@ ifdef dev
 else
 	RUST_TARGET_PATH=`pwd` xargo build --workspace --release --target $(target) --verbose
 endif
+
+toolchain: $(cross_gcc)
+	sysroot/build.sh check_build
+
+$(cross_gcc): toolchain
+
+hello: $(cross_gcc) sysroot/hello.cpp
+	$(cross_gcc) sysroot/hello.cpp -o $(cross_hello)
 
 # compile assembly files
 build/arch/$(arch)/asm/%.o: cykusz-rs/src/arch/$(arch)/asm/%.asm

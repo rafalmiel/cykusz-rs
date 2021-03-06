@@ -7,6 +7,12 @@ pub struct Spin<T: ?Sized> {
     l: M<T>,
 }
 
+impl<T: Default> Default for Spin<T> {
+    fn default() -> Self {
+        Spin::new(T::default())
+    }
+}
+
 pub struct SpinGuard<'a, T: ?Sized + 'a> {
     g: Option<MG<'a, T>>,
     irq: bool,

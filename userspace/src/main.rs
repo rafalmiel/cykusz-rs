@@ -398,6 +398,7 @@ fn exec(cmd: &str) {
     } else if cmd == "hello" {
         if let Ok(id) = syscall::fork() {
             if id != 0 {
+                println!("");
                 syscall::exec("/bin/hello").expect("Failed to exec hello");
             }
         } else {
@@ -423,7 +424,7 @@ fn exec(cmd: &str) {
             } else {
                 println!("mmap faileld");
             }
-            syscall::close(file);
+            syscall::close(file).expect("Failed to close file");
         } else {
             println!("file open failed");
         }
@@ -445,7 +446,7 @@ fn exec(cmd: &str) {
             } else {
                 println!("mmap faileld");
             }
-            syscall::close(file);
+            syscall::close(file).expect("Failed to close file");
         } else {
             println!("file open failed");
         }
@@ -477,7 +478,6 @@ fn exec(cmd: &str) {
 }
 
 fn main_cd() -> ! {
-    //println!("{}", unsafe { (&TEST as *const usize).read_volatile() });
     loop {
         let mut buf = [0u8; 256];
         let mut pwd = [0u8; 1024];

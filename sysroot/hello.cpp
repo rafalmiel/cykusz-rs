@@ -2,8 +2,9 @@
 #include <iostream>
 
 int main() {
-	syscalln0(29);
+	//syscalln0(29);
 	std::string input{};
+	std::cout << "Enter your name: ";
 	std::cin >> input;
-	std::cout << "Hello! " << input << std::endl;
+	std::cout << "Hello, " << input << "!" << std::endl;
 }

@@ -1,7 +1,5 @@
 use alloc::sync::Arc;
 
-use crate::kernel::fs::dirent::DirEntryItem;
-use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
 use crate::kernel::task::Task;
 
@@ -18,54 +16,9 @@ impl Default for TaskContainer {
 }
 
 impl TaskContainer {
-    pub fn add_task(&self, fun: fn()) -> Arc<Task> {
-        let task = Arc::new(Task::new_kern(fun));
-
-        self.register_task(task.clone());
-
-        task
-    }
-
     #[allow(unused)]
     pub fn get(&self, id: usize) -> Option<Arc<Task>> {
         self.tasks.lock().get(&id).cloned()
-    }
-
-    pub fn add_param_task(&self, fun: usize, val: usize) -> Arc<Task> {
-        let task = Arc::new(Task::new_param_kern(fun, val));
-
-        self.register_task(task.clone());
-
-        task
-    }
-
-    pub fn add_user_task(&self, exe: DirEntryItem) -> Arc<Task> {
-        let task = Arc::new(Task::new_user(exe));
-
-        self.register_task(task.clone());
-
-        task
-    }
-
-    pub fn fork(&self) -> Arc<Task> {
-        let current = current_task();
-
-        let task = Arc::new(current.fork());
-
-        self.register_task(task.clone());
-
-        task
-    }
-
-    pub fn exec(&self, exe: DirEntryItem) -> Arc<Task> {
-        let current = current_task();
-
-        let task = Arc::new(current.exec(exe));
-        drop(current);
-
-        self.register_task(task.clone());
-
-        task
     }
 
     pub fn remove_task(&self, id: usize) {

@@ -12,12 +12,9 @@ use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::icache::INodeItemStruct;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
-
 use crate::kernel::mm::VirtAddr;
-
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
-
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
@@ -577,7 +574,6 @@ pub fn sys_time() -> SyscallResult {
 }
 
 pub fn sys_exit() -> ! {
-    println!("SYS_EXIT");
     crate::kernel::sched::task_finished()
 }
 
@@ -588,12 +584,12 @@ pub fn sys_sleep(time_ns: u64) -> SyscallResult {
 }
 
 pub fn sys_fork() -> SyscallResult {
-    println!(
-        "free mem before fork: {}, used: {} heap: {}",
-        crate::kernel::mm::free_mem(),
-        crate::kernel::mm::used_mem(),
-        crate::kernel::mm::heap::heap_mem(),
-    );
+    //println!(
+    //    "free mem before fork: {}, used: {} heap: {}",
+    //    crate::kernel::mm::free_mem(),
+    //    crate::kernel::mm::used_mem(),
+    //    crate::kernel::mm::heap::heap_mem(),
+    //);
     //println!("icache stats");
     //crate::kernel::fs::icache::cache().print_stats();
     //println!("dir entry stats");

@@ -38,7 +38,6 @@ pub const SYS_SEEK: usize = 30;
 pub const SYS_PREAD: usize = 31;
 pub const SYS_PWRITE: usize = 32;
 
-
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {
     Perm = 1,

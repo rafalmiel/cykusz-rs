@@ -1,16 +1,14 @@
 use alloc::sync::Arc;
-use core::sync::atomic::Ordering;
-use core::sync::atomic::{AtomicBool, AtomicUsize};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
+use downcast_rs::DowncastSync;
+use intrusive_collections::LinkedListLink;
 use spin::Once;
 
 use crate::kernel::fs::dirent::DirEntryItem;
-use crate::kernel::sync::IrqGuard;
+use crate::kernel::sched::round_robin::RRScheduler;
+use crate::kernel::sched::task_container::TaskContainer;
 use crate::kernel::task::Task;
-
-use self::cpu_queue::CpuQueue;
-use self::cpu_queues::CpuQueues;
-use self::task_container::TaskContainer;
 
 #[macro_export]
 macro_rules! switch {
@@ -24,8 +22,8 @@ macro_rules! activate_task {
         $crate::arch::task::activate_task(&$ctx1.arch_task());
     };
 }
-mod cpu_queue;
-mod cpu_queues;
+
+mod round_robin;
 mod task_container;
 
 static NEW_TASK_ID: AtomicUsize = AtomicUsize::new(1);
@@ -33,195 +31,231 @@ static NEW_TASK_ID: AtomicUsize = AtomicUsize::new(1);
 #[thread_local]
 static LOCK_PROTECTION: AtomicBool = AtomicBool::new(false);
 
-#[thread_local]
-static LOCK_PROTECTION_ENTERED: AtomicBool = AtomicBool::new(false);
-
-#[thread_local]
-static CURRENT_TASK_ID: AtomicUsize = AtomicUsize::new(0);
-
-#[thread_local]
-static QUEUE_LEN: AtomicUsize = AtomicUsize::new(0);
-
 pub fn new_task_id() -> usize {
     NEW_TASK_ID.fetch_add(1, Ordering::SeqCst)
 }
 
-pub fn current_id() -> usize {
-    CURRENT_TASK_ID.load(Ordering::SeqCst)
+intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLink });
+
+pub trait SchedulerInterface: Send + Sync + DowncastSync {
+    fn init(&self) {}
+    fn reschedule(&self) -> bool;
+    fn current_task(&self) -> Arc<Task>;
+    fn current_id(&self) -> isize {
+        self.current_task().id() as isize
+    }
+    fn queue_task(&self, task: Arc<Task>);
+    fn sleep(&self, task: &Task, until: Option<usize>);
+    fn wake(&self, task: &Task);
+    fn exit(&self, status: isize) -> !;
 }
 
-pub fn queue_len() -> usize {
-    QUEUE_LEN.load(Ordering::SeqCst)
-}
+impl_downcast!(sync SchedulerInterface);
 
-#[derive(Default)]
 struct Scheduler {
+    sched: Arc<dyn SchedulerInterface>,
+
     tasks: TaskContainer,
-    cpu_queues: CpuQueues,
 }
 
 impl Scheduler {
-    fn add_task(&self, fun: fn()) -> Arc<Task> {
-        let _g = IrqGuard::new();
+    pub fn new() -> Scheduler {
+        Scheduler {
+            sched: RRScheduler::new(),
 
-        let task = self.tasks.add_task(fun);
+            tasks: TaskContainer::default(),
+        }
+    }
 
-        self.cpu_queues.add_task(task.clone());
+    fn init(&self) {
+        self.sched.init();
+    }
+
+    pub fn current_task(&self) -> Arc<Task> {
+        self.sched.current_task()
+    }
+
+    pub fn current_id(&self) -> isize {
+        self.current_task().id() as isize
+    }
+
+    pub fn reschedule(&self) -> bool {
+        self.sched.reschedule()
+    }
+
+    pub fn register_task(&self, task: &Arc<Task>) {
+        self.tasks.register_task(task.clone());
+    }
+
+    fn create_task(&self, fun: fn()) -> Arc<Task> {
+        let task = Task::new_kern(fun);
+
+        self.tasks.register_task(task.clone());
+
+        self.sched.queue_task(task.clone());
 
         task
     }
 
-    fn add_param_task(&self, fun: usize, val: usize) -> Arc<Task> {
-        let _g = IrqGuard::new();
+    fn create_param_task(&self, fun: usize, val: usize) -> Arc<Task> {
+        let task = Task::new_param_kern(fun, val);
 
-        let task = self.tasks.add_param_task(fun, val);
+        self.tasks.register_task(task.clone());
 
-        self.cpu_queues.add_task(task.clone());
-
-        task
-    }
-
-    fn add_user_task(&self, exe: DirEntryItem) -> Arc<Task> {
-        let task = self.tasks.add_user_task(exe);
-
-        let _g = IrqGuard::new();
-        self.cpu_queues.add_task(task.clone());
+        self.sched.queue_task(task.clone());
 
         task
     }
 
-    fn schedule_next(&self) {
-        self.cpu_queues.schedule_next();
+    fn create_user_task(&self, exe: DirEntryItem) -> Arc<Task> {
+        let task = Task::new_user(exe);
+
+        self.tasks.register_task(task.clone());
+
+        self.sched.queue_task(task.clone());
+
+        task
     }
 
-    fn reschedule(&self) -> bool {
-        let _g = IrqGuard::new();
-
-        self.cpu_queues.reschedule()
+    pub fn as_impl<T: SchedulerInterface>(&self) -> &T {
+        match self.sched.downcast_ref::<T>() {
+            Some(e) => e,
+            _ => panic!("invalid conversion"),
+        }
     }
 
-    fn activate_sched(&self) {
-        let _g = IrqGuard::new();
-
-        self.cpu_queues.activate_sched();
+    fn sleep(&self, task: &Task, time_ns: Option<usize>) {
+        self.sched.sleep(task, time_ns)
     }
 
-    fn enter_critical_section(&self) {
-        let _g = IrqGuard::new();
-
-        self.cpu_queues.enter_critical_section();
-    }
-
-    fn leave_critical_section(&self) {
-        let _g = IrqGuard::new();
-
-        self.cpu_queues.leave_critical_section();
-    }
-
-    fn current_task_finished(&self) -> ! {
-        current_task().vm().clear();
-        let _g = IrqGuard::new();
-
-        self.tasks.remove_task(current_id());
-        self.cpu_queues.current_task_finished()
-    }
-
-    fn execd_task_finished(&self) -> ! {
-        current_task().vm().clear();
-        let _g = IrqGuard::new();
-
-        self.cpu_queues.current_task_finished()
-    }
-
-    fn current_task(&self) -> Arc<Task> {
-        let _g = IrqGuard::new();
-
-        self.cpu_queues.current_task()
-    }
-
-    fn register_task(&self, task: Arc<Task>) {
-        self.tasks.register_task(task)
+    fn wake(&self, task: &Task) {
+        self.sched.wake(task);
     }
 
     fn close_all_tasks(&self) {
         self.tasks.close_all_tasks();
     }
 
-    fn fork(&self) -> Arc<Task> {
-        let task = self.tasks.fork();
+    pub fn fork(&self) -> Arc<Task> {
+        let current = self.sched.current_task();
 
-        let _g = IrqGuard::new();
-        self.cpu_queues.add_task(task.clone());
+        let forked = current.fork();
 
-        task
+        self.tasks.register_task(forked.clone());
+
+        self.sched.queue_task(forked.clone());
+
+        forked
     }
 
-    fn exec(&self, exe: DirEntryItem) {
-        let task = self.tasks.exec(exe);
+    pub fn exec(&self, exe: DirEntryItem) -> ! {
+        let current = self.sched.current_task();
 
-        let _g = IrqGuard::new();
-        self.cpu_queues.add_task(task);
+        let execd = current.exec(exe);
+
+        self.tasks.register_task(execd.clone());
+
+        self.sched.queue_task(execd);
+
+        drop(current);
+
+        self.sched.exit(0);
     }
 
-    fn init_tasks(&self) {
-        self.cpu_queues.init_tasks();
+    pub fn exit(&self) -> ! {
+        let current = current_task();
+
+        self.tasks.remove_task(current.id());
+
+        drop(current);
+
+        self.sched.exit(0)
     }
 }
 
 static SCHEDULER: Once<Scheduler> = Once::new();
 
+pub fn init() {
+    SCHEDULER.call_once(|| Scheduler::new());
+
+    scheduler().init();
+
+    enable_lock_protection();
+}
+
+pub fn init_ap() {
+    scheduler().init();
+
+    enable_lock_protection();
+}
+
 fn scheduler() -> &'static Scheduler {
-    SCHEDULER.get().expect("Scheduler not initialized")
+    SCHEDULER.get().unwrap()
 }
 
-fn scheduler_main() {
-    loop {
-        scheduler().schedule_next();
-    }
+pub(in crate::kernel::sched) fn finalize() {
+    crate::kernel::int::finish();
+    crate::kernel::timer::reset_counter();
 }
 
-pub(in crate::kernel::sched) fn register_task(task: Arc<Task>) {
-    scheduler().register_task(task)
+pub(in crate::kernel::sched) fn register_task(task: &Arc<Task>) {
+    scheduler().register_task(task);
 }
 
 pub fn reschedule() -> bool {
-    scheduler().reschedule()
-}
+    let scheduler = scheduler();
 
-pub fn activate_sched() {
-    scheduler().activate_sched();
-}
+    {
+        let current = scheduler.current_task();
 
-pub fn task_finished() -> ! {
-    scheduler().current_task_finished()
-}
+        if current.locks() > 0 {
+            current.set_to_reschedule(true);
+            finalize();
+            return false;
+        }
+    }
 
-pub fn create_task(fun: fn()) -> Arc<Task> {
-    scheduler().add_task(fun)
-}
-
-pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
-    scheduler().add_param_task(fun, val)
-}
-
-pub fn create_user_task(exe: DirEntryItem) -> Arc<Task> {
-    scheduler().add_user_task(exe)
-}
-
-pub fn fork() -> Arc<Task> {
-    let new = scheduler().fork();
-
-    new
-}
-
-pub fn exec(exe: DirEntryItem) -> ! {
-    scheduler().exec(exe);
-
-    scheduler().execd_task_finished();
+    scheduler.reschedule()
 }
 
 pub fn current_task() -> Arc<Task> {
     scheduler().current_task()
+}
+
+pub fn current_id() -> isize {
+    scheduler().current_id()
+}
+
+pub fn task_finished() -> ! {
+    scheduler().exit()
+}
+
+pub fn create_task(fun: fn()) -> Arc<Task> {
+    scheduler().create_task(fun)
+}
+
+pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
+    scheduler().create_param_task(fun, val)
+}
+
+pub fn create_user_task(exe: DirEntryItem) -> Arc<Task> {
+    scheduler().create_user_task(exe)
+}
+
+pub fn sleep(task: &Task, time_ns: Option<usize>) {
+    scheduler().sleep(task, time_ns)
+}
+
+pub fn wake(task: &Task) {
+    scheduler().wake(task);
+}
+
+pub fn fork() -> Arc<Task> {
+    scheduler().fork()
+}
+
+pub fn exec(exe: DirEntryItem) -> ! {
+    scheduler().exec(exe)
 }
 
 pub fn close_all_tasks() {
@@ -229,14 +263,14 @@ pub fn close_all_tasks() {
 }
 
 fn lock_protection_ready() -> bool {
-    crate::kernel::tls::is_ready()
-        && LOCK_PROTECTION.load(Ordering::SeqCst)
-        && !LOCK_PROTECTION_ENTERED.load(Ordering::SeqCst)
+    crate::kernel::tls::is_ready() && LOCK_PROTECTION.load(Ordering::SeqCst)
 }
 
 pub fn enter_critical_section() -> bool {
     if lock_protection_ready() {
-        scheduler().enter_critical_section();
+        let current = scheduler().current_task();
+
+        current.inc_locks();
 
         return true;
     }
@@ -246,18 +280,12 @@ pub fn enter_critical_section() -> bool {
 
 pub fn leave_critical_section() {
     if lock_protection_ready() {
-        scheduler().leave_critical_section();
+        let current = scheduler().current_task();
+
+        current.dec_locks();
     }
 }
 
 pub fn enable_lock_protection() {
     LOCK_PROTECTION.store(true, Ordering::SeqCst);
-}
-
-pub fn init() {
-    SCHEDULER.call_once(|| Scheduler::default());
-
-    scheduler().init_tasks();
-
-    enable_lock_protection();
 }

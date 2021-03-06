@@ -57,31 +57,32 @@ function _sysroot {
 }
 
 function _binutils {
-	mkdir -p $BUILD_DIR
+	mkdir -p $BINUTILS_BUILD_DIR
 
 	pushd .
 
-	mkdir -p $BINUTILS_BUILD_DIR
 	cd $BINUTILS_BUILD_DIR
 	$BINUTILS_SRC_DIR/configure --target=x86_64-cykusz --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb
-	make -j4
-	make install
 
 	popd
+
+	make -C $BINUTILS_BUILD_DIR -j4
+	make -C $BINUTILS_BUILD_DIR install
+
 }
 
 function _gcc {
-	mkdir -p $BUILD_DIR
+	mkdir -p $GCC_BUILD_DIR
 
 	pushd .
 
-	mkdir -p $GCC_BUILD_DIR
 	cd $GCC_BUILD_DIR
 	$GCC_SRC_DIR/configure --target=x86_64-cykusz --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++
-	make -j4 all-gcc all-target-libgcc
-	make install-gcc install-target-libgcc
 
 	popd
+
+	make -C $GCC_BUILD_DIR -j4 all-gcc all-target-libgcc
+	make -C $GCC_BUILD_DIR install-gcc install-target-libgcc
 }
 
 function _mlibc {
@@ -100,13 +101,8 @@ function _mlibc {
 }
 
 function _libstd {
-	pushd .
-
-	cd $GCC_BUILD_DIR
-	make -j4 all-target-libstdc++-v3
-	make install-target-libstdc++-v3
-
-	popd
+	make -C $GCC_BUILD_DIR -j4 all-target-libstdc++-v3
+	make -C $GCC_BUILD_DIR install-target-libstdc++-v3
 }
 
 function _build {

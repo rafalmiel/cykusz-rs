@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::{Spin, SpinGuard};
-use crate::kernel::task::{Task, TaskState};
+use crate::kernel::task::Task;
 
 pub struct WaitQueue {
     tasks: Spin<Vec<Arc<Task>>>,
@@ -149,11 +149,7 @@ impl WaitQueue {
         for i in (0..len).rev() {
             let t = tasks[i].clone();
 
-            if t.state() == TaskState::AwaitingIo {
-                t.set_state(TaskState::Runnable);
-            } else {
-                t.set_has_pending_io(true);
-            }
+            t.wake_up();
 
             return true;
         }
@@ -171,11 +167,7 @@ impl WaitQueue {
         for i in (0..len).rev() {
             let t = tasks[i].clone();
 
-            if t.state() == TaskState::AwaitingIo {
-                t.set_state(TaskState::Runnable);
-            } else {
-                t.set_has_pending_io(true);
-            }
+            t.wake_up();
 
             return true;
         }
@@ -196,11 +188,8 @@ impl WaitQueue {
         for i in (0..len).rev() {
             let t = tasks[i].clone();
 
-            if t.state() == TaskState::AwaitingIo {
-                t.set_state(TaskState::Runnable);
-            } else {
-                t.set_has_pending_io(true);
-            }
+            t.wake_up();
+
             res = true;
         }
 

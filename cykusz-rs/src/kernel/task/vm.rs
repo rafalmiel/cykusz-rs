@@ -84,7 +84,7 @@ impl MMapedFile {
     }
 
     fn split_from(&mut self, start: VirtAddr, end: VirtAddr, new_offset: usize) -> MMapedFile {
-        assert!(self.len > new_offset  - self.starting_offset);
+        assert!(self.len > new_offset - self.starting_offset);
 
         let new_len = self.len - (new_offset - self.starting_offset);
 
@@ -166,7 +166,10 @@ impl Mapping {
         new_page.clear();
 
         unsafe {
-            new_page.address_mapped().as_virt().copy_page_from_bytes(src, bytes);
+            new_page
+                .address_mapped()
+                .as_virt()
+                .copy_page_from_bytes(src, bytes);
         }
 
         map_to_flags(addr, new_page.address(), PageFlags::USER | prot.into());
@@ -618,8 +621,7 @@ impl VMData {
                 if p.p_type == ProgramType::Load {
                     let virt_begin = VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);
 
-                    let virt_fend =
-                        VirtAddr(p.p_vaddr as usize + p.p_filesz as usize);
+                    let virt_fend = VirtAddr(p.p_vaddr as usize + p.p_filesz as usize);
 
                     let virt_end =
                         VirtAddr(p.p_vaddr as usize + p.p_memsz as usize).align_up(PAGE_SIZE);
@@ -628,7 +630,10 @@ impl VMData {
 
                     let file_offset = p.p_offset.align(PAGE_SIZE as u64);
 
-                    println!("mmap {} - {} offset {:#x}", virt_begin, virt_fend, file_offset);
+                    //println!(
+                    //    "mmap {} - {} offset {:#x}",
+                    //    virt_begin, virt_fend, file_offset
+                    //);
 
                     last_mmap_end = self
                         .mmap_vm(
@@ -645,7 +650,7 @@ impl VMData {
                     let virt_fend = last_mmap_end;
 
                     if virt_fend < virt_end {
-                        println!("mmap {} - {} offset {:#x}", virt_fend, virt_end, 0);
+                        //println!("mmap {} - {} offset {:#x}", virt_fend, virt_end, 0);
                         let len = (virt_end - virt_fend).0;
 
                         last_mmap_end = self
@@ -653,7 +658,9 @@ impl VMData {
                                 Some(virt_fend),
                                 virt_end.0 - virt_fend.0,
                                 p.p_flags.into(),
-                                MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS | MMapFlags::MAP_FIXED,
+                                MMapFlags::MAP_PRIVATE
+                                    | MMapFlags::MAP_ANONYOMUS
+                                    | MMapFlags::MAP_FIXED,
                                 None,
                                 0,
                             )
@@ -751,6 +758,12 @@ impl VMData {
 
 pub struct VM {
     data: Spin<VMData>,
+}
+
+impl Default for VM {
+    fn default() -> VM {
+        VM::new()
+    }
 }
 
 bitflags! {

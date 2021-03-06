@@ -44,8 +44,8 @@ pub mod arch;
 pub mod kernel;
 mod drivers;
 //mod externs;
+pub mod init_task;
 pub mod lang_items;
-pub mod task_test;
 
 #[thread_local]
 static mut CPU_ID: u8 = 0;
@@ -110,6 +110,14 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Local Timer Started");
 
+    let current = crate::kernel::sched::create_task(init_task);
+
+    drop(current);
+
+    idle();
+}
+
+fn init_task() {
     kernel::net::init();
 
     println!("[ OK ] Network Stack Initialized");
@@ -127,9 +135,7 @@ pub fn rust_main(stack_top: VirtAddr) {
     kernel::net::init();
 
     // Start test tasks on this cpu
-    task_test::start();
-
-    idle();
+    init_task::exec()
 }
 
 pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
@@ -139,7 +145,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
         crate::CPU_ID = cpu_num;
     }
 
-    kernel::sched::enable_lock_protection();
+    kernel::sched::init_ap();
 
     println!("[ OK ] CPU {} Initialised", unsafe { crate::CPU_ID });
 
@@ -154,10 +160,12 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     // Start test tasks on this cpu
     //task_test::start();
 
+    //println!("CPU INIT FINISHED");
+
     idle();
 }
 
-fn idle() {
+fn idle() -> ! {
     loop {
         crate::kernel::int::disable();
         if crate::kernel::sched::reschedule() {

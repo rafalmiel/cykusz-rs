@@ -10,6 +10,12 @@ pub struct RwSpin<T> {
     l: RW<T>,
 }
 
+impl<T: Default> Default for RwSpin<T> {
+    fn default() -> Self {
+        RwSpin::new(T::default())
+    }
+}
+
 pub struct RwSpinReadGuard<'a, T: ?Sized + 'a> {
     g: Option<RWR<'a, T>>,
     irq: bool,

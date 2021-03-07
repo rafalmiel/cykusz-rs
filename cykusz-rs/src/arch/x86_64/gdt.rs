@@ -95,6 +95,12 @@ fn init_tss(stack_top: VirtAddr, fs_base: u64) {
         }
 
         dsc::load_tr(&sgm::SegmentSelector::from_raw(5 << 3));
+
+        use crate::arch::raw::msr;
+        msr::wrmsr(
+            msr::IA32_KERNEL_GS_BASE,
+            &TSS as *const _ as u64,
+        );
     }
 }
 

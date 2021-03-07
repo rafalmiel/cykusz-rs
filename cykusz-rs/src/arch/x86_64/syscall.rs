@@ -10,10 +10,6 @@ fn enable_syscall_extension() {
         msr::wrmsr(msr::IA32_STAR, 0x0013_0008_0000_0000);
         msr::wrmsr(msr::IA32_LSTAR, asm_syscall_handler as u64);
         msr::wrmsr(msr::IA32_FMASK, 0x200);
-        msr::wrmsr(
-            msr::IA32_KERNEL_GS_BASE,
-            &crate::arch::gdt::TSS as *const _ as u64,
-        );
     }
 }
 

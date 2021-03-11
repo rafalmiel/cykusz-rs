@@ -48,14 +48,14 @@ impl WaitQueue {
         self.remove_task(task);
     }
 
-    pub fn wait_lock_irq_for<'a, T, F: Fn(&SpinGuard<T>) -> bool>(
+    pub fn wait_lock_irq_for<'a, T, F: Fn(&mut SpinGuard<T>) -> bool>(
         &self,
         mtx: &'a Spin<T>,
         cond: F,
     ) -> SpinGuard<'a, T> {
         let mut lock = mtx.lock_irq();
 
-        if cond(&lock) {
+        if cond(&mut lock) {
             return lock;
         }
 
@@ -63,7 +63,7 @@ impl WaitQueue {
 
         self.add_task(task.clone());
 
-        while !cond(&lock) {
+        while !cond(&mut lock) {
             core::mem::drop(lock);
 
             task.await_io();
@@ -76,14 +76,14 @@ impl WaitQueue {
         lock
     }
 
-    pub fn wait_lock_for<'a, T, F: Fn(&SpinGuard<T>) -> bool>(
+    pub fn wait_lock_for<'a, T, F: Fn(&mut SpinGuard<T>) -> bool>(
         &self,
         mtx: &'a Spin<T>,
         cond: F,
     ) -> SpinGuard<'a, T> {
         let mut lock = mtx.lock();
 
-        if cond(&lock) {
+        if cond(&mut lock) {
             return lock;
         }
 
@@ -91,7 +91,7 @@ impl WaitQueue {
 
         self.add_task(task.clone());
 
-        while !cond(&lock) {
+        while !cond(&mut lock) {
             core::mem::drop(lock);
 
             task.await_io();

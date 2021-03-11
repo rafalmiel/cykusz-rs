@@ -16,10 +16,12 @@ use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
+use crate::kernel::task::zombie::Zombies;
 
 pub mod cwd;
 pub mod filetable;
 pub mod vm;
+pub mod zombie;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
@@ -42,6 +44,7 @@ impl From<usize> for TaskState {
 }
 
 intrusive_adapter!(pub TaskAdapter = Arc<Task> : Task { sibling: LinkedListLink });
+intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLink });
 
 #[derive(Default)]
 pub struct Task {
@@ -56,12 +59,12 @@ pub struct Task {
     locks: AtomicUsize,
     pending_io: AtomicBool,
     to_resched: AtomicBool,
-    to_delete: AtomicBool,
     filetable: filetable::FileTable,
     vm: VM,
     sleep_until: AtomicUsize,
     cwd: RwSpin<Option<Cwd>>,
     sref: Weak<Task>,
+    zombies: Zombies,
 }
 
 unsafe impl Sync for Task {}
@@ -144,7 +147,12 @@ impl Task {
         task.set_state(TaskState::Runnable);
         task.set_locks(self.locks());
 
-        Self::make_ptr(task)
+        let task = Self::make_ptr(task);
+
+        task.set_parent(Some(self.me()));
+        self.add_child(task.clone());
+
+        task
     }
 
     pub fn exec(&self, exe: DirEntryItem) -> Arc<Task> {
@@ -167,16 +175,7 @@ impl Task {
             let task = Self::make_ptr(task);
 
             // Inherit children
-            {
-                let mut new_list = task.children.lock();
-                let mut old_list = self.children.lock();
-
-                while let Some(child) = old_list.pop_back() {
-                    child.set_parent(Some(task.clone()));
-
-                    new_list.push_back(child);
-                }
-            }
+            self.migrate_children_to(task.clone());
 
             task
         } else {
@@ -184,11 +183,17 @@ impl Task {
         }
     }
 
+    fn me(&self) -> Arc<Task> {
+        self.sref.upgrade().unwrap()
+    }
+
     pub fn remove_child(&self, child: &Task) {
         let mut children = self.children.lock();
 
         if child.sibling.is_linked() {
             let mut cur = unsafe { children.cursor_mut_from_ptr(child) };
+
+            child.set_parent(None);
 
             cur.remove();
         }
@@ -210,7 +215,24 @@ impl Task {
         *self.parent.lock() = parent;
     }
 
-    pub fn migrate_children(&self) {
+    pub fn migrate_children_to(&self, to: Arc<Task>) {
+        let mut old_list = self.children.lock();
+
+        while let Some(child) = old_list.pop_back() {
+            child.set_parent(Some(to.clone()));
+            to.add_child(child);
+        }
+
+        if let Some(parent) = self.get_parent() {
+            to.set_parent(Some(parent.clone()));
+            parent.add_child(to);
+
+            parent.remove_child(self);
+            self.set_parent(None);
+        }
+    }
+
+    pub fn migrate_children_to_parent(&self) {
         if let Some(parent) = self.get_parent() {
             let mut children = self.children.lock();
 
@@ -218,10 +240,6 @@ impl Task {
                 child.set_parent(Some(parent.clone()));
                 parent.add_child(child);
             }
-
-            parent.remove_child(self);
-
-            self.set_parent(None);
         } else {
             let mut children = self.children.lock();
 
@@ -287,14 +305,6 @@ impl Task {
 
     pub fn set_to_reschedule(&self, s: bool) {
         self.to_resched.store(s, Ordering::SeqCst);
-    }
-
-    pub fn to_delete(&self) -> bool {
-        self.to_delete.load(Ordering::SeqCst)
-    }
-
-    pub fn set_to_delete(&self, d: bool) {
-        self.to_delete.store(d, Ordering::SeqCst);
     }
 
     pub fn state(&self) -> TaskState {
@@ -375,12 +385,21 @@ impl Task {
     pub fn vm(&self) -> &VM {
         &self.vm
     }
-}
 
-impl Drop for Task {
-    fn drop(&mut self) {
+    pub fn make_zombie(&self) {
         unsafe {
             self.arch_task_mut().deallocate();
         }
+
+        if let Some(parent) = self.get_parent() {
+            parent.zombies.add_zombie(self.me());
+
+            parent.remove_child(self);
+            self.set_parent(None);
+        }
+    }
+
+    pub fn wait_pid(&self, pid: usize) {
+        self.zombies.wait_pid(pid);
     }
 }

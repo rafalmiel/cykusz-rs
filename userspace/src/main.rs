@@ -374,10 +374,9 @@ fn exec(cmd: &str) {
         }
     } else if cmd == "fork" {
         if let Ok(id) = syscall::fork() {
-            if id != 0 {
-                println!("Forked shell id: {}", id);
+            if id == 0 {
             } else {
-                //syscall::sleep(100);
+                println!("Forked shell id: {}", id);
                 syscall::exit();
             }
         } else {
@@ -385,11 +384,10 @@ fn exec(cmd: &str) {
         }
     } else if cmd == "exec" {
         if let Ok(id) = syscall::fork() {
-            if id != 0 {
-                println!("Exec new shell with id: {}", id);
+            if id == 0 {
                 syscall::exec("/bin/shell").expect("Failed to exec shell");
             } else {
-                //syscall::sleep(100);
+                println!("Exec new shell with id: {}", id);
                 syscall::exit();
             }
         } else {
@@ -397,9 +395,10 @@ fn exec(cmd: &str) {
         }
     } else if cmd == "hello" {
         if let Ok(id) = syscall::fork() {
-            if id != 0 {
-                println!("");
+            if id == 0 {
                 syscall::exec("/bin/hello").expect("Failed to exec hello");
+            } else {
+                syscall::waitpid(id).expect("Wait pid failed");
             }
         } else {
             println!("fork failed");

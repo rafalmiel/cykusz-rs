@@ -121,7 +121,7 @@ asm_sysretq:
     o64 sysret
 
 asm_sysretq_forkinit:
-    call fork_get_pid
+    mov rax, 0
 
     jmp asm_sysretq
 

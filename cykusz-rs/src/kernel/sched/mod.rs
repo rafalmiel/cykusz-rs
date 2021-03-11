@@ -2,7 +2,6 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use downcast_rs::DowncastSync;
-use intrusive_collections::LinkedListLink;
 use spin::Once;
 
 use crate::kernel::fs::dirent::DirEntryItem;
@@ -34,8 +33,6 @@ static LOCK_PROTECTION: AtomicBool = AtomicBool::new(false);
 pub fn new_task_id() -> usize {
     NEW_TASK_ID.fetch_add(1, Ordering::SeqCst)
 }
-
-intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLink });
 
 pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn init(&self) {}
@@ -166,6 +163,8 @@ impl Scheduler {
         let current = current_task();
 
         self.tasks.remove_task(current.id());
+
+        current.migrate_children_to_parent();
 
         drop(current);
 

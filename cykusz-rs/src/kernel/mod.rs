@@ -13,11 +13,7 @@ pub mod utils;
 
 #[macro_use]
 pub mod sched;
-//#[macro_use]
-//pub mod sched2;
 #[macro_use]
 pub mod module;
 pub mod block;
 pub mod time;
-
-//pub use sched2 as sched;

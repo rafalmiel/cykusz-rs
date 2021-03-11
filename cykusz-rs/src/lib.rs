@@ -157,11 +157,6 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
     kernel::smp::notify_ap_ready();
 
-    // Start test tasks on this cpu
-    //task_test::start();
-
-    //println!("CPU INIT FINISHED");
-
     idle();
 }
 

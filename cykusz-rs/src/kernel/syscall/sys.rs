@@ -166,6 +166,13 @@ pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
 }
 
 pub fn sys_maps() -> SyscallResult {
+    println!(
+        "free mem before fork: {}, used: {} heap: {}",
+        crate::kernel::mm::free_mem(),
+        crate::kernel::mm::used_mem(),
+        crate::kernel::mm::heap::heap_mem(),
+    );
+
     current_task().vm().print_vm();
 
     Ok(0)
@@ -584,21 +591,15 @@ pub fn sys_sleep(time_ns: u64) -> SyscallResult {
 }
 
 pub fn sys_fork() -> SyscallResult {
-    //println!(
-    //    "free mem before fork: {}, used: {} heap: {}",
-    //    crate::kernel::mm::free_mem(),
-    //    crate::kernel::mm::used_mem(),
-    //    crate::kernel::mm::heap::heap_mem(),
-    //);
     //println!("icache stats");
     //crate::kernel::fs::icache::cache().print_stats();
     //println!("dir entry stats");
     //crate::kernel::fs::dirent::cache().print_stats();
     //println!("page cache stats");
     //crate::kernel::fs::pcache::cache().print_stats();
-    crate::kernel::sched::fork();
+    let child = crate::kernel::sched::fork();
 
-    Ok(0)
+    Ok(child.id())
 }
 
 pub fn sys_exec(path: u64, path_len: u64) -> SyscallResult {
@@ -607,6 +608,14 @@ pub fn sys_exec(path: u64, path_len: u64) -> SyscallResult {
     let prog = lookup_by_path(path, LookupMode::None)?;
 
     crate::kernel::sched::exec(prog);
+}
+
+pub fn sys_waitpid(pid: u64) -> SyscallResult {
+    let current = current_task();
+
+    current.wait_pid(pid as usize);
+
+    Ok(0)
 }
 
 pub fn sys_poweroff() -> ! {

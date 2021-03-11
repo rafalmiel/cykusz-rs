@@ -42,6 +42,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_MMAP => sys::sys_mmap(a, b, c, d, e, f),
         SYS_MUNMAP => sys::sys_munmap(a, b),
         SYS_MAPS => sys::sys_maps(),
+        SYS_WAITPID => sys::sys_waitpid(a),
 
         _ => Err(SyscallError::Inval),
     }

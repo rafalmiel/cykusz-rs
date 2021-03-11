@@ -303,6 +303,10 @@ pub fn exec(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_EXEC, path.as_ptr() as usize, path.len()) }
 }
 
+pub fn waitpid(pid: usize) -> SyscallResult {
+    unsafe { syscall1(SYS_WAITPID, pid as usize) }
+}
+
 pub fn poweroff() -> ! {
     unsafe {
         if let Err(e) = syscall0(SYS_POWEROFF) {

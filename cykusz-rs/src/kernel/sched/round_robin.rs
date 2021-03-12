@@ -157,8 +157,10 @@ impl Queues {
         self.push_runnable(task);
     }
 
-    fn sleep(&mut self, _task: &Task, time_ns: Option<usize>, lock: SpinGuard<()>) {
+    fn sleep(&mut self, time_ns: Option<usize>, lock: SpinGuard<()>) {
         let task = get_current();
+
+        assert_ne!(task.id(), self.idle_task.id(), "Idle task should not sleep");
 
         if task.has_pending_io() {
             task.set_has_pending_io(false);
@@ -174,18 +176,16 @@ impl Queues {
         self.reschedule(lock);
     }
 
-    fn wake(&mut self, task: &Task, _lock: SpinGuard<()>) {
+    fn wake(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
         if task.state() == TaskState::AwaitingIo {
             let mut cursor = if task.sleep_until() > 0 {
-                unsafe { self.deadline_awaiting.cursor_mut_from_ptr(task) }
+                unsafe { self.deadline_awaiting.cursor_mut_from_ptr(task.as_ref()) }
             } else {
-                unsafe { self.awaiting.cursor_mut_from_ptr(task) }
+                unsafe { self.awaiting.cursor_mut_from_ptr(task.as_ref()) }
             };
 
             if let Some(task) = cursor.remove() {
-                if task.id() != self.idle_task.id() {
-                    self.push_runnable(task);
-                }
+                self.push_runnable(task);
             }
         } else {
             task.set_has_pending_io(true);
@@ -283,15 +283,15 @@ impl SchedulerInterface for RRScheduler {
         queue.queue_task(task, lock);
     }
 
-    fn sleep(&self, task: &Task, until: Option<usize>) {
-        let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
+    fn sleep(&self, until: Option<usize>) {
+        let (lock, queue) = self.queues.this_cpu_mut();
 
         let lock = lock.lock_irq();
 
-        queue.sleep(task, until, lock);
+        queue.sleep(until, lock);
     }
 
-    fn wake(&self, task: &Task) {
+    fn wake(&self, task: Arc<Task>) {
         let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
 
         let lock = lock.lock_irq();

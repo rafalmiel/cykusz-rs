@@ -42,8 +42,8 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
         self.current_task().id() as isize
     }
     fn queue_task(&self, task: Arc<Task>);
-    fn sleep(&self, task: &Task, until: Option<usize>);
-    fn wake(&self, task: &Task);
+    fn sleep(&self, until: Option<usize>);
+    fn wake(&self, task: Arc<Task>);
     fn exit(&self, status: isize) -> !;
 }
 
@@ -121,11 +121,11 @@ impl Scheduler {
         }
     }
 
-    fn sleep(&self, task: &Task, time_ns: Option<usize>) {
-        self.sched.sleep(task, time_ns)
+    fn sleep(&self, time_ns: Option<usize>) {
+        self.sched.sleep(time_ns)
     }
 
-    fn wake(&self, task: &Task) {
+    fn wake(&self, task: Arc<Task>) {
         self.sched.wake(task);
     }
 
@@ -241,11 +241,11 @@ pub fn create_user_task(exe: DirEntryItem) -> Arc<Task> {
     scheduler().create_user_task(exe)
 }
 
-pub fn sleep(task: &Task, time_ns: Option<usize>) {
-    scheduler().sleep(task, time_ns)
+pub fn sleep(time_ns: Option<usize>) {
+    scheduler().sleep(time_ns)
 }
 
-pub fn wake(task: &Task) {
+pub fn wake(task: Arc<Task>) {
     scheduler().wake(task);
 }
 

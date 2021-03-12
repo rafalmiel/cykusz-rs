@@ -344,7 +344,7 @@ impl Task {
     }
 
     pub fn await_io(&self) {
-        crate::kernel::sched::sleep(self, None);
+        crate::kernel::sched::sleep(None);
 
         assert_eq!(
             self.state(),
@@ -355,7 +355,7 @@ impl Task {
     }
 
     pub fn wake_up(&self) {
-        crate::kernel::sched::wake(self);
+        crate::kernel::sched::wake(self.me());
     }
 
     pub unsafe fn arch_task_mut(&self) -> &mut ArchTask {
@@ -367,7 +367,7 @@ impl Task {
     }
 
     pub fn sleep(&self, time_ns: usize) {
-        crate::kernel::sched::sleep(self, Some(time_ns))
+        crate::kernel::sched::sleep(Some(time_ns))
     }
 
     pub fn sleep_until(&self) -> usize {
@@ -401,5 +401,10 @@ impl Task {
 
     pub fn wait_pid(&self, pid: usize) {
         self.zombies.wait_pid(pid);
+    }
+}
+
+impl Drop for Task {
+    fn drop(&mut self) {
     }
 }

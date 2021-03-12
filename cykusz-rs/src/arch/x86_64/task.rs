@@ -74,11 +74,6 @@ fn task_finished() {
     crate::kernel::sched::task_finished();
 }
 
-#[no_mangle]
-pub extern "C" fn fork_get_pid() -> isize {
-    crate::kernel::sched::current_id() as isize
-}
-
 fn prepare_p4<'a>() -> &'a mut P4Table {
     use crate::arch::mm::virt::current_p4_table;
 

@@ -162,6 +162,32 @@ impl LApic {
         }
     }
 
+    pub fn send_ipi(&mut self, target: usize, vector: u8) {
+        if !self.x2 {
+            self.reg_write(REG_CMD_ID, (target as u32) << 24);
+            self.reg_write(REG_CMD, vector as u32);
+
+            let mut status = self.reg_read(REG_CMD) & (1u32 << 12);
+
+            while status > 0 {
+                status = self.reg_read(REG_CMD) & (1u32 << 12);
+            }
+        } else {
+            unsafe {
+                msr::wrmsr(
+                    msr::IA32_X2APIC_ICR,
+                    vector as u64 | ((target as u64) << 32),
+                );
+
+                let mut status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
+
+                while status > 0 {
+                    status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
+                }
+            }
+        }
+    }
+
     pub fn start_timer(&mut self, one_shot: bool) {
         if !self.x2 {
             self.reg_write(REG_TIMDIV, 0b11);

@@ -405,6 +405,5 @@ impl Task {
 }
 
 impl Drop for Task {
-    fn drop(&mut self) {
-    }
+    fn drop(&mut self) {}
 }

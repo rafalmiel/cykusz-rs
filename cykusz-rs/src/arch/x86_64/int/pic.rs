@@ -24,4 +24,9 @@ impl InterruptController for Controller {
     fn set_level_triggered(&self, _src: u8, _ah: bool) {
         unimplemented!()
     }
+
+    fn send_ipi(&self, _target_cpu: usize, _vector: usize) {
+        // We won't have SMP with PIC controller anyway
+        unimplemented!()
+    }
 }

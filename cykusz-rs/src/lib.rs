@@ -93,6 +93,10 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Scheduler Initialised");
 
+    kernel::ipi::init();
+
+    println!("[ OK ] IPI Initialized");
+
     kernel::smp::start();
 
     println!(
@@ -118,6 +122,8 @@ pub fn rust_main(stack_top: VirtAddr) {
 }
 
 fn init_task() {
+    kernel::ipi::test_ipi();
+
     kernel::net::init();
 
     println!("[ OK ] Network Stack Initialized");
@@ -146,6 +152,8 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     }
 
     kernel::sched::init_ap();
+
+    kernel::ipi::init_ap();
 
     println!("[ OK ] CPU {} Initialised", unsafe { crate::CPU_ID });
 

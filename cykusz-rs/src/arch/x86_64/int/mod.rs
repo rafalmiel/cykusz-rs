@@ -7,6 +7,7 @@ pub trait InterruptController: Send + Sync {
     fn set_irq_dest(&self, src: u8, dest: u8);
     fn set_active_high(&self, src: u8, ah: bool);
     fn set_level_triggered(&self, src: u8, ah: bool);
+    fn send_ipi(&self, target_cpu: usize, vector: usize);
 }
 
 pub fn is_enabled() -> bool {
@@ -73,4 +74,8 @@ pub fn set_active_high(src: u8, ah: bool) {
 
 pub fn set_level_triggered(src: u8, ah: bool) {
     CONTROLLER.set_level_triggered(src, ah)
+}
+
+pub fn send_ipi(target_cpu: usize, vector: u8) {
+    CONTROLLER.send_ipi(target_cpu, vector as usize)
 }

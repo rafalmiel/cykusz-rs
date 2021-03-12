@@ -4,7 +4,6 @@ global asm_sysretq_userinit
 global asm_sysretq_forkinit
 
 extern fast_syscall_handler
-extern fork_get_pid
 extern restore_user_fs
 
 global asm_update_kern_fs_base

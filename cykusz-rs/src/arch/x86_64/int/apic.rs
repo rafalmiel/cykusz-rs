@@ -33,4 +33,8 @@ impl InterruptController for Controller {
     fn set_level_triggered(&self, src: u8, ah: bool) {
         IOAPIC.lock().set_int_level_triggered(src as u32, ah);
     }
+
+    fn send_ipi(&self, target_cpu: usize, vector: usize) {
+        LAPIC.irq().send_ipi(target_cpu, vector as u8);
+    }
 }

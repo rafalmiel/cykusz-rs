@@ -269,6 +269,10 @@ pub fn remove_handler(num: usize) -> bool {
     }
 }
 
+pub fn set_handler(num: usize, f: InterruptFn) {
+    SHARED_IRQS.set_int_handler(num, f);
+}
+
 pub fn set_user_handler(num: usize, f: InterruptFn) {
     assert!(num <= 255);
 

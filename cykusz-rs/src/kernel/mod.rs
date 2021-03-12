@@ -1,6 +1,7 @@
 pub mod device;
 pub mod fs;
 pub mod int;
+pub mod ipi;
 pub mod mm;
 pub mod net;
 pub mod smp;

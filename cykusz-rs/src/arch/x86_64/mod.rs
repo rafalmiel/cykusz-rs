@@ -12,6 +12,7 @@ pub mod dev;
 pub mod gdt;
 pub mod idt;
 pub mod int;
+pub mod ipi;
 pub mod mm;
 pub mod smp;
 pub mod syscall;

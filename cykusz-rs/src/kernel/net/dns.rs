@@ -11,6 +11,8 @@ use crate::kernel::net::{
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
+use crate::kernel::signal::SignalResult;
+
 #[derive(Debug, Copy, Clone)]
 pub struct Dns {}
 
@@ -221,7 +223,7 @@ impl Answer {
 
 static QUERY_ID: AtomicU16 = AtomicU16::new(0);
 
-fn query_host(dns: Arc<DnsService>, host: &[u8], src_port: u32) -> Option<Ip4> {
+fn query_host(dns: Arc<DnsService>, host: &[u8], src_port: u32) -> SignalResult<Ip4> {
     let drv = default_driver();
 
     let mut packet: Packet<Dns> =
@@ -244,7 +246,7 @@ fn query_host(dns: Arc<DnsService>, host: &[u8], src_port: u32) -> Option<Ip4> {
 
     crate::kernel::net::udp::send_packet(packet.downgrade());
 
-    Some(dns.await_result())
+    dns.await_result()
 }
 
 struct DnsService {
@@ -260,12 +262,12 @@ impl DnsService {
         }
     }
 
-    fn await_result(&self) -> Ip4 {
+    fn await_result(&self) -> SignalResult<Ip4> {
         let res = self
             .wait_queue
-            .wait_lock_for(&self.ip_result, |lck| lck.is_some());
+            .wait_lock_for(&self.ip_result, |lck| lck.is_some())?;
 
-        res.unwrap()
+        Ok(res.unwrap())
     }
 }
 
@@ -301,7 +303,7 @@ impl UdpService for DnsService {
     }
 }
 
-pub fn get_ip_by_host(host: &[u8]) -> Option<Ip4> {
+pub fn get_ip_by_host(host: &[u8]) -> SignalResult<Ip4> {
     let dns = Arc::new(DnsService::new());
 
     if let Some(port) = crate::kernel::net::udp::register_ephemeral_handler(dns.clone()) {
@@ -311,6 +313,6 @@ pub fn get_ip_by_host(host: &[u8]) -> Option<Ip4> {
 
         res
     } else {
-        None
+        panic!("Failed to register ephemeral port");
     }
 }

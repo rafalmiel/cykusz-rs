@@ -112,7 +112,9 @@ static TIMERS_WQ: WaitQueue = WaitQueue::new();
 fn check_timers() {
     let time = current_ns();
 
-    let mut timers = TIMERS_WQ.wait_lock_for(&TIMERS, |lck| !lck.is_empty());
+    let mut timers = TIMERS_WQ
+        .wait_lock_for(&TIMERS, |lck| !lck.is_empty())
+        .expect("Timers thread should not be signalled");
 
     loop {
         if let Some(timer) = timers.front().get() {
@@ -141,7 +143,8 @@ fn timer_fun() {
         check_timers();
 
         // check timers every 100 ms
-        task.sleep(100_000_000);
+        task.sleep(100_000_000)
+            .expect("Unexpected signal in timer thread");
     }
 }
 

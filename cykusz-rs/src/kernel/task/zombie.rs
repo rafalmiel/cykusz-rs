@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 
 use intrusive_collections::LinkedList;
 
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -26,7 +27,7 @@ impl Zombies {
         self.wq.notify_one();
     }
 
-    pub fn wait_pid(&self, pid: usize) {
+    pub fn wait_pid(&self, pid: usize) -> SignalResult<()> {
         self.wq.wait_lock_for(&self.list, |l| {
             let mut cur = l.front_mut();
 
@@ -41,6 +42,8 @@ impl Zombies {
             }
 
             false
-        });
+        })?;
+
+        Ok(())
     }
 }

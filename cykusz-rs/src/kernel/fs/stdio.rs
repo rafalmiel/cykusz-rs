@@ -28,7 +28,7 @@ impl INode for StdIn {
         Ok(crate::drivers::input::tty::read(
             buf.as_mut_ptr(),
             buf.len(),
-        ))
+        )?)
     }
 
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {

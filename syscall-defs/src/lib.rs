@@ -56,6 +56,7 @@ pub enum SyscallError {
     NotDir = 20,
     IsDir = 21,
     Inval = 22,
+    Interrupted = 23,
     UnknownError = 0xffff,
 }
 
@@ -163,6 +164,7 @@ impl SyscallFrom<isize> for SyscallResult {
                 -20 => Err(SyscallError::NotDir),
                 -21 => Err(SyscallError::IsDir),
                 -22 => Err(SyscallError::Inval),
+                -23 => Err(SyscallError::Interrupted),
                 _ => Err(SyscallError::UnknownError),
             }
         }

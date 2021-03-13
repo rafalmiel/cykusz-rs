@@ -12,6 +12,7 @@ pub enum FsError {
     EntryExists,
     InvalidParam,
     Busy,
+    Interrupted,
 }
 
 impl From<FsError> for syscall_defs::SyscallError {
@@ -25,6 +26,7 @@ impl From<FsError> for syscall_defs::SyscallError {
             FsError::EntryExists => SyscallError::Exists,
             FsError::InvalidParam => SyscallError::Inval,
             FsError::Busy => SyscallError::Busy,
+            FsError::Interrupted => SyscallError::Interrupted,
         }
     }
 }

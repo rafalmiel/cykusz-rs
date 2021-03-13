@@ -12,6 +12,7 @@ use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::sched::new_task_id;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
@@ -343,8 +344,8 @@ impl Task {
         self.pending_io.store(has, Ordering::SeqCst);
     }
 
-    pub fn await_io(&self) {
-        crate::kernel::sched::sleep(None);
+    pub fn await_io(&self) -> SignalResult<()> {
+        let res = crate::kernel::sched::sleep(None);
 
         assert_eq!(
             self.state(),
@@ -352,6 +353,8 @@ impl Task {
             "await_io assert, id: {}",
             self.id()
         );
+
+        res
     }
 
     pub fn wake_up(&self) {
@@ -366,7 +369,7 @@ impl Task {
         &(*self.arch_task.get())
     }
 
-    pub fn sleep(&self, time_ns: usize) {
+    pub fn sleep(&self, time_ns: usize) -> SignalResult<()> {
         crate::kernel::sched::sleep(Some(time_ns))
     }
 
@@ -399,8 +402,8 @@ impl Task {
         }
     }
 
-    pub fn wait_pid(&self, pid: usize) {
-        self.zombies.wait_pid(pid);
+    pub fn wait_pid(&self, pid: usize) -> SignalResult<()> {
+        self.zombies.wait_pid(pid)
     }
 }
 

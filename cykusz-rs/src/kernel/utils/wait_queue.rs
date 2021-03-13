@@ -2,11 +2,31 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::kernel::sched::current_task;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::task::Task;
 
 pub struct WaitQueue {
     tasks: Spin<Vec<Arc<Task>>>,
+}
+
+pub struct WaitQueueGuard<'a> {
+    wq: &'a WaitQueue,
+    task: &'a Arc<Task>,
+}
+
+impl<'a> WaitQueueGuard<'a> {
+    pub fn new(wq: &'a WaitQueue, task: &'a Arc<Task>) -> WaitQueueGuard<'a> {
+        wq.add_task(task.clone());
+
+        WaitQueueGuard::<'a> { wq, task }
+    }
+}
+
+impl<'a> Drop for WaitQueueGuard<'a> {
+    fn drop(&mut self) {
+        self.wq.remove_task(self.task.clone());
+    }
 }
 
 impl Default for WaitQueue {
@@ -24,96 +44,90 @@ impl WaitQueue {
         }
     }
 
-    pub fn wait_lock<T>(lock: SpinGuard<T>) {
+    pub fn wait_lock<T>(lock: SpinGuard<T>) -> SignalResult<()> {
         let task = current_task();
 
         core::mem::drop(lock);
 
-        task.await_io();
+        task.await_io()
     }
 
-    pub fn task_wait() {
+    pub fn task_wait() -> SignalResult<()> {
         let task = current_task();
 
-        task.await_io();
+        task.await_io()
     }
 
-    pub fn wait(&self) {
+    pub fn wait(&self) -> SignalResult<()> {
         let task = current_task();
 
-        self.add_task(task.clone());
+        let _guard = WaitQueueGuard::new(self, &task);
 
-        task.await_io();
-
-        self.remove_task(task);
+        task.await_io()
     }
 
     pub fn wait_lock_irq_for<'a, T, F: Fn(&mut SpinGuard<T>) -> bool>(
         &self,
         mtx: &'a Spin<T>,
         cond: F,
-    ) -> SpinGuard<'a, T> {
+    ) -> SignalResult<SpinGuard<'a, T>> {
         let mut lock = mtx.lock_irq();
 
         if cond(&mut lock) {
-            return lock;
+            return Ok(lock);
         }
 
         let task = current_task();
 
-        self.add_task(task.clone());
+        let _guard = WaitQueueGuard::new(self, &task);
 
         while !cond(&mut lock) {
             core::mem::drop(lock);
 
-            task.await_io();
+            task.await_io()?;
 
             lock = mtx.lock_irq();
         }
 
-        self.remove_task(task);
-
-        lock
+        Ok(lock)
     }
 
     pub fn wait_lock_for<'a, T, F: Fn(&mut SpinGuard<T>) -> bool>(
         &self,
         mtx: &'a Spin<T>,
         cond: F,
-    ) -> SpinGuard<'a, T> {
+    ) -> SignalResult<SpinGuard<'a, T>> {
         let mut lock = mtx.lock();
 
         if cond(&mut lock) {
-            return lock;
+            return Ok(lock);
         }
 
         let task = current_task();
 
-        self.add_task(task.clone());
+        let _guard = WaitQueueGuard::new(self, &task);
 
         while !cond(&mut lock) {
             core::mem::drop(lock);
 
-            task.await_io();
+            task.await_io()?;
 
             lock = mtx.lock();
         }
 
-        self.remove_task(task);
-
-        lock
+        Ok(lock)
     }
 
-    pub fn wait_for<F: Fn() -> bool>(&self, cond: F) {
+    pub fn wait_for<F: Fn() -> bool>(&self, cond: F) -> SignalResult<()> {
         let task = current_task();
 
-        self.add_task(task.clone());
+        let _guard = WaitQueueGuard::new(self, &task);
 
         while !cond() {
-            task.await_io();
+            task.await_io()?;
         }
 
-        self.remove_task(task);
+        Ok(())
     }
 
     pub fn add_task(&self, task: Arc<Task>) {

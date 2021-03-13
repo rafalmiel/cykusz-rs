@@ -12,7 +12,7 @@ use crate::kernel::timer::{create_timer, current_ns, Timer, TimerCallback};
 use crate::kernel::utils::buffer::{Buffer, BufferQueue};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 enum State {
     Closed,
     Listen,
@@ -318,7 +318,9 @@ impl SocketData {
 
                 let mut packet = self.make_ack_packet(cap, TcpFlags::empty());
 
-                self.proxy_buffer.read_data(&mut packet.data_mut()[..cap]);
+                self.proxy_buffer
+                    .read_data(&mut packet.data_mut()[..cap])
+                    .expect("[ NET ] Unexpected signal in process_ack");
 
                 self.send_packet(packet, true);
 
@@ -755,7 +757,7 @@ impl INode for Socket {
 
         let wnd_update = data.in_buffer.available_size() == 0;
 
-        let r = data.in_buffer.read_data(buf);
+        let r = data.in_buffer.read_data(buf)?;
 
         if wnd_update {
             data.send_ack();
@@ -778,7 +780,13 @@ impl INode for Socket {
                 //println!("[ TCP ] Proxy Buffer avail: {}", data.proxy_buffer.available_size());
 
                 while data.proxy_buffer.available_size() < buf.len() {
-                    WaitQueue::wait_lock(data);
+                    if let Err(e) = WaitQueue::wait_lock(data) {
+                        data = self.data.lock();
+
+                        data.proxy_buffer.wait_queue().remove_task(task);
+
+                        return Err(e)?;
+                    }
 
                     data = self.data.lock();
                 }

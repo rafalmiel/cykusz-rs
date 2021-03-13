@@ -7,6 +7,7 @@ use spin::Once;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::sched::round_robin::RRScheduler;
 use crate::kernel::sched::task_container::TaskContainer;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::task::Task;
 
 #[macro_export]
@@ -42,7 +43,7 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
         self.current_task().id() as isize
     }
     fn queue_task(&self, task: Arc<Task>);
-    fn sleep(&self, until: Option<usize>);
+    fn sleep(&self, until: Option<usize>) -> SignalResult<()>;
     fn wake(&self, task: Arc<Task>);
     fn exit(&self, status: isize) -> !;
 }
@@ -121,7 +122,7 @@ impl Scheduler {
         }
     }
 
-    fn sleep(&self, time_ns: Option<usize>) {
+    fn sleep(&self, time_ns: Option<usize>) -> SignalResult<()> {
         self.sched.sleep(time_ns)
     }
 
@@ -241,7 +242,7 @@ pub fn create_user_task(exe: DirEntryItem) -> Arc<Task> {
     scheduler().create_user_task(exe)
 }
 
-pub fn sleep(time_ns: Option<usize>) {
+pub fn sleep(time_ns: Option<usize>) -> SignalResult<()> {
     scheduler().sleep(time_ns)
 }
 

@@ -1,6 +1,7 @@
 use core::ops::{Deref, DerefMut};
 
 use crate::kernel::sched::current_task;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::spin_lock::{Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -22,7 +23,7 @@ impl<T> Mutex<T> {
         }
     }
 
-    pub fn lock(&self) -> MutexGuard<T> {
+    pub fn lock(&self) -> SignalResult<MutexGuard<T>> {
         let task = current_task();
 
         self.wait_queue.add_task(task.clone());
@@ -30,17 +31,20 @@ impl<T> Mutex<T> {
         loop {
             if let Some(g) = self.mutex.try_lock() {
                 self.wait_queue.remove_task(task);
-                return MutexGuard {
+                return Ok(MutexGuard {
                     g: Some(g),
                     m: &self,
-                };
+                });
             } else {
-                WaitQueue::task_wait();
+                if let Err(e) = WaitQueue::task_wait() {
+                    self.wait_queue.remove_task(task);
+                    return Err(e);
+                }
             }
         }
     }
 
-    pub fn lock_irq(&self) -> MutexGuard<T> {
+    pub fn lock_irq(&self) -> SignalResult<MutexGuard<T>> {
         let task = current_task();
 
         self.wait_queue.add_task(task.clone());
@@ -48,12 +52,15 @@ impl<T> Mutex<T> {
         loop {
             if let Some(g) = self.mutex.try_lock_irq() {
                 self.wait_queue.remove_task(task);
-                return MutexGuard {
+                return Ok(MutexGuard {
                     g: Some(g),
                     m: &self,
-                };
+                });
             } else {
-                WaitQueue::task_wait();
+                if let Err(e) = WaitQueue::task_wait() {
+                    self.wait_queue.remove_task(task);
+                    return Err(e);
+                }
             }
         }
     }

@@ -10,6 +10,7 @@ use crate::drivers::input::KeyListener;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -183,12 +184,12 @@ impl Tty {
         }
     }
 
-    fn read(&self, buf: *mut u8, len: usize) -> usize {
+    fn read(&self, buf: *mut u8, len: usize) -> SignalResult<usize> {
         let mut buffer = self
             .wait_queue
-            .wait_lock_irq_for(&self.buffer, |lck| lck.has_data());
+            .wait_lock_irq_for(&self.buffer, |lck| lck.has_data())?;
 
-        buffer.read(buf, len)
+        Ok(buffer.read(buf, len))
     }
 }
 
@@ -281,7 +282,7 @@ impl Device for Tty {
 
 impl INode for Tty {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
-        Ok(self.read(buf.as_mut_ptr(), buf.len()))
+        Ok(self.read(buf.as_mut_ptr(), buf.len())?)
     }
 
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool, FsError> {
@@ -299,7 +300,7 @@ lazy_static! {
     static ref LISTENER: Arc<Tty> = Tty::new().wrap();
 }
 
-pub fn read(buf: *mut u8, len: usize) -> usize {
+pub fn read(buf: *mut u8, len: usize) -> SignalResult<usize> {
     let l = &LISTENER;
 
     l.read(buf, len)

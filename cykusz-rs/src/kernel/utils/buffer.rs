@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::kernel::sched::current_task;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -76,12 +77,12 @@ impl BufferQueue {
         self.buffer.lock().size()
     }
 
-    pub fn read_data(&self, buf: &mut [u8]) -> usize {
+    pub fn read_data(&self, buf: &mut [u8]) -> SignalResult<usize> {
         let mut buffer = self
             .wait_queue
-            .wait_lock_for(&self.buffer, |lck| lck.has_data());
+            .wait_lock_for(&self.buffer, |lck| lck.has_data())?;
 
-        buffer.read_data(buf)
+        Ok(buffer.read_data(buf))
     }
 
     pub fn try_read_data_transient(&self, buf: &mut [u8]) -> usize {

@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use intrusive_collections::LinkedList;
 
 use crate::kernel::sched::SchedulerInterface;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -157,14 +158,14 @@ impl Queues {
         self.push_runnable(task);
     }
 
-    fn sleep(&mut self, time_ns: Option<usize>, lock: SpinGuard<()>) {
+    fn sleep(&mut self, time_ns: Option<usize>, lock: SpinGuard<()>) -> SignalResult<()> {
         let task = get_current();
 
         assert_ne!(task.id(), self.idle_task.id(), "Idle task should not sleep");
 
         if task.has_pending_io() {
             task.set_has_pending_io(false);
-            return;
+            return Ok(());
         }
 
         if let Some(time_ns) = time_ns {
@@ -174,6 +175,8 @@ impl Queues {
         }
 
         self.reschedule(lock);
+
+        Ok(())
     }
 
     fn wake(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
@@ -283,12 +286,12 @@ impl SchedulerInterface for RRScheduler {
         queue.queue_task(task, lock);
     }
 
-    fn sleep(&self, until: Option<usize>) {
+    fn sleep(&self, until: Option<usize>) -> SignalResult<()> {
         let (lock, queue) = self.queues.this_cpu_mut();
 
         let lock = lock.lock_irq();
 
-        queue.sleep(until, lock);
+        queue.sleep(until, lock)
     }
 
     fn wake(&self, task: Arc<Task>) {
@@ -328,7 +331,8 @@ impl RRScheduler {
 
         queue
             .dead_wq
-            .wait_lock_for(lock, |_sg| !queue.dead.is_empty());
+            .wait_lock_for(lock, |_sg| !queue.dead.is_empty())
+            .expect("[ SCHED ] Unexpected signal in reaper thread");
 
         queue.reap_dead(lock);
     }

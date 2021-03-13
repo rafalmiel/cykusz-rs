@@ -34,7 +34,9 @@ extern "C" fn AcpiOsWaitEventsComplete() {
 extern "C" fn AcpiOsSleep(Milliseconds: UINT64) {
     use crate::kernel::sched::current_task;
 
-    current_task().sleep(Milliseconds as usize * 1_000_000);
+    current_task()
+        .sleep(Milliseconds as usize * 1_000_000)
+        .expect("Unexpected signal in acpica thread");
 }
 
 #[no_mangle]

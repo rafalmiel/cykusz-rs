@@ -4,6 +4,7 @@ pub mod int;
 pub mod ipi;
 pub mod mm;
 pub mod net;
+pub mod signal;
 pub mod smp;
 pub mod sync;
 pub mod syscall;

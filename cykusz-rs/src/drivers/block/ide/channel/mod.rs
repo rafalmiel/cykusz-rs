@@ -307,14 +307,24 @@ impl IdeChannel {
         let mut offset = 0;
 
         while offset < request.count() {
-            let mut data = self
+            let data = self
                 .cmd_wq
                 .wait_lock_irq_for(&self.data, |l| l.active_cmd.is_none());
 
-            offset = data.run_request(request.clone(), offset, slave);
+            match data {
+                Ok(mut l) => {
+                    offset = l.run_request(request.clone(), offset, slave);
+                }
+                Err(_e) => {
+                    return Some(offset * 512);
+                }
+            }
         }
 
-        request.wait_queue().wait_for(|| request.is_complete());
+        while let Err(_e) = request.wait_queue().wait_for(|| request.is_complete()) {
+            // TODO: Make some waits uninterruptible
+            println!("[ IDE ] IO interrupted, retrying");
+        }
 
         Some(request.count() * 512)
     }

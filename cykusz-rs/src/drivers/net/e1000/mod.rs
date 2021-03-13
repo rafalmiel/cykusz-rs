@@ -13,6 +13,7 @@ use crate::kernel::mm::MappedAddr;
 use crate::kernel::net::eth::Eth;
 use crate::kernel::net::{NetDriver, Packet, RecvPacket};
 use crate::kernel::sched::current_task;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -35,7 +36,7 @@ impl NetDriver for E1000 {
         true
     }
 
-    fn receive(&self) -> RecvPacket {
+    fn receive(&self) -> SignalResult<RecvPacket> {
         let task = current_task();
 
         self.rx_wqueue.add_task(task.clone());
@@ -45,9 +46,9 @@ impl NetDriver for E1000 {
 
             if let Some(p) = data.receive() {
                 self.rx_wqueue.remove_task(task);
-                return p;
+                return Ok(p);
             } else {
-                WaitQueue::wait_lock(data);
+                WaitQueue::wait_lock(data)?
             }
         }
     }

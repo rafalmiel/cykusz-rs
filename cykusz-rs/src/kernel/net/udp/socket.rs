@@ -66,8 +66,7 @@ impl Socket {
 
 impl INode for Socket {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        let res = Ok(self.buffer.read_data(buf));
-        res
+        Ok(self.buffer.read_data(buf)?)
     }
 
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {

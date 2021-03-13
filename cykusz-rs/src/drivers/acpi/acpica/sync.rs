@@ -80,7 +80,7 @@ extern "C" fn AcpiOsWaitSemaphore(
 ) -> ACPI_STATUS {
     unsafe {
         let s = &*(Handle as *mut Semaphore);
-        s.acquire();
+        s.acquire().expect("[ ACPICA ] Signalled acpica thread");
     }
 
     AE_OK

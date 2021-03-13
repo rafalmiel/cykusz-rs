@@ -10,6 +10,7 @@ use crate::kernel::sched::create_param_task;
 use crate::kernel::sync::RwSpin;
 
 pub use self::packet::*;
+use crate::kernel::signal::SignalResult;
 
 pub mod arp;
 pub mod dhcp;
@@ -25,7 +26,7 @@ pub mod util;
 
 pub trait NetDriver: Sync + Send {
     fn send(&self, packet: Packet<Eth>) -> bool;
-    fn receive(&self) -> RecvPacket;
+    fn receive(&self) -> SignalResult<RecvPacket>;
     fn receive_finished(&self, id: usize);
     fn alloc_packet(&self, size: usize) -> Packet<Eth>;
     fn dealloc_patket(&self, packet: Packet<Eth>);
@@ -106,7 +107,9 @@ fn recv_thread(driver: usize) {
     let driver = DRIVERS.read()[driver].driver.clone();
 
     loop {
-        let packet = driver.receive();
+        let packet = driver
+            .receive()
+            .expect("[ NET ] Unexpected signal in recv_thread");
 
         process_packet(&packet);
 

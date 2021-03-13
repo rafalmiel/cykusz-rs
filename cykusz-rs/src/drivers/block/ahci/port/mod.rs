@@ -141,14 +141,24 @@ impl Port {
         let mut off = 0;
         // post request and wait for completion.....
         while off < request.count() {
-            let mut data = self
+            let data = self
                 .cmd_wq
                 .wait_lock_irq_for(&self.data, |d| d.free_cmds > 0);
 
-            off = data.run_request(request.clone(), off);
+            match data {
+                Ok(mut l) => {
+                    off = l.run_request(request.clone(), off);
+                }
+                Err(_e) => {
+                    return Some(off * 512);
+                }
+            }
         }
 
-        request.wait_queue().wait_for(|| request.is_complete());
+        while let Err(_e) = request.wait_queue().wait_for(|| request.is_complete()) {
+            // TODO: Make some waits uninterruptible
+            println!("[ AHCI ] IO interrupted, retrying");
+        }
 
         //if !is_int {
         //    crate::kernel::int::disable();

@@ -55,7 +55,9 @@ impl IpiCommand {
     }
 
     fn wait_complete(&self) {
-        self.wq.wait_for(|| self.completed() == 1);
+        while let Err(_e) = self.wq.wait_for(|| self.completed() == 1) {
+            println!("[ IPI ] IPI wait complete interrupted, retrying...");
+        }
     }
 }
 
@@ -127,7 +129,10 @@ fn ipi_thread() {
     let ipi = ipi().ipis.this_cpu();
 
     loop {
-        let mut list = ipi.wq.wait_lock_for(&ipi.ipis, |l| !l.is_empty());
+        let mut list = ipi
+            .wq
+            .wait_lock_for(&ipi.ipis, |l| !l.is_empty())
+            .expect("ipi_thread should not be signalled");
 
         while let Some(cmd) = list.pop_front() {
             cmd.execute();

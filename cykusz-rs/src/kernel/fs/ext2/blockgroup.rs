@@ -8,7 +8,7 @@ use spin::Once;
 
 use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
 use crate::kernel::fs::ext2::Ext2Filesystem;
-use crate::kernel::sync::{Mutex, RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
+use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard, Spin};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 use crate::kernel::utils::types::Align;
 
@@ -217,7 +217,7 @@ impl BlocksBitmap {
 
 pub struct BlockGroupDescriptors {
     d_desc: RwSpin<GroupDescriptors>,
-    d_inodes: Mutex<lru::LruCache<usize, Arc<INodeGroup>>>,
+    d_inodes: Spin<lru::LruCache<usize, Arc<INodeGroup>>>,
     fs: Once<Weak<super::Ext2Filesystem>>,
 }
 
@@ -225,7 +225,7 @@ impl BlockGroupDescriptors {
     pub fn new() -> BlockGroupDescriptors {
         BlockGroupDescriptors {
             d_desc: RwSpin::new(GroupDescriptors::new()),
-            d_inodes: Mutex::new(lru::LruCache::new(256)),
+            d_inodes: Spin::new(lru::LruCache::new(256)),
             fs: Once::new(),
         }
     }

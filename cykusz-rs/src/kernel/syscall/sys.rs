@@ -385,19 +385,17 @@ pub fn sys_rename(oldpath: u64, oldpath_len: u64, newpath: u64, newpath_len: u64
 
 pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResult {
     if let Ok(name) = core::str::from_utf8(make_buf(name, nlen)) {
-        let res = crate::kernel::net::dns::get_ip_by_host(name.as_bytes());
+        let ip = crate::kernel::net::dns::get_ip_by_host(name.as_bytes())?;
 
-        if let Some(ip) = res {
-            return if blen as usize >= core::mem::size_of::<Ip4>() {
-                let buf = make_buf_mut(buf, blen);
+        return if blen as usize >= core::mem::size_of::<Ip4>() {
+            let buf = make_buf_mut(buf, blen);
 
-                buf.copy_from_slice(&ip.v);
+            buf.copy_from_slice(&ip.v);
 
-                Ok(core::mem::size_of::<Ip4>())
-            } else {
-                Err(SyscallError::Fault)
-            };
-        }
+            Ok(core::mem::size_of::<Ip4>())
+        } else {
+            Err(SyscallError::Fault)
+        };
     }
 
     Err(SyscallError::Inval)
@@ -517,7 +515,7 @@ pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
         }
 
         if fd_found.is_none() {
-            task.await_io();
+            task.await_io()?;
         }
 
         first = false;
@@ -586,7 +584,7 @@ pub fn sys_exit() -> ! {
 
 pub fn sys_sleep(time_ns: u64) -> SyscallResult {
     let t = current_task();
-    t.sleep(time_ns as usize);
+    t.sleep(time_ns as usize)?;
     Ok(0)
 }
 
@@ -613,7 +611,7 @@ pub fn sys_exec(path: u64, path_len: u64) -> SyscallResult {
 pub fn sys_waitpid(pid: u64) -> SyscallResult {
     let current = current_task();
 
-    current.wait_pid(pid as usize);
+    current.wait_pid(pid as usize)?;
 
     Ok(0)
 }

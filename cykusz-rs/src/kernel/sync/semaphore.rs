@@ -1,4 +1,5 @@
 use crate::kernel::sched::current_task;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -21,7 +22,7 @@ impl Semaphore {
         }
     }
 
-    pub fn acquire(&self) {
+    pub fn acquire(&self) -> SignalResult<()> {
         let mut lh = self.internals.lock();
 
         let task = current_task();
@@ -30,7 +31,10 @@ impl Semaphore {
 
         loop {
             if lh.value < 1 {
-                WaitQueue::wait_lock(lh);
+                if let Err(e) = WaitQueue::wait_lock(lh) {
+                    self.wait_queue.remove_task(task);
+                    return Err(e);
+                }
 
                 lh = self.internals.lock();
             } else {
@@ -40,6 +44,8 @@ impl Semaphore {
         }
 
         self.wait_queue.remove_task(task);
+
+        Ok(())
     }
 
     pub fn release(&self) {

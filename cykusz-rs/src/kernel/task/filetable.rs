@@ -6,7 +6,7 @@ use syscall_defs::{OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
-use crate::kernel::sync::{Mutex, RwSpin};
+use crate::kernel::sync::{RwSpin, Spin};
 
 const FILE_NUM: usize = 256;
 
@@ -15,7 +15,7 @@ pub struct FileHandle {
     pub inode: DirEntryItem,
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
-    pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
+    pub dir_iter: Spin<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
     //#[allow(unused)]
     //fs: Option<Arc<dyn Filesystem>>,
 }
@@ -27,7 +27,7 @@ impl FileHandle {
             inode: inode.clone(),
             offset: AtomicUsize::new(0),
             flags,
-            dir_iter: Mutex::new((None, None)),
+            dir_iter: Spin::new((None, None)),
             //fs: if let Some(fs) = inode.inode().fs() {
             //    fs.upgrade()
             //} else {
@@ -214,7 +214,7 @@ impl FileTable {
                 inode: inode.clone(),
                 offset: AtomicUsize::new(0),
                 flags,
-                dir_iter: Mutex::new((None, None)),
+                dir_iter: Spin::new((None, None)),
                 //fs: if let Some(fs) = inode.inode().fs() {
                 //    fs.upgrade()
                 //} else {

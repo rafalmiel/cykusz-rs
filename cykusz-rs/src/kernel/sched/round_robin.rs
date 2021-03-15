@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use intrusive_collections::LinkedList;
 
 use crate::kernel::sched::SchedulerInterface;
-use crate::kernel::signal::SignalResult;
+use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -176,7 +176,13 @@ impl Queues {
 
         self.reschedule(lock);
 
-        Ok(())
+        let task = get_current();
+
+        if task.signals().has_pending() {
+            Err(SignalError::Interrupted)
+        } else {
+            Ok(())
+        }
     }
 
     fn wake(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {

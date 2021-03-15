@@ -12,12 +12,13 @@ use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::sched::new_task_id;
-use crate::kernel::signal::SignalResult;
+use crate::kernel::signal::{SignalResult, Signals};
 use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
 use crate::kernel::task::zombie::Zombies;
+use crate::kernel::tty::Terminal;
 
 pub mod cwd;
 pub mod filetable;
@@ -65,6 +66,8 @@ pub struct Task {
     sleep_until: AtomicUsize,
     cwd: RwSpin<Option<Cwd>>,
     sref: Weak<Task>,
+    signals: Arc<Signals>,
+    terminal: Terminal,
     zombies: Zombies,
 }
 
@@ -98,6 +101,8 @@ impl Task {
     fn make_ptr(mut task: Task) -> Arc<Task> {
         Arc::new_cyclic(|me| {
             task.sref = me.clone();
+
+            task.terminal.init(me);
 
             task
         })
@@ -153,6 +158,8 @@ impl Task {
         task.set_parent(Some(self.me()));
         self.add_child(task.clone());
 
+        self.terminal().try_transfer_to(task.clone());
+
         task
     }
 
@@ -177,6 +184,8 @@ impl Task {
 
             // Inherit children
             self.migrate_children_to(task.clone());
+
+            self.terminal().try_transfer_to(task.clone());
 
             task
         } else {
@@ -389,6 +398,20 @@ impl Task {
         &self.vm
     }
 
+    pub fn signals(&self) -> &Arc<Signals> {
+        &self.signals
+    }
+
+    pub fn signal(&self, sig: usize) {
+        self.signals.trigger(sig);
+
+        self.wake_up();
+    }
+
+    pub fn terminal(&self) -> &Terminal {
+        &self.terminal
+    }
+
     pub fn make_zombie(&self) {
         unsafe {
             self.arch_task_mut().deallocate();
@@ -399,6 +422,8 @@ impl Task {
 
             parent.remove_child(self);
             self.set_parent(None);
+
+            self.terminal().try_transfer_to(parent);
         }
     }
 

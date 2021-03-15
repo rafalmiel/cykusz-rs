@@ -159,7 +159,7 @@ fn ipi_test(src: usize, arg: *const ()) {
 pub fn test_ipi() {
     let count = crate::kernel::smp::cpu_count();
 
-    if count > 0 {
+    if count > 1 {
         println!("[ IPI ] Self test, send ipi to cpu 1");
         let msg = 42usize;
 

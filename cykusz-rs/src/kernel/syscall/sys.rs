@@ -616,6 +616,28 @@ pub fn sys_waitpid(pid: u64) -> SyscallResult {
     Ok(0)
 }
 
+pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
+    let current = current_task();
+
+    if let Some(handle) = current.get_handle(fd as usize) {
+        Ok(handle.inode.inode().ioctl(cmd as usize, arg as usize)?)
+    } else {
+        Err(SyscallError::BadFD)
+    }
+}
+
+pub fn sys_sigaction(sig: u64, handler: u64, sigreturn: u64) -> SyscallResult {
+    let handler: syscall_defs::signal::SignalHandler = handler.into();
+
+    println!("set sig {} handler {:?}", sig, handler);
+
+    current_task()
+        .signals()
+        .set_signal(sig as usize, handler, sigreturn as usize);
+
+    Ok(0)
+}
+
 pub fn sys_poweroff() -> ! {
     crate::kernel::sched::close_all_tasks();
     println!("[ SHUTDOWN ] Closed all tasks");

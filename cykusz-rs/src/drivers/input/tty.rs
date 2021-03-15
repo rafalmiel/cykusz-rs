@@ -10,9 +10,12 @@ use crate::drivers::input::KeyListener;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
+use crate::kernel::sched::current_task;
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::syscall::sys::PollTable;
+use crate::kernel::task::Task;
+use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 struct State {
@@ -122,6 +125,7 @@ struct Tty {
     state: Spin<State>,
     buffer: Spin<Buffer>,
     wait_queue: WaitQueue,
+    ctrl_task: Spin<Option<Arc<Task>>>,
     self_ptr: Weak<Tty>,
 }
 
@@ -168,6 +172,7 @@ impl Tty {
             state: Spin::new(State::new()),
             buffer: Spin::new(Buffer::new()),
             wait_queue: WaitQueue::new(),
+            ctrl_task: Spin::new(None),
             self_ptr: Weak::default(),
         }
     }
@@ -244,6 +249,13 @@ impl KeyListener for Tty {
                     w.remove_last_n(n);
                 }
             }
+            KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
+                if let Some(t) = self.ctrl_task.lock().clone() {
+                    println!("signal! task id {}", t.id());
+
+                    t.signal(syscall_defs::signal::SIG_INT);
+                }
+            }
             _ if !released => {
                 if let Some(finalmap) = state.map(false).map_or(None, |map| {
                     match state.caps {
@@ -280,6 +292,40 @@ impl Device for Tty {
     }
 }
 
+impl TerminalDevice for Tty {
+    fn id(&self) -> usize {
+        self.dev_id
+    }
+
+    fn attach(&self, task: Arc<Task>) -> bool {
+        let mut cur = self.ctrl_task.lock();
+
+        if cur.is_none() {
+            println!("[ TTY ] Attached task {}", task.id());
+            *cur = Some(task);
+
+            return true;
+        }
+
+        false
+    }
+
+    fn detach(&self, task: Arc<Task>) -> bool {
+        let mut ctrl = self.ctrl_task.lock();
+
+        if let Some(cur) = ctrl.as_ref() {
+            if cur.id() == task.id() {
+                println!("[ TTY ] Detached task {}", cur.id());
+                *ctrl = None;
+
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
 impl INode for Tty {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
         Ok(self.read(buf.as_mut_ptr(), buf.len())?)
@@ -294,26 +340,53 @@ impl INode for Tty {
 
         Ok(has_data)
     }
+
+    fn ioctl(&self, cmd: usize, _arg: usize) -> Result<usize, FsError> {
+        match cmd {
+            syscall_defs::ioctl::tty::TIOCSCTTY => {
+                if current_task().terminal().attach(tty().clone()) {
+                    Ok(0)
+                } else {
+                    Err(FsError::EntryExists)
+                }
+            }
+            syscall_defs::ioctl::tty::TIOCNOTTY => {
+                if current_task().terminal().detach_term(tty().clone()) {
+                    Ok(0)
+                } else {
+                    Err(FsError::EntryNotFound)
+                }
+            }
+            _ => Err(FsError::NotSupported),
+        }
+    }
 }
 
 lazy_static! {
-    static ref LISTENER: Arc<Tty> = Tty::new().wrap();
+    static ref TTY: Arc<Tty> = Tty::new().wrap();
+}
+
+fn tty() -> &'static Arc<Tty> {
+    &TTY
 }
 
 pub fn read(buf: *mut u8, len: usize) -> SignalResult<usize> {
-    let l = &LISTENER;
+    let l = tty();
 
     l.read(buf, len)
 }
 
 pub fn poll_listen(ptable: Option<&mut PollTable>) -> Result<bool, FsError> {
-    LISTENER.poll(ptable)
+    tty().poll(ptable)
 }
 
 fn init() {
-    crate::drivers::input::register_key_listener(LISTENER.as_ref());
-    if let Err(v) = crate::kernel::device::register_device(LISTENER.clone()) {
+    crate::drivers::input::register_key_listener(tty().as_ref());
+    if let Err(v) = crate::kernel::device::register_device(tty().clone()) {
         panic!("Failed to register Tty device: {:?}", v);
+    }
+    if let Err(v) = crate::kernel::tty::register_tty(tty().clone()) {
+        panic!("Failed to register Tty terminal {:?}", v);
     }
 }
 

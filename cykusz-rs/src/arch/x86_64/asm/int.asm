@@ -16,9 +16,22 @@ bits 64
     ;; These two are caller-saved on x86_64!
     push rdi
     push rsi
+
+    push rbx
+    push r15
+    push r14
+    push r13
+    push r12
+    push rbp
 %endmacro
 
 %macro popAll 0
+    pop rbp
+    pop r12
+    pop r13
+    pop r14
+    pop r15
+    pop rbx
     pop rsi
     pop rdi
     pop r11
@@ -83,10 +96,11 @@ isr_common:
     call update_kern_fs_base
 
     ; prepare parameters
-    mov rdi, qword [rsp + 72] ; int num value
-    mov rsi, qword [rsp + 80] ; err code value
+    mov rdi, qword [rsp + 120] ; int num value
+    mov rsi, qword [rsp + 128] ; err code value
     mov rdx, rsp              ; int frame ptr
-    add rdx, 88
+    add rdx, 136
+    mov rcx, rsp              ; regs frame ptr
 
     sti
 

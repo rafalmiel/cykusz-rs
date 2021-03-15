@@ -8,10 +8,9 @@ use crate::kernel::net::util::NetU16;
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
-
-use crate::kernel::signal::SignalResult;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Dns {}

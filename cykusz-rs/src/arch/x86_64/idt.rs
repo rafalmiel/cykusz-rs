@@ -169,8 +169,31 @@ extern "C" {
     static interrupt_handlers: [*const u8; 256];
 }
 
+pub struct ExceptionRegs {
+    pub rbp: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+    pub rbx: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub r11: u64,
+    pub r10: u64,
+    pub r9: u64,
+    pub r8: u64,
+    pub rdx: u64,
+    pub rcx: u64,
+    pub rax: u64,
+}
+
 #[no_mangle]
-pub extern "C" fn isr_handler(int: usize, err: usize, frame: &mut ExceptionStackFrame) {
+pub extern "C" fn isr_handler(
+    int: usize,
+    err: usize,
+    frame: &mut ExceptionStackFrame,
+    regs: &mut ExceptionRegs,
+) {
     let irqs = SHARED_IRQS.irqs.read();
 
     match &irqs[int] {
@@ -196,6 +219,8 @@ pub extern "C" fn isr_handler(int: usize, err: usize, frame: &mut ExceptionStack
     let ret_addr = VirtAddr(frame.ip as usize);
 
     if ret_addr.is_user() {
+        crate::arch::signal::arch_int_check_signals(frame, regs);
+
         restore_user_fs();
     }
 

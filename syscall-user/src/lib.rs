@@ -292,6 +292,7 @@ pub fn exit() -> ! {
 }
 
 pub fn sleep(time_ms: usize) -> SyscallResult {
+    crate::bochs();
     unsafe { syscall1(SYS_SLEEP, time_ms * 1_000_000) }
 }
 
@@ -305,6 +306,26 @@ pub fn exec(path: &str) -> SyscallResult {
 
 pub fn waitpid(pid: usize) -> SyscallResult {
     unsafe { syscall1(SYS_WAITPID, pid as usize) }
+}
+
+pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {
+    unsafe { syscall3(SYS_IOCTL, fd, cmd, arg) }
+}
+
+pub fn sigaction(sig: usize, handler: signal::SignalHandler) -> SyscallResult {
+    unsafe { syscall3(SYS_SIGACTION, sig, handler.into(), sigreturn as usize) }
+}
+
+#[allow(unused)]
+pub fn bochs() {
+    unsafe {
+        llvm_asm!("xchg %bx, %bx");
+    }
+}
+
+pub fn sigreturn() -> SyscallResult {
+    crate::bochs();
+    unsafe { syscall0(SYS_SIGRETURN) }
 }
 
 pub fn poweroff() -> ! {

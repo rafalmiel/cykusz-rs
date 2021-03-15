@@ -7,10 +7,10 @@ use alloc::vec::Vec;
 use crate::kernel::net::eth::Eth;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::create_param_task;
+use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::RwSpin;
 
 pub use self::packet::*;
-use crate::kernel::signal::SignalResult;
 
 pub mod arp;
 pub mod dhcp;

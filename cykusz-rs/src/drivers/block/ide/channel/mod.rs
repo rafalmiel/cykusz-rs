@@ -323,7 +323,7 @@ impl IdeChannel {
 
         while let Err(_e) = request.wait_queue().wait_for(|| request.is_complete()) {
             // TODO: Make some waits uninterruptible
-            println!("[ IDE ] IO interrupted, retrying");
+            //println!("[ IDE ] IO interrupted, retrying");
         }
 
         Some(request.count() * 512)

@@ -157,7 +157,7 @@ impl Port {
 
         while let Err(_e) = request.wait_queue().wait_for(|| request.is_complete()) {
             // TODO: Make some waits uninterruptible
-            println!("[ AHCI ] IO interrupted, retrying");
+            //println!("[ AHCI ] IO interrupted, retrying");
         }
 
         //if !is_int {

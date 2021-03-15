@@ -7,6 +7,7 @@ extern fast_syscall_handler
 extern restore_user_fs
 
 global asm_update_kern_fs_base
+extern arch_sys_check_signals
 
 update_kern_fs_base_locked:
     push rbx
@@ -71,7 +72,7 @@ asm_syscall_handler:
     push rcx                ; Push return value
     push r11                ; Push rflags
 
-    push r9
+    push r9                 ; Prepare syscall param stack
     push r8
     push r10
     push rdx
@@ -79,12 +80,17 @@ asm_syscall_handler:
     push rdi
     push rax
 
-    mov rdi, rsp
+    mov rdi, rsp            ; Param: pointer to the stack
 
     cld
     call fast_syscall_handler
-
     add rsp, 8              ; Preserve syscall return value in rax
+
+    push rax
+    mov rdi, rsp
+    call arch_sys_check_signals
+    pop rax
+
     pop rdi
     pop rsi
     pop rdx

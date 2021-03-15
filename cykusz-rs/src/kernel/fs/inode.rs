@@ -100,6 +100,10 @@ pub trait INode: Send + Sync + DowncastSync {
         return Err(FsError::EntryNotFound);
     }
 
+    fn ioctl(&self, _cmd: usize, _arg: usize) -> Result<usize> {
+        return Err(FsError::NotSupported);
+    }
+
     fn ref_update(&self, _new_ref: Weak<INodeItemInt>) {}
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {

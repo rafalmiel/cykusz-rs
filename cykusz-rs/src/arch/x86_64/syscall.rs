@@ -21,20 +21,31 @@ pub fn init_ap() {
     enable_syscall_extension();
 }
 
-#[repr(C, packed)]
+#[repr(C)]
+#[derive(Debug)]
 pub struct SyscallFrame {
-    rax: u64,
-    rdi: u64,
-    rsi: u64,
-    rdx: u64,
-    r10: u64,
-    r8: u64,
-    r9: u64,
+    pub rax: u64,
+    pub rdi: u64,
+    pub rsi: u64,
+    pub rdx: u64,
+    pub r10: u64,
+    pub r8: u64,
+    pub r9: u64,
+
+    pub r11: u64, // rflags
+    pub rcx: u64, // rip
+    pub rsp: u64, // rsp
 }
 
 #[no_mangle]
-pub extern "C" fn fast_syscall_handler(frame: &SyscallFrame) -> isize {
-    crate::kernel::syscall::syscall_handler(
-        frame.rax, frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
-    )
+pub extern "C" fn fast_syscall_handler(frame: &mut SyscallFrame) -> isize {
+    if frame.rax == syscall_defs::SYS_SIGRETURN as u64 {
+        crate::arch::signal::arch_sys_sigreturn(frame)
+    } else {
+        let res = crate::kernel::syscall::syscall_handler(
+            frame.rax, frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
+        );
+
+        res
+    }
 }

@@ -1,5 +1,8 @@
 #![no_std]
 
+pub mod ioctl;
+pub mod signal;
+
 #[macro_use]
 extern crate bitflags;
 
@@ -39,6 +42,9 @@ pub const SYS_PREAD: usize = 31;
 pub const SYS_PWRITE: usize = 32;
 
 pub const SYS_WAITPID: usize = 33;
+pub const SYS_IOCTL: usize = 34;
+pub const SYS_SIGACTION: usize = 35;
+pub const SYS_SIGRETURN: usize = 36;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

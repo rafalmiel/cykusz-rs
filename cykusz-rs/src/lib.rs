@@ -140,7 +140,7 @@ fn init_task() {
 
     kernel::net::init();
 
-    // Start test tasks on this cpu
+    // Start shell on this cpu
     init_task::exec()
 }
 

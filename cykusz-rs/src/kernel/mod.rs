@@ -11,6 +11,7 @@ pub mod syscall;
 pub mod task;
 pub mod timer;
 pub mod tls;
+pub mod tty;
 pub mod utils;
 
 #[macro_use]

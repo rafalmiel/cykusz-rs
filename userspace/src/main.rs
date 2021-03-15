@@ -16,6 +16,7 @@ use chrono::{Datelike, Timelike};
 use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry};
 
 use crate::file::File;
+use syscall::read;
 
 pub mod file;
 pub mod lang;
@@ -467,6 +468,8 @@ fn exec(cmd: &str) {
         if let Err(e) = syscall::maps() {
             println!("maps failed {:?}", e);
         }
+    } else if cmd == "signal_test" {
+        signal_test();
     } else if cmd.is_empty() {
         return;
     } else {
@@ -477,7 +480,43 @@ fn exec(cmd: &str) {
     }
 }
 
+pub fn sigint_handler(sig: usize) {
+    println!("Handled");
+
+    set_ready(true);
+    lang::bochs();
+}
+
+static mut READY: bool = false;
+
+fn set_ready(r: bool) {
+    unsafe {
+        (&mut READY as *mut bool).write_volatile(r);
+    }
+}
+
+fn ready() -> bool {
+    unsafe {
+        (&READY as *const bool).read_volatile()
+    }
+}
+
+fn signal_test() {
+    while !ready() {
+
+    }
+
+    set_ready(false);
+}
+
 fn main_cd() -> ! {
+    if let Err(e) = syscall::sigaction(
+        syscall_defs::signal::SIG_INT,
+        syscall_defs::signal::SignalHandler::Handle(sigint_handler),
+    ) {
+        println!("Failed to install signal handler: {:?}", e);
+    }
+
     loop {
         let mut buf = [0u8; 256];
         let mut pwd = [0u8; 1024];
@@ -489,14 +528,14 @@ fn main_cd() -> ! {
 
         print!("[root {}]# ", to_p);
 
-        let r = syscall::read(0, &mut buf).unwrap();
+        if let Ok(r) = syscall::read(0, &mut buf) {
+            let cmd = make_str(&buf[..r]).trim();
 
-        let cmd = make_str(&buf[..r]).trim();
-
-        if cmd == "pwd" {
-            println!("{}", pwd_str);
-        } else {
-            exec(cmd);
+            if cmd == "pwd" {
+                println!("{}", pwd_str);
+            } else {
+                exec(cmd);
+            }
         }
     }
 }

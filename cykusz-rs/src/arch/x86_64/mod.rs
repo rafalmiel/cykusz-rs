@@ -14,6 +14,7 @@ pub mod idt;
 pub mod int;
 pub mod ipi;
 pub mod mm;
+pub mod signal;
 pub mod smp;
 pub mod syscall;
 pub mod time;

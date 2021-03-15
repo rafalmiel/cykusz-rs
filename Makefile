@@ -96,7 +96,7 @@ $(cross_gcc): toolchain
 
 hello: $(cross_gcc) sysroot/hello.cpp
 	$(cross_gcc) sysroot/hello.cpp -o $(cross_hello)
-	$(cross_strip) $(cross_hello)
+#	$(cross_strip) $(cross_hello)
 
 # compile assembly files
 build/arch/$(arch)/asm/%.o: cykusz-rs/src/arch/$(arch)/asm/%.asm

@@ -481,7 +481,7 @@ fn exec(cmd: &str) {
 }
 
 pub fn sigint_handler(sig: usize) {
-    println!("Handled");
+    println!("Handled {}", sig);
 
     set_ready(true);
     lang::bochs();
@@ -513,6 +513,7 @@ fn main_cd() -> ! {
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIG_INT,
         syscall_defs::signal::SignalHandler::Handle(sigint_handler),
+        syscall_defs::signal::SignalFlags::RESTART,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }

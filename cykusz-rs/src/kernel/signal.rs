@@ -34,12 +34,17 @@ impl From<SignalError> for SyscallError {
 #[derive(Default, Copy, Clone, Debug)]
 pub struct SignalEntry {
     handler: syscall_defs::signal::SignalHandler,
+    flags: syscall_defs::signal::SignalFlags,
     sigreturn: usize,
 }
 
 impl SignalEntry {
     pub fn handler(&self) -> syscall_defs::signal::SignalHandler {
         self.handler
+    }
+
+    pub fn flags(&self) -> syscall_defs::signal::SignalFlags {
+        self.flags
     }
 
     pub fn sigreturn(&self) -> usize {
@@ -65,13 +70,13 @@ impl Signals {
         self.pending_mask.load(Ordering::SeqCst)
     }
 
-    pub fn do_signals(&self) -> Option<SignalEntry> {
+    pub fn do_signals(&self) -> Option<(usize, SignalEntry)> {
         let pending = self.pending();
 
         self.pending_mask.store(0, Ordering::SeqCst);
 
         if pending & (1u64 << SIG_INT) > 0 {
-            Some(self.entries.lock()[SIG_INT])
+            Some((SIG_INT, self.entries.lock()[SIG_INT]))
         } else {
             None
         }
@@ -87,16 +92,13 @@ impl Signals {
         &self,
         signal: usize,
         handler: syscall_defs::signal::SignalHandler,
+        flags: syscall_defs::signal::SignalFlags,
         sigreturn: usize,
     ) {
         assert!(signal < SIGNAL_COUNT);
 
         let mut signals = self.entries.lock();
 
-        signals[signal] = SignalEntry { handler, sigreturn };
+        signals[signal] = SignalEntry { handler, flags, sigreturn };
     }
-}
-
-pub fn do_signals() {
-    current_task().signals().do_signals();
 }

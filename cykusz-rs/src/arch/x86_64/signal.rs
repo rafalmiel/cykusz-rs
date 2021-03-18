@@ -2,6 +2,7 @@ use crate::arch::idt::ExceptionRegs;
 use crate::arch::raw::idt::ExceptionStackFrame;
 use crate::arch::syscall::SyscallFrame;
 use crate::kernel::sched::current_task;
+use syscall_defs::{SyscallResult, SyscallError};
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -15,7 +16,9 @@ pub struct SyscallUserFrame {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct SignalSigretutnFrame {
+    restart_syscall: u64,
     rax: u64,
     rbx: u64,
     rcx: u64,
@@ -39,9 +42,10 @@ pub fn arch_int_check_signals(frame: &mut ExceptionStackFrame, regs: &mut Except
     let task = current_task();
 
     if task.signals().has_pending() {
-        if let Some(entry) = task.signals().do_signals() {
+        if let Some((sig, entry)) = task.signals().do_signals() {
             if let syscall_defs::signal::SignalHandler::Handle(f) = entry.handler() {
                 let signal_frame = SignalSigretutnFrame {
+                    restart_syscall: u64::MAX,
                     rax: regs.rax,
                     rbx: regs.rbx,
                     rcx: regs.rcx,
@@ -74,6 +78,9 @@ pub fn arch_int_check_signals(frame: &mut ExceptionStackFrame, regs: &mut Except
 
                 println!("interrupt signal detected");
 
+                // Signal param
+                regs.rdi = sig as u64;
+
                 crate::bochs();
             }
         }
@@ -81,16 +88,27 @@ pub fn arch_int_check_signals(frame: &mut ExceptionStackFrame, regs: &mut Except
 }
 
 #[no_mangle]
-pub extern "C" fn arch_sys_check_signals(sys_frame: &mut SyscallFrame) {
+pub extern "C" fn arch_sys_check_signals(syscall_result: isize, sys_frame: &mut SyscallFrame) {
     let task = current_task();
 
     if task.signals().has_pending() {
-        if let Some(entry) = task.signals().do_signals() {
+        if let Some((sig, entry)) = task.signals().do_signals() {
             if let syscall_defs::signal::SignalHandler::Handle(f) = entry.handler() {
                 let sys_user_frame = unsafe { *(sys_frame.rsp as *const SyscallUserFrame) };
 
+                let res: SyscallResult = syscall_defs::SyscallFrom::syscall_from(syscall_result);
+
+                let restart = if res == Err(SyscallError::Interrupted) {
+                    entry.flags().contains(syscall_defs::signal::SignalFlags::RESTART)
+                } else {
+                    false
+                };
+
+                println!("sys_frame: {:?}", sys_frame);
+
                 let signal_frame = SignalSigretutnFrame {
-                    rax: sys_frame.rax,
+                    restart_syscall: if restart { sys_frame.rax } else { u64::MAX },
+                    rax: if restart { sys_frame.rax } else { syscall_result as u64 },
                     rbx: sys_user_frame.rbx,
                     rcx: sys_frame.rcx,
                     rdx: sys_frame.rdx,
@@ -108,6 +126,7 @@ pub extern "C" fn arch_sys_check_signals(sys_frame: &mut SyscallFrame) {
                     rflags: sys_frame.r11,
                     rip: sys_frame.rcx,
                 };
+                println!("prepared signal frame: {:?}", signal_frame);
 
                 sys_frame.rsp += core::mem::size_of::<SyscallUserFrame>() as u64;
                 sys_frame.rsp -= core::mem::size_of::<SignalSigretutnFrame>() as u64;
@@ -126,6 +145,9 @@ pub extern "C" fn arch_sys_check_signals(sys_frame: &mut SyscallFrame) {
                 }
 
                 sys_frame.rcx = f as u64;
+
+                // Signal param
+                sys_frame.rdi = sig as u64;
 
                 crate::bochs();
             }
@@ -161,6 +183,13 @@ pub fn arch_sys_sigreturn(sys_frame: &mut SyscallFrame) -> isize {
     sys_user_frame.r13 = signal_frame.r13;
     sys_user_frame.r14 = signal_frame.r14;
     sys_user_frame.r15 = signal_frame.r15;
+
+    println!("returning sygnal_frame: {:?}", signal_frame);
+
+    if signal_frame.restart_syscall != u64::MAX {
+        println!("restarting, syscall num: {}", result);
+        sys_frame.rcx -= 2;
+    }
 
     crate::bochs();
 

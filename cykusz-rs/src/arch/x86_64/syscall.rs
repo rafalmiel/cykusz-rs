@@ -46,6 +46,8 @@ pub extern "C" fn fast_syscall_handler(frame: &mut SyscallFrame) -> isize {
             frame.rax, frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
         );
 
+        crate::arch::signal::arch_sys_check_signals(res, frame);
+
         res
     }
 }

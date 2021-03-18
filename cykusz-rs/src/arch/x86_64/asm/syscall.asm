@@ -86,10 +86,10 @@ asm_syscall_handler:
     call fast_syscall_handler
     add rsp, 8              ; Preserve syscall return value in rax
 
-    push rax
-    mov rdi, rsp
-    call arch_sys_check_signals
-    pop rax
+;    push rax
+;    mov rdi, rsp
+;    call arch_sys_check_signals
+;    pop rax
 
     pop rdi
     pop rsi
@@ -101,18 +101,32 @@ asm_syscall_handler:
 asm_sysretq:
     cli
 
+    push r9
+    push r8
+    push r10
+    push rdi
+    push rsi
+    push rdx
     push rax                ; Preserve syscall return value
     call restore_user_fs    ; Set this tasks fs base
     pop rax
+    pop rdx
+    pop rsi
+    pop rdi
+    pop r10
+    pop r8
+    pop r9
 
     pop r11                 ; Restore rflags
     pop rcx                 ; Restore return value
 
+    push rdx
     swapgs
     mov rdx, rsp
     add rdx, 8
     mov [gs:4], rdx
     swapgs
+    pop rdx
 
     pop rsp                 ; Restore user stack
 

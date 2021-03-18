@@ -312,8 +312,8 @@ pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {
     unsafe { syscall3(SYS_IOCTL, fd, cmd, arg) }
 }
 
-pub fn sigaction(sig: usize, handler: signal::SignalHandler) -> SyscallResult {
-    unsafe { syscall3(SYS_SIGACTION, sig, handler.into(), sigreturn as usize) }
+pub fn sigaction(sig: usize, handler: signal::SignalHandler, flags: signal::SignalFlags) -> SyscallResult {
+    unsafe { syscall4(SYS_SIGACTION, sig, handler.into(), flags.bits() as usize, sigreturn as usize) }
 }
 
 #[allow(unused)]

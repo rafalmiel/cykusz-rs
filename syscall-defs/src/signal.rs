@@ -7,6 +7,13 @@ pub enum SignalHandler {
     Handle(fn(usize)),
 }
 
+bitflags! {
+    #[derive(Default)]
+    pub struct SignalFlags: u64 {
+        const RESTART = 1;
+    }
+}
+
 impl Default for SignalHandler {
     fn default() -> Self {
         SignalHandler::Default

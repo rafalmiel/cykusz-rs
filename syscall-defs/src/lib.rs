@@ -1,10 +1,10 @@
 #![no_std]
 
-pub mod ioctl;
-pub mod signal;
-
 #[macro_use]
 extern crate bitflags;
+
+pub mod ioctl;
+pub mod signal;
 
 pub const SYS_READ: usize = 0;
 pub const SYS_WRITE: usize = 1;
@@ -63,6 +63,7 @@ pub enum SyscallError {
     IsDir = 21,
     Inval = 22,
     Interrupted = 23,
+    InterruptedRestart = 24,
     UnknownError = 0xffff,
 }
 
@@ -171,6 +172,7 @@ impl SyscallFrom<isize> for SyscallResult {
                 -21 => Err(SyscallError::IsDir),
                 -22 => Err(SyscallError::Inval),
                 -23 => Err(SyscallError::Interrupted),
+                -24 => Err(SyscallError::InterruptedRestart),
                 _ => Err(SyscallError::UnknownError),
             }
         }

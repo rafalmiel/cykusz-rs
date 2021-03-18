@@ -44,7 +44,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_MAPS => sys::sys_maps(),
         SYS_WAITPID => sys::sys_waitpid(a),
         SYS_IOCTL => sys::sys_ioctl(a, b, c),
-        SYS_SIGACTION => sys::sys_sigaction(a, b, c),
+        SYS_SIGACTION => sys::sys_sigaction(a, b, c, d),
 
         _ => Err(SyscallError::Inval),
     }

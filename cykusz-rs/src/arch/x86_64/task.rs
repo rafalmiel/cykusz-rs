@@ -447,10 +447,6 @@ extern "C" {
     fn asm_sysretq_forkinit();
 }
 
-pub extern "C" fn arch_do_signals() {
-    crate::kernel::signal::do_signals();
-}
-
 pub fn activate_task(to: &Task) {
     unsafe {
         if to.is_user() {

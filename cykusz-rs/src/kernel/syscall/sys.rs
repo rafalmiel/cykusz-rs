@@ -16,7 +16,6 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::current_task;
 use crate::kernel::utils::wait_queue::WaitQueue;
-use crate::kernel::fs::vfs::FsError;
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
@@ -87,7 +86,6 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
 pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
-    println!("sys_read {} {:#x} len {}", fd, buf, len);
 
     let task = current_task();
     return if let Some(f) = task.get_handle(fd) {
@@ -630,8 +628,6 @@ pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
 
 pub fn sys_sigaction(sig: u64, handler: u64, flags: u64, sigreturn: u64) -> SyscallResult {
     let handler: syscall_defs::signal::SignalHandler = handler.into();
-
-    println!("set sig {} handler {:?}", sig, handler);
 
     if let Some(flags) = syscall_defs::signal::SignalFlags::from_bits(flags) {
         current_task()

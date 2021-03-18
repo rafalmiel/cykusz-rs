@@ -159,6 +159,7 @@ impl Task {
         self.add_child(task.clone());
 
         self.terminal().try_transfer_to(task.clone());
+        task.signals().copy_from(self.signals());
 
         task
     }
@@ -413,10 +414,6 @@ impl Task {
     }
 
     pub fn make_zombie(&self) {
-        unsafe {
-            self.arch_task_mut().deallocate();
-        }
-
         if let Some(parent) = self.get_parent() {
             parent.zombies.add_zombie(self.me());
 
@@ -424,6 +421,10 @@ impl Task {
             self.set_parent(None);
 
             self.terminal().try_transfer_to(parent);
+        }
+
+        unsafe {
+            self.arch_task_mut().deallocate();
         }
     }
 

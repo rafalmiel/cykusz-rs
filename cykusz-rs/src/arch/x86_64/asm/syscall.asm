@@ -123,7 +123,7 @@ asm_sysretq:
     push rdx
     swapgs
     mov rdx, rsp
-    add rdx, 8
+    add rdx, 16
     mov [gs:4], rdx
     swapgs
     pop rdx
@@ -140,6 +140,7 @@ asm_sysretq:
     o64 sysret
 
 asm_sysretq_forkinit:
+    xchg bx, bx
     mov rax, 0
 
     jmp asm_sysretq

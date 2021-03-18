@@ -292,7 +292,6 @@ pub fn exit() -> ! {
 }
 
 pub fn sleep(time_ms: usize) -> SyscallResult {
-    crate::bochs();
     unsafe { syscall1(SYS_SLEEP, time_ms * 1_000_000) }
 }
 
@@ -312,8 +311,20 @@ pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {
     unsafe { syscall3(SYS_IOCTL, fd, cmd, arg) }
 }
 
-pub fn sigaction(sig: usize, handler: signal::SignalHandler, flags: signal::SignalFlags) -> SyscallResult {
-    unsafe { syscall4(SYS_SIGACTION, sig, handler.into(), flags.bits() as usize, sigreturn as usize) }
+pub fn sigaction(
+    sig: usize,
+    handler: signal::SignalHandler,
+    flags: signal::SignalFlags,
+) -> SyscallResult {
+    unsafe {
+        syscall4(
+            SYS_SIGACTION,
+            sig,
+            handler.into(),
+            flags.bits() as usize,
+            sigreturn as usize,
+        )
+    }
 }
 
 #[allow(unused)]
@@ -324,7 +335,6 @@ pub fn bochs() {
 }
 
 pub fn sigreturn() -> SyscallResult {
-    crate::bochs();
     unsafe { syscall0(SYS_SIGRETURN) }
 }
 

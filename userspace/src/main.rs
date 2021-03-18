@@ -16,7 +16,6 @@ use chrono::{Datelike, Timelike};
 use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry};
 
 use crate::file::File;
-use syscall::read;
 
 pub mod file;
 pub mod lang;
@@ -480,11 +479,8 @@ fn exec(cmd: &str) {
     }
 }
 
-pub fn sigint_handler(sig: usize) {
-    println!("Handled {}", sig);
-
+pub fn sigint_handler(_sig: usize) {
     set_ready(true);
-    lang::bochs();
 }
 
 static mut READY: bool = false;
@@ -496,15 +492,11 @@ fn set_ready(r: bool) {
 }
 
 fn ready() -> bool {
-    unsafe {
-        (&READY as *const bool).read_volatile()
-    }
+    unsafe { (&READY as *const bool).read_volatile() }
 }
 
 fn signal_test() {
-    while !ready() {
-
-    }
+    while !ready() {}
 
     set_ready(false);
 }
@@ -513,7 +505,7 @@ fn main_cd() -> ! {
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIG_INT,
         syscall_defs::signal::SignalHandler::Handle(sigint_handler),
-        syscall_defs::signal::SignalFlags::RESTART,
+        syscall_defs::signal::SignalFlags::empty(),
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }

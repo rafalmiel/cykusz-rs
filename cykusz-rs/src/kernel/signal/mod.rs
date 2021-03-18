@@ -1,12 +1,14 @@
 #![allow(dead_code)]
 
 use core::sync::atomic::{AtomicU64, Ordering};
+use bit_field::BitField;
 use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
-use syscall_defs::signal::SIG_INT;
+
+mod default;
 
 #[derive(Debug, PartialEq)]
 pub enum SignalError {
@@ -70,18 +72,6 @@ impl Signals {
         self.pending_mask.load(Ordering::SeqCst)
     }
 
-    pub fn do_signals(&self) -> Option<(usize, SignalEntry)> {
-        let pending = self.pending();
-
-        self.pending_mask.store(0, Ordering::SeqCst);
-
-        if pending & (1u64 << SIG_INT) > 0 {
-            Some((SIG_INT, self.entries.lock()[SIG_INT]))
-        } else {
-            None
-        }
-    }
-
     pub fn trigger(&self, signal: usize) {
         assert!(signal < SIGNAL_COUNT);
 
@@ -99,6 +89,58 @@ impl Signals {
 
         let mut signals = self.entries.lock();
 
-        signals[signal] = SignalEntry { handler, flags, sigreturn };
+        signals[signal] = SignalEntry {
+            handler,
+            flags,
+            sigreturn,
+        };
     }
+
+    pub fn copy_from(&self, signals: &Signals) {
+        *self.entries.lock() = *signals.entries.lock();
+
+        self.pending_mask.store(
+            signals.pending_mask.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
+        self.blocked_mask.store(
+            signals.blocked_mask.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
+    }
+}
+
+pub fn do_signals() -> Option<(usize, SignalEntry)> {
+    let mut task = current_task();
+
+    let mut signals = task.signals();
+
+    if !signals.has_pending() {
+        return None;
+    }
+
+    let pending = signals.pending();
+
+    for s in 0..SIGNAL_COUNT {
+        if pending.get_bit(s) {
+            let entry = signals.entries.lock()[s];
+
+            signals.pending_mask.store(0, Ordering::SeqCst);
+
+            match entry.handler() {
+                syscall_defs::signal::SignalHandler::Default => {
+                    drop(signals);
+
+                    task = default::handle_default(s, task);
+                    signals = task.signals();
+                }
+                syscall_defs::signal::SignalHandler::Handle(_) => {
+                    return Some((s, entry));
+                }
+                syscall_defs::signal::SignalHandler::Ignore => {}
+            }
+        }
+    }
+
+    None
 }

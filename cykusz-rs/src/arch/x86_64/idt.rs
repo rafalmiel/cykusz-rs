@@ -434,7 +434,6 @@ fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
         }
     }
 
-    crate::bochs();
     println!(
         "PAGE FAULT! 0x{:x} CPU: {}, rip: {:?} virt: {}",
         err,

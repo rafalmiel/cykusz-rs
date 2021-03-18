@@ -230,6 +230,8 @@ impl Queues {
         assert_ne!(task.id(), self.idle_task.id());
 
         task.set_state(TaskState::AwaitingIo);
+        task.set_sleep_until(0);
+
         self.awaiting.push_back(task);
     }
 
@@ -239,9 +241,9 @@ impl Queues {
 
         use crate::kernel::timer::current_ns;
 
+        task.set_state(TaskState::AwaitingIo);
         task.set_sleep_until(current_ns() as usize + time_ns);
 
-        task.set_state(TaskState::AwaitingIo);
         self.deadline_awaiting.push_back(task);
     }
 
@@ -250,6 +252,8 @@ impl Queues {
         assert_ne!(task.id(), self.idle_task.id());
 
         task.set_state(TaskState::Runnable);
+        task.set_sleep_until(0);
+
         self.runnable.push_back(task);
     }
 }

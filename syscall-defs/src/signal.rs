@@ -1,4 +1,4 @@
-pub const SIG_INT: usize = 0;
+pub const SIGINT: usize = 2;
 
 #[derive(Debug, Copy, Clone)]
 pub enum SignalHandler {
@@ -10,7 +10,7 @@ pub enum SignalHandler {
 bitflags! {
     #[derive(Default)]
     pub struct SignalFlags: u64 {
-        const RESTART = 1;
+        const RESTART = (1u64 << 3);
     }
 }
 

@@ -54,7 +54,7 @@ impl SignalEntry {
     }
 }
 
-const SIGNAL_COUNT: usize = 1;
+const SIGNAL_COUNT: usize = 3;
 
 #[derive(Default)]
 pub struct Signals {
@@ -88,6 +88,8 @@ impl Signals {
         assert!(signal < SIGNAL_COUNT);
 
         let mut signals = self.entries.lock();
+
+        println!("add handler {:?}", handler);
 
         signals[signal] = SignalEntry {
             handler,

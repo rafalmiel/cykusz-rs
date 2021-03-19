@@ -169,6 +169,7 @@ extern "C" {
     static interrupt_handlers: [*const u8; 256];
 }
 
+#[derive(Debug)]
 pub struct ExceptionRegs {
     pub rbp: u64,
     pub r12: u64,

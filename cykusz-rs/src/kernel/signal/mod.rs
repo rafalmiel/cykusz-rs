@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use core::sync::atomic::{AtomicU64, Ordering};
 use bit_field::BitField;
+use core::sync::atomic::{AtomicU64, Ordering};
 use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;

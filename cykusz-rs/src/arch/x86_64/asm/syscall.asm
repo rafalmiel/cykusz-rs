@@ -9,6 +9,43 @@ extern restore_user_fs
 global asm_update_kern_fs_base
 extern arch_sys_check_signals
 
+%macro pushAll 0
+    push rax
+    push rcx
+    push rdx
+    push r8
+    push r9
+    push r10
+    push r11
+    ;; These two are caller-saved on x86_64!
+    push rdi
+    push rsi
+
+    push rbx
+    push r15
+    push r14
+    push r13
+    push r12
+    push rbp
+%endmacro
+
+%macro popAll 0
+    pop rbp
+    pop r12
+    pop r13
+    pop r14
+    pop r15
+    pop rbx
+    pop rsi
+    pop rdi
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rdx
+    pop rcx
+%endmacro
+
 update_kern_fs_base_locked:
     push rbx
     push rdx
@@ -47,111 +84,71 @@ asm_update_kern_fs_base:
     ret
 
 asm_syscall_handler:
-    push rbx
-    push rbp
-    push r12
-    push r13
-    push r14
-    push r15
-
     swapgs
 
     mov [gs:28], rsp  ; Temporarily save user stack
     mov rsp, [gs:4]   ; Set kernel stack
 
-    mov r12, qword [gs:28]
+    sub rsp, 8
+    push rax
+    mov rax, qword [gs:28]
     mov qword [gs:28], 0
+    mov [rsp + 8], rax
+    pop rax
 
     call update_kern_fs_base_locked
 
     swapgs
 
     sti
+    ; push rax - user stack pointer pushed earlier
+    push rcx ; syscall frame
+    push r11
 
-    push r12                ; Push user stack
-    push rcx                ; Push return value
-    push r11                ; Push rflags
+    pushAll
 
-    push r9                 ; Prepare syscall param stack
-    push r8
-    push r10
-    push rdx
-    push rsi
-    push rdi
-    push rax
-
-    mov rdi, rsp            ; Param: pointer to the stack
+    mov rdi, rsp            ; Param: pointer to regs
+    mov rsi, rsp            ; Param: pointer to syscall frame
+    add rsi, 120
 
     cld
     call fast_syscall_handler
-    add rsp, 8              ; Preserve syscall return value in rax
 
-;    push rax
-;    mov rdi, rsp
-;    call arch_sys_check_signals
-;    pop rax
+    push rax
+    call restore_user_fs
+    pop rax
 
-    pop rdi
-    pop rsi
-    pop rdx
-    pop r10
-    pop r8
-    pop r9
+    popAll
+    add rsp, 8 ; Preserve rax
 
 asm_sysretq:
     cli
 
-    push r9
-    push r8
-    push r10
-    push rdi
-    push rsi
-    push rdx
-    push rax                ; Preserve syscall return value
-    call restore_user_fs    ; Set this tasks fs base
-    pop rax
-    pop rdx
-    pop rsi
-    pop rdi
-    pop r10
-    pop r8
-    pop r9
-
-    pop r11                 ; Restore rflags
-    pop rcx                 ; Restore return value
+    pop r11     ; Restore rflags
+    pop rcx     ; Restore rip
 
     push rdx
     swapgs
     mov rdx, rsp
-    add rdx, 16
-    mov [gs:4], rdx
+    add rdx, 16         ; Skip rdx and user rsp currently on the stack
+    mov [gs:4], rdx     ; Stash kernel stack
     swapgs
     pop rdx
 
-    pop rsp                 ; Restore user stack
-
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rbp
-    pop rbx
+    pop rsp     ; Restore user stack
 
     o64 sysret
 
 asm_sysretq_forkinit:
-    xchg bx, bx
+    call restore_user_fs
+
     mov rax, 0
 
     jmp asm_sysretq
 
 asm_sysretq_userinit:
-    call restore_user_fs    ; Switch to user fs base
+    call restore_user_fs
 
-    pop r11                 ; Restore rflags
-    pop rcx                 ; Restore return value
-    pop rsp                 ; Restore user stack
-
-    o64 sysret
+    jmp asm_sysretq
 
 

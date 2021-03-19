@@ -251,7 +251,7 @@ impl KeyListener for Tty {
             }
             KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
                 if let Some(t) = self.ctrl_task.lock().clone() {
-                    t.signal(syscall_defs::signal::SIG_INT);
+                    t.signal(syscall_defs::signal::SIGINT);
                 }
             }
             _ if !released => {

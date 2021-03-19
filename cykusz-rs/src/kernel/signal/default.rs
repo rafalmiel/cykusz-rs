@@ -9,8 +9,8 @@ enum Action {
 }
 
 static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
-    Action::Ignore, // UNUSED
-    Action::Ignore, // UNUSED
+    Action::Ignore,            // UNUSED
+    Action::Ignore,            // UNUSED
     Action::Handle(terminate), // SIG_INT
 ];
 

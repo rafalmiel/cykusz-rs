@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 use crate::arch::raw::idt;
-use crate::arch::raw::idt::ExceptionStackFrame;
+use crate::arch::raw::idt::InterruptFrame;
 use crate::arch::tls::restore_user_fs;
 use crate::arch::x86_64::int::end_of_int;
 use crate::kernel::mm::VirtAddr;
@@ -12,8 +12,8 @@ use crate::kernel::task::vm::PageFaultReason;
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
 
-pub type ExceptionFn = fn(&mut ExceptionStackFrame);
-pub type ExceptionErrFn = fn(&mut ExceptionStackFrame, u64);
+pub type ExceptionFn = fn(&mut InterruptFrame);
+pub type ExceptionErrFn = fn(&mut InterruptFrame, u64);
 pub type InterruptFn = fn();
 pub type SharedInterruptFn = fn() -> bool;
 
@@ -192,7 +192,7 @@ pub struct ExceptionRegs {
 pub extern "C" fn isr_handler(
     int: usize,
     err: usize,
-    frame: &mut ExceptionStackFrame,
+    frame: &mut InterruptFrame,
     regs: &mut ExceptionRegs,
 ) {
     let irqs = SHARED_IRQS.irqs.read();
@@ -328,39 +328,39 @@ pub fn remove_shared_irq_handler(irq: usize, handler: SharedInterruptFn) {
     SHARED_IRQS.remove_shared_int_handler(irq, handler);
 }
 
-fn divide_by_zero(_frame: &mut idt::ExceptionStackFrame) {
+fn divide_by_zero(_frame: &mut idt::InterruptFrame) {
     println!("Divide By Zero error!");
     loop {}
 }
 
-fn debug(_frame: &mut idt::ExceptionStackFrame) {
+fn debug(_frame: &mut idt::InterruptFrame) {
     unsafe {
         println!("INT: Debug exception! CPU: {}", crate::CPU_ID);
     }
     loop {}
 }
 
-fn non_maskable_interrupt(_frame: &mut idt::ExceptionStackFrame) {
+fn non_maskable_interrupt(_frame: &mut idt::InterruptFrame) {
     println!("INT: Non Maskable Interrupt");
     loop {}
 }
 
-fn breakpoint(_frame: &mut idt::ExceptionStackFrame) {
+fn breakpoint(_frame: &mut idt::InterruptFrame) {
     println!("INT: Breakpoint!");
     loop {}
 }
 
-fn overflow(_frame: &mut idt::ExceptionStackFrame) {
+fn overflow(_frame: &mut idt::InterruptFrame) {
     println!("Overflow error!");
     loop {}
 }
 
-fn bound_range_exceeded(_frame: &mut idt::ExceptionStackFrame) {
+fn bound_range_exceeded(_frame: &mut idt::InterruptFrame) {
     println!("Bound Range Exceeded error!");
     loop {}
 }
 
-fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) {
+fn invalid_opcode(_frame: &mut idt::InterruptFrame) {
     println!(
         "Invalid Opcode error! task {} {:?} {}",
         crate::kernel::sched::current_id(),
@@ -370,32 +370,32 @@ fn invalid_opcode(_frame: &mut idt::ExceptionStackFrame) {
     loop {}
 }
 
-fn device_not_available(_frame: &mut idt::ExceptionStackFrame) {
+fn device_not_available(_frame: &mut idt::InterruptFrame) {
     println!("Device Not Available error!");
     loop {}
 }
 
-fn double_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn double_fault(_frame: &mut idt::InterruptFrame, err: u64) {
     println!("Double Fault error! 0x{:x}", err);
     loop {}
 }
 
-fn invalid_tss(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn invalid_tss(_frame: &mut idt::InterruptFrame, err: u64) {
     println!("Invalid TSS error! 0x{:x}", err);
     loop {}
 }
 
-fn segment_not_present(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn segment_not_present(_frame: &mut idt::InterruptFrame, err: u64) {
     println!("Segment Not Present error 0x{:x}", err);
     loop {}
 }
 
-fn stack_segment_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn stack_segment_fault(_frame: &mut idt::InterruptFrame, err: u64) {
     println!("Stack Segment Failt error! 0x{:x}", err);
     loop {}
 }
 
-fn general_protection_fault(frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn general_protection_fault(frame: &mut idt::InterruptFrame, err: u64) {
     println!(
         "General Protection Fault error! 0x{:x} frame: {:?}",
         err,
@@ -404,7 +404,7 @@ fn general_protection_fault(frame: &mut idt::ExceptionStackFrame, err: u64) {
     loop {}
 }
 
-fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn page_fault(_frame: &mut idt::InterruptFrame, err: u64) {
     let virt = VirtAddr(unsafe { crate::arch::raw::ctrlregs::cr2() });
 
     let reason = PageFaultReason::from_bits_truncate(err as usize);
@@ -445,32 +445,32 @@ fn page_fault(_frame: &mut idt::ExceptionStackFrame, err: u64) {
     loop {}
 }
 
-fn x87_floating_point_exception(_frame: &mut idt::ExceptionStackFrame) {
+fn x87_floating_point_exception(_frame: &mut idt::InterruptFrame) {
     println!("x87 Floating Point Exception!");
     loop {}
 }
 
-fn alignment_check(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn alignment_check(_frame: &mut idt::InterruptFrame, err: u64) {
     println!("Alignment Check error! 0x{:x}", err);
     loop {}
 }
 
-fn machine_check(_frame: &mut idt::ExceptionStackFrame) {
+fn machine_check(_frame: &mut idt::InterruptFrame) {
     println!("Machine Check error");
     loop {}
 }
 
-fn simd_floating_point_exception(_frame: &mut idt::ExceptionStackFrame) {
+fn simd_floating_point_exception(_frame: &mut idt::InterruptFrame) {
     println!("SIMD Floating Point Exception!");
     loop {}
 }
 
-fn virtualisation_exception(_frame: &mut idt::ExceptionStackFrame) {
+fn virtualisation_exception(_frame: &mut idt::InterruptFrame) {
     println!("Virtualisation Exception!");
     loop {}
 }
 
-fn security_exception(_frame: &mut idt::ExceptionStackFrame, err: u64) {
+fn security_exception(_frame: &mut idt::InterruptFrame, err: u64) {
     println!("Security Exception! 0x{:x}", err);
     loop {}
 }

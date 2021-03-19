@@ -44,6 +44,7 @@ extern arch_sys_check_signals
     pop r8
     pop rdx
     pop rcx
+    ; Skip rax to preserve the return value of a syscall
 %endmacro
 
 update_kern_fs_base_locked:
@@ -107,9 +108,9 @@ asm_syscall_handler:
 
     pushAll
 
-    mov rdi, rsp            ; Param: pointer to regs
-    mov rsi, rsp            ; Param: pointer to syscall frame
-    add rsi, 120
+    mov rdi, rsp            ; Param: pointer to syscall frame
+    add rdi, 120
+    mov rsi, rsp            ; Param: pointer to regs
 
     cld
     call fast_syscall_handler

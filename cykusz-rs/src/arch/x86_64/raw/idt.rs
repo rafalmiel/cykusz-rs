@@ -16,7 +16,7 @@ pub struct IdtEntry {
 }
 
 #[repr(C)]
-pub struct ExceptionStackFrame {
+pub struct InterruptFrame {
     pub ip: u64,
     pub cs: u64,
     pub cf: u64,
@@ -24,7 +24,7 @@ pub struct ExceptionStackFrame {
     pub ss: u64,
 }
 
-impl ::core::fmt::Debug for ExceptionStackFrame {
+impl ::core::fmt::Debug for InterruptFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

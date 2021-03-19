@@ -27,20 +27,23 @@ pub fn init_ap() {
 #[derive(Debug)]
 pub struct SyscallFrame {
     pub rflags: u64, // rflags
-    pub rip: u64, // rip
-    pub rsp: u64, // rsp
+    pub rip: u64,    // rip
+    pub rsp: u64,    // rsp
 }
 
 #[no_mangle]
-pub extern "C" fn fast_syscall_handler(frame: &mut ExceptionRegs, sys_frame: &mut SyscallFrame) -> isize {
-    if frame.rax == syscall_defs::SYS_SIGRETURN as u64 {
-        crate::arch::signal::arch_sys_sigreturn(frame, sys_frame)
+pub extern "C" fn fast_syscall_handler(
+    sys_frame: &mut SyscallFrame,
+    regs: &mut ExceptionRegs,
+) -> isize {
+    if regs.rax == syscall_defs::SYS_SIGRETURN as u64 {
+        crate::arch::signal::arch_sys_sigreturn(sys_frame, regs)
     } else {
         let res = crate::kernel::syscall::syscall_handler(
-            frame.rax, frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8, frame.r9,
+            regs.rax, regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9,
         );
 
-        crate::arch::signal::arch_sys_check_signals(res, frame, sys_frame);
+        crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs);
 
         res
     }

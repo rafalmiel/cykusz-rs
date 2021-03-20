@@ -170,7 +170,7 @@ extern "C" {
 }
 
 #[derive(Debug)]
-pub struct ExceptionRegs {
+pub struct RegsFrame {
     pub rbp: u64,
     pub r12: u64,
     pub r13: u64,
@@ -193,7 +193,7 @@ pub extern "C" fn isr_handler(
     int: usize,
     err: usize,
     frame: &mut InterruptFrame,
-    regs: &mut ExceptionRegs,
+    regs: &mut RegsFrame,
 ) {
     let irqs = SHARED_IRQS.irqs.read();
 

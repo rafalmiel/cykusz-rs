@@ -1,14 +1,16 @@
 use syscall_defs::{SyscallError, SyscallResult};
 
-use crate::arch::idt::ExceptionRegs;
+use crate::arch::idt::RegsFrame;
 use crate::arch::raw::idt::InterruptFrame;
 use crate::arch::syscall::SyscallFrame;
+use crate::arch::utils::StackHelper;
 
 const SYSCALL_INSTRUCTION_SIZE: u64 = 2;
+const REDZONE_SIZE: u64 = 128;
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct SigReturnFrame {
+pub struct SignalFrame {
     restart_syscall: u64,
     rax: u64,
     rbx: u64,
@@ -29,9 +31,9 @@ pub struct SigReturnFrame {
     rip: u64,
 }
 
-impl SigReturnFrame {
-    fn from_interrupt(frame: &mut InterruptFrame, regs: &mut ExceptionRegs) -> SigReturnFrame {
-        SigReturnFrame {
+impl SignalFrame {
+    fn from_interrupt(frame: &mut InterruptFrame, regs: &mut RegsFrame) -> SignalFrame {
+        SignalFrame {
             restart_syscall: u64::MAX,
             rax: regs.rax,
             rbx: regs.rbx,
@@ -57,9 +59,9 @@ impl SigReturnFrame {
         restart: bool,
         syscall_result: u64,
         sys_frame: &mut SyscallFrame,
-        regs: &mut ExceptionRegs,
-    ) -> SigReturnFrame {
-        SigReturnFrame {
+        regs: &mut RegsFrame,
+    ) -> SignalFrame {
+        SignalFrame {
             restart_syscall: if restart { regs.rax } else { u64::MAX },
             rax: if restart {
                 regs.rax
@@ -86,52 +88,8 @@ impl SigReturnFrame {
     }
 }
 
-struct StackWriter<'a> {
-    ptr: &'a mut u64,
-}
-
-impl<'a> StackWriter<'a> {
-    fn new(ptr: &'a mut u64) -> StackWriter<'a> {
-        StackWriter::<'a> { ptr }
-    }
-
-    fn skip(&mut self, by: u64) {
-        *self.ptr -= by;
-    }
-
-    fn skip_redzone(&mut self) {
-        self.skip(128);
-    }
-
-    fn write<T: Sized>(&mut self, val: T) {
-        *self.ptr -= core::mem::size_of::<T>() as u64;
-
-        unsafe {
-            (*self.ptr as *mut T).write(val);
-        }
-    }
-
-    fn restore(&mut self, by: u64) {
-        *self.ptr += by;
-    }
-
-    fn restore_redzone(&mut self) {
-        self.restore(128);
-    }
-
-    fn read<T: Sized>(&mut self) -> T {
-        let v = unsafe {
-            (*self.ptr as *mut T).read()
-        };
-
-        *self.ptr += core::mem::size_of::<T>() as u64;
-
-        v
-    }
-}
-
-impl ExceptionRegs {
-    fn load_signal_frame(&mut self, frame: &SigReturnFrame) {
+impl RegsFrame {
+    fn load_signal_frame(&mut self, frame: &SignalFrame) {
         self.rdi = frame.rdi;
         self.rsi = frame.rsi;
         self.rdx = frame.rdx;
@@ -151,16 +109,18 @@ impl ExceptionRegs {
     }
 }
 
-pub fn arch_int_check_signals(frame: &mut InterruptFrame, regs: &mut ExceptionRegs) {
+pub fn arch_int_check_signals(frame: &mut InterruptFrame, regs: &mut RegsFrame) {
     if let Some((sig, entry)) = crate::kernel::signal::do_signals() {
         if let syscall_defs::signal::SignalHandler::Handle(f) = entry.handler() {
-            let signal_frame = SigReturnFrame::from_interrupt(frame, regs);
+            let signal_frame = SignalFrame::from_interrupt(frame, regs);
 
-            let mut writer = StackWriter::new(&mut frame.sp);
+            let mut writer = StackHelper::new(&mut frame.sp);
 
-            writer.skip_redzone();
-            writer.write(signal_frame);
-            writer.write(entry.sigreturn());
+            writer.skip_by(REDZONE_SIZE);
+            unsafe {
+                writer.write(signal_frame);
+                writer.write(entry.sigreturn());
+            }
 
             frame.ip = f as u64;
 
@@ -174,7 +134,7 @@ pub fn arch_int_check_signals(frame: &mut InterruptFrame, regs: &mut ExceptionRe
 pub extern "C" fn arch_sys_check_signals(
     syscall_result: isize,
     sys_frame: &mut SyscallFrame,
-    regs: &mut ExceptionRegs,
+    regs: &mut RegsFrame,
 ) {
     if let Some((sig, entry)) = crate::kernel::signal::do_signals() {
         if let syscall_defs::signal::SignalHandler::Handle(f) = entry.handler() {
@@ -186,13 +146,16 @@ pub extern "C" fn arch_sys_check_signals(
                     .contains(syscall_defs::signal::SignalFlags::RESTART);
 
             let signal_frame =
-                SigReturnFrame::from_syscall(restart, syscall_result as u64, sys_frame, regs);
+                SignalFrame::from_syscall(restart, syscall_result as u64, sys_frame, regs);
 
-            let mut writer = StackWriter::new(&mut sys_frame.rsp);
+            let mut writer = StackHelper::new(&mut sys_frame.rsp);
 
-            writer.skip_redzone();
-            writer.write(signal_frame);
-            writer.write(entry.sigreturn());
+            writer.skip_by(REDZONE_SIZE);
+
+            unsafe {
+                writer.write(signal_frame);
+                writer.write(entry.sigreturn());
+            }
 
             sys_frame.rip = f as u64;
 
@@ -202,11 +165,14 @@ pub extern "C" fn arch_sys_check_signals(
     }
 }
 
-pub fn arch_sys_sigreturn(sys_frame: &mut SyscallFrame, user_regs: &mut ExceptionRegs) -> isize {
-    let mut writer = StackWriter::new(&mut sys_frame.rsp);
+pub fn arch_sys_sigreturn(sys_frame: &mut SyscallFrame, user_regs: &mut RegsFrame) -> isize {
+    let mut writer = StackHelper::new(&mut sys_frame.rsp);
 
-    let signal_frame = writer.read::<SigReturnFrame>();
-    writer.restore_redzone();
+    let signal_frame = unsafe {
+        writer.restore::<SignalFrame>()
+    };
+
+    writer.restore_by(REDZONE_SIZE);
 
     let result = signal_frame.rax as isize;
 
@@ -216,7 +182,7 @@ pub fn arch_sys_sigreturn(sys_frame: &mut SyscallFrame, user_regs: &mut Exceptio
     sys_frame.rip = signal_frame.rip;
 
     if signal_frame.restart_syscall != u64::MAX {
-        sys_frame.rip -= SYSCALL_INSTRUCTION_SIZE;
+        sys_frame.rip -= SYSCALL_INSTRUCTION_SIZE as u64;
     }
 
     crate::bochs();

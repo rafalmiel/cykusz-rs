@@ -5,15 +5,18 @@ use syscall_defs::{MMapFlags, MMapProt};
 
 use crate::arch::gdt;
 use crate::arch::mm::virt::p4_table_addr;
+use crate::arch::mm::virt::p4_table;
+use crate::arch::mm::virt::table::P4Table;
+use crate::arch::mm::phys::{allocate_order, deallocate_order};
+use crate::arch::raw::idt::InterruptFrame;
 use crate::arch::raw::segmentation::SegmentSelector;
-use crate::arch::x86_64::mm::phys::{allocate_order, deallocate_order};
-use crate::arch::x86_64::mm::virt::p4_table;
-use crate::arch::x86_64::mm::virt::table::P4Table;
-use crate::arch::x86_64::raw::mm::MappedAddr;
+use crate::arch::raw::mm::MappedAddr;
+use crate::arch::syscall::SyscallFrame;
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};
 use crate::kernel::task::vm::{TlsVmInfo, VM};
+use crate::arch::utils::StackHelper;
 
 const USER_STACK_SIZE: usize = 0x4000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
@@ -137,21 +140,10 @@ fn prepare_tls(vm: &VM, p_table: &mut P4Table, tls: &TlsVmInfo) -> VirtAddr {
 }
 
 #[repr(C, packed)]
-struct IretqFrame {
+struct KTaskInitFrame {
     pub rdi: usize,
-    pub ip: usize,
-    pub cs: usize,
-    pub rlfags: usize,
-    pub sp: usize,
-    pub ss: usize,
+    pub int: InterruptFrame,
     pub task_finished_fun: usize,
-}
-
-#[repr(C, packed)]
-pub struct SysretqFrame {
-    pub rflags: usize,
-    pub rip: usize,
-    pub stack: usize,
 }
 
 impl Default for Task {
@@ -193,82 +185,80 @@ impl Task {
         cs: SegmentSelector,
         ds: SegmentSelector,
         int_enabled: bool,
-        sp: *mut u8,
+        sp: usize,
         cr3: PhysAddr,
         param: usize,
     ) -> Unique<Context> {
-        let frame: &mut IretqFrame =
-            &mut *(sp.offset(-(::core::mem::size_of::<IretqFrame>() as isize)) as *mut IretqFrame);
+        let mut sp_tmp = sp as u64;
+
+        let mut helper = StackHelper::new(&mut sp_tmp);
+
+        let frame = helper.next::<KTaskInitFrame>();
 
         frame.task_finished_fun = task_finished as usize;
-        frame.ss = ds.bits() as usize;
-        frame.sp = sp.offset(-8) as usize;
-        frame.rlfags = if int_enabled { 0x200 } else { 0x0 };
-        frame.cs = cs.bits() as usize;
-        frame.ip = fun as usize;
+        frame.int.ss = ds.bits() as u64;
+        frame.int.sp = (sp - 8) as u64;
+        frame.int.cf = if int_enabled { 0x200 } else { 0x0 };
+        frame.int.cs = cs.bits() as u64;
+        frame.int.ip = fun as u64;
         frame.rdi = param;
 
-        let mut ctx = Unique::new_unchecked(sp.offset(
-            -(::core::mem::size_of::<Context>() as isize
-                + ::core::mem::size_of::<IretqFrame>() as isize),
-        ) as *mut Context);
+        let ctx = helper.next::<Context>();
 
-        ctx.as_ptr().write(Context::empty());
-        ctx.as_mut().rip = isr_return as usize;
-        ctx.as_mut().cr3 = cr3.0;
+        *ctx = Context::empty();
+        ctx.rip = isr_return as usize;
+        ctx.cr3 = cr3.0;
 
-        ctx
+        Unique::new_unchecked(ctx as *mut Context)
     }
 
     unsafe fn prepare_sysretq_ctx(
         fun: usize,
         int_enabled: bool,
         user_stack: Option<usize>,
-        sp: *mut u8,
+        sp: usize,
         cr3: PhysAddr,
     ) -> Unique<Context> {
-        let frame: &mut SysretqFrame = &mut *(sp
-            .offset(-(::core::mem::size_of::<SysretqFrame>() as isize))
-            as *mut SysretqFrame);
+        let mut sp = sp as u64;
 
-        frame.stack = user_stack.unwrap() as usize;
+        let mut helper = StackHelper::new(&mut sp);
+
+        let frame = helper.next::<SyscallFrame>();
+
+        frame.rsp = user_stack.unwrap() as u64;
         frame.rflags = if int_enabled { 0x200 } else { 0x0 };
-        frame.rip = fun as usize;
+        frame.rip = fun as u64;
 
-        let mut ctx = Unique::new_unchecked(sp.offset(
-            -(::core::mem::size_of::<Context>() as isize
-                + ::core::mem::size_of::<SysretqFrame>() as isize),
-        ) as *mut Context);
+        let ctx = helper.next::<Context>();
 
-        ctx.as_ptr().write(Context::empty());
-        ctx.as_mut().rip = asm_sysretq_userinit as usize;
-        ctx.as_mut().cr3 = cr3.0;
+        *ctx = Context::empty();
+        ctx.rip = asm_sysretq_userinit as usize;
+        ctx.cr3 = cr3.0;
 
-        ctx
+        Unique::new_unchecked(ctx as *mut Context)
     }
 
-    unsafe fn fork_ctx(&self, sp: *mut u8, cr3: usize) -> Unique<Context> {
-        let parent_sys_frame =
-            VirtAddr(self.stack_top + self.stack_size - size_of::<SysretqFrame>())
-                .read_ref::<SysretqFrame>();
+    unsafe fn syscall_frame(&self) -> &SyscallFrame {
+        VirtAddr(self.stack_top + self.stack_size - size_of::<SyscallFrame>())
+            .read_ref::<SyscallFrame>()
+    }
 
-        let frame: &mut SysretqFrame =
-            &mut *(sp.offset(-(size_of::<SysretqFrame>() as isize)) as *mut SysretqFrame);
+    unsafe fn fork_ctx(&self, sp: usize, cr3: usize) -> Unique<Context> {
+        let parent_sys_frame = self.syscall_frame();
 
-        frame.stack = parent_sys_frame.stack;
-        frame.rflags = parent_sys_frame.rflags;
-        frame.rip = parent_sys_frame.rip;
+        let mut sp = sp as u64;
 
-        let mut ctx = Unique::new_unchecked(
-            sp.offset(-(size_of::<Context>() as isize + size_of::<SysretqFrame>() as isize))
-                as *mut Context,
-        );
+        let mut helper = StackHelper::new(&mut sp);
 
-        ctx.as_ptr().write(Context::empty());
-        ctx.as_mut().rip = asm_sysretq_forkinit as usize;
-        ctx.as_mut().cr3 = cr3;
+        *helper.next::<SyscallFrame>() = *parent_sys_frame;
 
-        ctx
+        let ctx = helper.next::<Context>();
+
+        *ctx = Context::empty();
+        ctx.rip = asm_sysretq_forkinit as usize;
+        ctx.cr3 = cr3;
+
+        Unique::new_unchecked(ctx as *mut Context)
     }
 
     fn new_sp(
@@ -283,7 +273,7 @@ impl Task {
         param: usize,
     ) -> Task {
         unsafe {
-            let sp = (stack as *mut u8).offset(stack_size as isize);
+            let sp = stack + stack_size;
 
             let ctx = if user_stack.is_none() {
                 Task::prepare_iretq_ctx(fun, cs, ds, int_enabled, sp, cr3, param)
@@ -295,7 +285,7 @@ impl Task {
             Task {
                 ctx,
                 cr3: cr3.0,
-                stack_top: sp as usize - stack_size,
+                stack_top: sp - stack_size,
                 stack_size,
                 user_stack,
                 user_fs_base: 0,
@@ -312,14 +302,14 @@ impl Task {
         user_stack: Option<usize>,
         param: usize,
     ) -> Task {
-        let sp = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0 as *mut u8;
+        let sp = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0;
 
         Task::new_sp(
             fun,
             cs,
             ds,
             int_enabled,
-            sp as usize,
+            sp,
             KERN_STACK_SIZE,
             cr3,
             user_stack,
@@ -407,16 +397,16 @@ impl Task {
         // Flush the pagetable of the current process
         crate::arch::mm::virt::flush_all();
 
-        let sp_top = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0 as *mut u8;
+        let sp_top = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0;
 
-        let sp = unsafe { sp_top.offset(KERN_STACK_SIZE as isize) };
+        let sp = sp_top + KERN_STACK_SIZE;
 
         let new_ctx = unsafe { self.fork_ctx(sp, new_p4.phys_addr().0) };
 
         Task {
             ctx: new_ctx,
             cr3: new_p4.phys_addr().0,
-            stack_top: sp_top as usize,
+            stack_top: sp_top,
             stack_size: KERN_STACK_SIZE,
             user_stack: self.user_stack,
             user_fs_base: self.user_fs_base,

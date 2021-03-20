@@ -1,4 +1,4 @@
-use crate::arch::idt::ExceptionRegs;
+use crate::arch::idt::RegsFrame;
 
 extern "C" {
     fn asm_syscall_handler();
@@ -24,7 +24,7 @@ pub fn init_ap() {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct SyscallFrame {
     pub rflags: u64, // rflags
     pub rip: u64,    // rip
@@ -34,7 +34,7 @@ pub struct SyscallFrame {
 #[no_mangle]
 pub extern "C" fn fast_syscall_handler(
     sys_frame: &mut SyscallFrame,
-    regs: &mut ExceptionRegs,
+    regs: &mut RegsFrame,
 ) -> isize {
     if regs.rax == syscall_defs::SYS_SIGRETURN as u64 {
         crate::arch::signal::arch_sys_sigreturn(sys_frame, regs)

@@ -19,6 +19,7 @@ use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
 use crate::kernel::task::zombie::Zombies;
 use crate::kernel::tty::Terminal;
+use syscall_defs::signal::SIGCHLD;
 
 pub mod cwd;
 pub mod filetable;
@@ -388,9 +389,9 @@ impl Task {
     }
 
     pub fn signal(&self, sig: usize) {
-        self.signals.trigger(sig);
-
-        self.wake_up();
+        if self.signals.trigger(sig) {
+            self.wake_up();
+        }
     }
 
     pub fn terminal(&self) -> &Terminal {
@@ -404,7 +405,9 @@ impl Task {
             parent.remove_child(self);
             self.set_parent(None);
 
-            self.terminal().try_transfer_to(parent);
+            self.terminal().try_transfer_to(parent.clone());
+
+            parent.signal(SIGCHLD);
         }
 
         unsafe {
@@ -412,7 +415,7 @@ impl Task {
         }
     }
 
-    pub fn wait_pid(&self, pid: usize) -> SignalResult<()> {
+    pub fn wait_pid(&self, pid: usize) -> SignalResult<usize> {
         self.zombies.wait_pid(pid)
     }
 }

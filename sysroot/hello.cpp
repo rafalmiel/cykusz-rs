@@ -11,6 +11,7 @@ int main() {
 	
 	struct sigaction sact{};
 	sact.sa_handler = int_handler;
+	sact.sa_flags = SA_RESTART;
 
 	sigaction(SIGINT, &sact, nullptr);
 

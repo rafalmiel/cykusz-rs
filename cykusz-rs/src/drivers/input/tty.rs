@@ -254,6 +254,11 @@ impl KeyListener for Tty {
                     t.signal(syscall_defs::signal::SIGINT);
                 }
             }
+            KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
+                if let Some(t) = self.ctrl_task.lock().clone() {
+                    t.signal(syscall_defs::signal::SIGQUIT);
+                }
+            }
             _ if !released => {
                 if let Some(finalmap) = state.map(false).map_or(None, |map| {
                     match state.caps {

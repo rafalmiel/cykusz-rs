@@ -7,6 +7,7 @@ use syscall_defs::SyscallError;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::Spin;
+use syscall_defs::signal::SignalHandler;
 
 mod default;
 
@@ -41,6 +42,14 @@ pub struct SignalEntry {
 }
 
 impl SignalEntry {
+    pub fn ignore() -> SignalEntry {
+        SignalEntry {
+            handler: syscall_defs::signal::SignalHandler::Ignore,
+            flags: syscall_defs::signal::SignalFlags::empty(),
+            sigreturn: 0,
+        }
+    }
+
     pub fn handler(&self) -> syscall_defs::signal::SignalHandler {
         self.handler
     }
@@ -54,13 +63,41 @@ impl SignalEntry {
     }
 }
 
-const SIGNAL_COUNT: usize = 3;
+const SIGNAL_COUNT: usize = 18;
 
-#[derive(Default)]
 pub struct Signals {
     entries: Spin<[SignalEntry; SIGNAL_COUNT]>,
     blocked_mask: AtomicU64,
     pending_mask: AtomicU64,
+}
+
+impl Default for Signals {
+    fn default() -> Signals {
+        Signals {
+            entries: Spin::new([
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::default(), // SIGINT
+                SignalEntry::default(), // SIGQUIT
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(),
+                SignalEntry::ignore(), // SIGCHLD
+            ]),
+            blocked_mask: Default::default(),
+            pending_mask: Default::default(),
+        }
+    }
 }
 
 impl Signals {
@@ -72,10 +109,18 @@ impl Signals {
         self.pending_mask.load(Ordering::SeqCst)
     }
 
-    pub fn trigger(&self, signal: usize) {
+    pub fn trigger(&self, signal: usize) -> bool {
         assert!(signal < SIGNAL_COUNT);
 
-        self.pending_mask.fetch_or(1u64 << signal, Ordering::SeqCst);
+        let sigs = self.entries.lock();
+
+        if sigs[signal].handler() != SignalHandler::Ignore {
+            self.pending_mask.fetch_or(1u64 << signal, Ordering::SeqCst);
+
+            true
+        } else {
+            false
+        }
     }
 
     pub fn clear(&self) {

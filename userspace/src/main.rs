@@ -398,8 +398,6 @@ fn exec(cmd: &str) {
         if let Ok(id) = syscall::fork() {
             if id == 0 {
                 syscall::exec("/bin/hello").expect("Failed to exec hello");
-            } else {
-                syscall::waitpid(id).expect("Wait pid failed");
             }
         } else {
             println!("fork failed");
@@ -503,10 +501,32 @@ fn signal_test() {
     set_ready(false);
 }
 
+fn sigchld_handler(_sig: usize) {
+    let pid = syscall::waitpid(0);
+
+    if let Ok(pid) = pid {
+        println!("child died: {}", pid);
+    }
+}
+
 fn main_cd() -> ! {
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGINT,
         syscall_defs::signal::SignalHandler::Handle(sigint_handler),
+        syscall_defs::signal::SignalFlags::RESTART,
+    ) {
+        println!("Failed to install signal handler: {:?}", e);
+    }
+    if let Err(e) = syscall::sigaction(
+        syscall_defs::signal::SIGQUIT,
+        syscall_defs::signal::SignalHandler::Ignore,
+        syscall_defs::signal::SignalFlags::empty(),
+    ) {
+        println!("Failed to install signal handler: {:?}", e);
+    }
+    if let Err(e) = syscall::sigaction(
+        syscall_defs::signal::SIGCHLD,
+        syscall_defs::signal::SignalHandler::Handle(sigchld_handler),
         syscall_defs::signal::SignalFlags::RESTART,
     ) {
         println!("Failed to install signal handler: {:?}", e);

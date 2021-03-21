@@ -27,12 +27,15 @@ impl Zombies {
         self.wq.notify_one();
     }
 
-    pub fn wait_pid(&self, pid: usize) -> SignalResult<()> {
+    pub fn wait_pid(&self, pid: usize) -> SignalResult<usize> {
+        let mut res = 0;
         self.wq.wait_lock_for(&self.list, |l| {
             let mut cur = l.front_mut();
 
             while let Some(t) = cur.get() {
-                if t.id() == pid {
+                if t.id() == pid || pid == 0 {
+                    res = t.id();
+
                     cur.remove();
 
                     return true;
@@ -44,6 +47,6 @@ impl Zombies {
             false
         })?;
 
-        Ok(())
+        Ok(res)
     }
 }

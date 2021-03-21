@@ -611,9 +611,7 @@ pub fn sys_exec(path: u64, path_len: u64) -> SyscallResult {
 pub fn sys_waitpid(pid: u64) -> SyscallResult {
     let current = current_task();
 
-    current.wait_pid(pid as usize)?;
-
-    Ok(0)
+    Ok(current.wait_pid(pid as usize)?)
 }
 
 pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {

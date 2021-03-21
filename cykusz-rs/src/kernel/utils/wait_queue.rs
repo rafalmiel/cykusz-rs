@@ -66,10 +66,10 @@ impl WaitQueue {
         task.await_io()
     }
 
-    pub fn wait_lock_irq_for<'a, T, F: Fn(&mut SpinGuard<T>) -> bool>(
+    pub fn wait_lock_irq_for<'a, T, F: FnMut(&mut SpinGuard<T>) -> bool>(
         &self,
         mtx: &'a Spin<T>,
-        cond: F,
+        mut cond: F,
     ) -> SignalResult<SpinGuard<'a, T>> {
         let mut lock = mtx.lock_irq();
 
@@ -92,10 +92,10 @@ impl WaitQueue {
         Ok(lock)
     }
 
-    pub fn wait_lock_for<'a, T, F: Fn(&mut SpinGuard<T>) -> bool>(
+    pub fn wait_lock_for<'a, T, F: FnMut(&mut SpinGuard<T>) -> bool>(
         &self,
         mtx: &'a Spin<T>,
-        cond: F,
+        mut cond: F,
     ) -> SignalResult<SpinGuard<'a, T>> {
         let mut lock = mtx.lock();
 
@@ -118,7 +118,7 @@ impl WaitQueue {
         Ok(lock)
     }
 
-    pub fn wait_for<F: Fn() -> bool>(&self, cond: F) -> SignalResult<()> {
+    pub fn wait_for<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
         let task = current_task();
 
         let _guard = WaitQueueGuard::new(self, &task);

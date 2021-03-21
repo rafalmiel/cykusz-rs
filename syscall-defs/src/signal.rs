@@ -1,6 +1,8 @@
 pub const SIGINT: usize = 2;
+pub const SIGQUIT: usize = 3;
+pub const SIGCHLD: usize = 17;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SignalHandler {
     Ignore,
     Default,

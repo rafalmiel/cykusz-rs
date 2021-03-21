@@ -562,36 +562,36 @@ impl Table<Level4> {
         }
     }
 
-    pub fn deallocate_user(&mut self) {
+    pub fn deallocate_user(&mut self, clear_root: bool) {
         let _g = self.lock();
 
         let flags = Entry::PRESENT | Entry::USER;
 
-        self.for_entries(flags, |idx3, e3| {
-            let l3 = self.next_level(idx3).unwrap();
-
-            l3.for_entries(flags, move |idx2, e2| {
-                let l2 = l3.next_level(idx2).unwrap();
-
-                l2.for_entries(flags, |idx1, e1| {
-                    let l1 = l2.next_level(idx1).unwrap();
-
-                    l1.for_entries(flags, |_idx, e| {
+        self.for_entries_mut(flags, |_idx3, e3, l3| {
+            l3.for_entries_mut(flags, |_idx2, e2, l2| {
+                l2.for_entries_mut(flags, |_idx1, e1, l1| {
+                    l1.for_entries_mut(flags, |_idx, e| {
                         e.unref_phys_page();
+                        e.clear();
                     });
 
                     e1.unref_phys_page();
+                    e1.clear();
                 });
 
                 e2.unref_phys_page();
+                e2.clear();
             });
 
             e3.unref_phys_page();
+            e3.clear();
         });
 
-        let frame = Frame::new(self.phys_addr());
+        if clear_root {
+            let frame = Frame::new(self.phys_addr());
 
-        crate::kernel::mm::deallocate(&frame);
+            crate::kernel::mm::deallocate(&frame);
+        }
     }
 
     pub fn duplicate(&mut self) -> &P4Table {

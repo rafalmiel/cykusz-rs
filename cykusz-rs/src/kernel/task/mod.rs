@@ -164,31 +164,15 @@ impl Task {
         task
     }
 
-    pub fn exec(&self, exe: DirEntryItem) -> Arc<Task> {
-        //println!("execing id {}", self.id);
-        let mut task = Task::new_with_id(self.id);
+    pub fn exec(&self, exe: DirEntryItem) -> ! {
+        let vm = self.vm();
+        vm.clear();
 
-        let vm = task.vm();
+        self.signals().clear();
+        self.set_locks(0);
 
         if let Some((entry, tls_vm)) = vm.load_bin(exe) {
-            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, vm, tls_vm));
-
-            // Inherit open files
-            task.filetable = self.filetable.clone();
-
-            // Inheric current working directory
-            if let Some(e) = self.get_dent() {
-                task.set_cwd(e);
-            }
-
-            let task = Self::make_ptr(task);
-
-            // Inherit children
-            self.migrate_children_to(task.clone());
-
-            self.terminal().try_transfer_to(task.clone());
-
-            task
+            unsafe { self.arch_task_mut().exec(entry, vm, tls_vm) }
         } else {
             panic!("Failed to exec task")
         }

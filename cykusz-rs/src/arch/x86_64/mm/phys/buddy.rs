@@ -175,6 +175,10 @@ impl BuddyAlloc {
     }
 
     fn clear_bit(&mut self, addr: PhysAddr, order: usize) -> bool {
+        if addr < self.start {
+            return false;
+        }
+
         let (byte, bit) = self.get_byte_bit(addr, order);
 
         let b = &mut self.buddies[order][byte];

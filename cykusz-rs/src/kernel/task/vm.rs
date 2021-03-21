@@ -180,6 +180,7 @@ impl Mapping {
 
         if !reason.contains(PageFaultReason::PRESENT) {
             // Page not present so just make it available
+            //println!("map: private read");
             map_flags(addr_aligned, PageFlags::USER | self.prot.into());
 
             true
@@ -189,8 +190,10 @@ impl Mapping {
                     // If there is more than one process mapping this page, make a private copy
                     // Otherwise, this page is not shared with anyone, so just make it writable
                     if phys_page.vm_use_count() > 1 {
+                        //println!("map: private copy");
                         Self::map_copy(addr_aligned, addr_aligned, PAGE_SIZE, self.prot);
                     } else {
+                        //println!("map: private mark read");
                         if !update_flags(addr_aligned, PageFlags::USER | self.prot.into()) {
                             panic!("Update flags failed");
                         }

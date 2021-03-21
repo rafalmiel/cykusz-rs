@@ -1,3 +1,6 @@
 [workspace]
 members = ["syscall-defs", "syscall-user", "user-alloc", "userspace", "acpica", "cykusz-rs"]
 
+[profile.release]
+debug=false
+

@@ -1,11 +1,7 @@
-use alloc::sync::Arc;
-
-use crate::kernel::task::Task;
-
 #[derive(Copy, Clone)]
 enum Action {
     Ignore,
-    Handle(fn(Arc<Task>) -> Arc<Task>),
+    Handle(fn()),
 }
 
 static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
@@ -14,17 +10,14 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
     Action::Handle(terminate), // SIG_INT
 ];
 
-fn terminate(task: Arc<Task>) -> Arc<Task> {
-    drop(task);
+fn terminate() {
     crate::kernel::sched::task_finished();
 }
 
-pub(in crate::kernel::signal) fn handle_default(sig: usize, mut task: Arc<Task>) -> Arc<Task> {
+pub(in crate::kernel::signal) fn handle_default(sig: usize) {
     let action = DEFAULT_ACTIONS[sig];
 
     if let Action::Handle(f) = action {
-        task = (f)(task);
+        (f)();
     }
-
-    task
 }

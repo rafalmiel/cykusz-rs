@@ -20,10 +20,10 @@ fn set_current(current: &Arc<Task>) {
     }
 }
 
-fn get_current() -> Arc<Task> {
+fn get_current<'a>() -> &'a Arc<Task> {
     let _guard = IrqGuard::new();
 
-    unsafe { CURRENT_TASK.as_ref().unwrap().clone() }
+    unsafe { CURRENT_TASK.as_ref().unwrap() }
 }
 
 struct Queues {
@@ -149,7 +149,7 @@ impl Queues {
     }
 
     fn reschedule(&self, lock: SpinGuard<()>) -> bool {
-        self.switch_to_sched(&get_current(), lock);
+        self.switch_to_sched(get_current(), lock);
 
         self.prev_id != get_current().id()
     }
@@ -159,7 +159,7 @@ impl Queues {
     }
 
     fn sleep(&mut self, time_ns: Option<usize>, lock: SpinGuard<()>) -> SignalResult<()> {
-        let task = get_current();
+        let task = get_current().clone();
 
         assert_ne!(task.id(), self.idle_task.id(), "Idle task should not sleep");
 
@@ -284,7 +284,7 @@ impl SchedulerInterface for RRScheduler {
         queue.reschedule(lock)
     }
 
-    fn current_task(&self) -> Arc<Task> {
+    fn current_task<'a>(&self) -> &'a Arc<Task> {
         get_current()
     }
 

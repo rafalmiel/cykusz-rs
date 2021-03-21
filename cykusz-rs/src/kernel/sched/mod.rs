@@ -38,7 +38,7 @@ pub fn new_task_id() -> usize {
 pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn init(&self) {}
     fn reschedule(&self) -> bool;
-    fn current_task(&self) -> Arc<Task>;
+    fn current_task<'a>(&self) -> &'a Arc<Task>;
     fn current_id(&self) -> isize {
         self.current_task().id() as isize
     }
@@ -69,7 +69,7 @@ impl Scheduler {
         self.sched.init();
     }
 
-    pub fn current_task(&self) -> Arc<Task> {
+    pub fn current_task<'a>(&self) -> &'a Arc<Task> {
         self.sched.current_task()
     }
 
@@ -149,25 +149,15 @@ impl Scheduler {
     pub fn exec(&self, exe: DirEntryItem) -> ! {
         let current = self.sched.current_task();
 
-        let execd = current.exec(exe);
-
-        self.tasks.register_task(execd.clone());
-
-        self.sched.queue_task(execd);
-
-        drop(current);
-
-        self.sched.exit(0);
+        current.exec(exe);
     }
 
     pub fn exit(&self) -> ! {
-        let current = current_task();
+        let current = current_task_ref();
 
         self.tasks.remove_task(current.id());
 
         current.migrate_children_to_parent();
-
-        drop(current);
 
         self.sched.exit(0)
     }
@@ -219,6 +209,10 @@ pub fn reschedule() -> bool {
 }
 
 pub fn current_task() -> Arc<Task> {
+    scheduler().current_task().clone()
+}
+
+pub fn current_task_ref<'a>() -> &'a Arc<Task> {
     scheduler().current_task()
 }
 

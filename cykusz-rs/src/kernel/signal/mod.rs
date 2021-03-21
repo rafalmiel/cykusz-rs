@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sched::current_task;
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::Spin;
 
 mod default;
@@ -78,6 +78,12 @@ impl Signals {
         self.pending_mask.fetch_or(1u64 << signal, Ordering::SeqCst);
     }
 
+    pub fn clear(&self) {
+        self.entries.lock().fill(SignalEntry::default());
+
+        self.pending_mask.store(0, Ordering::SeqCst);
+    }
+
     pub fn set_signal(
         &self,
         signal: usize,
@@ -113,9 +119,9 @@ impl Signals {
 }
 
 pub fn do_signals() -> Option<(usize, SignalEntry)> {
-    let mut task = current_task();
+    let task = current_task_ref();
 
-    let mut signals = task.signals();
+    let signals = task.signals();
 
     if !signals.has_pending() {
         return None;
@@ -131,10 +137,7 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
 
             match entry.handler() {
                 syscall_defs::signal::SignalHandler::Default => {
-                    drop(signals);
-
-                    task = default::handle_default(s, task);
-                    signals = task.signals();
+                    default::handle_default(s);
                 }
                 syscall_defs::signal::SignalHandler::Handle(_) => {
                     return Some((s, entry));

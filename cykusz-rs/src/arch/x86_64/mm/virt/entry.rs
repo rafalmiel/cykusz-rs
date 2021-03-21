@@ -84,7 +84,6 @@ impl Entry {
     }
 
     pub fn set_frame_flags(&mut self, frame: &Frame, flags: Entry) {
-        //println!("set frame flags {} {:?}", frame.address(), flags);
         self.set_frame(frame);
         self.set_flags(flags);
     }
@@ -94,7 +93,6 @@ impl Entry {
             if let Some(page) = self.address().to_phys_page() {
                 let cnt = page.dec_vm_use_count();
                 if cnt == 0 {
-                    //println!("unref phys page dealloc {}", self.address());
                     deallocate_order(&Frame::new(self.address()), 0);
 
                     return true;
@@ -115,7 +113,6 @@ impl Entry {
 
     pub fn set_frame(&mut self, frame: &Frame) {
         let ref_page = self.address() != frame.address();
-        //println!("set frame {} do ref page? {}", frame.address(), ref_page);
 
         if ref_page {
             self.unref_phys_page();
@@ -130,7 +127,6 @@ impl Entry {
     }
 
     pub fn set_flags(&mut self, flags: Entry) {
-        //println!("set flags {} {:?}", self.address(), flags);
         self.bits &= !FLAG_MASK;
         self.insert(Entry::from_bits(flags.bits & FLAG_MASK).unwrap());
     }

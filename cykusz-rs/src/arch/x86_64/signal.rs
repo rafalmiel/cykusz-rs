@@ -168,9 +168,7 @@ pub extern "C" fn arch_sys_check_signals(
 pub fn arch_sys_sigreturn(sys_frame: &mut SyscallFrame, user_regs: &mut RegsFrame) -> isize {
     let mut writer = StackHelper::new(&mut sys_frame.rsp);
 
-    let signal_frame = unsafe {
-        writer.restore::<SignalFrame>()
-    };
+    let signal_frame = unsafe { writer.restore::<SignalFrame>() };
 
     writer.restore_by(REDZONE_SIZE);
 

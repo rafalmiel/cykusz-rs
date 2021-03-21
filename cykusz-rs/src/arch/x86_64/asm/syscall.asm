@@ -2,6 +2,7 @@ global asm_syscall_handler
 global asm_sysretq
 global asm_sysretq_userinit
 global asm_sysretq_forkinit
+global asm_jmp_user
 
 extern fast_syscall_handler
 extern restore_user_fs
@@ -143,6 +144,8 @@ asm_sysretq:
 asm_sysretq_forkinit:
     call restore_user_fs
 
+    xchg bx, bx
+
     mov rax, 0
 
     jmp asm_sysretq
@@ -152,4 +155,15 @@ asm_sysretq_userinit:
 
     jmp asm_sysretq
 
+asm_jmp_user:
+    push rdi    ; Param: user stack
+    push rsi    ; Param: entry
+    push rdx    ; Param: rflags
 
+    call restore_user_fs
+
+    pop r11
+    pop rcx
+    pop rsp
+
+    o64 sysret

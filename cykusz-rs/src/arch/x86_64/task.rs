@@ -4,19 +4,21 @@ use core::ptr::Unique;
 use syscall_defs::{MMapFlags, MMapProt};
 
 use crate::arch::gdt;
-use crate::arch::mm::virt::p4_table_addr;
+use crate::arch::gdt::update_tss_rps0;
+use crate::arch::mm::phys::{allocate_order, deallocate_order};
 use crate::arch::mm::virt::p4_table;
 use crate::arch::mm::virt::table::P4Table;
-use crate::arch::mm::phys::{allocate_order, deallocate_order};
+use crate::arch::mm::virt::{activate_table, current_p4_table, p4_table_addr};
 use crate::arch::raw::idt::InterruptFrame;
-use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::raw::mm::MappedAddr;
+use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::syscall::SyscallFrame;
+use crate::arch::utils::StackHelper;
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};
+
 use crate::kernel::task::vm::{TlsVmInfo, VM};
-use crate::arch::utils::StackHelper;
 
 const USER_STACK_SIZE: usize = 0x4000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
@@ -78,8 +80,6 @@ fn task_finished() {
 }
 
 fn prepare_p4<'a>() -> &'a mut P4Table {
-    use crate::arch::mm::virt::current_p4_table;
-
     let current_p4 = current_p4_table();
     let frame = allocate().expect("Out of mem!");
     let new_p4 = P4Table::new_mut(&frame);
@@ -413,13 +413,51 @@ impl Task {
         }
     }
 
+    pub fn exec(&mut self, entry: VirtAddr, vm: &VM, tls_vm: Option<TlsVmInfo>) -> ! {
+        let p_table = if self.is_user() {
+            let p_table = current_p4_table();
+            p_table.deallocate_user(false);
+            p_table
+        } else {
+            prepare_p4()
+        };
+
+        vm.mmap_vm(
+            Some(VirtAddr(0x8000_0000_0000 - USER_STACK_SIZE)),
+            USER_STACK_SIZE,
+            MMapProt::PROT_WRITE | MMapProt::PROT_READ,
+            MMapFlags::MAP_FIXED | MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS,
+            None,
+            0,
+        );
+
+        let tls_ptr = if let Some(tls) = &tls_vm {
+            prepare_tls(vm, p_table, tls)
+        } else {
+            VirtAddr(0)
+        };
+
+        self.cr3 = p_table.phys_addr().0;
+        self.user_fs_base = tls_ptr.0;
+        self.user_stack = Some(0x8000_0000_0000);
+
+        self.ctx = Unique::dangling();
+
+        update_tss_rps0(self.stack_top + self.stack_size);
+
+        unsafe {
+            activate_table(p_table);
+            asm_jmp_user(0x8000_0000_0000, entry.0, 0x200);
+        }
+    }
+
     pub fn deallocate(&mut self) {
         let cr3 = unsafe { self.ctx.as_ref().cr3 };
 
         self.ctx = Unique::dangling();
         if self.is_user() {
             let p4 = p4_table(PhysAddr(cr3));
-            p4.deallocate_user();
+            p4.deallocate_user(true);
         }
         deallocate_order(
             &Frame::new(MappedAddr(self.stack_top).to_phys()),
@@ -435,6 +473,7 @@ extern "C" {
     fn isr_return();
     fn asm_sysretq_userinit();
     fn asm_sysretq_forkinit();
+    fn asm_jmp_user(ustack: usize, entry: usize, rflags: usize) -> !;
 }
 
 pub fn activate_task(to: &Task) {

@@ -35,9 +35,11 @@ pub struct SyscallFrame {
 pub extern "C" fn fast_syscall_handler(
     sys_frame: &mut SyscallFrame,
     regs: &mut RegsFrame,
-) -> isize {
+) {
     if regs.rax == syscall_defs::SYS_SIGRETURN as u64 {
-        crate::arch::signal::arch_sys_sigreturn(sys_frame, regs)
+
+        // Store syscall result in rax
+        regs.rax = crate::arch::signal::arch_sys_sigreturn(sys_frame, regs) as u64
     } else {
         let res = crate::kernel::syscall::syscall_handler(
             regs.rax, regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9,
@@ -45,6 +47,7 @@ pub extern "C" fn fast_syscall_handler(
 
         crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs);
 
-        res
+        // Store syscall result in rax
+        regs.rax = res as u64
     }
 }

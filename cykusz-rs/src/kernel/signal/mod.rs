@@ -1,13 +1,15 @@
 #![allow(dead_code)]
 
 use bit_field::BitField;
+use core::ops::{Index, IndexMut};
 use core::sync::atomic::{AtomicU64, Ordering};
+use syscall_defs::signal::SignalFlags;
+use syscall_defs::signal::SignalHandler;
 use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::Spin;
-use syscall_defs::signal::SignalHandler;
 
 mod default;
 
@@ -36,25 +38,25 @@ impl From<SignalError> for SyscallError {
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct SignalEntry {
-    handler: syscall_defs::signal::SignalHandler,
-    flags: syscall_defs::signal::SignalFlags,
+    handler: SignalHandler,
+    flags: SignalFlags,
     sigreturn: usize,
 }
 
 impl SignalEntry {
     pub fn ignore() -> SignalEntry {
         SignalEntry {
-            handler: syscall_defs::signal::SignalHandler::Ignore,
-            flags: syscall_defs::signal::SignalFlags::empty(),
+            handler: SignalHandler::Ignore,
+            flags: SignalFlags::empty(),
             sigreturn: 0,
         }
     }
 
-    pub fn handler(&self) -> syscall_defs::signal::SignalHandler {
+    pub fn handler(&self) -> SignalHandler {
         self.handler
     }
 
-    pub fn flags(&self) -> syscall_defs::signal::SignalFlags {
+    pub fn flags(&self) -> SignalFlags {
         self.flags
     }
 
@@ -65,39 +67,30 @@ impl SignalEntry {
 
 const SIGNAL_COUNT: usize = 18;
 
-pub struct Signals {
-    entries: Spin<[SignalEntry; SIGNAL_COUNT]>,
-    blocked_mask: AtomicU64,
-    pending_mask: AtomicU64,
+#[derive(Copy, Clone, Default)]
+struct Entries {
+    entries: [SignalEntry; SIGNAL_COUNT],
 }
 
-impl Default for Signals {
-    fn default() -> Signals {
-        Signals {
-            entries: Spin::new([
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::default(), // SIGINT
-                SignalEntry::default(), // SIGQUIT
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(),
-                SignalEntry::ignore(), // SIGCHLD
-            ]),
-            blocked_mask: Default::default(),
-            pending_mask: Default::default(),
-        }
+impl Index<usize> for Entries {
+    type Output = SignalEntry;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.entries[index]
     }
+}
+
+impl IndexMut<usize> for Entries {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.entries[index]
+    }
+}
+
+#[derive(Default)]
+pub struct Signals {
+    entries: Spin<Entries>,
+    blocked_mask: AtomicU64,
+    pending_mask: AtomicU64,
 }
 
 impl Signals {
@@ -114,7 +107,13 @@ impl Signals {
 
         let sigs = self.entries.lock();
 
-        if sigs[signal].handler() != SignalHandler::Ignore {
+        let handler = sigs[signal].handler();
+
+        if match handler {
+            SignalHandler::Ignore => false,
+            SignalHandler::Default => !default::ignore_by_default(signal),
+            SignalHandler::Handle(_) => true,
+        } {
             self.pending_mask.fetch_or(1u64 << signal, Ordering::SeqCst);
 
             true
@@ -124,7 +123,7 @@ impl Signals {
     }
 
     pub fn clear(&self) {
-        self.entries.lock().fill(SignalEntry::default());
+        *self.entries.lock() = Entries::default();
 
         self.pending_mask.store(0, Ordering::SeqCst);
     }
@@ -132,15 +131,13 @@ impl Signals {
     pub fn set_signal(
         &self,
         signal: usize,
-        handler: syscall_defs::signal::SignalHandler,
-        flags: syscall_defs::signal::SignalFlags,
+        handler: SignalHandler,
+        flags: SignalFlags,
         sigreturn: usize,
     ) {
         assert!(signal < SIGNAL_COUNT);
 
         let mut signals = self.entries.lock();
-
-        println!("add handler {:?}", handler);
 
         signals[signal] = SignalEntry {
             handler,
@@ -181,13 +178,15 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
             signals.pending_mask.store(0, Ordering::SeqCst);
 
             match entry.handler() {
-                syscall_defs::signal::SignalHandler::Default => {
+                SignalHandler::Default => {
                     default::handle_default(s);
                 }
-                syscall_defs::signal::SignalHandler::Handle(_) => {
+                SignalHandler::Handle(_) => {
                     return Some((s, entry));
                 }
-                syscall_defs::signal::SignalHandler::Ignore => {}
+                SignalHandler::Ignore => {
+                    unreachable!()
+                }
             }
         }
     }

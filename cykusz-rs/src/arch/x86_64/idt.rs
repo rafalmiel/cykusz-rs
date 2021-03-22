@@ -5,7 +5,7 @@ use crate::arch::raw::idt::InterruptFrame;
 use crate::arch::tls::restore_user_fs;
 use crate::arch::x86_64::int::end_of_int;
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::sched::current_task;
+use crate::kernel::sched::{current_task, current_task_ref};
 use crate::kernel::sync::RwSpin;
 use crate::kernel::sync::Spin;
 use crate::kernel::task::vm::PageFaultReason;
@@ -328,8 +328,15 @@ pub fn remove_shared_irq_handler(irq: usize, handler: SharedInterruptFn) {
     SHARED_IRQS.remove_shared_int_handler(irq, handler);
 }
 
-fn divide_by_zero(_frame: &mut idt::InterruptFrame) {
-    println!("Divide By Zero error!");
+fn divide_by_zero(frame: &mut idt::InterruptFrame) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGFPE ] Task {} divide_by_zero error", task.id());
+        task.signal(syscall_defs::signal::SIGFPE);
+
+        return;
+    }
     loop {}
 }
 
@@ -350,21 +357,45 @@ fn breakpoint(_frame: &mut idt::InterruptFrame) {
     loop {}
 }
 
-fn overflow(_frame: &mut idt::InterruptFrame) {
+fn overflow(frame: &mut idt::InterruptFrame) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGFPE ] Task {} overflow error", task.id());
+        task.signal(syscall_defs::signal::SIGFPE);
+
+        return;
+    }
     println!("Overflow error!");
     loop {}
 }
 
-fn bound_range_exceeded(_frame: &mut idt::InterruptFrame) {
+fn bound_range_exceeded(frame: &mut idt::InterruptFrame) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGSEGV ] Task {} bound range exceeded error", task.id());
+        task.signal(syscall_defs::signal::SIGSEGV);
+
+        return;
+    }
     println!("Bound Range Exceeded error!");
     loop {}
 }
 
-fn invalid_opcode(_frame: &mut idt::InterruptFrame) {
+fn invalid_opcode(frame: &mut idt::InterruptFrame) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGILL ] Task {} invalid_opcode error", task.id());
+        task.signal(syscall_defs::signal::SIGILL);
+
+        return;
+    }
     println!(
         "Invalid Opcode error! task {} {:?} {}",
         crate::kernel::sched::current_id(),
-        _frame,
+        frame,
         unsafe { crate::CPU_ID }
     );
     loop {}
@@ -385,17 +416,41 @@ fn invalid_tss(_frame: &mut idt::InterruptFrame, err: u64) {
     loop {}
 }
 
-fn segment_not_present(_frame: &mut idt::InterruptFrame, err: u64) {
+fn segment_not_present(frame: &mut idt::InterruptFrame, err: u64) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGSEGV ] Task {} segment_not_present error", task.id());
+        task.signal(syscall_defs::signal::SIGSEGV);
+
+        return;
+    }
     println!("Segment Not Present error 0x{:x}", err);
     loop {}
 }
 
-fn stack_segment_fault(_frame: &mut idt::InterruptFrame, err: u64) {
+fn stack_segment_fault(frame: &mut idt::InterruptFrame, err: u64) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGSEGV ] Task {} stack_segment error", task.id());
+        task.signal(syscall_defs::signal::SIGSEGV);
+
+        return;
+    }
     println!("Stack Segment Failt error! 0x{:x}", err);
     loop {}
 }
 
 fn general_protection_fault(frame: &mut idt::InterruptFrame, err: u64) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGBUS ] Task {} general_protecion error", task.id());
+        task.signal(syscall_defs::signal::SIGBUS);
+
+        return;
+    }
     println!(
         "General Protection Fault error! 0x{:x} frame: {:?}",
         err,
@@ -404,12 +459,12 @@ fn general_protection_fault(frame: &mut idt::InterruptFrame, err: u64) {
     loop {}
 }
 
-fn page_fault(_frame: &mut idt::InterruptFrame, err: u64) {
+fn page_fault(frame: &mut idt::InterruptFrame, err: u64) {
     let virt = VirtAddr(unsafe { crate::arch::raw::ctrlregs::cr2() });
 
     let reason = PageFaultReason::from_bits_truncate(err as usize);
 
-    if virt.is_user() {
+    if frame.is_user() {
         // page fault originated in userspace
         // let the task try handle it
 
@@ -417,6 +472,11 @@ fn page_fault(_frame: &mut idt::InterruptFrame, err: u64) {
 
         //println!("user pagefault {} {:?}", virt, reason);
         if task.handle_pagefault(reason, virt) {
+            return;
+        } else {
+            println!("[ SIGSEGV ] Task {} page_fault error", task.id());
+            task.signal(syscall_defs::signal::SIGSEGV);
+
             return;
         }
     //println!("user pagefault failed");
@@ -439,18 +499,34 @@ fn page_fault(_frame: &mut idt::InterruptFrame, err: u64) {
         "PAGE FAULT! 0x{:x} CPU: {}, rip: {:?} virt: {}",
         err,
         unsafe { crate::CPU_ID },
-        _frame,
+        frame,
         virt
     );
     loop {}
 }
 
-fn x87_floating_point_exception(_frame: &mut idt::InterruptFrame) {
+fn x87_floating_point_exception(frame: &mut idt::InterruptFrame) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGSEGV ] Task {} x87_floating_point error", task.id());
+        task.signal(syscall_defs::signal::SIGFPE);
+
+        return;
+    }
     println!("x87 Floating Point Exception!");
     loop {}
 }
 
-fn alignment_check(_frame: &mut idt::InterruptFrame, err: u64) {
+fn alignment_check(frame: &mut idt::InterruptFrame, err: u64) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGBUS ] Task {} alignment_check error", task.id());
+        task.signal(syscall_defs::signal::SIGBUS);
+
+        return;
+    }
     println!("Alignment Check error! 0x{:x}", err);
     loop {}
 }
@@ -460,7 +536,15 @@ fn machine_check(_frame: &mut idt::InterruptFrame) {
     loop {}
 }
 
-fn simd_floating_point_exception(_frame: &mut idt::InterruptFrame) {
+fn simd_floating_point_exception(frame: &mut idt::InterruptFrame) {
+    if frame.is_user() {
+        let task = current_task_ref();
+
+        println!("[ SIGFPE ] Task {} simd_floating_point error", task.id());
+        task.signal(syscall_defs::signal::SIGFPE);
+
+        return;
+    }
     println!("SIMD Floating Point Exception!");
     loop {}
 }

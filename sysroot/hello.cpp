@@ -20,4 +20,6 @@ int main() {
 
 	std::cin >> input;
 	std::cout << "Hello, " << input << "!" << std::endl;
+
+	*reinterpret_cast<int*>(0xABABABABABABABAB) = 0xdeadbeef;
 }

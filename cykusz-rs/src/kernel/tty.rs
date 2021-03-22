@@ -122,7 +122,6 @@ impl Terminal {
     }
 
     pub fn try_transfer_to(&self, task: Arc<Task>) {
-        println!("trying to transfer terminal to {}", task.id());
         let mut term = self.attached_to.lock();
 
         if let Some(t) = term.as_ref() {

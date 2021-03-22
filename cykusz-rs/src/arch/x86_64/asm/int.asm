@@ -5,43 +5,7 @@ extern update_kern_fs_base
 section .text
 bits 64
 
-%macro pushAll 0
-    push rax
-    push rcx
-    push rdx
-    push r8
-    push r9
-    push r10
-    push r11
-    ;; These two are caller-saved on x86_64!
-    push rdi
-    push rsi
-
-    push rbx
-    push r15
-    push r14
-    push r13
-    push r12
-    push rbp
-%endmacro
-
-%macro popAll 0
-    pop rbp
-    pop r12
-    pop r13
-    pop r14
-    pop r15
-    pop rbx
-    pop rsi
-    pop rdi
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rdx
-    pop rcx
-    pop rax
-%endmacro
+%include "cykusz-rs/src/arch/x86_64/asm/regs.inc"
 
 %macro ISR_NOERRCODE 1
 	[global isr%1]
@@ -89,7 +53,7 @@ ISR_NOERRCODE i
 
 extern isr_handler
 
-; isr_handler(int_num, err_code, irq_frame)
+; isr_handler(int_num, err_code, irq_frame, regs)
 isr_common:
     pushAll
 

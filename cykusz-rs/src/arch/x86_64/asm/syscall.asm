@@ -10,43 +10,7 @@ extern restore_user_fs
 global asm_update_kern_fs_base
 extern arch_sys_check_signals
 
-%macro pushAll 0
-    push rax
-    push rcx
-    push rdx
-    push r8
-    push r9
-    push r10
-    push r11
-    ;; These two are caller-saved on x86_64!
-    push rdi
-    push rsi
-
-    push rbx
-    push r15
-    push r14
-    push r13
-    push r12
-    push rbp
-%endmacro
-
-%macro popAll 0
-    pop rbp
-    pop r12
-    pop r13
-    pop r14
-    pop r15
-    pop rbx
-    pop rsi
-    pop rdi
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop rdx
-    pop rcx
-    ; Skip rax to preserve the return value of a syscall
-%endmacro
+%include "cykusz-rs/src/arch/x86_64/asm/regs.inc"
 
 update_kern_fs_base_locked:
     push rbx
@@ -116,12 +80,9 @@ asm_syscall_handler:
     cld
     call fast_syscall_handler
 
-    push rax
     call restore_user_fs
-    pop rax
 
     popAll
-    add rsp, 8 ; Preserve rax
 
 asm_sysretq:
     cli
@@ -143,8 +104,6 @@ asm_sysretq:
 
 asm_sysretq_forkinit:
     call restore_user_fs
-
-    xchg bx, bx
 
     mov rax, 0
 

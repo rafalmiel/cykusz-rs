@@ -35,7 +35,7 @@ pub extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("Panicked... {:?}", info);
-    loop {}
+    syscall::exit()
 }
 
 #[allow(non_snake_case)]
@@ -51,5 +51,5 @@ extern "C" fn eh_personality() {}
 #[lang = "oom"]
 fn oom(layout: Layout) -> ! {
     println!("Out of memory! {:?}", layout);
-    loop {}
+    syscall::exit()
 }

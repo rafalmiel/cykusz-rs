@@ -129,6 +129,10 @@ impl HbaPortTfdReg {
             o => HbaPortTfdRegStatus::CmdSpec(o),
         }
     }
+
+    pub fn status_val(&self) -> u32 {
+        self.0.get_bits(0..=7)
+    }
 }
 
 #[derive(Debug)]

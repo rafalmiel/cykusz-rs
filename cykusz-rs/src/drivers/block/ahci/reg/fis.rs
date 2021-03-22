@@ -44,8 +44,16 @@ pub struct FisRegH2D {
 
 impl FisRegH2D {
     pub fn reset(&mut self) {
-        let mut this = self;
-        this.to_bytes_mut().fill(0);
+        self.set_fis_type(FisType::RegH2D);
+        self.set_flags(0);
+        self.set_featurel(0);
+        self.set_featureh(0);
+        self.set_lba(0);
+        self.set_device(0);
+        self.set_count(0);
+        self.set_icc(0);
+        self.set_control(0);
+        self._rsv1.fill(0);
     }
 
     pub fn fis_type(&self) -> FisType {
@@ -58,19 +66,27 @@ impl FisRegH2D {
         }
     }
 
+    pub fn flags(&self) -> u8 {
+        self.flags.get()
+    }
+
+    pub fn set_flags(&self, v: u8) {
+        self.flags.set(v);
+    }
+
     pub fn pm_port(&self) -> usize {
-        unsafe { self.flags.get().get_bits(8..=12) as usize }
+        unsafe { self.flags.get().get_bits(0..=3) as usize }
     }
 
     pub fn set_pm_port(&mut self, port: usize) {
         unsafe {
             self.flags
-                .set(*self.flags.get().set_bits(8..=12, port as u8));
+                .set(*self.flags.get().set_bits(0..=3, port as u8));
         }
     }
 
     pub fn c(&self) -> bool {
-        unsafe { self.flags.get().get_bit(15) }
+        unsafe { self.flags.get().get_bit(7) }
     }
 
     pub fn set_c(&mut self, i: bool) {

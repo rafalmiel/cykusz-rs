@@ -1,5 +1,9 @@
 pub const SIGINT: usize = 2;
 pub const SIGQUIT: usize = 3;
+pub const SIGILL: usize = 4;
+pub const SIGBUS: usize = 7;
+pub const SIGFPE: usize = 8;
+pub const SIGSEGV: usize = 11;
 pub const SIGCHLD: usize = 17;
 
 #[derive(Debug, Copy, Clone, PartialEq)]

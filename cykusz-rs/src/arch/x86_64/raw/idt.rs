@@ -24,6 +24,12 @@ pub struct InterruptFrame {
     pub ss: u64,
 }
 
+impl InterruptFrame {
+    pub fn is_user(&self) -> bool {
+        SegmentSelector::from_raw(self.cs as u16).contains(SegmentSelector::RPL_3)
+    }
+}
+
 impl ::core::fmt::Debug for InterruptFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

@@ -5,6 +5,7 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use intrusive_collections::LinkedListLink;
 
+use syscall_defs::signal::SIGCHLD;
 use syscall_defs::OpenFlags;
 
 use crate::arch::mm::VirtAddr;
@@ -19,7 +20,6 @@ use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
 use crate::kernel::task::zombie::Zombies;
 use crate::kernel::tty::Terminal;
-use syscall_defs::signal::SIGCHLD;
 
 pub mod cwd;
 pub mod filetable;

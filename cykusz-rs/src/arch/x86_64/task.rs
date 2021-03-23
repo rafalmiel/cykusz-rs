@@ -464,6 +464,10 @@ impl Task {
         );
         self.stack_top = 0;
     }
+
+    pub fn update_user_fs(&mut self, val: VirtAddr) {
+        self.user_fs_base = val.0;
+    }
 }
 
 extern "C" {

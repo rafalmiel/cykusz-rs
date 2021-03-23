@@ -353,6 +353,10 @@ pub fn futex_wake(val: &AtomicU32) -> SyscallResult {
     unsafe { syscall1(SYS_FUTEX_WAKE, (val as *const AtomicU32) as usize) }
 }
 
+pub fn arch_prctl(cmd: syscall_defs::prctl::PrctlCmd, addr: usize) -> SyscallResult {
+    unsafe { syscall2(SYS_ARCH_PRCTL, cmd as usize, addr) }
+}
+
 pub fn poweroff() -> ! {
     unsafe {
         if let Err(e) = syscall0(SYS_POWEROFF) {

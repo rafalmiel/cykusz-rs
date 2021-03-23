@@ -4,6 +4,7 @@
 extern crate bitflags;
 
 pub mod ioctl;
+pub mod prctl;
 pub mod signal;
 
 pub const SYS_READ: usize = 0;
@@ -48,6 +49,8 @@ pub const SYS_SIGRETURN: usize = 36;
 
 pub const SYS_FUTEX_WAIT: usize = 37;
 pub const SYS_FUTEX_WAKE: usize = 38;
+
+pub const SYS_ARCH_PRCTL: usize = 39;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

@@ -1,4 +1,9 @@
+use syscall_defs::{SyscallError, SyscallResult};
+
 use crate::arch::idt::RegsFrame;
+use crate::kernel::mm::VirtAddr;
+use crate::kernel::sched::current_task_ref;
+use crate::kernel::sync::IrqGuard;
 
 extern "C" {
     fn asm_syscall_handler();
@@ -45,5 +50,31 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
 
         // Store syscall result in rax
         regs.rax = res as u64
+    }
+}
+
+pub fn sys_arch_prctl(cmd: u64, addr: u64) -> SyscallResult {
+    use syscall_defs::prctl::PrctlCmd;
+
+    let cmd: PrctlCmd = (cmd as usize).into();
+
+    match cmd {
+        PrctlCmd::ArchSetFs => {
+            let addr = VirtAddr(addr as usize);
+
+            if !addr.is_user() {
+                return Err(SyscallError::Inval);
+            }
+
+            let task = current_task_ref();
+
+            unsafe {
+                let _guard = IrqGuard::new();
+                task.arch_task_mut().update_user_fs(addr);
+            }
+
+            Ok(0)
+        }
+        PrctlCmd::Unknown => Err(SyscallError::Inval),
     }
 }

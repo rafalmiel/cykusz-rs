@@ -14,7 +14,7 @@ use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
-use crate::kernel::sched::current_task;
+use crate::kernel::sched::{current_task, current_task_ref};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
@@ -37,7 +37,7 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
         let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
 
-        let task = current_task();
+        let task = current_task_ref();
 
         if flags.contains(OpenFlags::DIRECTORY) && inode.inode().ftype()? != FileType::Dir {
             return Err(SyscallError::NotDir);
@@ -60,7 +60,7 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
 }
 
 pub fn sys_close(fd: u64) -> SyscallResult {
-    let task = current_task();
+    let task = current_task_ref();
 
     if task.close_file(fd as usize) {
         return Ok(0);
@@ -72,7 +72,7 @@ pub fn sys_close(fd: u64) -> SyscallResult {
 pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
-    let task = current_task();
+    let task = current_task_ref();
     return if let Some(f) = task.get_handle(fd) {
         if f.flags.intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
             Ok(f.write(make_buf(buf, len))?)
@@ -87,7 +87,7 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
 pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
-    let task = current_task();
+    let task = current_task_ref();
     return if let Some(f) = task.get_handle(fd) {
         if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
             Ok(f.read(make_buf_mut(buf, len))?)
@@ -104,7 +104,7 @@ pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
 
     match cmd {
         FcntlCmd::GetFL => {
-            let task = current_task();
+            let task = current_task_ref();
 
             if let Some(handle) = task.get_handle(fd as usize) {
                 Ok(handle.flags().bits())
@@ -117,7 +117,7 @@ pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
 }
 
 pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) -> SyscallResult {
-    let task = current_task();
+    let task = current_task_ref();
 
     let addr = if addr != 0 {
         Some(VirtAddr(addr as usize))
@@ -156,7 +156,7 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
 pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
     let addr = VirtAddr(addr as usize);
 
-    let task = current_task();
+    let task = current_task_ref();
 
     if task.vm().munmap_vm(addr, len as usize) {
         Ok(0)
@@ -173,7 +173,7 @@ pub fn sys_maps() -> SyscallResult {
         crate::kernel::mm::heap::heap_mem(),
     );
 
-    current_task().vm().print_vm();
+    current_task_ref().vm().print_vm();
 
     Ok(0)
 }
@@ -184,7 +184,7 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
             let dir = dentry.read().inode.clone();
 
             if dir.ftype()? == FileType::Dir {
-                let task = current_task();
+                let task = current_task_ref();
                 task.set_cwd(dentry);
                 return Ok(0);
             } else {
@@ -199,7 +199,7 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
 pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
     let buf = make_buf_mut(buf, len);
 
-    if let Some(pwd) = current_task().get_pwd() {
+    if let Some(pwd) = current_task_ref().get_pwd() {
         if pwd.len() > len as usize {
             Err(SyscallError::IO)
         } else {
@@ -239,7 +239,7 @@ pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
 pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
-    let task = current_task();
+    let task = current_task_ref();
     return if let Some(f) = task.get_handle(fd) {
         Ok(f.get_dents(make_buf_mut(buf, len))?)
     } else {
@@ -412,7 +412,7 @@ pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
     };
 
     if let Some(socket) = socket {
-        let task = current_task();
+        let task = current_task_ref();
 
         use crate::kernel::fs::icache;
 
@@ -443,7 +443,7 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
     };
 
     if let Some(socket) = socket {
-        let task = current_task();
+        let task = current_task_ref();
 
         use crate::kernel::fs::icache;
 
@@ -485,7 +485,7 @@ impl Drop for PollTable {
 pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
     let buf = make_buf(fds, fds_len);
 
-    let task = current_task();
+    let task = current_task_ref();
 
     let mut fd_found: Option<usize> = None;
     let mut first = true;
@@ -583,7 +583,7 @@ pub fn sys_exit() -> ! {
 }
 
 pub fn sys_sleep(time_ns: u64) -> SyscallResult {
-    let t = current_task();
+    let t = current_task_ref();
     t.sleep(time_ns as usize)?;
     Ok(0)
 }
@@ -609,13 +609,13 @@ pub fn sys_exec(path: u64, path_len: u64) -> SyscallResult {
 }
 
 pub fn sys_waitpid(pid: u64) -> SyscallResult {
-    let current = current_task();
+    let current = current_task_ref();
 
     Ok(current.wait_pid(pid as usize)?)
 }
 
 pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
-    let current = current_task();
+    let current = current_task_ref();
 
     if let Some(handle) = current.get_handle(fd as usize) {
         Ok(handle.inode.inode().ioctl(cmd as usize, arg as usize)?)
@@ -628,7 +628,7 @@ pub fn sys_sigaction(sig: u64, handler: u64, flags: u64, sigreturn: u64) -> Sysc
     let handler: syscall_defs::signal::SignalHandler = handler.into();
 
     if let Some(flags) = syscall_defs::signal::SignalFlags::from_bits(flags) {
-        current_task()
+        current_task_ref()
             .signals()
             .set_signal(sig as usize, handler, flags, sigreturn as usize);
 

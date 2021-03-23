@@ -44,6 +44,10 @@ impl WaitQueue {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.tasks.lock().is_empty()
+    }
+
     pub fn wait_lock<T>(lock: SpinGuard<T>) -> SignalResult<()> {
         let task = current_task();
 

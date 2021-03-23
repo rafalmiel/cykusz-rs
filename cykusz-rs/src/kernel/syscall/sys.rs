@@ -638,6 +638,19 @@ pub fn sys_sigaction(sig: u64, handler: u64, flags: u64, sigreturn: u64) -> Sysc
     }
 }
 
+pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
+    let uaddr = VirtAddr(uaddr as usize);
+    let expected = expected as u32;
+
+    crate::kernel::futex::futex().wait(uaddr, expected)
+}
+
+pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
+    let uaddr = VirtAddr(uaddr as usize);
+
+    crate::kernel::futex::futex().wake(uaddr)
+}
+
 pub fn sys_poweroff() -> ! {
     crate::kernel::sched::close_all_tasks();
     println!("[ SHUTDOWN ] Closed all tasks");

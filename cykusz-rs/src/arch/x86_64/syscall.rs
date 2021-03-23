@@ -32,12 +32,8 @@ pub struct SyscallFrame {
 }
 
 #[no_mangle]
-pub extern "C" fn fast_syscall_handler(
-    sys_frame: &mut SyscallFrame,
-    regs: &mut RegsFrame,
-) {
+pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut RegsFrame) {
     if regs.rax == syscall_defs::SYS_SIGRETURN as u64 {
-
         // Store syscall result in rax
         regs.rax = crate::arch::signal::arch_sys_sigreturn(sys_frame, regs) as u64
     } else {

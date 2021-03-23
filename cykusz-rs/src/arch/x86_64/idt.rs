@@ -465,7 +465,7 @@ fn page_fault(frame: &mut idt::InterruptFrame, err: u64) {
 
     let reason = PageFaultReason::from_bits_truncate(err as usize);
 
-    if frame.is_user() {
+    if virt.is_user() {
         // page fault originated in userspace
         // let the task try handle it
 

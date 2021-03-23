@@ -140,6 +140,10 @@ fn init_task() {
 
     kernel::net::init();
 
+    kernel::futex::init();
+
+    println!("[ OK ] Futexes Initialized");
+
     // Start shell on this cpu
     init_task::exec()
 }

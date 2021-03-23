@@ -46,6 +46,9 @@ pub const SYS_IOCTL: usize = 34;
 pub const SYS_SIGACTION: usize = 35;
 pub const SYS_SIGRETURN: usize = 36;
 
+pub const SYS_FUTEX_WAIT: usize = 37;
+pub const SYS_FUTEX_WAKE: usize = 38;
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {
     Perm = 1,

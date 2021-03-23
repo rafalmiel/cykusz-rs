@@ -90,7 +90,6 @@ pub extern "C" fn arch_sys_check_signals(
             let mut writer = StackHelper::new(&mut sys_frame.rsp);
 
             writer.skip_by(REDZONE_SIZE);
-
             unsafe {
                 writer.write(signal_frame);
                 writer.write(entry.sigreturn());

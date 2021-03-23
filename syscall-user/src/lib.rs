@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(llvm_asm)]
 
+use core::sync::atomic::AtomicU32;
 use syscall_defs::*;
 
 #[macro_use]
@@ -336,6 +337,20 @@ pub fn bochs() {
 
 pub fn sigreturn() -> SyscallResult {
     unsafe { syscall0(SYS_SIGRETURN) }
+}
+
+pub fn futex_wait(val: &AtomicU32, expected: u32) -> SyscallResult {
+    unsafe {
+        syscall2(
+            SYS_FUTEX_WAIT,
+            (val as *const AtomicU32) as usize,
+            expected as usize,
+        )
+    }
+}
+
+pub fn futex_wake(val: &AtomicU32) -> SyscallResult {
+    unsafe { syscall1(SYS_FUTEX_WAKE, (val as *const AtomicU32) as usize) }
 }
 
 pub fn poweroff() -> ! {

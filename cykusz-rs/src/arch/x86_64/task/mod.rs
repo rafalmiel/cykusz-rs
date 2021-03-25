@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::mem::size_of;
 use core::ptr::Unique;
 
@@ -18,6 +19,8 @@ use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};
 use crate::kernel::task::vm::{TlsVmInfo, VM};
+
+mod args;
 
 const USER_STACK_SIZE: usize = 0x4000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
@@ -412,7 +415,25 @@ impl Task {
         }
     }
 
-    pub fn exec(&mut self, entry: VirtAddr, vm: &VM, tls_vm: Option<TlsVmInfo>) -> ! {
+    pub fn exec(
+        &mut self,
+        entry: VirtAddr,
+        vm: &VM,
+        tls_vm: Option<TlsVmInfo>,
+        args: Option<&[&str]>,
+        envs: Option<&[&str]>,
+    ) -> ! {
+        let args = if let Some(a) = args {
+            Some(args::Args::from_ref(a))
+        } else {
+            None
+        };
+        let envs = if let Some(e) = envs {
+            Some(args::Args::from_ref(e))
+        } else {
+            None
+        };
+
         let p_table = if self.is_user() {
             let p_table = current_p4_table();
             p_table.deallocate_user(false);
@@ -421,8 +442,10 @@ impl Task {
             prepare_p4()
         };
 
+        let mut user_stack: u64 = 0x8000_0000_0000;
+
         vm.mmap_vm(
-            Some(VirtAddr(0x8000_0000_0000 - USER_STACK_SIZE)),
+            Some(VirtAddr(user_stack as usize - USER_STACK_SIZE)),
             USER_STACK_SIZE,
             MMapProt::PROT_WRITE | MMapProt::PROT_READ,
             MMapFlags::MAP_FIXED | MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS,
@@ -446,7 +469,35 @@ impl Task {
 
         unsafe {
             activate_table(p_table);
-            asm_jmp_user(0x8000_0000_0000, entry.0, 0x200);
+        }
+
+        // Prepare user stack program arguments
+        let mut helper = StackHelper::new(&mut user_stack);
+
+        let mut envp = Vec::<u64>::new();
+        let mut argp = Vec::<u64>::new();
+
+        if let Some(e) = envs {
+            envp = e.write_strings(&mut helper);
+        }
+        if let Some(a) = args {
+            argp = a.write_strings(&mut helper);
+        }
+
+        helper.align_down(); // align to 64 bytes
+        unsafe {
+            helper.write(0u64);
+            helper.write_slice(envp.as_slice()); // char *const envp[]
+            helper.write(0u64);
+            helper.write_slice(argp.as_slice()); // char *const argv[]
+            helper.write(argp.len()); // int argc
+        }
+
+        drop(envp);
+        drop(argp);
+
+        unsafe {
+            asm_jmp_user(helper.current() as usize, entry.0, 0x200);
         }
     }
 

@@ -600,12 +600,22 @@ pub fn sys_fork() -> SyscallResult {
     Ok(child.id())
 }
 
-pub fn sys_exec(path: u64, path_len: u64) -> SyscallResult {
-    let path = Path::new(make_str(path, path_len));
+pub fn sys_exec(path: u64, args: u64, envs: u64) -> SyscallResult {
+    let path = unsafe { *(path as *const &str) };
+    let args = if args != 0 {
+        Some(unsafe { *(args as *const &[&str]) })
+    } else {
+        None
+    };
+    let envs = if envs != 0 {
+        Some(unsafe { *(envs as *const &[&str]) })
+    } else {
+        None
+    };
 
-    let prog = lookup_by_path(path, LookupMode::None)?;
+    let prog = lookup_by_path(Path::new(path), LookupMode::None)?;
 
-    crate::kernel::sched::exec(prog);
+    crate::kernel::sched::exec(prog, args, envs);
 }
 
 pub fn sys_waitpid(pid: u64) -> SyscallResult {

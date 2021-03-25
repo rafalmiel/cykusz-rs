@@ -7,6 +7,8 @@ use syscall_defs::*;
 #[macro_use]
 pub mod print;
 
+extern crate alloc;
+
 pub unsafe fn syscall0(mut a: usize) -> SyscallResult {
     llvm_asm!("syscall"
         : "={rax}"(a)
@@ -300,8 +302,18 @@ pub fn fork() -> SyscallResult {
     unsafe { syscall0(SYS_FORK) }
 }
 
-pub fn exec(path: &str) -> SyscallResult {
-    unsafe { syscall2(SYS_EXEC, path.as_ptr() as usize, path.len()) }
+pub fn exec(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) -> SyscallResult {
+    let args = if let Some(a) = &args {
+        a as *const &[&str] as usize
+    } else {
+        0
+    };
+    let envs = if let Some(e) = &env {
+        e as *const &[&str] as usize
+    } else {
+        0
+    };
+    unsafe { syscall3(SYS_EXEC, &path as *const &str as usize, args, envs) }
 }
 
 pub fn waitpid(pid: usize) -> SyscallResult {

@@ -165,7 +165,7 @@ impl Task {
         task
     }
 
-    pub fn exec(&self, exe: DirEntryItem) -> ! {
+    pub fn exec(&self, exe: DirEntryItem, args: Option<&[&str]>, envs: Option<&[&str]>) -> ! {
         let vm = self.vm();
         vm.clear();
 
@@ -173,7 +173,7 @@ impl Task {
         self.set_locks(0);
 
         if let Some((entry, tls_vm)) = vm.load_bin(exe) {
-            unsafe { self.arch_task_mut().exec(entry, vm, tls_vm) }
+            unsafe { self.arch_task_mut().exec(entry, vm, tls_vm, args, envs) }
         } else {
             panic!("Failed to exec task")
         }

@@ -387,7 +387,7 @@ fn exec(cmd: &str) {
                 println!("Exec new shell with id: {}", id);
             }
             if id == 0 {
-                syscall::exec("/bin/shell").expect("Failed to exec shell");
+                syscall::exec("/bin/shell", None, None).expect("Failed to exec shell");
             } else {
                 syscall::exit();
             }
@@ -397,7 +397,8 @@ fn exec(cmd: &str) {
     } else if cmd == "hello" {
         if let Ok(id) = syscall::fork() {
             if id == 0 {
-                syscall::exec("/bin/hello").expect("Failed to exec hello");
+                syscall::exec("/bin/hello", Some(&["-arg1", "-arg2"]), None)
+                    .expect("Failed to exec hello");
             }
         } else {
             println!("fork failed");

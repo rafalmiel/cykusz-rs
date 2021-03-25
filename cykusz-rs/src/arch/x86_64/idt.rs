@@ -475,7 +475,12 @@ fn page_fault(frame: &mut idt::InterruptFrame, err: u64) {
         if task.handle_pagefault(reason, virt) {
             return;
         } else {
-            println!("[ SIGSEGV ] Task {} page_fault error", task.id());
+            println!(
+                "[ SIGSEGV ] Task {} page_fault error {} ip: {:#x}",
+                task.id(),
+                virt,
+                frame.ip
+            );
             task.signal(syscall_defs::signal::SIGSEGV);
 
             return;

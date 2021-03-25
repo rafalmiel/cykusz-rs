@@ -28,5 +28,5 @@ pub fn exec() -> ! {
     let shell =
         lookup_by_real_path(Path::new("/bin/shell"), LookupMode::None).expect("Shell not found");
 
-    crate::kernel::sched::exec(shell)
+    crate::kernel::sched::exec(shell, None, None)
 }

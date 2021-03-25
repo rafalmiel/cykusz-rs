@@ -2,13 +2,18 @@
 #include <iostream>
 #include <vector>
 #include <signal.h>
+#include <unistd.h>
 
 void int_handler(int sig) {
 	std::cout << "INT signal received" << std::endl;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 	//syscalln0(29);
+	//
+	for (int i = 0; i < argc; ++i) {
+		std::cout << "hello arg: " << argv[i] << std::endl;
+	}
 	
 	struct sigaction sact{};
 	sact.sa_handler = int_handler;
@@ -28,6 +33,10 @@ int main() {
 	}
 	std::cout << std::endl;
 
+	char* const args[3] = {"-arg1", "-arg2", nullptr};
+	char* const envs[1] = {nullptr};
+
+	execve("/bin/hello", nullptr, nullptr);
 	// Trigger SIGBUS for testing
 	*reinterpret_cast<int*>(0xABABABABABABABAB) = 0xdeadbeef;
 }

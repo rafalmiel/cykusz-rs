@@ -146,10 +146,10 @@ impl Scheduler {
         forked
     }
 
-    pub fn exec(&self, exe: DirEntryItem) -> ! {
+    pub fn exec(&self, exe: DirEntryItem, args: Option<&[&str]>, envs: Option<&[&str]>) -> ! {
         let current = self.sched.current_task();
 
-        current.exec(exe);
+        current.exec(exe, args, envs);
     }
 
     pub fn exit(&self) -> ! {
@@ -248,8 +248,8 @@ pub fn fork() -> Arc<Task> {
     scheduler().fork()
 }
 
-pub fn exec(exe: DirEntryItem) -> ! {
-    scheduler().exec(exe)
+pub fn exec(exe: DirEntryItem, args: Option<&[&str]>, envs: Option<&[&str]>) -> ! {
+    scheduler().exec(exe, args, envs)
 }
 
 pub fn close_all_tasks() {

@@ -613,6 +613,12 @@ pub fn sys_exec(path: u64, args: u64, envs: u64) -> SyscallResult {
         None
     };
 
+    if let Some(a) = args {
+        for a in a.iter() {
+            println!("arg: {}", a);
+        }
+    }
+
     let prog = lookup_by_path(Path::new(path), LookupMode::None)?;
 
     crate::kernel::sched::exec(prog, args, envs);
@@ -652,11 +658,17 @@ pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
     let uaddr = VirtAddr(uaddr as usize);
     let expected = expected as u32;
 
+    println!("[ FUTEX ] wait {} {}", uaddr, expected);
+
     crate::kernel::futex::futex().wait(uaddr, expected)
 }
 
 pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
     let uaddr = VirtAddr(uaddr as usize);
+
+    println!("[ FUTEX ] wake {} {}", uaddr, unsafe {
+        uaddr.read_volatile::<u32>()
+    });
 
     crate::kernel::futex::futex().wake(uaddr)
 }

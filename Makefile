@@ -19,9 +19,11 @@ rust_os := target/$(target)/release/libcykusz_rs.a
 user := target/$(target)/release/program
 kernel := build/kernel-$(arch).bin
 endif
-cross_gcc := sysroot/cross/bin/x86_64-cykusz-g++
+cross_cpp := sysroot/cross/bin/x86_64-cykusz-g++
+cross_c := sysroot/cross/bin/x86_64-cykusz-gcc
 cross_strip := sysroot/cross/bin/x86_64-cykusz-strip
 cross_hello := sysroot/build/hello
+cross_stack := sysroot/build/stack
 
 .PHONY: all clean run ata bochs iso toolchain fsck
 
@@ -87,16 +89,17 @@ else
 	RUST_TARGET_PATH=`pwd` xargo build --workspace --release --target $(target) --verbose
 endif
 
-toolchain: $(cross_gcc)
+toolchain: $(cross_cpp)
 	sysroot/build.sh check_build
 
 fsck:
 	sudo disk_scripts/fsck_disk.sh
 
-$(cross_gcc): toolchain
+$(cross_cpp): toolchain
 
-hello: $(cross_gcc) sysroot/hello.cpp
-	$(cross_gcc) sysroot/hello.cpp -o $(cross_hello)
+hello: $(cross_cpp) sysroot/hello.cpp sysroot/stack.c
+	$(cross_cpp) sysroot/hello.cpp -o $(cross_hello)
+	$(cross_c) sysroot/stack.c -o $(cross_stack)
 #	$(cross_strip) $(cross_hello)
 
 # compile assembly files

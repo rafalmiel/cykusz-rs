@@ -4,13 +4,26 @@
 #include <signal.h>
 #include <unistd.h>
 
+class TestCtr {
+	public:
+		TestCtr() {
+			std::cout << "Ctr()" << std::endl;
+		}
+
+		~TestCtr() {
+			std::cout << "~Ctr()" << std::endl;
+		}
+};
+
+static TestCtr TEST{};
+
 void int_handler(int sig) {
 	std::cout << "INT signal received" << std::endl;
 }
 
 int main(int argc, char *argv[]) {
-	//syscalln0(29);
-	//
+	syscalln0(29);
+
 	for (int i = 0; i < argc; ++i) {
 		std::cout << "hello arg: " << argv[i] << std::endl;
 	}
@@ -35,8 +48,4 @@ int main(int argc, char *argv[]) {
 
 	char* const args[3] = {"-arg1", "-arg2", nullptr};
 	char* const envs[1] = {nullptr};
-
-	execve("/bin/hello", nullptr, nullptr);
-	// Trigger SIGBUS for testing
-	*reinterpret_cast<int*>(0xABABABABABABABAB) = 0xdeadbeef;
 }

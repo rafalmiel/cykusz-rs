@@ -403,6 +403,15 @@ fn exec(cmd: &str) {
         } else {
             println!("fork failed");
         }
+    } else if cmd == "stack" {
+        if let Ok(id) = syscall::fork() {
+            if id == 0 {
+                syscall::exec("/bin/stack", Some(&["-arg1", "-arg2"]), Some(&["env1=TRUE", "env2=FALSE"]))
+                    .expect("Failed to exec hello");
+            }
+        } else {
+            println!("fork failed");
+        }
     } else if cmd == "mmap" {
         if let Ok(file) = syscall::open("/home/mmap.bin", OpenFlags::RDWR) {
             if let Ok(addr) = syscall::mmap(

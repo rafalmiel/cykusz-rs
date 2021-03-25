@@ -11,8 +11,8 @@ impl Args {
     pub fn from_ref(arg: &[&str]) -> Args {
         let mut vec = Vec::<String>::new();
 
-        for &a in arg.iter() {
-            vec.push(String::from(a));
+        for a in arg.iter() {
+            vec.push(String::from(*a));
         }
 
         Args { args: vec }

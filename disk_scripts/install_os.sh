@@ -15,6 +15,7 @@ mount /dev/loop0p2 mnt
 mkdir -p mnt/bin
 cp -f build/isofiles/boot/program mnt/bin/shell
 cp -f sysroot/build/hello mnt/bin/hello
+cp -f sysroot/build/stack mnt/bin/stack
 umount mnt
 
 losetup -D

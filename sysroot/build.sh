@@ -77,7 +77,7 @@ function _gcc {
 	pushd .
 
 	cd $GCC_BUILD_DIR
-	$GCC_SRC_DIR/configure --target=x86_64-cykusz --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++
+	$GCC_SRC_DIR/configure --target=x86_64-cykusz --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix
 
 	popd
 

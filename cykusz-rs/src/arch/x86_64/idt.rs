@@ -26,16 +26,16 @@ enum IrqHandler {
 }
 
 struct Irqs {
-    irqs: RwSpin<[IrqHandler; 256]>,
+    irqs: [RwSpin<IrqHandler>; 256],
 }
 
 impl Irqs {
     fn set_exception_handler(&self, idx: usize, f: ExceptionFn) {
-        let mut irqs = self.irqs.write_irq();
+        let mut irqs = self.irqs[idx].write_irq();
 
-        match irqs[idx] {
+        match *irqs {
             IrqHandler::Missing => {
-                irqs[idx] = IrqHandler::Exception(f);
+                *irqs = IrqHandler::Exception(f);
             }
             _ => {
                 panic!("Exception handler already exists");
@@ -44,11 +44,11 @@ impl Irqs {
     }
 
     fn set_exception_err_handler(&self, idx: usize, f: ExceptionErrFn) {
-        let mut irqs = self.irqs.write_irq();
+        let mut irqs = self.irqs[idx].write_irq();
 
-        match irqs[idx] {
+        match *irqs {
             IrqHandler::Missing => {
-                irqs[idx] = IrqHandler::ExceptionErr(f);
+                *irqs = IrqHandler::ExceptionErr(f);
             }
             _ => {
                 panic!("ExceptionErr handler already exists");
@@ -57,11 +57,11 @@ impl Irqs {
     }
 
     fn set_int_handler(&self, idx: usize, f: InterruptFn) {
-        let mut irqs = self.irqs.write_irq();
+        let mut irqs = self.irqs[idx].write_irq();
 
-        match irqs[idx] {
+        match *irqs {
             IrqHandler::Missing => {
-                irqs[idx] = IrqHandler::Interrupt(f);
+                *irqs = IrqHandler::Interrupt(f);
             }
             _ => {
                 panic!("Interrupt handler already exists");
@@ -70,13 +70,14 @@ impl Irqs {
     }
 
     fn set_shared_int_handler(&self, idx: usize, f: SharedInterruptFn) {
-        let mut irqs = self.irqs.write_irq();
+        let mut irqs = self.irqs[idx].write_irq();
+        println!("add shared {}", idx);
 
-        match &mut irqs[idx] {
+        match &mut *irqs {
             IrqHandler::Missing => {
                 let mut v = Vec::<SharedInterruptFn>::new();
                 v.push(f);
-                irqs[idx] = IrqHandler::SharedInterrupt(v);
+                *irqs = IrqHandler::SharedInterrupt(v);
             }
             IrqHandler::SharedInterrupt(v) => {
                 v.push(f);
@@ -88,9 +89,9 @@ impl Irqs {
     }
 
     fn remove_shared_int_handler(&self, idx: usize, handler: SharedInterruptFn) {
-        let mut irqs = self.irqs.write_irq();
+        let mut irqs = self.irqs[idx].write_irq();
 
-        if let IrqHandler::SharedInterrupt(h) = &mut irqs[idx] {
+        if let IrqHandler::SharedInterrupt(h) = &mut *irqs {
             if let Some(i) = h.iter().enumerate().find_map(|(i, e)| {
                 if *e == handler {
                     return Some(i);
@@ -196,9 +197,14 @@ pub extern "C" fn isr_handler(
     frame: &mut InterruptFrame,
     regs: &mut RegsFrame,
 ) {
-    let irqs = SHARED_IRQS.irqs.read();
+    let irqs = if int == 32 {
+        // Special case for local timer int
+        SHARED_IRQS.irqs[int].read_irq()
+    } else {
+        SHARED_IRQS.irqs[int].read()
+    };
 
-    match &irqs[int] {
+    match &*irqs {
         IrqHandler::Exception(e) => {
             e(frame);
         }
@@ -230,7 +236,7 @@ pub extern "C" fn isr_handler(
 }
 
 pub fn init() {
-    let mut idt = IDT.lock();
+    let mut idt = IDT.lock_irq();
 
     unsafe {
         for (i, &h) in interrupt_handlers.iter().enumerate() {
@@ -266,16 +272,16 @@ pub fn init() {
 }
 
 pub fn init_ap() {
-    let idt = IDT.lock();
+    let idt = IDT.lock_irq();
     idt.load();
 }
 
 pub fn has_handler(num: usize) -> bool {
     assert!(num <= 255);
 
-    let irqs = SHARED_IRQS.irqs.read();
+    let irqs = SHARED_IRQS.irqs[num].read_irq();
 
-    if let IrqHandler::Missing = irqs[num] {
+    if let IrqHandler::Missing = *irqs {
         false
     } else {
         true
@@ -284,11 +290,11 @@ pub fn has_handler(num: usize) -> bool {
 
 pub fn remove_handler(num: usize) -> bool {
     assert!(num <= 255);
-    let mut irqs = SHARED_IRQS.irqs.write_irq();
+    let mut irqs = SHARED_IRQS.irqs[num].write_irq();
 
-    match &irqs[num] {
+    match &mut *irqs {
         IrqHandler::Interrupt(_) | IrqHandler::ExceptionErr(_) | IrqHandler::Exception(_) => {
-            irqs[num] = IrqHandler::Missing;
+            *irqs = IrqHandler::Missing;
 
             true
         }
@@ -311,9 +317,9 @@ pub fn set_user_handler(num: usize, f: InterruptFn) {
 }
 
 static SHARED_IRQS: Irqs = {
-    const MISSING: IrqHandler = IrqHandler::Missing;
+    const MISSING: RwSpin<IrqHandler> = RwSpin::new(IrqHandler::Missing);
     Irqs {
-        irqs: RwSpin::new([MISSING; 256]),
+        irqs: [MISSING; 256],
     }
 };
 
@@ -481,9 +487,11 @@ fn page_fault(frame: &mut idt::InterruptFrame, err: u64) {
                 virt,
                 frame.ip
             );
-            task.signal(syscall_defs::signal::SIGSEGV);
+            if VirtAddr(frame.ip as usize).is_user() {
+                task.signal(syscall_defs::signal::SIGSEGV);
 
-            return;
+                return;
+            }
         }
     //println!("user pagefault failed");
     } else if reason.contains(PageFaultReason::PRESENT | PageFaultReason::WRITE) {

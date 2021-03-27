@@ -5,6 +5,7 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use intrusive_collections::LinkedListLink;
 
+use syscall_defs::exec::ExeArgs;
 use syscall_defs::signal::SIGCHLD;
 use syscall_defs::OpenFlags;
 
@@ -53,6 +54,7 @@ intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLi
 pub struct Task {
     arch_task: UnsafeCell<ArchTask>,
     id: usize,
+    gid: usize,
     on_cpu: AtomicUsize,
     parent: Spin<Option<Arc<Task>>>,
     children: Spin<intrusive_collections::LinkedList<TaskAdapter>>,
@@ -62,8 +64,8 @@ pub struct Task {
     locks: AtomicUsize,
     pending_io: AtomicBool,
     to_resched: AtomicBool,
-    filetable: filetable::FileTable,
-    vm: VM,
+    filetable: Arc<filetable::FileTable>,
+    vm: Arc<VM>,
     sleep_until: AtomicUsize,
     cwd: RwSpin<Option<Cwd>>,
     sref: Weak<Task>,
@@ -87,6 +89,7 @@ impl Task {
         let mut def = Task::default();
 
         def.id = id;
+        def.gid = id;
         def.on_cpu
             .store(unsafe { crate::CPU_ID } as usize, Ordering::SeqCst);
 
@@ -147,7 +150,7 @@ impl Task {
         task.arch_task = UnsafeCell::new(unsafe { self.arch_task().fork() });
 
         task.vm().fork(self.vm());
-        task.filetable = self.filetable.clone();
+        task.filetable = Arc::new(self.filetable.as_ref().clone());
         if let Some(e) = self.get_dent() {
             task.set_cwd(e);
         }
@@ -165,7 +168,7 @@ impl Task {
         task
     }
 
-    pub fn exec(&self, exe: DirEntryItem, args: Option<&[&str]>, envs: Option<&[&str]>) -> ! {
+    pub fn exec(&self, exe: DirEntryItem, args: Option<ExeArgs>, envs: Option<ExeArgs>) -> ! {
         let vm = self.vm();
         vm.clear();
 
@@ -177,6 +180,39 @@ impl Task {
         } else {
             panic!("Failed to exec task")
         }
+    }
+
+    pub fn spawn_thread(&self, entry: VirtAddr, user_stack: VirtAddr) -> Arc<Task> {
+        let mut thread = Task::new();
+
+        thread.arch_task =
+            UnsafeCell::new(unsafe { self.arch_task().fork_thread(entry.0, user_stack.0) });
+
+        let group_leader = if self.is_group_leader() {
+            self.me()
+        } else {
+            let group_leader = self
+                .get_parent()
+                .expect("Not a group leader parent missing?");
+
+            assert!(group_leader.is_group_leader(), "Parent not a group leader?");
+            group_leader
+        };
+
+        thread.gid = group_leader.id();
+        thread.filetable = group_leader.filetable.clone();
+        thread.vm = group_leader.vm.clone();
+        if let Some(d) = group_leader.get_dent() {
+            thread.set_cwd(d);
+        }
+        thread.signals = group_leader.signals.clone();
+
+        let thread = Self::make_ptr(thread);
+
+        thread.set_parent(Some(group_leader.clone()));
+        group_leader.add_child(thread.clone());
+
+        thread
     }
 
     fn me(&self) -> Arc<Task> {
@@ -327,6 +363,14 @@ impl Task {
         self.id
     }
 
+    pub fn gid(&self) -> usize {
+        self.gid
+    }
+
+    pub fn is_group_leader(&self) -> bool {
+        self.gid == self.id
+    }
+
     pub fn on_cpu(&self) -> usize {
         self.on_cpu.load(Ordering::SeqCst)
     }
@@ -380,7 +424,7 @@ impl Task {
         self.vm.handle_pagefault(reason, addr)
     }
 
-    pub fn vm(&self) -> &VM {
+    pub fn vm(&self) -> &Arc<VM> {
         &self.vm
     }
 

@@ -138,6 +138,7 @@ impl Queues {
         } else {
             if let Some(current) = self.current.as_ref() {
                 if current.state() == TaskState::Runnable {
+                    //println!("self {}", current.id());
                     self.switch(current, lock);
 
                     return;
@@ -155,6 +156,7 @@ impl Queues {
     }
 
     fn queue_task(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
+        //println!("queue task {}", task.id());
         self.push_runnable(task);
     }
 

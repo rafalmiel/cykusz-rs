@@ -4,6 +4,7 @@ mod types;
 
 extern crate rlibc;
 extern crate syscall_defs;
+#[macro_use]
 extern crate syscall_user as syscall;
 
 use core::alloc::{GlobalAlloc, Layout};
@@ -48,6 +49,16 @@ impl Heap {
         }
     }
 
+    fn print_debug(&self) {
+        println!(
+            "heap {:p} {:#x} {:#x} top: {:#x}",
+            self as *const _,
+            self.heap_start,
+            self.heap_end,
+            self.heap.top()
+        );
+    }
+
     fn alloc(&mut self, layout: Layout) -> *mut u8 {
         match self.heap.allocate_first_fit(layout) {
             Ok(a) => a.as_ptr(),
@@ -89,6 +100,10 @@ impl LockedHeap {
     fn init(&self) {
         self.0.lock().init()
     }
+
+    fn print_debug(&self) {
+        self.0.lock().print_debug();
+    }
 }
 
 unsafe impl GlobalAlloc for LockedHeap {
@@ -106,4 +121,8 @@ static HEAP: LockedHeap = LockedHeap(spin::Mutex::new(Heap::empty()));
 
 pub fn init() {
     HEAP.init();
+}
+
+pub fn print_debug() {
+    HEAP.print_debug();
 }

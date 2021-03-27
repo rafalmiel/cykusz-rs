@@ -1,8 +1,12 @@
+#![feature(new_uninit)]
 #![no_std]
 
 #[macro_use]
 extern crate bitflags;
 
+extern crate alloc;
+
+pub mod exec;
 pub mod ioctl;
 pub mod prctl;
 pub mod signal;
@@ -51,6 +55,7 @@ pub const SYS_FUTEX_WAIT: usize = 37;
 pub const SYS_FUTEX_WAKE: usize = 38;
 
 pub const SYS_ARCH_PRCTL: usize = 39;
+pub const SYS_SPAWN_THREAD: usize = 40;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SyscallError {

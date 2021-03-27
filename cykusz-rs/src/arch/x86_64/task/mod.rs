@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use core::mem::size_of;
 use core::ptr::Unique;
 
+use syscall_defs::exec::ExeArgs;
 use syscall_defs::{MMapFlags, MMapProt};
 
 use crate::arch::gdt;
@@ -263,6 +264,31 @@ impl Task {
         Unique::new_unchecked(ctx as *mut Context)
     }
 
+    unsafe fn fork_thread_ctx(
+        &self,
+        entry: usize,
+        user_stack: usize,
+        sp: usize,
+    ) -> Unique<Context> {
+        let mut sp = sp as u64;
+
+        let mut helper = StackHelper::new(&mut sp);
+
+        let sys_frame = helper.next::<SyscallFrame>();
+
+        sys_frame.rip = entry as u64;
+        sys_frame.rflags = 0x200;
+        sys_frame.rsp = user_stack as u64;
+
+        let ctx = helper.next::<Context>();
+
+        *ctx = Context::empty();
+        ctx.rip = asm_sysretq_forkinit as usize;
+        ctx.cr3 = self.cr3;
+
+        Unique::new_unchecked(ctx as *mut Context)
+    }
+
     fn new_sp(
         fun: usize,
         cs: SegmentSelector,
@@ -415,24 +441,33 @@ impl Task {
         }
     }
 
+    pub fn fork_thread(&self, entry: usize, user_stack: usize) -> Task {
+        let sp_top = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0;
+
+        let sp = sp_top + KERN_STACK_SIZE;
+
+        let new_ctx = unsafe { self.fork_thread_ctx(entry, user_stack, sp) };
+
+        Task {
+            ctx: new_ctx,
+            cr3: self.cr3,
+            stack_top: sp_top,
+            stack_size: KERN_STACK_SIZE,
+            user_stack: Some(user_stack),
+            user_fs_base: self.user_fs_base,
+        }
+    }
+
     pub fn exec(
         &mut self,
         entry: VirtAddr,
         vm: &VM,
         tls_vm: Option<TlsVmInfo>,
-        args: Option<&[&str]>,
-        envs: Option<&[&str]>,
+        args: Option<ExeArgs>,
+        envs: Option<ExeArgs>,
     ) -> ! {
-        let args = if let Some(a) = args {
-            Some(args::Args::from_ref(a))
-        } else {
-            None
-        };
-        let envs = if let Some(e) = envs {
-            Some(args::Args::from_ref(e))
-        } else {
-            None
-        };
+        let args = args.map(|a| args::Args::new(a));
+        let envs = envs.map(|e| args::Args::new(e));
 
         let p_table = if self.is_user() {
             let p_table = current_p4_table();
@@ -479,12 +514,12 @@ impl Task {
 
         if let Some(e) = envs {
             envp = e.write_strings(&mut helper);
-        }
+        };
         if let Some(a) = args {
             argp = a.write_strings(&mut helper);
         }
 
-        helper.align_down(); // align to 64 bytes
+        helper.align_down(); // align to 16 bytes
         unsafe {
             helper.write(0u64);
             helper.write_slice(envp.as_slice()); // char *const envp[]

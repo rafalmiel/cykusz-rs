@@ -174,6 +174,31 @@ impl WaitQueue {
 
         false
     }
+
+    pub fn notify_group(&self, gid: usize) -> bool {
+        let tasks = self.tasks.lock_irq();
+
+        let len = tasks.len();
+
+        if len == 0 {
+            return false;
+        }
+
+        let mut res = false;
+
+        for i in (0..len).rev() {
+            let t = tasks[i].clone();
+
+            if t.gid() == gid {
+                t.wake_up();
+
+                res = true;
+            }
+        }
+
+        return res;
+    }
+
     pub fn notify_one_debug(&self) -> bool {
         let tasks = self.tasks.lock_irq();
         let len = tasks.len();
@@ -184,6 +209,8 @@ impl WaitQueue {
 
         for i in (0..len).rev() {
             let t = tasks[i].clone();
+
+            println!("wake up {}", t.id());
 
             t.wake_up();
 
@@ -206,6 +233,28 @@ impl WaitQueue {
         for i in (0..len).rev() {
             let t = tasks[i].clone();
 
+            t.wake_up();
+
+            res = true;
+        }
+
+        res
+    }
+
+    pub fn notify_all_debug(&self) -> bool {
+        let tasks = self.tasks.lock_irq();
+        let len = tasks.len();
+
+        if len == 0 {
+            return false;
+        }
+
+        let mut res = false;
+
+        for i in (0..len).rev() {
+            let t = tasks[i].clone();
+
+            println!("wake up {}", t.id());
             t.wake_up();
 
             res = true;

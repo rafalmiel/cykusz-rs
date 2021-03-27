@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(llvm_asm)]
 
+use alloc::vec::Vec;
 use core::sync::atomic::AtomicU32;
 use syscall_defs::*;
 
@@ -303,17 +304,28 @@ pub fn fork() -> SyscallResult {
 }
 
 pub fn exec(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) -> SyscallResult {
-    let args = if let Some(a) = &args {
-        a as *const &[&str] as usize
+    let args = if let Some(args) = args {
+        syscall_defs::exec::into_syscall_slice(args)
     } else {
-        0
+        Vec::new()
     };
-    let envs = if let Some(e) = &env {
-        e as *const &[&str] as usize
+    let env = if let Some(env) = env {
+        syscall_defs::exec::into_syscall_slice(env)
     } else {
-        0
+        Vec::new()
     };
-    unsafe { syscall3(SYS_EXEC, &path as *const &str as usize, args, envs) }
+
+    unsafe {
+        syscall6(
+            SYS_EXEC,
+            path.as_ptr() as usize,
+            path.len(),
+            args.as_ptr() as usize,
+            args.len(),
+            env.as_ptr() as usize,
+            env.len(),
+        )
+    }
 }
 
 pub fn waitpid(pid: usize) -> SyscallResult {
@@ -367,6 +379,10 @@ pub fn futex_wake(val: &AtomicU32) -> SyscallResult {
 
 pub fn arch_prctl(cmd: syscall_defs::prctl::PrctlCmd, addr: usize) -> SyscallResult {
     unsafe { syscall2(SYS_ARCH_PRCTL, cmd as usize, addr) }
+}
+
+pub fn spawn_thread(entry: fn(usize) -> i32, stack: usize) -> SyscallResult {
+    unsafe { syscall2(SYS_SPAWN_THREAD, entry as usize, stack) }
 }
 
 pub fn poweroff() -> ! {

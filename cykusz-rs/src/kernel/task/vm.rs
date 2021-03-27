@@ -185,25 +185,7 @@ impl Mapping {
 
             true
         } else if reason.contains(PageFaultReason::WRITE) {
-            if let Some(phys) = addr_aligned.to_phys_pagewalk() {
-                if let Some(phys_page) = phys.to_phys_page() {
-                    // If there is more than one process mapping this page, make a private copy
-                    // Otherwise, this page is not shared with anyone, so just make it writable
-                    if phys_page.vm_use_count() > 1 {
-                        //println!("map: private copy");
-                        Self::map_copy(addr_aligned, addr_aligned, PAGE_SIZE, self.prot);
-                    } else {
-                        //println!("map: private mark read");
-                        if !update_flags(addr_aligned, PageFlags::USER | self.prot.into()) {
-                            panic!("Update flags failed");
-                        }
-                    };
-
-                    return true;
-                }
-            }
-
-            false
+            return self.handle_cow(addr_aligned, false, PAGE_SIZE);
         } else {
             false
         }
@@ -237,7 +219,9 @@ impl Mapping {
 
                         f.active_mappings.remove(&addr_aligned);
                     }
-                } else if reason.contains(PageFaultReason::WRITE) {
+                } else if reason.contains(PageFaultReason::WRITE)
+                    && !reason.contains(PageFaultReason::PRESENT)
+                {
                     // We are writing to private file mapping so copy the content of the page.
                     // Changes made to private mapping should not be persistent
 
@@ -247,7 +231,7 @@ impl Mapping {
 
                     f.active_mappings.remove(&addr_aligned);
                 } else {
-                    return false;
+                    return self.handle_cow(addr_aligned, true, bytes);
                 }
 
                 true
@@ -259,6 +243,26 @@ impl Mapping {
         } else {
             false
         }
+    }
+
+    fn handle_cow(&mut self, addr_aligned: VirtAddr, do_copy: bool, bytes: usize) -> bool {
+        if let Some(phys) = addr_aligned.to_phys_pagewalk() {
+            if let Some(phys_page) = phys.to_phys_page() {
+                // If there is more than one process mapping this page, make a private copy
+                // Otherwise, this page is not shared with anyone, so just make it writable
+                if phys_page.vm_use_count() > 1 || do_copy {
+                    Self::map_copy(addr_aligned, addr_aligned, bytes, self.prot);
+                } else {
+                    if !update_flags(addr_aligned, PageFlags::USER | self.prot.into()) {
+                        panic!("Update flags failed");
+                    }
+                };
+
+                return true;
+            }
+        }
+
+        false
     }
 
     fn handle_pf_shared_file(&mut self, reason: PageFaultReason, addr: VirtAddr) -> bool {

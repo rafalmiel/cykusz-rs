@@ -105,7 +105,7 @@ asm_sysretq:
 asm_sysretq_forkinit:
     call restore_user_fs
 
-    mov rax, 0
+    popAll
 
     jmp asm_sysretq
 

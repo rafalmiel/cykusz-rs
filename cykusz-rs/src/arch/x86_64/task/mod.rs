@@ -7,6 +7,7 @@ use syscall_defs::{MMapFlags, MMapProt};
 
 use crate::arch::gdt;
 use crate::arch::gdt::update_tss_rps0;
+use crate::arch::idt::RegsFrame;
 use crate::arch::mm::phys::{allocate_order, deallocate_order};
 use crate::arch::mm::virt::p4_table;
 use crate::arch::mm::virt::table::P4Table;
@@ -246,14 +247,26 @@ impl Task {
             .read_ref::<SyscallFrame>()
     }
 
+    unsafe fn syscall_regs(&self) -> &RegsFrame {
+        VirtAddr(
+            self.stack_top + self.stack_size - size_of::<SyscallFrame>() - size_of::<RegsFrame>(),
+        )
+        .read_ref::<RegsFrame>()
+    }
+
     unsafe fn fork_ctx(&self, sp: usize, cr3: usize) -> Unique<Context> {
         let parent_sys_frame = self.syscall_frame();
+        let parent_regs_frame = self.syscall_regs();
 
         let mut sp = sp as u64;
 
         let mut helper = StackHelper::new(&mut sp);
 
         *helper.next::<SyscallFrame>() = *parent_sys_frame;
+
+        let regs = helper.next::<RegsFrame>();
+        *regs = *parent_regs_frame;
+        regs.rax = 0;
 
         let ctx = helper.next::<Context>();
 

@@ -86,6 +86,7 @@ impl Queues {
         }
 
         unsafe {
+            let _guard = IrqGuard::new();
             switch!(&from, &self.sched_task);
         }
     }

@@ -25,7 +25,7 @@ impl<'a> StackHelper<'a> {
     }
 
     pub fn align_down(&mut self) {
-        *self.ptr = (*self.ptr).align_down(64);
+        *self.ptr = (*self.ptr).align_down(16);
     }
 
     pub unsafe fn write_bytes(&mut self, bytes: &[u8]) {

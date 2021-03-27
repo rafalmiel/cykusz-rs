@@ -3,6 +3,7 @@
 #include <vector>
 #include <signal.h>
 #include <unistd.h>
+#include <thread>
 
 class TestCtr {
 	public:
@@ -21,9 +22,13 @@ void int_handler(int sig) {
 	std::cout << "INT signal received" << std::endl;
 }
 
-int main(int argc, char *argv[]) {
-	syscalln0(29);
+void print_thread() {
+	std::cout << "Hello, from thread" << std::endl;
 
+	while(true){}
+}
+
+int main(int argc, char *argv[]) {
 	for (int i = 0; i < argc; ++i) {
 		std::cout << "hello arg: " << argv[i] << std::endl;
 	}
@@ -36,6 +41,8 @@ int main(int argc, char *argv[]) {
 
 	std::string input{};
 	std::cout << "Enter your name: ";
+
+	//std::thread thr{print_thread};
 
 	std::cin >> input;
 	std::cout << "Hello, " << input << "!" << std::endl;

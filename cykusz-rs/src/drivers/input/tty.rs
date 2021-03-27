@@ -239,7 +239,9 @@ impl KeyListener for Tty {
                     buf.put_char('\n' as u8);
                     buf.commit_write();
                 }
-                self.wait_queue.notify_one();
+                if let Some(t) = &*self.ctrl_task.lock() {
+                    self.wait_queue.notify_group(t.gid());
+                }
             }
             KeyCode::KEY_U if (state.lctrl || state.rctrl) && !released => {
                 use crate::arch::output::writer;

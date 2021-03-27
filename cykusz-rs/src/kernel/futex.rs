@@ -1,11 +1,13 @@
-use crate::kernel::mm::{PhysAddr, VirtAddr};
-use crate::kernel::utils::wait_queue::WaitQueue;
-use spin::Once;
-
-use crate::kernel::sync::Spin;
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU32, Ordering};
+
+use spin::Once;
+
 use syscall_defs::{SyscallError, SyscallResult};
+
+use crate::kernel::mm::{PhysAddr, VirtAddr};
+use crate::kernel::sync::Spin;
+use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub struct Futex {
     lock: Spin<()>,
@@ -81,7 +83,7 @@ impl FutexContainer {
 
                 Ok(0)
             } else {
-                Err(SyscallError::Inval)
+                Ok(0)
             }
         } else {
             Err(SyscallError::Inval)

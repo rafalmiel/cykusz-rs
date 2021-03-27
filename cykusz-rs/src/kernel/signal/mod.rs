@@ -1,8 +1,10 @@
 #![allow(dead_code)]
 
-use bit_field::BitField;
 use core::ops::{Index, IndexMut};
 use core::sync::atomic::{AtomicU64, Ordering};
+
+use bit_field::BitField;
+
 use syscall_defs::signal::SignalFlags;
 use syscall_defs::signal::SignalHandler;
 use syscall_defs::SyscallError;

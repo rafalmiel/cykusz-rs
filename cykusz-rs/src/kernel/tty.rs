@@ -1,12 +1,13 @@
+use alloc::collections::BTreeMap;
 use alloc::sync::{Arc, Weak};
+
+use spin::Once;
 
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::fs::{lookup_by_real_path, LookupMode};
 use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::task::Task;
-use alloc::collections::BTreeMap;
-use spin::Once;
 
 pub trait TerminalDevice: Send + Sync {
     fn id(&self) -> usize;

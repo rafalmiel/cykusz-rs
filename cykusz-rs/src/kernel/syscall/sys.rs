@@ -88,6 +88,7 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
+
     return if let Some(f) = task.get_handle(fd) {
         if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
             Ok(f.read(make_buf_mut(buf, len))?)
@@ -600,28 +601,43 @@ pub fn sys_fork() -> SyscallResult {
     Ok(child.id())
 }
 
-pub fn sys_exec(path: u64, args: u64, envs: u64) -> SyscallResult {
-    let path = unsafe { *(path as *const &str) };
-    let args = if args != 0 {
-        Some(unsafe { *(args as *const &[&str]) })
-    } else {
-        None
-    };
-    let envs = if envs != 0 {
-        Some(unsafe { *(envs as *const &[&str]) })
-    } else {
-        None
-    };
-
-    if let Some(a) = args {
-        for a in a.iter() {
-            println!("arg: {}", a);
-        }
-    }
+pub fn sys_exec(
+    path: u64,
+    path_len: u64,
+    args: u64,
+    args_len: u64,
+    envs: u64,
+    envs_len: u64,
+) -> SyscallResult {
+    let path = make_str(path, path_len);
 
     let prog = lookup_by_path(Path::new(path), LookupMode::None)?;
 
+    let args = if args_len > 0 {
+        Some(syscall_defs::exec::from_syscall_slice(
+            args as usize,
+            args_len as usize,
+        ))
+    } else {
+        None
+    };
+    let envs = if envs_len > 0 {
+        Some(syscall_defs::exec::from_syscall_slice(
+            envs as usize,
+            envs_len as usize,
+        ))
+    } else {
+        None
+    };
+
     crate::kernel::sched::exec(prog, args, envs);
+}
+
+pub fn sys_spawn_thread(entry: u64, stack: u64) -> SyscallResult {
+    let thread =
+        crate::kernel::sched::spawn_thread(VirtAddr(entry as usize), VirtAddr(stack as usize));
+
+    Ok(thread.id())
 }
 
 pub fn sys_waitpid(pid: u64) -> SyscallResult {

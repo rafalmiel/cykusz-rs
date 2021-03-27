@@ -375,7 +375,6 @@ fn exec(cmd: &str) {
     } else if cmd == "fork" {
         if let Ok(id) = syscall::fork() {
             if id > 0 {
-                println!("Forked shell id: {}", id);
                 syscall::exit();
             }
         } else {
@@ -406,8 +405,12 @@ fn exec(cmd: &str) {
     } else if cmd == "stack" {
         if let Ok(id) = syscall::fork() {
             if id == 0 {
-                syscall::exec("/bin/stack", Some(&["-arg1", "-arg2"]), Some(&["env1=TRUE", "env2=FALSE"]))
-                    .expect("Failed to exec hello");
+                syscall::exec(
+                    "/bin/stack",
+                    Some(&["-arg1", "-arg2"]),
+                    Some(&["env1=TRUE", "env2=FALSE"]),
+                )
+                .expect("Failed to exec hello");
             }
         } else {
             println!("fork failed");

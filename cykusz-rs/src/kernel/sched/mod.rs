@@ -4,7 +4,10 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use downcast_rs::DowncastSync;
 use spin::Once;
 
+use syscall_defs::exec::ExeArgs;
+
 use crate::kernel::fs::dirent::DirEntryItem;
+use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::round_robin::RRScheduler;
 use crate::kernel::sched::task_container::TaskContainer;
 use crate::kernel::signal::SignalResult;
@@ -146,10 +149,22 @@ impl Scheduler {
         forked
     }
 
-    pub fn exec(&self, exe: DirEntryItem, args: Option<&[&str]>, envs: Option<&[&str]>) -> ! {
+    pub fn exec(&self, exe: DirEntryItem, args: Option<ExeArgs>, envs: Option<ExeArgs>) -> ! {
         let current = self.sched.current_task();
 
         current.exec(exe, args, envs);
+    }
+
+    pub fn spawn_thread(&self, entry: VirtAddr, stack: VirtAddr) -> Arc<Task> {
+        let current = self.sched.current_task();
+
+        let thread = current.spawn_thread(entry, stack);
+
+        self.tasks.register_task(thread.clone());
+
+        self.sched.queue_task(thread.clone());
+
+        thread
     }
 
     pub fn exit(&self) -> ! {
@@ -248,8 +263,12 @@ pub fn fork() -> Arc<Task> {
     scheduler().fork()
 }
 
-pub fn exec(exe: DirEntryItem, args: Option<&[&str]>, envs: Option<&[&str]>) -> ! {
+pub fn exec(exe: DirEntryItem, args: Option<ExeArgs>, envs: Option<ExeArgs>) -> ! {
     scheduler().exec(exe, args, envs)
+}
+
+pub fn spawn_thread(entry: VirtAddr, stack: VirtAddr) -> Arc<Task> {
+    scheduler().spawn_thread(entry, stack)
 }
 
 pub fn close_all_tasks() {

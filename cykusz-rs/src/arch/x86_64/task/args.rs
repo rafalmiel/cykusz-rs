@@ -1,21 +1,16 @@
-use alloc::string::String;
 use alloc::vec::Vec;
+
+use syscall_defs::exec::ExeArgs;
 
 use crate::arch::utils::StackHelper;
 
 pub struct Args {
-    args: Vec<String>,
+    args: ExeArgs,
 }
 
 impl Args {
-    pub fn from_ref(arg: &[&str]) -> Args {
-        let mut vec = Vec::<String>::new();
-
-        for a in arg.iter() {
-            vec.push(String::from(*a));
-        }
-
-        Args { args: vec }
+    pub fn new(exe: ExeArgs) -> Args {
+        Args { args: exe }
     }
 
     pub fn write_strings(&self, helper: &mut StackHelper) -> Vec<u64> {
@@ -24,7 +19,7 @@ impl Args {
         for (_i, e) in self.args.iter().enumerate() {
             unsafe {
                 helper.write(0u8);
-                helper.write_bytes(e.as_bytes());
+                helper.write_bytes(e);
             }
 
             pos.push(helper.current());

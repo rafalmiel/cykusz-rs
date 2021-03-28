@@ -185,8 +185,10 @@ impl Mapping {
 
             true
         } else if reason.contains(PageFaultReason::WRITE) {
+            //println!("map: handle cow");
             return self.handle_cow(addr_aligned, false, PAGE_SIZE);
         } else {
+            //println!("map: present read fail");
             false
         }
     }
@@ -207,6 +209,8 @@ impl Mapping {
                     if bytes == PAGE_SIZE {
                         // Page is not present and we are reading from it, so map it readable
                         f.active_mappings.insert(addr_aligned, p.clone());
+
+                        //println!("map read {}", addr_aligned);
 
                         let mut flags: PageFlags = PageFlags::USER | self.prot.into();
                         flags.remove(PageFlags::WRITABLE);
@@ -230,7 +234,9 @@ impl Mapping {
                     Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
 
                     f.active_mappings.remove(&addr_aligned);
-                } else {
+                } else if reason.contains(PageFaultReason::PRESENT)
+                    && reason.contains(PageFaultReason::WRITE)
+                {
                     return self.handle_cow(addr_aligned, true, bytes);
                 }
 
@@ -594,8 +600,8 @@ impl VMData {
             let is_anonymous = map.flags.contains(MMapFlags::MAP_ANONYOMUS);
 
             //println!(
-            //    "page fault {} p {} a {} r {:?}",
-            //    addr, is_private, is_anonymous, reason
+            //    "page fault {} p {} a {} {:?} pid {}",
+            //    addr, is_private, is_anonymous, reason, current_task_ref().id(),
             //);
 
             return match (is_private, is_anonymous) {
@@ -610,6 +616,8 @@ impl VMData {
                 (true, true) => map.handle_pf_private_anon(reason, addr),
             };
         } else {
+            //println!("task {}: mmap not found", current_task_ref().id());
+            //self.print_vm();
             false
         }
     }
@@ -701,7 +709,7 @@ impl VMData {
     fn print_vm(&self) {
         for e in self.maps.iter() {
             println!(
-                "{} {}: {:?}, {:?} [ {} ]",
+                "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
                 e.start,
                 e.end,
                 e.prot,
@@ -710,7 +718,17 @@ impl VMData {
                     f.file.full_path()
                 } else {
                     String::from("")
-                }
+                },
+                if let Some(f) = &e.mmaped_file {
+                    f.starting_offset
+                } else {
+                    0
+                },
+                if let Some(f) = &e.mmaped_file {
+                    f.len
+                } else {
+                    0
+                },
             );
         }
     }

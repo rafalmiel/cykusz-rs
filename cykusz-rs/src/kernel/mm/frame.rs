@@ -16,7 +16,7 @@ impl Frame {
     pub fn clear(&mut self) {
         for a in (self.address_mapped()..self.address_mapped() + MappedAddr(PAGE_SIZE)).step_by(8) {
             unsafe {
-                a.store(0);
+                a.store(0u64);
             }
         }
     }

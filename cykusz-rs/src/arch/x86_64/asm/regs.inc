@@ -14,9 +14,13 @@
     push rcx
     push rbx
     push rax
+    mov rax, cr2
+    push rax
 %endmacro
 
 %macro popAll 0
+    pop rax
+    mov cr2, rax
     pop rax
     pop rbx
     pop rcx

@@ -12,8 +12,8 @@ use crate::kernel::task::vm::PageFaultReason;
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
 
-pub type ExceptionFn = fn(&mut InterruptFrame);
-pub type ExceptionErrFn = fn(&mut InterruptFrame, u64);
+pub type ExceptionFn = fn(&mut InterruptFrame, &mut RegsFrame);
+pub type ExceptionErrFn = fn(&mut InterruptFrame, &mut RegsFrame, u64);
 pub type InterruptFn = fn();
 pub type SharedInterruptFn = fn() -> bool;
 
@@ -173,6 +173,7 @@ extern "C" {
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct RegsFrame {
+    pub cr2: u64,
     pub rax: u64,
     pub rbx: u64,
     pub rcx: u64,
@@ -206,10 +207,10 @@ pub extern "C" fn isr_handler(
 
     match &*irqs {
         IrqHandler::Exception(e) => {
-            e(frame);
+            e(frame, regs);
         }
         IrqHandler::ExceptionErr(e) => {
-            e(frame, err as u64);
+            e(frame, regs, err as u64);
         }
         IrqHandler::Interrupt(e) => {
             e();
@@ -335,7 +336,7 @@ pub fn remove_shared_irq_handler(irq: usize, handler: SharedInterruptFn) {
     SHARED_IRQS.remove_shared_int_handler(irq, handler);
 }
 
-fn divide_by_zero(frame: &mut idt::InterruptFrame) {
+fn divide_by_zero(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
@@ -347,24 +348,24 @@ fn divide_by_zero(frame: &mut idt::InterruptFrame) {
     loop {}
 }
 
-fn debug(_frame: &mut idt::InterruptFrame) {
+fn debug(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     unsafe {
         println!("INT: Debug exception! CPU: {}", crate::CPU_ID);
     }
     loop {}
 }
 
-fn non_maskable_interrupt(_frame: &mut idt::InterruptFrame) {
+fn non_maskable_interrupt(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     println!("INT: Non Maskable Interrupt");
     loop {}
 }
 
-fn breakpoint(_frame: &mut idt::InterruptFrame) {
+fn breakpoint(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     println!("INT: Breakpoint!");
     loop {}
 }
 
-fn overflow(frame: &mut idt::InterruptFrame) {
+fn overflow(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
@@ -377,7 +378,7 @@ fn overflow(frame: &mut idt::InterruptFrame) {
     loop {}
 }
 
-fn bound_range_exceeded(frame: &mut idt::InterruptFrame) {
+fn bound_range_exceeded(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
@@ -390,11 +391,15 @@ fn bound_range_exceeded(frame: &mut idt::InterruptFrame) {
     loop {}
 }
 
-fn invalid_opcode(frame: &mut idt::InterruptFrame) {
+fn invalid_opcode(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGILL ] Task {} invalid_opcode error", task.id());
+        println!(
+            "[ SIGILL ] Task {} invalid_opcode error {:#x}",
+            task.id(),
+            frame.ip
+        );
         task.signal(syscall_defs::signal::SIGILL);
 
         return;
@@ -408,22 +413,22 @@ fn invalid_opcode(frame: &mut idt::InterruptFrame) {
     loop {}
 }
 
-fn device_not_available(_frame: &mut idt::InterruptFrame) {
+fn device_not_available(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     println!("Device Not Available error!");
     loop {}
 }
 
-fn double_fault(_frame: &mut idt::InterruptFrame, err: u64) {
+fn double_fault(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: u64) {
     println!("Double Fault error! 0x{:x}", err);
     loop {}
 }
 
-fn invalid_tss(_frame: &mut idt::InterruptFrame, err: u64) {
+fn invalid_tss(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: u64) {
     println!("Invalid TSS error! 0x{:x}", err);
     loop {}
 }
 
-fn segment_not_present(frame: &mut idt::InterruptFrame, err: u64) {
+fn segment_not_present(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: u64) {
     if frame.is_user() {
         let task = current_task_ref();
 
@@ -436,7 +441,7 @@ fn segment_not_present(frame: &mut idt::InterruptFrame, err: u64) {
     loop {}
 }
 
-fn stack_segment_fault(frame: &mut idt::InterruptFrame, err: u64) {
+fn stack_segment_fault(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: u64) {
     if frame.is_user() {
         let task = current_task_ref();
 
@@ -449,14 +454,16 @@ fn stack_segment_fault(frame: &mut idt::InterruptFrame, err: u64) {
     loop {}
 }
 
-fn general_protection_fault(frame: &mut idt::InterruptFrame, err: u64) {
+fn general_protection_fault(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: u64) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGBUS ] Task {} general_protecion error", task.id());
+        println!(
+            "[ SIGBUS ] Task {} general_protecion error {:#x}",
+            task.id(),
+            frame.ip
+        );
         task.signal(syscall_defs::signal::SIGBUS);
-
-        return;
     }
     println!(
         "General Protection Fault error! 0x{:x} frame: {:?}",
@@ -466,8 +473,8 @@ fn general_protection_fault(frame: &mut idt::InterruptFrame, err: u64) {
     loop {}
 }
 
-fn page_fault(frame: &mut idt::InterruptFrame, err: u64) {
-    let virt = VirtAddr(unsafe { crate::arch::raw::ctrlregs::cr2() });
+fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
+    let virt = VirtAddr(regs.cr2 as usize);
 
     let reason = PageFaultReason::from_bits_truncate(err as usize);
 
@@ -477,7 +484,7 @@ fn page_fault(frame: &mut idt::InterruptFrame, err: u64) {
 
         let task = current_task();
 
-        //println!("user pagefault {} {:?}", virt, reason);
+        //println!("user pagefault {} {:?} pid: {}", virt, reason, task.id());
         if task.handle_pagefault(reason, virt) {
             return;
         } else {
@@ -519,7 +526,7 @@ fn page_fault(frame: &mut idt::InterruptFrame, err: u64) {
     loop {}
 }
 
-fn x87_floating_point_exception(frame: &mut idt::InterruptFrame) {
+fn x87_floating_point_exception(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
@@ -532,7 +539,7 @@ fn x87_floating_point_exception(frame: &mut idt::InterruptFrame) {
     loop {}
 }
 
-fn alignment_check(frame: &mut idt::InterruptFrame, err: u64) {
+fn alignment_check(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: u64) {
     if frame.is_user() {
         let task = current_task_ref();
 
@@ -545,12 +552,12 @@ fn alignment_check(frame: &mut idt::InterruptFrame, err: u64) {
     loop {}
 }
 
-fn machine_check(_frame: &mut idt::InterruptFrame) {
+fn machine_check(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     println!("Machine Check error");
     loop {}
 }
 
-fn simd_floating_point_exception(frame: &mut idt::InterruptFrame) {
+fn simd_floating_point_exception(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
@@ -563,12 +570,12 @@ fn simd_floating_point_exception(frame: &mut idt::InterruptFrame) {
     loop {}
 }
 
-fn virtualisation_exception(_frame: &mut idt::InterruptFrame) {
+fn virtualisation_exception(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     println!("Virtualisation Exception!");
     loop {}
 }
 
-fn security_exception(_frame: &mut idt::InterruptFrame, err: u64) {
+fn security_exception(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: u64) {
     println!("Security Exception! 0x{:x}", err);
     loop {}
 }

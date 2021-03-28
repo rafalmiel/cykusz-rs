@@ -120,6 +120,7 @@ impl Queues {
 
         if let Some(to_run) = self.runnable.pop_front() {
             if let Some(current) = self.current.clone() {
+                //println!("{} -> {}", current.id(), to_run.id());
                 if !current.sched.is_linked() && current.id() != to_run.id() {
                     self.push_runnable(current);
                 }

@@ -74,7 +74,7 @@ asm_syscall_handler:
     pushAll
 
     mov rdi, rsp            ; Param: pointer to syscall frame
-    add rdi, 120
+    add rdi, 128
     mov rsi, rsp            ; Param: pointer to regs
 
     cld

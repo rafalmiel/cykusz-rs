@@ -60,10 +60,10 @@ isr_common:
     call update_kern_fs_base
 
     ; prepare parameters
-    mov rdi, qword [rsp + 120] ; int num value
-    mov rsi, qword [rsp + 128] ; err code value
+    mov rdi, qword [rsp + 128] ; int num value
+    mov rsi, qword [rsp + 136] ; err code value
     mov rdx, rsp              ; int frame ptr
-    add rdx, 136
+    add rdx, 144
     mov rcx, rsp              ; regs frame ptr
 
     sti

@@ -64,7 +64,7 @@ pub fn sys_arch_prctl(cmd: u64, addr: u64) -> SyscallResult {
             let addr = VirtAddr(addr as usize);
 
             if !addr.is_user() {
-                return Err(SyscallError::Inval);
+                return Err(SyscallError::EINVAL);
             }
 
             let task = current_task_ref();
@@ -76,6 +76,6 @@ pub fn sys_arch_prctl(cmd: u64, addr: u64) -> SyscallResult {
 
             Ok(0)
         }
-        PrctlCmd::Unknown => Err(SyscallError::Inval),
+        PrctlCmd::Unknown => Err(SyscallError::EINVAL),
     }
 }

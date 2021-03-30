@@ -33,7 +33,7 @@ impl From<SignalError> for FsError {
 impl From<SignalError> for SyscallError {
     fn from(s: SignalError) -> Self {
         match s {
-            SignalError::Interrupted => SyscallError::Interrupted,
+            SignalError::Interrupted => SyscallError::EINTR,
         }
     }
 }

@@ -18,15 +18,15 @@ pub enum FsError {
 impl From<FsError> for syscall_defs::SyscallError {
     fn from(e: FsError) -> Self {
         match e {
-            FsError::NotSupported => SyscallError::Access,
-            FsError::NotFile => SyscallError::NoEnt,
-            FsError::IsDir => SyscallError::IsDir,
-            FsError::NotDir => SyscallError::NotDir,
-            FsError::EntryNotFound => SyscallError::NoEnt,
-            FsError::EntryExists => SyscallError::Exists,
-            FsError::InvalidParam => SyscallError::Inval,
-            FsError::Busy => SyscallError::Busy,
-            FsError::Interrupted => SyscallError::Interrupted,
+            FsError::NotSupported => SyscallError::EACCES,
+            FsError::NotFile => SyscallError::ENOENT,
+            FsError::IsDir => SyscallError::EISDIR,
+            FsError::NotDir => SyscallError::ENOTDIR,
+            FsError::EntryNotFound => SyscallError::ENOENT,
+            FsError::EntryExists => SyscallError::EEXIST,
+            FsError::InvalidParam => SyscallError::EINVAL,
+            FsError::Busy => SyscallError::EBUSY,
+            FsError::Interrupted => SyscallError::EINTR,
         }
     }
 }

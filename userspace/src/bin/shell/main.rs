@@ -16,6 +16,7 @@ use chrono::{Datelike, Timelike};
 use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry, SyscallError};
 
 use crate::file::File;
+use alloc::vec::Vec;
 
 pub mod file;
 pub mod lang;
@@ -457,10 +458,18 @@ fn exec(cmd: &str) {
         }
     } else if cmd == "hello" {
         start_process("/bin/hello", None, None);
-    } else if cmd == "stack" {
+    } else if cmd.starts_with("stack") {
+        let mut split = cmd.split_whitespace();
+
+        let mut args = Vec::<&str>::new();
+
+        while let Some(a) = split.next() {
+            args.push(a);
+        }
+
         start_process(
             "/bin/stack",
-            Some(&["-arg1", "-arg2"]),
+            Some(args.as_slice()),
             Some(&["env1=TRUE", "env2=FALSE"]),
         );
     } else if cmd == "mmap" {
@@ -562,6 +571,7 @@ fn signal_test() {
     set_ready(false);
 }
 
+#[allow(dead_code)]
 fn sigchld_handler(_sig: usize) {
     let pid = syscall::waitpid(0);
 

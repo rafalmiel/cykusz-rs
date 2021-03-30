@@ -13,7 +13,7 @@ extern crate user_alloc;
 
 mod lang;
 
-fn spawn_shell() -> usize {
+fn spawn_shell() {
     if let Ok(pid) = syscall::fork() {
         if pid == 0 {
             let tty = syscall::open("/dev/tty", syscall_defs::OpenFlags::RDWR)
@@ -27,8 +27,6 @@ fn spawn_shell() -> usize {
             }
 
             unreachable!();
-        } else {
-            return pid;
         }
     } else {
         panic!("init: fork failed");

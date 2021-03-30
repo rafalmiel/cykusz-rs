@@ -172,7 +172,7 @@ impl Scheduler {
 
         self.tasks.remove_task(current.id());
 
-        current.migrate_children_to_parent();
+        current.migrate_children_to_init();
 
         self.sched.exit(0)
     }

@@ -41,8 +41,6 @@ extern "C" fn AcpiOsInstallInterruptHandler(
         return AE_BAD_PARAMETER;
     }
 
-    println!("adding acpi irq {}", InterruptNumber);
-
     if !has_handler(InterruptNumber as usize + 32) {
         let mut ctx = CTX.lock_irq();
 
@@ -58,7 +56,6 @@ extern "C" fn AcpiOsInstallInterruptHandler(
         set_irq_dest(InterruptNumber as u8, InterruptNumber as u8 + 32);
         add_shared_irq_handler(InterruptNumber as usize + 32, acpi_irq);
 
-        println!("added");
         AE_OK
     } else {
         AE_ALREADY_EXISTS

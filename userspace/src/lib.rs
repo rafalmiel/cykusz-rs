@@ -1,3 +1,16 @@
+#![no_std]
+#![feature(llvm_asm)]
+#![feature(lang_items)]
+#![feature(extended_key_value_attributes)]
+#![feature(linkage)]
+
+extern crate alloc;
+extern crate rlibc;
+extern crate syscall_defs;
+#[macro_use]
+extern crate syscall_user as syscall;
+extern crate user_alloc;
+
 use core::alloc::Layout;
 use core::panic::PanicInfo;
 
@@ -9,6 +22,10 @@ pub fn bochs() {
         llvm_asm!("xchg %bx, %bx");
     }
 }
+
+#[linkage = "weak"]
+#[no_mangle]
+pub fn main() {}
 
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {
@@ -28,7 +45,9 @@ pub extern "C" fn _start() -> ! {
 
     user_alloc::init();
 
-    super::main_cd()
+    main();
+
+    syscall::exit();
 }
 
 /// This function is called on panic.

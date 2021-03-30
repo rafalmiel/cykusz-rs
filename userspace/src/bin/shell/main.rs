@@ -1,15 +1,13 @@
 #![no_std]
 #![no_main]
 #![feature(llvm_asm)]
-#![feature(lang_items)]
 #![feature(thread_local)]
 
 extern crate alloc;
-extern crate rlibc;
+extern crate program;
 extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
-extern crate user_alloc;
 
 use chrono::{Datelike, Timelike};
 
@@ -19,7 +17,6 @@ use crate::file::File;
 use alloc::vec::Vec;
 
 pub mod file;
-pub mod lang;
 pub mod nc;
 
 #[thread_local]
@@ -134,9 +131,13 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
         if id == 0 {
             tty.attach();
             drop(tty);
-            syscall::exec(path, args, env).expect("Failed to exec hello");
+            if let Err(e) = syscall::exec(path, args, env) {
+                println!("shell: {:?}", e);
+            } else {
+                unreachable!();
+            }
 
-            unreachable!();
+            syscall::exit();
         } else {
             while let Err(SyscallError::EINTR) = syscall::waitpid(id) {}
         }
@@ -446,8 +447,6 @@ fn exec(cmd: &str) {
                 println!("Exec new shell with id: {}", id);
             }
             if id == 0 {
-                tty.attach();
-
                 drop(tty);
                 syscall::exec("/bin/shell", None, None).expect("Failed to exec shell");
             } else {
@@ -456,22 +455,6 @@ fn exec(cmd: &str) {
         } else {
             println!("fork failed");
         }
-    } else if cmd == "hello" {
-        start_process("/bin/hello", None, None);
-    } else if cmd.starts_with("stack") {
-        let mut split = cmd.split_whitespace();
-
-        let mut args = Vec::<&str>::new();
-
-        while let Some(a) = split.next() {
-            args.push(a);
-        }
-
-        start_process(
-            "/bin/stack",
-            Some(args.as_slice()),
-            Some(&["env1=TRUE", "env2=FALSE"]),
-        );
     } else if cmd == "mmap" {
         if let Ok(file) = syscall::open("/home/mmap.bin", OpenFlags::RDWR) {
             if let Ok(addr) = syscall::mmap(
@@ -540,10 +523,21 @@ fn exec(cmd: &str) {
     } else if cmd.is_empty() {
         return;
     } else {
-        println!(
-            "shell: {}: command not found",
-            cmd.split(" ").nth(0).unwrap()
-        );
+        let mut split = cmd.split_whitespace();
+
+        let mut args = Vec::<&str>::new();
+
+        while let Some(a) = split.next() {
+            args.push(a);
+        }
+
+        if !cmd.is_empty() {
+            start_process(
+                args[0],
+                Some(args.as_slice()),
+                Some(&["env1=TRUE", "env2=FALSE"]),
+            );
+        }
     }
 }
 
@@ -580,7 +574,13 @@ fn sigchld_handler(_sig: usize) {
     }
 }
 
-fn main_cd() -> ! {
+#[no_mangle]
+pub fn main() {
+    {
+        let tty = Tty::new();
+        tty.attach();
+    }
+
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGINT,
         syscall_defs::signal::SignalHandler::Handle(sigint_handler),
@@ -627,7 +627,7 @@ fn main_cd() -> ! {
 }
 
 #[allow(dead_code)]
-fn main() -> ! {
+fn main_old() -> ! {
     use file::*;
 
     loop {

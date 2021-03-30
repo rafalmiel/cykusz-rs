@@ -38,4 +38,8 @@ impl INode for DevNode {
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
         self.dev.inode().poll(ptable)
     }
+
+    fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
+        self.dev.inode().ioctl(cmd, arg)
+    }
 }

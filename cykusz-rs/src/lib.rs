@@ -44,7 +44,6 @@ pub mod arch;
 pub mod kernel;
 mod drivers;
 //mod externs;
-pub mod init_task;
 pub mod lang_items;
 
 #[thread_local]
@@ -145,7 +144,7 @@ fn init_task() {
     println!("[ OK ] Futexes Initialized");
 
     // Start shell on this cpu
-    init_task::exec()
+    crate::kernel::init::exec();
 }
 
 pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {

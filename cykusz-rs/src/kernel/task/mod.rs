@@ -162,7 +162,6 @@ impl Task {
         task.set_parent(Some(self.me()));
         self.add_child(task.clone());
 
-        self.terminal().try_transfer_to(task.clone());
         task.signals().copy_from(self.signals());
 
         task
@@ -432,9 +431,13 @@ impl Task {
         &self.signals
     }
 
-    pub fn signal(&self, sig: usize) {
+    pub fn signal(&self, sig: usize) -> bool {
         if self.signals.trigger(sig) {
             self.wake_up();
+
+            true
+        } else {
+            false
         }
     }
 
@@ -449,7 +452,7 @@ impl Task {
             parent.remove_child(self);
             self.set_parent(None);
 
-            self.terminal().try_transfer_to(parent.clone());
+            self.terminal().detach();
 
             parent.signal(SIGCHLD);
         }

@@ -1,6 +1,7 @@
 pub mod device;
 pub mod fs;
 pub mod futex;
+pub mod init;
 pub mod int;
 pub mod ipi;
 pub mod mm;

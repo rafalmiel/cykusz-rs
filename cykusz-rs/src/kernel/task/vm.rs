@@ -719,13 +719,7 @@ impl VMData {
                     f.len,
                 );
             } else {
-                println!(
-                    "{} {}: {:?}, {:?}",
-                    e.start,
-                    e.end,
-                    e.prot,
-                    e.flags,
-                );
+                println!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
             }
         }
     }

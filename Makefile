@@ -12,11 +12,13 @@ assembly_object_files := $(patsubst cykusz-rs/src/arch/$(arch)/asm/%.asm, \
 target ?= $(arch)-unknown-none-gnu
 ifdef dev
 rust_os := target/$(target)/debug/libcykusz_rs.a
-user := target/$(target)/debug/program
+rust_shell := target/$(target)/debug/shell
+rust_init := target/$(target)/debug/init
 kernel := build/kernel-$(arch)-g.bin
 else
 rust_os := target/$(target)/release/libcykusz_rs.a
-user := target/$(target)/release/program
+rust_shell := target/$(target)/release/shell
+rust_init := target/$(target)/release/init
 kernel := build/kernel-$(arch).bin
 endif
 cross_cpp := sysroot/cross/bin/x86_64-cykusz-g++
@@ -27,7 +29,7 @@ cross_stack := sysroot/build/stack
 
 .PHONY: all clean run ata bochs iso toolchain fsck
 
-all: $(kernel) $(user)
+all: $(kernel) $(rust_shell) $(rust_init)
 
 clean:
 	cargo clean
@@ -65,14 +67,14 @@ bochs: $(iso) $(disk)
 
 iso: $(iso)
 
-$(iso): $(kernel) $(grub_cfg) $(user)
+$(iso): $(kernel) $(grub_cfg) $(rust_shell)
 	mkdir -p build/isofiles/boot/grub
 	cp $(kernel) build/isofiles/boot/kernel.bin
 	cp $(grub_cfg) build/isofiles/boot/grub
-	cp $(user) build/isofiles/boot/program
+	cp $(rust_shell) build/isofiles/boot/program
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
-$(disk): $(iso) hello
+$(disk): $(rust_shell) $(rust_init) hello
 	sudo disk_scripts/install_os.sh
 
 $(vdi): $(disk)

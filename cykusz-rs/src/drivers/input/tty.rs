@@ -239,7 +239,7 @@ impl KeyListener for Tty {
                     buf.put_char('\n' as u8);
                     buf.commit_write();
                 }
-                if let Some(t) = &*self.ctrl_task.lock() {
+                if let Some(_t) = &*self.ctrl_task.lock() {
                     self.wait_queue.notify_all();
                 }
             }

@@ -238,9 +238,7 @@ impl SyscallFrom<isize> for SyscallResult {
         if e >= 0 {
             return Ok(e as usize);
         } else {
-            let e: SyscallError = unsafe {
-                core::mem::transmute((-e) as u64)
-            };
+            let e: SyscallError = unsafe { core::mem::transmute((-e) as u64) };
 
             Err(e)
         }

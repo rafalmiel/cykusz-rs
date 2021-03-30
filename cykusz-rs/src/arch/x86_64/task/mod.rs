@@ -293,6 +293,9 @@ impl Task {
         sys_frame.rflags = 0x200;
         sys_frame.rsp = user_stack as u64;
 
+        let regs = helper.next::<RegsFrame>();
+        *regs = RegsFrame::default();
+
         let ctx = helper.next::<Context>();
 
         *ctx = Context::empty();

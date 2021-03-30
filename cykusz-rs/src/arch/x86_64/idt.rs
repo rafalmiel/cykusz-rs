@@ -71,7 +71,6 @@ impl Irqs {
 
     fn set_shared_int_handler(&self, idx: usize, f: SharedInterruptFn) {
         let mut irqs = self.irqs[idx].write_irq();
-        println!("add shared {}", idx);
 
         match &mut *irqs {
             IrqHandler::Missing => {

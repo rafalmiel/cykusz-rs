@@ -246,39 +246,14 @@ impl Task {
         *self.parent.lock() = parent;
     }
 
-    pub fn migrate_children_to(&self, to: Arc<Task>) {
-        let mut old_list = self.children.lock();
+    pub fn migrate_children_to_init(&self) {
+        let parent = crate::kernel::init::init_task();
 
-        while let Some(child) = old_list.pop_back() {
-            child.set_parent(Some(to.clone()));
-            to.add_child(child);
-        }
+        let mut children = self.children.lock();
 
-        if let Some(parent) = self.get_parent() {
-            to.set_parent(Some(parent.clone()));
-            parent.add_child(to);
-
-            parent.remove_child(self);
-            self.set_parent(None);
-        }
-    }
-
-    pub fn migrate_children_to_parent(&self) {
-        if let Some(parent) = self.get_parent() {
-            let mut children = self.children.lock();
-
-            while let Some(child) = children.pop_back() {
-                child.set_parent(Some(parent.clone()));
-                parent.add_child(child);
-            }
-        } else {
-            let mut children = self.children.lock();
-
-            for child in children.iter() {
-                child.set_parent(None);
-            }
-
-            children.clear();
+        while let Some(child) = children.pop_back() {
+            child.set_parent(Some(parent.clone()));
+            parent.add_child(child);
         }
     }
 
@@ -452,10 +427,10 @@ impl Task {
             parent.remove_child(self);
             self.set_parent(None);
 
-            self.terminal().detach();
-
             parent.signal(SIGCHLD);
         }
+
+        self.terminal().detach();
 
         unsafe {
             self.arch_task_mut().deallocate();

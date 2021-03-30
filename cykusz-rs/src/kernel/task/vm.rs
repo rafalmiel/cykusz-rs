@@ -1,6 +1,5 @@
 use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
-use alloc::string::String;
 use core::ops::Range;
 
 use syscall_defs::{MMapFlags, MMapProt};
@@ -708,28 +707,26 @@ impl VMData {
 
     fn print_vm(&self) {
         for e in self.maps.iter() {
-            println!(
-                "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
-                e.start,
-                e.end,
-                e.prot,
-                e.flags,
-                if let Some(f) = &e.mmaped_file {
-                    f.file.full_path()
-                } else {
-                    String::from("")
-                },
-                if let Some(f) = &e.mmaped_file {
-                    f.starting_offset
-                } else {
-                    0
-                },
-                if let Some(f) = &e.mmaped_file {
-                    f.len
-                } else {
-                    0
-                },
-            );
+            if let Some(f) = &e.mmaped_file {
+                println!(
+                    "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
+                    e.start,
+                    e.end,
+                    e.prot,
+                    e.flags,
+                    f.file.full_path(),
+                    f.starting_offset,
+                    f.len,
+                );
+            } else {
+                println!(
+                    "{} {}: {:?}, {:?}",
+                    e.start,
+                    e.end,
+                    e.prot,
+                    e.flags,
+                );
+            }
         }
     }
 

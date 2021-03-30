@@ -13,16 +13,16 @@ pub fn bochs() {
 #[no_mangle] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {
     /* fd 0 stdin */
-    if syscall::fcntl(0, FcntlCmd::GetFL) == Err(SyscallError::BadFD) {
+    if syscall::fcntl(0, FcntlCmd::GetFL) == Err(SyscallError::EBADFD) {
         syscall::open("/dev/stdin", OpenFlags::RDONLY).expect("Failed to open /dev/stdin");
     }
     /* fd 1 stdout */
-    if syscall::fcntl(1, FcntlCmd::GetFL) == Err(SyscallError::BadFD) {
+    if syscall::fcntl(1, FcntlCmd::GetFL) == Err(SyscallError::EBADFD) {
         syscall::open("/dev/stdout", OpenFlags::WRONLY).expect("Failed to open /dev/stdout");
     }
 
     /* fd 2 stderr*/
-    if syscall::fcntl(2, FcntlCmd::GetFL) == Err(SyscallError::BadFD) {
+    if syscall::fcntl(2, FcntlCmd::GetFL) == Err(SyscallError::EBADFD) {
         syscall::open("/dev/stdout", OpenFlags::WRONLY).expect("Failed to open /dev/stdout");
     }
 

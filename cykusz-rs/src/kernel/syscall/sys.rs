@@ -32,7 +32,7 @@ fn make_str<'a>(b: u64, len: u64) -> &'a str {
 }
 
 pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
-    let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::Inval)?;
+    let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
         let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
@@ -40,7 +40,7 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
         let task = current_task_ref();
 
         if flags.contains(OpenFlags::DIRECTORY) && inode.inode().ftype()? != FileType::Dir {
-            return Err(SyscallError::NotDir);
+            return Err(SyscallError::ENOTDIR);
         }
 
         if flags.contains(OpenFlags::CREAT) {
@@ -52,10 +52,10 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
         if let Some(fd) = task.open_file(inode, flags) {
             return Ok(fd);
         } else {
-            Err(SyscallError::NoDev)
+            Err(SyscallError::ENODEV)
         }
     } else {
-        Err(SyscallError::Inval)
+        Err(SyscallError::EINVAL)
     }
 }
 
@@ -65,7 +65,7 @@ pub fn sys_close(fd: u64) -> SyscallResult {
     if task.close_file(fd as usize) {
         return Ok(0);
     } else {
-        return Err(SyscallError::BadFD);
+        return Err(SyscallError::EBADFD);
     }
 }
 
@@ -77,10 +77,10 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
         if f.flags.intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
             Ok(f.write(make_buf(buf, len))?)
         } else {
-            Err(SyscallError::Access)
+            Err(SyscallError::EACCES)
         }
     } else {
-        Err(SyscallError::BadFD)
+        Err(SyscallError::EBADFD)
     };
 }
 
@@ -93,10 +93,10 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
         if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
             Ok(f.read(make_buf_mut(buf, len))?)
         } else {
-            Err(SyscallError::Access)
+            Err(SyscallError::EACCES)
         }
     } else {
-        Err(SyscallError::BadFD)
+        Err(SyscallError::EBADFD)
     };
 }
 
@@ -110,10 +110,10 @@ pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
             if let Some(handle) = task.get_handle(fd as usize) {
                 Ok(handle.flags().bits())
             } else {
-                Err(SyscallError::BadFD)
+                Err(SyscallError::EBADFD)
             }
         }
-        FcntlCmd::Inval => Err(SyscallError::Inval),
+        FcntlCmd::Inval => Err(SyscallError::EINVAL),
     }
 }
 
@@ -129,18 +129,18 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
     let prot = if let Some(prot) = MMapProt::from_bits(prot as usize) {
         prot
     } else {
-        return Err(SyscallError::Inval);
+        return Err(SyscallError::EINVAL);
     };
     let flags = if let Some(flags) = MMapFlags::from_bits(flags as usize) {
         flags
     } else {
-        return Err(SyscallError::Inval);
+        return Err(SyscallError::EINVAL);
     };
     let file = if !flags.contains(MMapFlags::MAP_ANONYOMUS) {
         if let Some(file) = task.get_handle(fd as usize) {
             Some(file.inode.clone())
         } else {
-            return Err(SyscallError::Inval);
+            return Err(SyscallError::EINVAL);
         }
     } else {
         None
@@ -150,7 +150,7 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
     if let Some(res) = task.vm().mmap_vm(addr, len, prot, flags, file, offset) {
         Ok(res.0)
     } else {
-        Err(SyscallError::Fault)
+        Err(SyscallError::EFAULT)
     }
 }
 
@@ -162,7 +162,7 @@ pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
     if task.vm().munmap_vm(addr, len as usize) {
         Ok(0)
     } else {
-        Err(SyscallError::Fault)
+        Err(SyscallError::EFAULT)
     }
 }
 
@@ -189,12 +189,12 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
                 task.set_cwd(dentry);
                 return Ok(0);
             } else {
-                return Err(SyscallError::NotDir);
+                return Err(SyscallError::ENOTDIR);
             }
         }
     }
 
-    Err(SyscallError::Inval)
+    Err(SyscallError::EINVAL)
 }
 
 pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
@@ -202,13 +202,13 @@ pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
 
     if let Some(pwd) = current_task_ref().get_pwd() {
         if pwd.len() > len as usize {
-            Err(SyscallError::IO)
+            Err(SyscallError::EIO)
         } else {
             buf[..pwd.len()].copy_from_slice(pwd.as_bytes());
             Ok(pwd.len())
         }
     } else {
-        Err(SyscallError::Inval)
+        Err(SyscallError::EINVAL)
     }
 }
 
@@ -227,13 +227,13 @@ pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
                 inode.mkdir(name.str())?;
                 Ok(0)
             } else {
-                Err(SyscallError::Exists)
+                Err(SyscallError::EEXIST)
             }
         } else {
-            Err(SyscallError::NotDir)
+            Err(SyscallError::ENOTDIR)
         }
     } else {
-        Err(SyscallError::Inval)
+        Err(SyscallError::EINVAL)
     }
 }
 
@@ -244,7 +244,7 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
     return if let Some(f) = task.get_handle(fd) {
         Ok(f.get_dents(make_buf_mut(buf, len))?)
     } else {
-        Err(SyscallError::BadFD)
+        Err(SyscallError::EBADFD)
     };
 }
 
@@ -270,7 +270,7 @@ pub fn sys_symlink(
 
         Ok(0)
     } else {
-        Err(SyscallError::NotDir)
+        Err(SyscallError::ENOTDIR)
     }
 }
 
@@ -288,7 +288,7 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
 
         Ok(0)
     } else {
-        return Err(SyscallError::NotDir);
+        return Err(SyscallError::ENOTDIR);
     }
 }
 
@@ -308,7 +308,7 @@ pub fn sys_unlink(path: u64, path_len: u64) -> SyscallResult {
 
         Ok(0)
     } else {
-        return Err(SyscallError::Fault);
+        return Err(SyscallError::EFAULT);
     }
 }
 
@@ -327,13 +327,13 @@ pub fn sys_link(target: u64, target_len: u64, linkpath: u64, linkpath_len: u64) 
     };
 
     if Weak::as_ptr(&inode.fs().unwrap()) != Weak::as_ptr(&target_entry.inode().fs().unwrap()) {
-        return Err(SyscallError::Inval);
+        return Err(SyscallError::EINVAL);
     }
 
     if inode.ftype()? == FileType::Dir {
         inode.link(name.str(), target_entry.inode())?;
     } else {
-        return Err(SyscallError::NotDir);
+        return Err(SyscallError::ENOTDIR);
     }
 
     Ok(0)
@@ -352,11 +352,11 @@ pub fn sys_rename(oldpath: u64, oldpath_len: u64, newpath: u64, newpath_len: u64
     };
 
     if new.inode().fs().unwrap().as_ptr() != old.inode().fs().unwrap().as_ptr() {
-        return Err(SyscallError::Access);
+        return Err(SyscallError::EACCES);
     }
 
     if new.inode().ftype()? != FileType::Dir {
-        return Err(SyscallError::NotDir);
+        return Err(SyscallError::ENOTDIR);
     }
 
     if old.inode().ftype()? == FileType::Dir {
@@ -365,7 +365,7 @@ pub fn sys_rename(oldpath: u64, oldpath_len: u64, newpath: u64, newpath_len: u64
 
         while let Some(i) = c.clone() {
             if Arc::downgrade(&i).as_ptr() == Arc::downgrade(&old).as_ptr() {
-                return Err(SyscallError::Inval);
+                return Err(SyscallError::EINVAL);
             }
 
             c = i.parent();
@@ -395,16 +395,16 @@ pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResu
 
             Ok(core::mem::size_of::<Ip4>())
         } else {
-            Err(SyscallError::Fault)
+            Err(SyscallError::EFAULT)
         };
     }
 
-    Err(SyscallError::Inval)
+    Err(SyscallError::EINVAL)
 }
 
 pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
     let flags =
-        syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::Inval)?;
+        syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)?;
 
     let socket = if flags.contains(ConnectionFlags::UDP) {
         crate::kernel::net::socket::udp_bind(port as u32)
@@ -424,16 +424,16 @@ pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
         if let Some(fd) = task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR) {
             Ok(fd)
         } else {
-            Err(SyscallError::Fault)
+            Err(SyscallError::EFAULT)
         }
     } else {
-        Err(SyscallError::Busy)
+        Err(SyscallError::EBUSY)
     }
 }
 
 pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallResult {
     let flags =
-        syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::Inval)?;
+        syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)?;
 
     let host = Ip4::new(make_buf(host, host_len));
 
@@ -455,10 +455,10 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
         if let Some(fd) = task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR) {
             Ok(fd)
         } else {
-            Err(SyscallError::Fault)
+            Err(SyscallError::EFAULT)
         }
     } else {
-        Err(SyscallError::Busy)
+        Err(SyscallError::EBUSY)
     }
 }
 
@@ -525,7 +525,7 @@ pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
     if let Some(fd) = fd_found {
         Ok(fd)
     } else {
-        Err(SyscallError::Fault)
+        Err(SyscallError::EFAULT)
     }
 }
 
@@ -550,16 +550,16 @@ pub fn sys_mount(
                 if let Ok(_) = crate::kernel::fs::mount::mount(dest, fs) {
                     Ok(0)
                 } else {
-                    Err(SyscallError::Fault)
+                    Err(SyscallError::EFAULT)
                 }
             } else {
-                Err(SyscallError::Inval)
+                Err(SyscallError::EINVAL)
             }
         } else {
-            Err(SyscallError::NoDev)
+            Err(SyscallError::ENODEV)
         }
     } else {
-        Err(SyscallError::Inval)
+        Err(SyscallError::EINVAL)
     }
 }
 
@@ -652,7 +652,7 @@ pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
     if let Some(handle) = current.get_handle(fd as usize) {
         Ok(handle.inode.inode().ioctl(cmd as usize, arg as usize)?)
     } else {
-        Err(SyscallError::BadFD)
+        Err(SyscallError::EBADFD)
     }
 }
 
@@ -666,7 +666,7 @@ pub fn sys_sigaction(sig: u64, handler: u64, flags: u64, sigreturn: u64) -> Sysc
 
         Ok(0)
     } else {
-        Err(SyscallError::Inval)
+        Err(SyscallError::EINVAL)
     }
 }
 
@@ -704,7 +704,7 @@ pub fn sys_poweroff() -> ! {
 
 pub fn sys_reboot() -> SyscallResult {
     if !crate::arch::acpi::reboot() {
-        Err(SyscallError::NoEnt)
+        Err(SyscallError::ENOENT)
     } else {
         Ok(0)
     }

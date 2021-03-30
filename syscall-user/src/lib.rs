@@ -123,7 +123,7 @@ pub fn fcntl(fd: usize, cmd: FcntlCmd) -> Result<OpenFlags, SyscallError> {
             if let Some(fl) = OpenFlags::from_bits(r) {
                 Ok(fl)
             } else {
-                Err(SyscallError::Inval)
+                Err(SyscallError::EINVAL)
             }
         }
         Err(e) => Err(e),

@@ -72,7 +72,7 @@ impl FutexContainer {
                 Ok(0)
             }
         } else {
-            Err(SyscallError::Inval)
+            Err(SyscallError::EINVAL)
         }
     }
 
@@ -86,7 +86,7 @@ impl FutexContainer {
                 Ok(0)
             }
         } else {
-            Err(SyscallError::Inval)
+            Err(SyscallError::EINVAL)
         }
     }
 }

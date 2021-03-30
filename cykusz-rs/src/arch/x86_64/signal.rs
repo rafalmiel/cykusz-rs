@@ -79,7 +79,7 @@ pub extern "C" fn arch_sys_check_signals(
         if let syscall_defs::signal::SignalHandler::Handle(f) = entry.handler() {
             let res: SyscallResult = syscall_defs::SyscallFrom::syscall_from(syscall_result);
 
-            let restart = res == Err(SyscallError::Interrupted)
+            let restart = res == Err(SyscallError::EINTR)
                 && entry
                     .flags()
                     .contains(syscall_defs::signal::SignalFlags::RESTART);

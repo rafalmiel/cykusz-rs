@@ -240,7 +240,7 @@ impl KeyListener for Tty {
                     buf.commit_write();
                 }
                 if let Some(t) = &*self.ctrl_task.lock() {
-                    self.wait_queue.notify_group(t.gid());
+                    self.wait_queue.notify_all();
                 }
             }
             KeyCode::KEY_U if (state.lctrl || state.rctrl) && !released => {

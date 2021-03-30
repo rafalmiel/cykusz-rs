@@ -539,7 +539,7 @@ fn main_cd() -> ! {
     }
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGCHLD,
-        syscall_defs::signal::SignalHandler::Handle(sigchld_handler),
+        syscall_defs::signal::SignalHandler::Ignore,
         syscall_defs::signal::SignalFlags::RESTART,
     ) {
         println!("Failed to install signal handler: {:?}", e);

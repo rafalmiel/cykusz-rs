@@ -8,8 +8,8 @@ extern "C" fn eh_personality() {}
 #[cfg(not(test))]
 #[no_mangle]
 #[lang = "panic_impl"]
-pub fn panic_impl(pi: &PanicInfo) -> ! {
-    println!("PANIC: {:?}", pi);
+pub fn panic_impl(_pi: &PanicInfo) -> ! {
+    println!("PANIC: {:?}", unsafe { crate::CPU_ID });
     crate::idle()
 }
 

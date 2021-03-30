@@ -13,7 +13,8 @@ umount mnt
 
 mount /dev/loop0p2 mnt
 mkdir -p mnt/bin
-cp -f build/isofiles/boot/program mnt/bin/shell
+cp -f target/x86_64-unknown-none-gnu/release/init mnt/bin/init
+cp -f target/x86_64-unknown-none-gnu/release/shell mnt/bin/shell
 cp -f sysroot/build/hello mnt/bin/hello
 cp -f sysroot/build/stack mnt/bin/stack
 umount mnt

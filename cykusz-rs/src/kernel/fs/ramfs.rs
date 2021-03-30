@@ -222,6 +222,14 @@ impl INode for LockedRamINode {
             Err(FsError::EntryNotFound)
         }
     }
+
+    fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
+        if let Content::DevNode(Some(d)) = &self.0.read().content {
+            d.ioctl(cmd, arg)
+        } else {
+            Err(FsError::NotSupported)
+        }
+    }
 }
 
 impl LockedRamINode {

@@ -13,7 +13,7 @@ extern crate user_alloc;
 
 use chrono::{Datelike, Timelike};
 
-use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry};
+use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry, SyscallError};
 
 use crate::file::File;
 
@@ -90,6 +90,59 @@ fn base_10_bytes(mut n: u64, buf: &mut [u8]) -> &[u8] {
     let slice = &mut buf[..i];
     slice.reverse();
     &*slice
+}
+
+fn get_tty_fd() -> usize {
+    syscall::open("/dev/tty", OpenFlags::RDWR).expect("Failed to get tty fd")
+}
+
+struct Tty {
+    fd: usize,
+}
+
+impl Tty {
+    fn new() -> Tty {
+        Tty { fd: get_tty_fd() }
+    }
+
+    fn close(&self) {
+        syscall::close(self.fd).expect("Failed to close tty");
+    }
+
+    fn detach(&self) {
+        syscall::ioctl(self.fd, syscall_defs::ioctl::tty::TIOCNOTTY, 0)
+            .expect("Failed to detach tty");
+    }
+
+    fn attach(&self) {
+        syscall::ioctl(self.fd, syscall_defs::ioctl::tty::TIOCSCTTY, 0)
+            .expect("Failed to attach tty");
+    }
+}
+
+impl Drop for Tty {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
+fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
+    let tty = Tty::new();
+    tty.detach();
+    if let Ok(id) = syscall::fork() {
+        if id == 0 {
+            tty.attach();
+            drop(tty);
+            syscall::exec(path, args, env).expect("Failed to exec hello");
+
+            unreachable!();
+        } else {
+            while let Err(SyscallError::EINTR) = syscall::waitpid(id) {}
+        }
+    } else {
+        println!("fork failed");
+    }
+    tty.attach();
 }
 
 fn exec(cmd: &str) {
@@ -373,19 +426,28 @@ fn exec(cmd: &str) {
             }
         }
     } else if cmd == "fork" {
+        let tty = Tty::new();
+        tty.detach();
         if let Ok(id) = syscall::fork() {
             if id > 0 {
                 syscall::exit();
+            } else {
+                tty.attach();
             }
         } else {
             println!("fork failed");
         }
     } else if cmd == "exec" {
+        let tty = Tty::new();
+        tty.detach();
         if let Ok(id) = syscall::fork() {
             if id > 0 {
                 println!("Exec new shell with id: {}", id);
             }
             if id == 0 {
+                tty.attach();
+
+                drop(tty);
                 syscall::exec("/bin/shell", None, None).expect("Failed to exec shell");
             } else {
                 syscall::exit();
@@ -394,27 +456,13 @@ fn exec(cmd: &str) {
             println!("fork failed");
         }
     } else if cmd == "hello" {
-        if let Ok(id) = syscall::fork() {
-            if id == 0 {
-                syscall::exec("/bin/hello", Some(&["-arg1", "-arg2"]), None)
-                    .expect("Failed to exec hello");
-            }
-        } else {
-            println!("fork failed");
-        }
+        start_process("/bin/hello", None, None);
     } else if cmd == "stack" {
-        if let Ok(id) = syscall::fork() {
-            if id == 0 {
-                syscall::exec(
-                    "/bin/stack",
-                    Some(&["-arg1", "-arg2"]),
-                    Some(&["env1=TRUE", "env2=FALSE"]),
-                )
-                .expect("Failed to exec hello");
-            }
-        } else {
-            println!("fork failed");
-        }
+        start_process(
+            "/bin/stack",
+            Some(&["-arg1", "-arg2"]),
+            Some(&["env1=TRUE", "env2=FALSE"]),
+        );
     } else if cmd == "mmap" {
         if let Ok(file) = syscall::open("/home/mmap.bin", OpenFlags::RDWR) {
             if let Ok(addr) = syscall::mmap(

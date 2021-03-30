@@ -171,7 +171,7 @@ extern "C" {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct RegsFrame {
     pub cr2: u64,
     pub rax: u64,

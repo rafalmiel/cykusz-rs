@@ -291,6 +291,14 @@ pub fn enter_critical_section() -> bool {
     return false;
 }
 
+pub fn current_locks_var<'a>() -> Option<&'a AtomicUsize> {
+    if lock_protection_ready() {
+        Some(current_task_ref().locks_ref())
+    } else {
+        None
+    }
+}
+
 pub fn leave_critical_section() {
     if lock_protection_ready() {
         let current = scheduler().current_task();

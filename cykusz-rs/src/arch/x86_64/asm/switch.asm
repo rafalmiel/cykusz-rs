@@ -8,13 +8,16 @@ bits 64
 ; old = rdi
 ; new = rsi
 switch_to:
+    pushfq			; push regs to current ctx
+
+    cli
+
+    push rbp
     push r15
     push r14
     push r13
     push r12
     push rbx
-    push rbp
-    pushfq			; push regs to current ctx
 
     mov rax, cr3    ; Save CR3
     push rax
@@ -25,13 +28,14 @@ switch_to:
     pop rax         ; Restore CR3
     mov cr3, rax
 
-    popfq
-    pop rbp
     pop rbx
     pop r12
     pop r13
     pop r14
     pop r15
+    pop rbp
+
+    popfq
 
     ret
 

@@ -33,8 +33,6 @@ const KERN_STACK_ORDER: usize = 2;
 pub struct Context {
     /// Page Table pointer
     pub cr3: usize,
-    /// RFLAGS register
-    pub rflags: usize,
     /// RBX register
     pub rbp: usize,
     /// R12 register
@@ -47,6 +45,8 @@ pub struct Context {
     pub r15: usize,
     /// Base pointer
     pub rbx: usize,
+    /// RFLAGS register
+    pub rflags: usize,
     /// Instruction pointer
     pub rip: usize,
 }

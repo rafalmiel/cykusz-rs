@@ -66,7 +66,6 @@ asm_syscall_handler:
 
     swapgs
 
-    sti
     ; push rax - user stack pointer pushed earlier
     push rcx ; syscall frame
     push r11
@@ -80,12 +79,12 @@ asm_syscall_handler:
     cld
     call fast_syscall_handler
 
+    cli
     call restore_user_fs
 
     popAll
 
 asm_sysretq:
-    cli
 
     pop r11     ; Restore rflags
     pop rcx     ; Restore rip
@@ -103,6 +102,7 @@ asm_sysretq:
     o64 sysret
 
 asm_sysretq_forkinit:
+    cli
     call restore_user_fs
 
     popAll
@@ -110,6 +110,7 @@ asm_sysretq_forkinit:
     jmp asm_sysretq
 
 asm_sysretq_userinit:
+    cli
     call restore_user_fs
 
     jmp asm_sysretq
@@ -119,6 +120,7 @@ asm_jmp_user:
     push rsi    ; Param: entry
     push rdx    ; Param: rflags
 
+    cli
     call restore_user_fs
 
     pop r11

@@ -5,7 +5,7 @@ use core::hint::spin_loop as cpu_relax;
 use core::marker::Sync;
 use core::ops::{Deref, DerefMut, Drop};
 use core::option::Option::{self, None, Some};
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// This type provides MUTual EXclusion based on spinning.
 ///
@@ -134,6 +134,56 @@ impl<T: ?Sized> RawSpin<T> {
             }
         }
     }
+    fn obtain_lock_with_int(&self) {
+        let had_int = crate::kernel::int::is_enabled();
+
+        if !had_int {
+            self.obtain_lock();
+            return;
+        }
+
+        crate::kernel::int::disable();
+
+        while self
+            .lock
+            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Acquire)
+            .is_err()
+        {
+            crate::kernel::int::enable();
+            // Wait until the lock looks unlocked before retrying
+            while self.lock.load(Ordering::Relaxed) {
+                cpu_relax();
+            }
+            crate::kernel::int::disable();
+        }
+    }
+
+    fn obtain_lock_with_ref(&self, locks: &AtomicUsize) {
+        let had_int = crate::kernel::int::is_enabled();
+
+        if !had_int {
+            self.obtain_lock();
+            locks.fetch_add(1, Ordering::SeqCst);
+            return;
+        }
+
+        crate::kernel::int::disable();
+        while self
+            .lock
+            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Acquire)
+            .is_err()
+        {
+            crate::kernel::int::enable();
+            // Wait until the lock looks unlocked before retrying
+            while self.lock.load(Ordering::Relaxed) {
+                cpu_relax();
+            }
+            crate::kernel::int::disable();
+        }
+        locks.fetch_add(1, Ordering::SeqCst);
+
+        crate::kernel::int::enable();
+    }
 
     fn release_lock(&self) {
         self.lock.store(false, Ordering::Relaxed)
@@ -156,6 +206,20 @@ impl<T: ?Sized> RawSpin<T> {
     /// ```
     pub fn lock(&self) -> RawSpinGuard<T> {
         self.obtain_lock();
+        RawSpinGuard {
+            lock: &self.lock,
+            data: unsafe { &mut *self.data.get() },
+        }
+    }
+    pub fn lock_with_int(&self) -> RawSpinGuard<T> {
+        self.obtain_lock_with_int();
+        RawSpinGuard {
+            lock: &self.lock,
+            data: unsafe { &mut *self.data.get() },
+        }
+    }
+    pub fn lock_with_ref(&self, locks: &AtomicUsize) -> RawSpinGuard<T> {
+        self.obtain_lock_with_ref(locks);
         RawSpinGuard {
             lock: &self.lock,
             data: unsafe { &mut *self.data.get() },
@@ -186,6 +250,66 @@ impl<T: ?Sized> RawSpin<T> {
                 data: unsafe { &mut *self.data.get() },
             })
         } else {
+            None
+        }
+    }
+
+    pub fn try_lock_with_int(&self) -> Option<RawSpinGuard<T>> {
+        let had_int = crate::kernel::int::is_enabled();
+
+        if !had_int {
+            return self.try_lock();
+        }
+
+        crate::kernel::int::disable();
+
+        if self
+            .lock
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
+            .is_ok()
+        {
+            Some(RawSpinGuard {
+                lock: &self.lock,
+                data: unsafe { &mut *self.data.get() },
+            })
+        } else {
+            crate::kernel::int::enable();
+
+            None
+        }
+    }
+
+    pub fn try_lock_with_ref(&self, locks: &AtomicUsize) -> Option<RawSpinGuard<T>> {
+        let had_int = crate::kernel::int::is_enabled();
+
+        if !had_int {
+            let res = self.try_lock();
+
+            if res.is_some() {
+                locks.fetch_add(1, Ordering::SeqCst);
+            }
+
+            return res;
+        }
+
+        crate::kernel::int::disable();
+
+        if self
+            .lock
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Acquire)
+            .is_ok()
+        {
+            locks.fetch_add(1, Ordering::SeqCst);
+
+            crate::kernel::int::enable();
+
+            Some(RawSpinGuard {
+                lock: &self.lock,
+                data: unsafe { &mut *self.data.get() },
+            })
+        } else {
+            crate::kernel::int::enable();
+
             None
         }
     }

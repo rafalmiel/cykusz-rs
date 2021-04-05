@@ -107,7 +107,7 @@ impl Signals {
     pub fn trigger(&self, signal: usize) -> bool {
         assert!(signal < SIGNAL_COUNT);
 
-        let sigs = self.entries.lock();
+        let sigs = self.entries.lock_irq();
 
         let handler = sigs[signal].handler();
 
@@ -125,7 +125,7 @@ impl Signals {
     }
 
     pub fn clear(&self) {
-        *self.entries.lock() = Entries::default();
+        *self.entries.lock_irq() = Entries::default();
 
         self.pending_mask.store(0, Ordering::SeqCst);
     }
@@ -139,7 +139,7 @@ impl Signals {
     ) {
         assert!(signal < SIGNAL_COUNT);
 
-        let mut signals = self.entries.lock();
+        let mut signals = self.entries.lock_irq();
 
         signals[signal] = SignalEntry {
             handler,
@@ -149,7 +149,7 @@ impl Signals {
     }
 
     pub fn copy_from(&self, signals: &Signals) {
-        *self.entries.lock() = *signals.entries.lock();
+        *self.entries.lock() = *signals.entries.lock_irq();
 
         self.pending_mask.store(
             signals.pending_mask.load(Ordering::SeqCst),
@@ -165,19 +165,25 @@ impl Signals {
 pub fn do_signals() -> Option<(usize, SignalEntry)> {
     let task = current_task_ref();
 
+    if task.is_terminate_thread() {
+        crate::kernel::sched::exit_thread();
+    }
+
     let signals = task.signals();
 
     if !signals.has_pending() {
         return None;
     }
 
-    let pending = signals.pending();
+    let mut pending = signals.pending();
 
     for s in 0..SIGNAL_COUNT {
         if pending.get_bit(s) {
-            let entry = signals.entries.lock()[s];
+            let entry = signals.entries.lock_irq()[s];
 
-            signals.pending_mask.store(0, Ordering::SeqCst);
+            pending.set_bit(s, false);
+
+            signals.pending_mask.store(pending, Ordering::SeqCst);
 
             match entry.handler() {
                 SignalHandler::Default => {

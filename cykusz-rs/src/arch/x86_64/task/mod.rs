@@ -80,15 +80,13 @@ impl Context {
 }
 
 fn task_finished() {
-    crate::kernel::sched::task_finished();
+    crate::kernel::sched::exit();
 }
 
 fn prepare_p4<'a>() -> &'a mut P4Table {
     let current_p4 = current_p4_table();
-    let frame = allocate().expect("Out of mem!");
-    let new_p4 = P4Table::new_mut(&frame);
 
-    new_p4.clear();
+    let new_p4 = P4Table::new();
 
     // Map kernel code to the user space, don't care about intel exploits for now
     for i in 256..512 {
@@ -460,6 +458,9 @@ impl Task {
     pub fn fork_thread(&self, entry: usize, user_stack: usize) -> Task {
         let sp_top = allocate_order(KERN_STACK_ORDER).unwrap().address_mapped().0;
 
+        let p4 = p4_table(PhysAddr(self.cr3 as usize));
+        p4.ref_table();
+
         let sp = sp_top + KERN_STACK_SIZE;
 
         let new_ctx = unsafe { self.fork_thread_ctx(entry, user_stack, sp) };
@@ -487,7 +488,7 @@ impl Task {
 
         let p_table = if self.is_user() {
             let p_table = current_p4_table();
-            p_table.deallocate_user(false);
+            p_table.deallocate_user();
             p_table
         } else {
             prepare_p4()
@@ -553,12 +554,27 @@ impl Task {
     }
 
     pub fn deallocate(&mut self) {
-        let cr3 = unsafe { self.ctx.as_ref().cr3 };
+        let cr3 = self.cr3;
 
         self.ctx = Unique::dangling();
         if self.is_user() {
             let p4 = p4_table(PhysAddr(cr3));
-            p4.deallocate_user(true);
+            p4.deallocate_user();
+            p4.unref_table();
+        }
+        deallocate_order(
+            &Frame::new(MappedAddr(self.stack_top).to_phys()),
+            KERN_STACK_ORDER,
+        );
+        self.stack_top = 0;
+    }
+
+    pub fn deallocate_kernel(&mut self) {
+        let cr3 = self.cr3;
+
+        if self.is_user() {
+            let p4 = p4_table(PhysAddr(cr3));
+            p4.unref_table();
         }
         deallocate_order(
             &Frame::new(MappedAddr(self.stack_top).to_phys()),

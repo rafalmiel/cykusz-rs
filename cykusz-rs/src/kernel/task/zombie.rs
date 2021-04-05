@@ -33,8 +33,8 @@ impl Zombies {
             let mut cur = l.front_mut();
 
             while let Some(t) = cur.get() {
-                if t.id() == pid || pid == 0 {
-                    res = t.id();
+                if t.pid() == pid || pid == 0 {
+                    res = t.pid();
 
                     cur.remove();
 

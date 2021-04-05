@@ -131,7 +131,7 @@ impl Terminal {
                     if task.terminal().attach(t.clone()) {
                         *term = None;
                     } else {
-                        panic!("Failed to attach terminal to task {}", task.id());
+                        panic!("Failed to attach terminal to task {}", task.tid());
                     }
                 } else {
                     println!("detach failed");

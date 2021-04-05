@@ -14,6 +14,7 @@ use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{
     allocate_order, map_flags, map_to_flags, unmap, update_flags, VirtAddr, MAX_USER_ADDR,
 };
+
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 
@@ -600,7 +601,7 @@ impl VMData {
 
             //println!(
             //    "page fault {} p {} a {} {:?} pid {}",
-            //    addr, is_private, is_anonymous, reason, current_task_ref().id(),
+            //    addr.align_down(PAGE_SIZE), is_private, is_anonymous, reason, current_task_ref().tid(),
             //);
 
             return match (is_private, is_anonymous) {

@@ -11,6 +11,7 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::round_robin::RRScheduler;
 use crate::kernel::sched::task_container::TaskContainer;
 use crate::kernel::signal::SignalResult;
+use crate::kernel::sync::IrqGuard;
 use crate::kernel::task::Task;
 
 #[macro_export]
@@ -34,7 +35,7 @@ static NEW_TASK_ID: AtomicUsize = AtomicUsize::new(1);
 #[thread_local]
 static LOCK_PROTECTION: AtomicBool = AtomicBool::new(false);
 
-pub fn new_task_id() -> usize {
+pub fn new_task_tid() -> usize {
     NEW_TASK_ID.fetch_add(1, Ordering::SeqCst)
 }
 
@@ -43,12 +44,13 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn reschedule(&self) -> bool;
     fn current_task<'a>(&self) -> &'a Arc<Task>;
     fn current_id(&self) -> isize {
-        self.current_task().id() as isize
+        self.current_task().tid() as isize
     }
     fn queue_task(&self, task: Arc<Task>);
     fn sleep(&self, until: Option<usize>) -> SignalResult<()>;
     fn wake(&self, task: Arc<Task>);
     fn exit(&self, status: isize) -> !;
+    fn exit_thread(&self) -> !;
 }
 
 impl_downcast!(sync SchedulerInterface);
@@ -77,7 +79,7 @@ impl Scheduler {
     }
 
     pub fn current_id(&self) -> isize {
-        self.current_task().id() as isize
+        self.current_task().tid() as isize
     }
 
     pub fn reschedule(&self) -> bool {
@@ -168,13 +170,51 @@ impl Scheduler {
     }
 
     pub fn exit(&self) -> ! {
+        let _g = IrqGuard::new();
         let current = current_task_ref();
 
-        self.tasks.remove_task(current.id());
+        if current.is_process_leader() {
+            for c in current
+                .children()
+                .iter()
+                .filter(|t| t.pid() == current.pid())
+            {
+                c.terminate_thread();
+            }
 
-        current.migrate_children_to_init();
+            self.tasks.remove_task(current.tid());
 
-        self.sched.exit(0)
+            current.migrate_children_to_init();
+
+            self.sched.exit(0)
+        } else {
+            let leader = current.get_parent().expect("Thread has no parent");
+
+            for c in leader
+                .children()
+                .iter()
+                .filter(|t| t.pid() == current.pid() && t.tid() != current.tid())
+            {
+                c.terminate_thread();
+            }
+
+            leader.terminate_thread();
+
+            self.sched.exit_thread();
+        }
+    }
+
+    pub fn exit_thread(&self) -> ! {
+        let _g = IrqGuard::new();
+        let task = current_task_ref();
+
+        if task.is_process_leader() {
+            self.exit();
+        } else {
+            self.tasks.remove_task(task.tid());
+
+            self.sched.exit_thread();
+        }
     }
 }
 
@@ -235,8 +275,12 @@ pub fn current_id() -> isize {
     scheduler().current_id()
 }
 
-pub fn task_finished() -> ! {
+pub fn exit() -> ! {
     scheduler().exit()
+}
+
+pub fn exit_thread() -> ! {
+    scheduler().exit_thread();
 }
 
 pub fn create_task(fun: fn()) -> Arc<Task> {

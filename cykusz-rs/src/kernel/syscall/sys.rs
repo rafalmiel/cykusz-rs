@@ -15,6 +15,7 @@ use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::{current_task, current_task_ref};
+
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
@@ -580,7 +581,7 @@ pub fn sys_time() -> SyscallResult {
 }
 
 pub fn sys_exit() -> ! {
-    crate::kernel::sched::task_finished()
+    crate::kernel::sched::exit()
 }
 
 pub fn sys_sleep(time_ns: u64) -> SyscallResult {
@@ -598,7 +599,7 @@ pub fn sys_fork() -> SyscallResult {
     //crate::kernel::fs::pcache::cache().print_stats();
     let child = crate::kernel::sched::fork();
 
-    Ok(child.id())
+    Ok(child.tid())
 }
 
 pub fn sys_exec(
@@ -637,13 +638,25 @@ pub fn sys_spawn_thread(entry: u64, stack: u64) -> SyscallResult {
     let thread =
         crate::kernel::sched::spawn_thread(VirtAddr(entry as usize), VirtAddr(stack as usize));
 
-    Ok(thread.id())
+    Ok(thread.tid())
 }
 
 pub fn sys_waitpid(pid: u64) -> SyscallResult {
     let current = current_task_ref();
 
     Ok(current.wait_pid(pid as usize)?)
+}
+
+pub fn sys_getpid() -> SyscallResult {
+    Ok(current_task_ref().pid())
+}
+
+pub fn sys_gettid() -> SyscallResult {
+    Ok(current_task_ref().tid())
+}
+
+pub fn sys_exit_thread() -> ! {
+    crate::kernel::sched::exit_thread();
 }
 
 pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
@@ -674,7 +687,7 @@ pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
     let uaddr = VirtAddr(uaddr as usize);
     let expected = expected as u32;
 
-    println!("[ FUTEX ] wait {} {}", uaddr, expected);
+    //println!("[ FUTEX ] wait {} {} {}", uaddr, expected, crate::kernel::int::is_enabled());
 
     crate::kernel::futex::futex().wait(uaddr, expected)
 }
@@ -682,9 +695,9 @@ pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
 pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
     let uaddr = VirtAddr(uaddr as usize);
 
-    println!("[ FUTEX ] wake {} {}", uaddr, unsafe {
-        uaddr.read_volatile::<u32>()
-    });
+    //println!("[ FUTEX ] wake {} {}", uaddr, unsafe {
+    //    uaddr.read_volatile::<u32>()
+    //});
 
     crate::kernel::futex::futex().wake(uaddr)
 }

@@ -206,20 +206,20 @@ where
         )
     }
 
-    pub fn new_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
+    pub fn new_from_frame_mut<'a>(frame: &Frame) -> &'a mut Table<L> {
         Table::<L>::new_at_frame_mut(frame)
     }
 
-    pub fn new<'a>(frame: &Frame) -> &'a Table<L> {
+    pub fn new_from_frame<'a>(frame: &Frame) -> &'a Table<L> {
         Table::<L>::new_at_frame(frame)
     }
 
     pub fn new_mut_at_phys<'a>(addr: PhysAddr) -> &'a mut Table<L> {
-        Table::<L>::new_mut(&Frame::new(addr))
+        Table::<L>::new_from_frame_mut(&Frame::new(addr))
     }
 
     pub fn new_at_phys<'a>(addr: PhysAddr) -> &'a Table<L> {
-        Table::<L>::new(&Frame::new(addr))
+        Table::<L>::new_from_frame(&Frame::new(addr))
     }
 
     pub fn do_unmap(&mut self, idx: usize) -> bool {
@@ -331,6 +331,32 @@ impl Table<Level4> {
             Some(pp.lock_pt())
         } else {
             None
+        }
+    }
+
+    pub fn new<'a>() -> &'a mut Table<Level4> {
+        let table = Self::new_alloc();
+
+        table.clear();
+
+        table.ref_table();
+
+        table
+    }
+
+    pub fn ref_table(&self) {
+        if let Some(page) = self.phys_page() {
+            page.inc_vm_use_count();
+        }
+    }
+
+    pub fn unref_table(&self) {
+        if let Some(page) = self.phys_page() {
+            if page.dec_vm_use_count() == 0 {
+                let frame = Frame::new(self.phys_addr());
+
+                crate::kernel::mm::deallocate(&frame);
+            }
         }
     }
 
@@ -562,7 +588,7 @@ impl Table<Level4> {
         }
     }
 
-    pub fn deallocate_user(&mut self, clear_root: bool) {
+    pub fn deallocate_user(&mut self) {
         let _g = self.lock();
 
         let flags = Entry::PRESENT | Entry::USER;
@@ -586,18 +612,12 @@ impl Table<Level4> {
             e3.unref_phys_page();
             e3.clear();
         });
-
-        if clear_root {
-            let frame = Frame::new(self.phys_addr());
-
-            crate::kernel::mm::deallocate(&frame);
-        }
     }
 
     pub fn duplicate(&mut self) -> &P4Table {
         let _g = self.lock();
 
-        let new = P4Table::new_alloc();
+        let new = P4Table::new();
 
         for e in 256..512 {
             new.set_entry(e, self.entry_at(e));

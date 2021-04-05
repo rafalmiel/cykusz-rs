@@ -22,11 +22,11 @@ impl TaskContainer {
     }
 
     pub fn remove_task(&self, id: usize) {
-        self.tasks.lock().remove(&id).expect("not found");
+        self.tasks.lock().remove(&id);
     }
 
     pub fn register_task(&self, task: Arc<Task>) {
-        self.tasks.lock().insert(task.id(), task);
+        self.tasks.lock().insert(task.tid(), task);
     }
 
     pub fn close_all_tasks(&self) {

@@ -3,7 +3,7 @@ use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use intrusive_collections::LinkedListLink;
+use intrusive_collections::{LinkedList, LinkedListLink};
 
 use syscall_defs::exec::ExeArgs;
 use syscall_defs::signal::SIGCHLD;
@@ -13,9 +13,9 @@ use crate::arch::mm::VirtAddr;
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
-use crate::kernel::sched::new_task_id;
+use crate::kernel::sched::new_task_tid;
 use crate::kernel::signal::{SignalResult, Signals};
-use crate::kernel::sync::{RwSpin, Spin};
+use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
@@ -53,8 +53,10 @@ intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLi
 #[derive(Default)]
 pub struct Task {
     arch_task: UnsafeCell<ArchTask>,
-    id: usize,
-    gid: usize,
+    tid: usize,
+    pid: usize,
+    gid: AtomicUsize,
+    sid: AtomicUsize,
     on_cpu: AtomicUsize,
     parent: Spin<Option<Arc<Task>>>,
     children: Spin<intrusive_collections::LinkedList<TaskAdapter>>,
@@ -72,6 +74,7 @@ pub struct Task {
     signals: Arc<Signals>,
     terminal: Terminal,
     zombies: Zombies,
+    terminate_thread: AtomicBool,
 }
 
 unsafe impl Sync for Task {}
@@ -82,14 +85,17 @@ impl Task {
     }
 
     pub fn new() -> Task {
-        Self::new_with_id(new_task_id())
+        Self::new_with_id(new_task_tid())
     }
 
-    pub fn new_with_id(id: usize) -> Task {
+    pub fn new_with_id(tid: usize) -> Task {
         let mut def = Task::default();
 
-        def.id = id;
-        def.gid = id;
+        def.set_tid(tid);
+        def.set_pid(tid);
+        def.set_gid(tid);
+        def.set_sid(tid);
+
         def.on_cpu
             .store(unsafe { crate::CPU_ID } as usize, Ordering::SeqCst);
 
@@ -147,6 +153,9 @@ impl Task {
     pub fn fork(&self) -> Arc<Task> {
         let mut task = Task::new();
 
+        task.set_gid(self.gid());
+        task.set_sid(self.sid());
+
         task.arch_task = UnsafeCell::new(unsafe { self.arch_task().fork() });
 
         task.vm().fork(self.vm());
@@ -187,34 +196,40 @@ impl Task {
         thread.arch_task =
             UnsafeCell::new(unsafe { self.arch_task().fork_thread(entry.0, user_stack.0) });
 
-        let group_leader = if self.is_group_leader() {
+        let process_leader = if self.is_process_leader() {
             self.me()
         } else {
-            let group_leader = self
+            let process_leader = self
                 .get_parent()
                 .expect("Not a group leader parent missing?");
 
-            assert!(group_leader.is_group_leader(), "Parent not a group leader?");
-            group_leader
+            assert!(
+                process_leader.is_process_leader(),
+                "Parent not a process leader?"
+            );
+            process_leader
         };
 
-        thread.gid = group_leader.id();
-        thread.filetable = group_leader.filetable.clone();
-        thread.vm = group_leader.vm.clone();
-        if let Some(d) = group_leader.get_dent() {
+        thread.set_pid(process_leader.pid());
+        thread.set_gid(process_leader.gid());
+        thread.set_sid(process_leader.sid());
+
+        thread.filetable = process_leader.filetable.clone();
+        thread.vm = process_leader.vm.clone();
+        if let Some(d) = process_leader.get_dent() {
             thread.set_cwd(d);
         }
-        thread.signals = group_leader.signals.clone();
+        thread.signals = process_leader.signals().clone();
 
         let thread = Self::make_ptr(thread);
 
-        thread.set_parent(Some(group_leader.clone()));
-        group_leader.add_child(thread.clone());
+        thread.set_parent(Some(process_leader.clone()));
+        process_leader.add_child(thread.clone());
 
         thread
     }
 
-    fn me(&self) -> Arc<Task> {
+    pub fn me(&self) -> Arc<Task> {
         self.sref.upgrade().unwrap()
     }
 
@@ -246,14 +261,26 @@ impl Task {
         *self.parent.lock() = parent;
     }
 
+    pub fn children(&self) -> SpinGuard<LinkedList<TaskAdapter>> {
+        self.children.lock_irq()
+    }
+
     pub fn migrate_children_to_init(&self) {
         let parent = crate::kernel::init::init_task();
 
-        let mut children = self.children.lock();
+        let mut children = self.children.lock_irq();
 
-        while let Some(child) = children.pop_back() {
-            child.set_parent(Some(parent.clone()));
-            parent.add_child(child);
+        let mut cursor = children.cursor_mut();
+
+        while let Some(child) = cursor.get() {
+            if child.is_process_leader() {
+                child.set_parent(Some(parent.clone()));
+                parent.add_child(child.me());
+
+                cursor.remove();
+            } else {
+                cursor.move_next();
+            }
         }
     }
 
@@ -333,16 +360,60 @@ impl Task {
         self.locks.load(Ordering::SeqCst)
     }
 
-    pub fn id(&self) -> usize {
-        self.id
+    pub fn locks_ref(&self) -> &AtomicUsize {
+        &self.locks
+    }
+
+    pub fn tid(&self) -> usize {
+        self.tid
+    }
+
+    pub fn set_tid(&mut self, v: usize) {
+        self.tid = v;
+    }
+
+    pub fn pid(&self) -> usize {
+        self.pid
+    }
+
+    pub fn set_pid(&mut self, v: usize) {
+        self.pid = v;
     }
 
     pub fn gid(&self) -> usize {
-        self.gid
+        self.gid.load(Ordering::SeqCst)
+    }
+
+    pub fn set_gid(&self, v: usize) {
+        self.gid.store(v, Ordering::SeqCst);
+    }
+
+    pub fn sid(&self) -> usize {
+        self.sid.load(Ordering::SeqCst)
+    }
+
+    pub fn set_sid(&self, v: usize) {
+        self.sid.store(v, Ordering::SeqCst)
+    }
+
+    pub fn is_process_leader(&self) -> bool {
+        self.tid() == self.pid()
+    }
+
+    pub fn process_leader(&self) -> Arc<Task> {
+        if self.is_process_leader() {
+            self.me()
+        } else {
+            self.get_parent().unwrap()
+        }
     }
 
     pub fn is_group_leader(&self) -> bool {
-        self.gid == self.id
+        self.gid() == self.pid()
+    }
+
+    pub fn is_session_leader(&self) -> bool {
+        self.pid() == self.sid()
     }
 
     pub fn on_cpu(&self) -> usize {
@@ -364,7 +435,7 @@ impl Task {
             self.state(),
             TaskState::Runnable,
             "await_io assert, id: {}",
-            self.id()
+            self.tid()
         );
 
         res
@@ -407,7 +478,7 @@ impl Task {
     }
 
     pub fn signal(&self, sig: usize) -> bool {
-        if self.signals.trigger(sig) {
+        if self.signals().trigger(sig) {
             self.wake_up();
 
             true
@@ -420,20 +491,42 @@ impl Task {
         &self.terminal
     }
 
+    pub fn is_terminate_thread(&self) -> bool {
+        self.terminate_thread.load(Ordering::SeqCst)
+    }
+
+    pub fn terminate_thread(&self) {
+        self.terminate_thread.store(true, Ordering::SeqCst);
+
+        self.wake_up();
+    }
+
     pub fn make_zombie(&self) {
-        if let Some(parent) = self.get_parent() {
-            parent.zombies.add_zombie(self.me());
+        if self.is_process_leader() {
+            self.terminal().detach();
 
-            parent.remove_child(self);
-            self.set_parent(None);
+            if let Some(parent) = self.get_parent() {
+                parent.zombies.add_zombie(self.me());
 
-            parent.signal(SIGCHLD);
-        }
+                parent.remove_child(self);
+                self.set_parent(None);
 
-        self.terminal().detach();
+                parent.signal(SIGCHLD);
+            }
 
-        unsafe {
-            self.arch_task_mut().deallocate();
+            unsafe {
+                println!("deallocate thread {}", self.tid());
+                self.arch_task_mut().deallocate();
+            }
+        } else {
+            if let Some(parent) = self.get_parent() {
+                parent.remove_child(self);
+                self.set_parent(None);
+            }
+
+            unsafe {
+                self.arch_task_mut().deallocate_kernel();
+            }
         }
     }
 
@@ -443,5 +536,7 @@ impl Task {
 }
 
 impl Drop for Task {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        println!("drop task {}", self.tid());
+    }
 }

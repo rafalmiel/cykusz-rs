@@ -146,7 +146,7 @@ impl WaitQueue {
         if let Some(idx) = tasks.iter().enumerate().find_map(|e| {
             let t = e.1;
 
-            if t.id() == task.id() {
+            if t.tid() == task.tid() {
                 return Some(e.0);
             }
 
@@ -164,15 +164,11 @@ impl WaitQueue {
             return false;
         }
 
-        for i in (0..len).rev() {
-            let t = tasks[i].clone();
+        let t = tasks.first().unwrap();
 
-            t.wake_up();
+        t.wake_up();
 
-            return true;
-        }
-
-        false
+        return true;
     }
 
     pub fn notify_group(&self, gid: usize) -> bool {
@@ -186,7 +182,7 @@ impl WaitQueue {
 
         let mut res = false;
 
-        for i in (0..len).rev() {
+        for i in 0..len {
             let t = tasks[i].clone();
 
             if t.gid() == gid {
@@ -207,17 +203,13 @@ impl WaitQueue {
             return false;
         }
 
-        for i in (0..len).rev() {
-            let t = tasks[i].clone();
+        let t = tasks.first().unwrap();
 
-            println!("wake up {}", t.id());
+        println!("wake up {}", t.tid());
 
-            t.wake_up();
+        t.wake_up();
 
-            return true;
-        }
-
-        false
+        return true;
     }
 
     pub fn notify_all(&self) -> bool {
@@ -230,7 +222,7 @@ impl WaitQueue {
 
         let mut res = false;
 
-        for i in (0..len).rev() {
+        for i in 0..len {
             let t = tasks[i].clone();
 
             t.wake_up();
@@ -251,10 +243,10 @@ impl WaitQueue {
 
         let mut res = false;
 
-        for i in (0..len).rev() {
+        for i in 0..len {
             let t = tasks[i].clone();
 
-            println!("wake up {}", t.id());
+            println!("wake up {}", t.tid());
             t.wake_up();
 
             res = true;

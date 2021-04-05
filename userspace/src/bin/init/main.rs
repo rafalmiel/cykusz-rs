@@ -26,7 +26,7 @@ pub fn main() {
 
     loop {
         if let Ok(r) = syscall::waitpid(0) {
-            println!("init: child terminated: {}", r);
+            println!("[ init ]: child terminated: {}", r);
         }
     }
 }

@@ -42,7 +42,7 @@ impl PhysPage {
     }
 
     pub fn lock_pt(&self) -> SpinGuard<()> {
-        self.pt_lock.lock()
+        self.pt_lock.lock_irq()
     }
 
     pub fn unlink_page_cache(&self) {

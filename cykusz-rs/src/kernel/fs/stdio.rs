@@ -14,7 +14,7 @@ pub struct StdOut {
 
 impl INode for StdOut {
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
-        print!("{}", String::from_utf8_lossy(buf));
+        print!("{}", unsafe { core::str::from_utf8_unchecked(buf) });
         Ok(buf.len())
     }
 }

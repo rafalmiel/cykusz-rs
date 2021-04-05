@@ -385,6 +385,18 @@ pub fn spawn_thread(entry: fn(usize) -> i32, stack: usize) -> SyscallResult {
     unsafe { syscall2(SYS_SPAWN_THREAD, entry as usize, stack) }
 }
 
+pub fn exit_thread() -> SyscallResult {
+    unsafe { syscall0(SYS_EXIT_THREAD) }
+}
+
+pub fn getpid() -> SyscallResult {
+    unsafe { syscall0(SYS_GETPID) }
+}
+
+pub fn gettid() -> SyscallResult {
+    unsafe { syscall0(SYS_GETTID) }
+}
+
 pub fn poweroff() -> ! {
     unsafe {
         if let Err(e) = syscall0(SYS_POWEROFF) {

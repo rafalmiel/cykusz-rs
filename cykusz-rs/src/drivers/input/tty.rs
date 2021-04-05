@@ -306,7 +306,7 @@ impl TerminalDevice for Tty {
         let mut cur = self.ctrl_task.lock();
 
         if cur.is_none() {
-            println!("[ TTY ] Attached task {}", task.id());
+            println!("[ TTY ] Attached task {}", task.tid());
             *cur = Some(task);
 
             return true;
@@ -319,8 +319,8 @@ impl TerminalDevice for Tty {
         let mut ctrl = self.ctrl_task.lock();
 
         if let Some(cur) = ctrl.as_ref() {
-            if cur.id() == task.id() {
-                println!("[ TTY ] Detached task {}", cur.id());
+            if cur.tid() == task.tid() {
+                println!("[ TTY ] Detached task {}", cur.tid());
                 *ctrl = None;
 
                 return true;

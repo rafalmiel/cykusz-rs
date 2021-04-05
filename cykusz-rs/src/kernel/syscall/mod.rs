@@ -63,8 +63,11 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_FUTEX_WAKE => sys::sys_futex_wake(a),
         SYS_ARCH_PRCTL => crate::arch::syscall::sys_arch_prctl(a, b),
         SYS_SPAWN_THREAD => sys::sys_spawn_thread(a, b),
+        SYS_EXIT_THREAD => sys::sys_exit_thread(),
+        SYS_GETPID => sys::sys_getpid(),
+        SYS_GETTID => sys::sys_gettid(),
 
-        _ => Err(SyscallError::EINVAL),
+        _ => Err(SyscallError::ENOSYS),
     }
     .syscall_into()
 }

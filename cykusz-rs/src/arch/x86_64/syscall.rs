@@ -60,7 +60,7 @@ pub fn sys_arch_prctl(cmd: u64, addr: u64) -> SyscallResult {
 
     match cmd {
         PrctlCmd::ArchSetFs => {
-            println!("[ ARCH ] Set FS: {:#x}", addr);
+            //println!("[ ARCH ] Set FS: {:#x}", addr);
             let addr = VirtAddr(addr as usize);
 
             if !addr.is_user() {
@@ -71,6 +71,7 @@ pub fn sys_arch_prctl(cmd: u64, addr: u64) -> SyscallResult {
 
             unsafe {
                 let _guard = IrqGuard::new();
+                //print!("!");
                 task.arch_task_mut().update_user_fs(addr);
             }
 

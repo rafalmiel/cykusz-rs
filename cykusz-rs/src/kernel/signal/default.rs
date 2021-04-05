@@ -26,7 +26,7 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
 ];
 
 fn terminate() {
-    crate::kernel::sched::task_finished();
+    crate::kernel::sched::exit();
 }
 
 pub(in crate::kernel::signal) fn ignore_by_default(sig: usize) -> bool {

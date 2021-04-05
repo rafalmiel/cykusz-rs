@@ -1,9 +1,9 @@
 use crate::arch::raw::ctrlregs;
 use crate::arch::raw::mm;
-use crate::kernel::mm::allocate;
+use crate::kernel::mm::{PhysAddr, VirtAddr};
+
 use crate::kernel::mm::virt;
 use crate::kernel::mm::PAGE_SIZE;
-use crate::kernel::mm::{PhysAddr, VirtAddr};
 
 use self::table::*;
 
@@ -85,10 +85,7 @@ pub unsafe fn activate_table(table: &P4Table) {
 }
 
 fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
-    let frame = allocate().expect("Out of mem!");
-    let table = P4Table::new_mut(&frame);
-
-    table.clear();
+    let table = P4Table::new();
 
     for elf in mboot_info.elf_tag().unwrap().sections() {
         let s = elf.address().align_down(PAGE_SIZE);

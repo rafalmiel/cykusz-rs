@@ -522,6 +522,10 @@ fn exec(cmd: &str) {
         signal_test();
     } else if cmd.is_empty() {
         return;
+    } else if cmd == "hello_test" {
+        for _ in 0..50 {
+            start_process("/bin/hello", Some(&["hello"]), None);
+        }
     } else {
         let mut split = cmd.split_whitespace();
 

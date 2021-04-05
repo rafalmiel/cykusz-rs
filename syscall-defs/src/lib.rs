@@ -56,6 +56,9 @@ pub const SYS_FUTEX_WAKE: usize = 38;
 
 pub const SYS_ARCH_PRCTL: usize = 39;
 pub const SYS_SPAWN_THREAD: usize = 40;
+pub const SYS_EXIT_THREAD: usize = 41;
+pub const SYS_GETPID: usize = 42;
+pub const SYS_GETTID: usize = 43;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

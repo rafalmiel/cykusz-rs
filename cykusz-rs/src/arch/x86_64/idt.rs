@@ -352,7 +352,7 @@ fn divide_by_zero(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGFPE ] Task {} divide_by_zero error", task.id());
+        println!("[ SIGFPE ] Task {} divide_by_zero error", task.tid());
         task.signal(syscall_defs::signal::SIGFPE);
 
         return;
@@ -381,7 +381,7 @@ fn overflow(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGFPE ] Task {} overflow error", task.id());
+        println!("[ SIGFPE ] Task {} overflow error", task.tid());
         task.signal(syscall_defs::signal::SIGFPE);
 
         return;
@@ -394,7 +394,7 @@ fn bound_range_exceeded(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) 
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGSEGV ] Task {} bound range exceeded error", task.id());
+        println!("[ SIGSEGV ] Task {} bound range exceeded error", task.tid());
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -409,7 +409,7 @@ fn invalid_opcode(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
 
         println!(
             "[ SIGILL ] Task {} invalid_opcode error {:#x}",
-            task.id(),
+            task.tid(),
             frame.ip
         );
         task.signal(syscall_defs::signal::SIGILL);
@@ -444,7 +444,7 @@ fn segment_not_present(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, e
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGSEGV ] Task {} segment_not_present error", task.id());
+        println!("[ SIGSEGV ] Task {} segment_not_present error", task.tid());
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -457,7 +457,7 @@ fn stack_segment_fault(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, e
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGSEGV ] Task {} stack_segment error", task.id());
+        println!("[ SIGSEGV ] Task {} stack_segment error", task.tid());
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -472,7 +472,7 @@ fn general_protection_fault(frame: &mut idt::InterruptFrame, _regs: &mut RegsFra
 
         println!(
             "[ SIGBUS ] Task {} general_protecion error {:#x}",
-            task.id(),
+            task.tid(),
             frame.ip
         );
         task.signal(syscall_defs::signal::SIGBUS);
@@ -496,13 +496,13 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
 
         let task = current_task();
 
-        //println!("user pagefault {} {:?} pid: {}", virt, reason, task.id());
+        //println!("user pagefault {:#x} {} {:?} pid: {}", frame.ip, virt, reason, task.tid());
         if task.handle_pagefault(reason, virt) {
             return;
         } else {
             println!(
                 "[ SIGSEGV ] Task {} page_fault error {} ip: {:#x}",
-                task.id(),
+                task.tid(),
                 virt,
                 frame.ip
             );
@@ -542,7 +542,7 @@ fn x87_floating_point_exception(frame: &mut idt::InterruptFrame, _regs: &mut Reg
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGSEGV ] Task {} x87_floating_point error", task.id());
+        println!("[ SIGSEGV ] Task {} x87_floating_point error", task.tid());
         task.signal(syscall_defs::signal::SIGFPE);
 
         return;
@@ -555,7 +555,7 @@ fn alignment_check(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: 
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGBUS ] Task {} alignment_check error", task.id());
+        println!("[ SIGBUS ] Task {} alignment_check error", task.tid());
         task.signal(syscall_defs::signal::SIGBUS);
 
         return;
@@ -573,7 +573,7 @@ fn simd_floating_point_exception(frame: &mut idt::InterruptFrame, _regs: &mut Re
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGFPE ] Task {} simd_floating_point error", task.id());
+        println!("[ SIGFPE ] Task {} simd_floating_point error", task.tid());
         task.signal(syscall_defs::signal::SIGFPE);
 
         return;

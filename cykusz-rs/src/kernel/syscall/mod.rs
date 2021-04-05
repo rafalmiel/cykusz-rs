@@ -8,8 +8,22 @@ pub fn init_ap() {
     crate::arch::syscall::init_ap();
 }
 
+fn conditional_enable_int(sys: usize) {
+    use syscall_defs::*;
+    match sys {
+        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT => {
+            return;
+        }
+        _ => {
+            crate::kernel::int::enable();
+        }
+    }
+}
+
 #[allow(unused_variables)]
 pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> isize {
+    conditional_enable_int(num as usize);
+
     use syscall_defs::*;
     match num as usize {
         SYS_READ => sys::sys_read(a, b, c),

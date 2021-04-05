@@ -6,18 +6,17 @@ use spin::Once;
 use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::mm::{PhysAddr, VirtAddr};
+
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub struct Futex {
-    lock: Spin<()>,
     wq: WaitQueue,
 }
 
 impl Futex {
     fn new() -> Futex {
         Futex {
-            lock: Spin::new(()),
             wq: WaitQueue::new(),
         }
     }
@@ -54,24 +53,28 @@ impl FutexContainer {
 
     pub fn wait(&self, addr: VirtAddr, expected: u32) -> SyscallResult {
         if let Some(phys) = addr.to_phys_pagewalk() {
-            let futex = self.get_alloc(phys);
-
             let atom = unsafe { addr.read_ref::<AtomicU32>() };
 
-            let res = futex
-                .wq
-                .wait_lock_for(&futex.lock, |_l| atom.load(Ordering::SeqCst) == expected);
+            if atom.load(Ordering::SeqCst) == expected {
+                let futex = self.get_alloc(phys);
 
-            if futex.wq.is_empty() {
-                self.fut.lock().remove(&phys);
-            }
+                let res = futex.wq.wait();
 
-            if let Err(e) = res {
-                Err(e.into())
+                if futex.wq.is_empty() {
+                    self.fut.lock().remove(&phys);
+                }
+
+                if let Err(e) = res {
+                    Err(e.into())
+                } else {
+                    Ok(0)
+                }
             } else {
-                Ok(0)
+                println!("futex eagain");
+                Err(SyscallError::EAGAIN)
             }
         } else {
+            println!("futex einval");
             Err(SyscallError::EINVAL)
         }
     }
@@ -79,8 +82,9 @@ impl FutexContainer {
     pub fn wake(&self, addr: VirtAddr) -> SyscallResult {
         if let Some(phys) = addr.to_phys_pagewalk() {
             if let Some(futex) = self.get(phys) {
-                futex.wq.notify_all();
-
+                if futex.wq.notify_all() {
+                    crate::kernel::sched::reschedule();
+                }
                 Ok(0)
             } else {
                 Ok(0)

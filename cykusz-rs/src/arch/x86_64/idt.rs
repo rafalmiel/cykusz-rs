@@ -206,25 +206,38 @@ pub extern "C" fn isr_handler(
 
     match &*irqs {
         IrqHandler::Exception(e) => {
-            e(frame, regs);
+            let f = *e;
+            drop(irqs);
+
+            f(frame, regs);
         }
         IrqHandler::ExceptionErr(e) => {
-            e(frame, regs, err as u64);
+            let f = *e;
+            drop(irqs);
+
+            f(frame, regs, err as u64);
         }
         IrqHandler::Interrupt(e) => {
-            e();
+            let f = *e;
+            drop(irqs);
+
+            f();
         }
         IrqHandler::SharedInterrupt(e) => {
             for h in e.iter() {
                 h();
             }
+
+            drop(irqs);
         }
-        IrqHandler::Missing => {}
+        IrqHandler::Missing => {
+            drop(irqs);
+        }
     }
 
-    drop(irqs);
-
     let ret_addr = VirtAddr(frame.ip as usize);
+
+    crate::kernel::int::disable();
 
     if ret_addr.is_user() {
         crate::arch::signal::arch_int_check_signals(frame, regs);

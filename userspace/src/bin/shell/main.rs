@@ -523,7 +523,7 @@ fn exec(cmd: &str) {
     } else if cmd.is_empty() {
         return;
     } else if cmd == "hello_test" {
-        for _ in 0..50 {
+        for _ in 0..10000 {
             start_process("/bin/hello", Some(&["hello"]), None);
         }
     } else {
@@ -589,6 +589,7 @@ pub fn main() {
         syscall_defs::signal::SIGINT,
         syscall_defs::signal::SignalHandler::Handle(sigint_handler),
         syscall_defs::signal::SignalFlags::RESTART,
+        0,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }
@@ -596,6 +597,7 @@ pub fn main() {
         syscall_defs::signal::SIGQUIT,
         syscall_defs::signal::SignalHandler::Ignore,
         syscall_defs::signal::SignalFlags::empty(),
+        0,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }
@@ -603,6 +605,7 @@ pub fn main() {
         syscall_defs::signal::SIGCHLD,
         syscall_defs::signal::SignalHandler::Ignore,
         syscall_defs::signal::SignalFlags::RESTART,
+        0,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }

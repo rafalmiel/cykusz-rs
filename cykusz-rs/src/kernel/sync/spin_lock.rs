@@ -2,7 +2,6 @@ use core::ops::{Deref, DerefMut};
 
 use crate::kernel::int;
 use crate::kernel::sched::{current_id, current_locks_var};
-
 use crate::kernel::sync::raw_spin::{RawSpin as M, RawSpinGuard as MG};
 
 pub struct Spin<T: ?Sized> {

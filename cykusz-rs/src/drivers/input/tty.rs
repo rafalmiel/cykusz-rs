@@ -239,7 +239,7 @@ impl KeyListener for Tty {
                     buf.put_char('\n' as u8);
                     buf.commit_write();
                 }
-                if let Some(_t) = &*self.ctrl_task.lock() {
+                if let Some(_t) = &*self.ctrl_task.lock_irq() {
                     self.wait_queue.notify_all();
                 }
             }
@@ -252,12 +252,12 @@ impl KeyListener for Tty {
                 }
             }
             KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.ctrl_task.lock().clone() {
+                if let Some(t) = self.ctrl_task.lock_irq().clone() {
                     t.signal(syscall_defs::signal::SIGINT);
                 }
             }
             KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.ctrl_task.lock().clone() {
+                if let Some(t) = self.ctrl_task.lock_irq().clone() {
                     t.signal(syscall_defs::signal::SIGQUIT);
                 }
             }
@@ -303,7 +303,7 @@ impl TerminalDevice for Tty {
     }
 
     fn attach(&self, task: Arc<Task>) -> bool {
-        let mut cur = self.ctrl_task.lock();
+        let mut cur = self.ctrl_task.lock_irq();
 
         if cur.is_none() {
             println!("[ TTY ] Attached task {}", task.tid());
@@ -316,7 +316,7 @@ impl TerminalDevice for Tty {
     }
 
     fn detach(&self, task: Arc<Task>) -> bool {
-        let mut ctrl = self.ctrl_task.lock();
+        let mut ctrl = self.ctrl_task.lock_irq();
 
         if let Some(cur) = ctrl.as_ref() {
             if cur.tid() == task.tid() {

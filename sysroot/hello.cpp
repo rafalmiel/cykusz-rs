@@ -6,8 +6,6 @@
 #include <thread>
 #include <mutex>
 
-#include "lock.hpp"
-
 class TestCtr {
 	public:
 		TestCtr() {
@@ -28,8 +26,6 @@ void int_handler(int sig) {
 static int CNT = 0;
 
 static std::mutex MUT;
-
-static FutexLock lock;
 
 void print_thread() {
 		for (int i = 0;i < 10; ++i) {

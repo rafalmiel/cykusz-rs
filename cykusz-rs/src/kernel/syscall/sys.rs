@@ -15,7 +15,6 @@ use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::{current_task, current_task_ref};
-
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
@@ -669,7 +668,13 @@ pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
     }
 }
 
-pub fn sys_sigaction(sig: u64, handler: u64, flags: u64, sigreturn: u64) -> SyscallResult {
+pub fn sys_sigaction(
+    sig: u64,
+    handler: u64,
+    flags: u64,
+    _sigmask: u64,
+    sigreturn: u64,
+) -> SyscallResult {
     let handler: syscall_defs::signal::SignalHandler = handler.into();
 
     if let Some(flags) = syscall_defs::signal::SignalFlags::from_bits(flags) {
@@ -681,6 +686,18 @@ pub fn sys_sigaction(sig: u64, handler: u64, flags: u64, sigreturn: u64) -> Sysc
     } else {
         Err(SyscallError::EINVAL)
     }
+}
+
+pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {
+    let how = syscall_defs::signal::SigProcMask::from(how);
+    let set = unsafe { VirtAddr(set as usize).read::<u64>() };
+    let old_set = if old_set > 0 {
+        Some(unsafe { VirtAddr(old_set as usize).read_mut::<u64>() })
+    } else {
+        None
+    };
+    current_task_ref().signals().set_mask(how, set, old_set);
+    Ok(0)
 }
 
 pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {

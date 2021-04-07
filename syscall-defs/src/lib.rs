@@ -50,15 +50,16 @@ pub const SYS_WAITPID: usize = 33;
 pub const SYS_IOCTL: usize = 34;
 pub const SYS_SIGACTION: usize = 35;
 pub const SYS_SIGRETURN: usize = 36;
+pub const SYS_SIGPROCMASK: usize = 37;
 
-pub const SYS_FUTEX_WAIT: usize = 37;
-pub const SYS_FUTEX_WAKE: usize = 38;
+pub const SYS_FUTEX_WAIT: usize = 38;
+pub const SYS_FUTEX_WAKE: usize = 39;
 
-pub const SYS_ARCH_PRCTL: usize = 39;
-pub const SYS_SPAWN_THREAD: usize = 40;
-pub const SYS_EXIT_THREAD: usize = 41;
-pub const SYS_GETPID: usize = 42;
-pub const SYS_GETTID: usize = 43;
+pub const SYS_ARCH_PRCTL: usize = 40;
+pub const SYS_SPAWN_THREAD: usize = 41;
+pub const SYS_EXIT_THREAD: usize = 42;
+pub const SYS_GETPID: usize = 43;
+pub const SYS_GETTID: usize = 44;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

@@ -172,6 +172,7 @@ impl Scheduler {
     pub fn exit(&self) -> ! {
         let _g = IrqGuard::new();
         let current = current_task_ref();
+        assert_eq!(current.locks(), 0, "Killing thread holding a locks");
 
         if current.is_process_leader() {
             for c in current

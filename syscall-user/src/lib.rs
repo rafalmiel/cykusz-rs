@@ -340,16 +340,32 @@ pub fn sigaction(
     sig: usize,
     handler: signal::SignalHandler,
     flags: signal::SignalFlags,
+    sigmask: u64,
 ) -> SyscallResult {
     unsafe {
-        syscall4(
+        syscall5(
             SYS_SIGACTION,
             sig,
             handler.into(),
             flags.bits() as usize,
+            sigmask as usize,
             sigreturn as usize,
         )
     }
+}
+
+pub fn sigprocmask(
+    how: syscall_defs::signal::SigProcMask,
+    set: &mut u64,
+    old_set: Option<&mut u64>,
+) -> SyscallResult {
+    let set = set as *const u64 as usize;
+    let old_set = if let Some(f) = old_set {
+        f as *const u64 as usize
+    } else {
+        0
+    };
+    unsafe { syscall3(SYS_SIGPROCMASK, how as usize, set, old_set) }
 }
 
 #[allow(unused)]

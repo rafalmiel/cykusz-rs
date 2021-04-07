@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/rafalmiel/cykusz-rs.svg?branch=master)](https://travis-ci.com/rafalmiel/cykusz-rs)
+![CI](https://github.com/rafalmiel/cykusz-rs/actions/workflows/main.yml/badge.svg)
 
 # cykusz-rs
 

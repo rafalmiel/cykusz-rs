@@ -20,6 +20,13 @@ bitflags! {
     }
 }
 
+#[repr(u64)]
+pub enum SigProcMask {
+    Block = 0,
+    Unblock = 1,
+    Set = 2,
+}
+
 impl Default for SignalHandler {
     fn default() -> Self {
         SignalHandler::Default
@@ -43,5 +50,22 @@ impl From<SignalHandler> for usize {
             SignalHandler::Default => 1,
             SignalHandler::Handle(f) => f as usize,
         }
+    }
+}
+
+impl From<u64> for SigProcMask {
+    fn from(v: u64) -> Self {
+        match v {
+            0 => SigProcMask::Block,
+            1 => SigProcMask::Unblock,
+            2 => SigProcMask::Set,
+            _ => panic!("Invalid SigProcMask {}", v),
+        }
+    }
+}
+
+impl From<SigProcMask> for usize {
+    fn from(s: SigProcMask) -> Self {
+        s as u64 as usize
     }
 }

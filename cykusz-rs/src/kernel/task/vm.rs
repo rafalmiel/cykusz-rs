@@ -14,7 +14,6 @@ use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{
     allocate_order, map_flags, map_to_flags, unmap, update_flags, VirtAddr, MAX_USER_ADDR,
 };
-
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 

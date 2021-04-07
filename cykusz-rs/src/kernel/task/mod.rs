@@ -71,7 +71,7 @@ pub struct Task {
     sleep_until: AtomicUsize,
     cwd: RwSpin<Option<Cwd>>,
     sref: Weak<Task>,
-    signals: Arc<Signals>,
+    signals: Signals,
     terminal: Terminal,
     zombies: Zombies,
     terminate_thread: AtomicBool,
@@ -262,7 +262,7 @@ impl Task {
     }
 
     pub fn children(&self) -> SpinGuard<LinkedList<TaskAdapter>> {
-        self.children.lock_irq()
+        self.children.lock()
     }
 
     pub fn migrate_children_to_init(&self) {
@@ -473,17 +473,46 @@ impl Task {
         &self.vm
     }
 
-    pub fn signals(&self) -> &Arc<Signals> {
+    pub fn signals(&self) -> &Signals {
         &self.signals
     }
 
     pub fn signal(&self, sig: usize) -> bool {
-        if self.signals().trigger(sig) {
-            self.wake_up();
+        use crate::kernel::signal::TriggerResult;
 
-            true
-        } else {
-            false
+        match self.signals().trigger(sig) {
+            TriggerResult::Triggered => {
+                self.wake_up();
+
+                return true;
+            }
+            TriggerResult::Ignored => {
+                return false;
+            }
+            TriggerResult::Blocked => {
+                // Find other thread in process to notify
+                let process_leader = self.process_leader();
+
+                if !process_leader.signals().is_blocked(sig) {
+                    process_leader.wake_up();
+
+                    return true;
+                }
+
+                for c in process_leader
+                    .children()
+                    .iter()
+                    .filter(|t| t.pid() == self.pid())
+                {
+                    if !c.signals().is_blocked(sig) {
+                        c.wake_up();
+
+                        return true;
+                    }
+                }
+
+                false
+            }
         }
     }
 
@@ -515,7 +544,6 @@ impl Task {
             }
 
             unsafe {
-                println!("deallocate thread {}", self.tid());
                 self.arch_task_mut().deallocate();
             }
         } else {

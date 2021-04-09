@@ -11,7 +11,7 @@ pub fn init_ap() {
 fn conditional_enable_int(sys: usize) {
     use syscall_defs::*;
     match sys {
-        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT => {
+        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT | SYS_EXIT | SYS_EXIT_THREAD => {
             return;
         }
         _ => {
@@ -67,6 +67,8 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_EXIT_THREAD => sys::sys_exit_thread(),
         SYS_GETPID => sys::sys_getpid(),
         SYS_GETTID => sys::sys_gettid(),
+        SYS_SETSID => sys::sys_setsid(),
+        SYS_SETPGID => sys::sys_setpgid(a, b),
 
         _ => Err(SyscallError::ENOSYS),
     }

@@ -1,10 +1,9 @@
 #![feature(new_uninit)]
 #![no_std]
 
+extern crate alloc;
 #[macro_use]
 extern crate bitflags;
-
-extern crate alloc;
 
 pub mod exec;
 pub mod ioctl;
@@ -60,6 +59,8 @@ pub const SYS_SPAWN_THREAD: usize = 41;
 pub const SYS_EXIT_THREAD: usize = 42;
 pub const SYS_GETPID: usize = 43;
 pub const SYS_GETTID: usize = 44;
+pub const SYS_SETSID: usize = 45;
+pub const SYS_SETPGID: usize = 46;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

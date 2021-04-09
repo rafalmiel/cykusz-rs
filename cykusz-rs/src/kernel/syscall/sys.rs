@@ -654,6 +654,14 @@ pub fn sys_gettid() -> SyscallResult {
     Ok(current_task_ref().tid())
 }
 
+pub fn sys_setsid() -> SyscallResult {
+    crate::kernel::session::sessions().set_sid(current_task())
+}
+
+pub fn sys_setpgid(pid: u64, pgid: u64) -> SyscallResult {
+    crate::kernel::session::sessions().set_pgid(pid as usize, pgid as usize)
+}
+
 pub fn sys_exit_thread() -> ! {
     crate::kernel::sched::exit_thread();
 }

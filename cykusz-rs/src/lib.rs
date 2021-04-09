@@ -78,7 +78,7 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::tls::init(stack_top);
 
-    println!("[ OK ] Per-CPU Storage Initialised");
+    println!("[ OK ] Per-CPU Storage Initialized");
 
     unsafe {
         CPU_ID = 0;
@@ -88,9 +88,13 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] VFS Initialized");
 
+    kernel::session::init();
+
+    println!("[ OK ] Sessions Initialized");
+
     kernel::sched::init();
 
-    println!("[ OK ] Scheduler Initialised");
+    println!("[ OK ] Scheduler Initialized");
 
     kernel::ipi::init();
 
@@ -158,7 +162,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
     kernel::ipi::init_ap();
 
-    println!("[ OK ] CPU {} Initialised", unsafe { crate::CPU_ID });
+    println!("[ OK ] CPU {} Initialized", unsafe { crate::CPU_ID });
 
     kernel::syscall::init_ap();
 

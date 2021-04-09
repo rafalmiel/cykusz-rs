@@ -1,7 +1,5 @@
 #![no_std]
 
-mod types;
-
 extern crate rlibc;
 extern crate syscall_defs;
 #[macro_use]
@@ -12,6 +10,8 @@ use core::ptr::NonNull;
 
 use syscall_defs::{MMapFlags, MMapProt};
 use types::Align;
+
+mod types;
 
 const HEAP_START: usize = 0x1000_0000;
 

@@ -10,8 +10,8 @@ use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::round_robin::RRScheduler;
 use crate::kernel::sched::task_container::TaskContainer;
+use crate::kernel::session::sessions;
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::IrqGuard;
 use crate::kernel::task::Task;
 
 #[macro_export]
@@ -95,6 +95,8 @@ impl Scheduler {
 
         self.tasks.register_task(task.clone());
 
+        sessions().register_process(task.clone());
+
         self.sched.queue_task(task.clone());
 
         task
@@ -105,6 +107,8 @@ impl Scheduler {
 
         self.tasks.register_task(task.clone());
 
+        sessions().register_process(task.clone());
+
         self.sched.queue_task(task.clone());
 
         task
@@ -114,6 +118,8 @@ impl Scheduler {
         let task = Task::new_user(exe);
 
         self.tasks.register_task(task.clone());
+
+        sessions().register_process(task.clone());
 
         self.sched.queue_task(task.clone());
 
@@ -146,6 +152,8 @@ impl Scheduler {
 
         self.tasks.register_task(forked.clone());
 
+        sessions().register_process(forked.clone());
+
         self.sched.queue_task(forked.clone());
 
         forked
@@ -170,7 +178,6 @@ impl Scheduler {
     }
 
     pub fn exit(&self) -> ! {
-        let _g = IrqGuard::new();
         let current = current_task_ref();
         assert_eq!(current.locks(), 0, "Killing thread holding a locks");
 
@@ -184,6 +191,10 @@ impl Scheduler {
             }
 
             self.tasks.remove_task(current.tid());
+
+            if let Err(e) = sessions().remove_process(current) {
+                panic!("Failed to remove process from a session {:?}", e);
+            }
 
             current.migrate_children_to_init();
 
@@ -206,7 +217,6 @@ impl Scheduler {
     }
 
     pub fn exit_thread(&self) -> ! {
-        let _g = IrqGuard::new();
         let task = current_task_ref();
 
         if task.is_process_leader() {
@@ -216,6 +226,10 @@ impl Scheduler {
 
             self.sched.exit_thread();
         }
+    }
+
+    pub fn get_task(&self, tid: usize) -> Option<Arc<Task>> {
+        self.tasks.get(tid)
     }
 }
 
@@ -262,6 +276,10 @@ pub fn reschedule() -> bool {
     }
 
     scheduler.reschedule()
+}
+
+pub fn get_task(tid: usize) -> Option<Arc<Task>> {
+    scheduler().get_task(tid)
 }
 
 pub fn current_task() -> Arc<Task> {

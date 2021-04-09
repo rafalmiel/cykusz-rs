@@ -404,7 +404,11 @@ impl Task {
         if self.is_process_leader() {
             self.me()
         } else {
-            self.get_parent().unwrap()
+            let parent = self.get_parent().unwrap();
+
+            assert!(parent.is_process_leader());
+
+            parent
         }
     }
 

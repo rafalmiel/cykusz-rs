@@ -9,12 +9,13 @@ extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
 
+use alloc::vec::Vec;
+
 use chrono::{Datelike, Timelike};
 
 use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry, SyscallError};
 
 use crate::file::File;
-use alloc::vec::Vec;
 
 pub mod file;
 pub mod nc;
@@ -129,6 +130,13 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
     tty.detach();
     if let Ok(id) = syscall::fork() {
         if id == 0 {
+            // Make the process a group leader
+            if let Err(e) = syscall::setpgid(0, 0) {
+                println!("setpgid failed {:?}", e);
+
+                syscall::exit();
+            }
+
             tty.attach();
             drop(tty);
             if let Err(e) = syscall::exec(path, args, env) {
@@ -139,6 +147,10 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
 
             syscall::exit();
         } else {
+            if let Err(e) = syscall::setpgid(id, id) {
+                println!("parent setpgid failed {:?}", e);
+            }
+
             while let Err(SyscallError::EINTR) = syscall::waitpid(id) {}
         }
     } else {

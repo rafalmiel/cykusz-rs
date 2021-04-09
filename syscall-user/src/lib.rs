@@ -1,14 +1,15 @@
 #![no_std]
 #![feature(llvm_asm)]
 
+extern crate alloc;
+
 use alloc::vec::Vec;
 use core::sync::atomic::AtomicU32;
+
 use syscall_defs::*;
 
 #[macro_use]
 pub mod print;
-
-extern crate alloc;
 
 pub unsafe fn syscall0(mut a: usize) -> SyscallResult {
     llvm_asm!("syscall"
@@ -411,6 +412,14 @@ pub fn getpid() -> SyscallResult {
 
 pub fn gettid() -> SyscallResult {
     unsafe { syscall0(SYS_GETTID) }
+}
+
+pub fn setsid() -> SyscallResult {
+    unsafe { syscall0(SYS_SETSID) }
+}
+
+pub fn setpgid(pid: usize, pgid: usize) -> SyscallResult {
+    unsafe { syscall2(SYS_SETPGID, pid, pgid) }
 }
 
 pub fn poweroff() -> ! {

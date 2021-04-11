@@ -49,6 +49,7 @@ fn new_cache_marker() -> usize {
 
 pub struct DirEntryData {
     pub parent: Option<DirEntryItem>,
+    #[allow(unused)]
     fs_ref: Option<Arc<dyn Filesystem>>,
     pub name: String,
     pub inode: INodeItem,

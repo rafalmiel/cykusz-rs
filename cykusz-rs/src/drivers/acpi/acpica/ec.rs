@@ -4,7 +4,7 @@ use crate::arch::raw::cpuio::Port;
 use crate::kernel::timer::busy_sleep;
 
 struct GlobalLockGuard {
-    handle: u32,
+    handle: i32,
 }
 
 impl GlobalLockGuard {
@@ -13,7 +13,7 @@ impl GlobalLockGuard {
 
         assert_eq!(
             unsafe {
-                acpica::AcpiAcquireGlobalLock(u16::max_value(), &mut lock.handle as *mut u32)
+                acpica::AcpiAcquireGlobalLock(u16::max_value() as i16, &mut lock.handle as *mut i32)
             },
             acpica::AE_OK
         );
@@ -79,7 +79,7 @@ pub unsafe extern "C" fn embedded_ctl(
             *Value = 0xFF;
             return AE_OK;
         }
-        *Value = data.read() as u64;
+        *Value = data.read() as i64;
     } else {
         //Write
         if !wait_for(0b10, 0) {

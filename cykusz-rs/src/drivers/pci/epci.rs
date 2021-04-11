@@ -25,7 +25,7 @@ impl Mcfg {
         while len > 0 {
             let c = unsafe { &*cfg };
 
-            if c.PciSegment == segment
+            if c.PciSegment as u16 == segment
                 && (c.StartBusNumber as u16 <= bus && bus <= c.EndBusNumber as u16)
             {
                 let addr = PhysAddr(c.Address as usize).to_mapped();

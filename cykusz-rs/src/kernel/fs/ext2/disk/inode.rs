@@ -57,7 +57,7 @@ impl From<syscall_defs::FileType> for FileType {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct INode {
     type_and_perm: u16,
@@ -171,16 +171,16 @@ impl INode {
         self.os_specific
     }
     pub fn direct_ptrs(&self) -> &[u32] {
-        unsafe { &self.data_ptr[..12] }
+        &self.data_ptr[..12]
     }
     pub fn direct_ptrs_mut(&mut self) -> &mut [u32] {
-        unsafe { &mut self.data_ptr[..12] }
+        &mut self.data_ptr[..12]
     }
     pub fn block_ptrs(&self) -> &[u32] {
-        unsafe { &self.data_ptr }
+        &self.data_ptr
     }
     pub fn block_ptrs_mut(&mut self) -> &mut [u32] {
-        unsafe { &mut self.data_ptr }
+        &mut self.data_ptr
     }
     pub fn s_indir_ptr(&self) -> u32 {
         self.data_ptr[12]

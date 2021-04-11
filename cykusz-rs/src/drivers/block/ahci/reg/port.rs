@@ -466,7 +466,7 @@ impl HbaPortDevslp {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct HbaPort {
     clb: VCell<PhysAddr>,
     fb: VCell<PhysAddr>,

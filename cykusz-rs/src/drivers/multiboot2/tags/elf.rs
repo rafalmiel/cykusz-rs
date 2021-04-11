@@ -1,13 +1,13 @@
 use crate::drivers::multiboot2::tags::Tag;
 use crate::kernel::mm::{PhysAddr, VirtAddr};
 
-#[repr(packed)]
+#[repr(C)]
 pub struct Elf {
     pub tag: Tag,
     pub num: u32,
     pub entsize: u32,
     pub shndx: u32,
-    pub first_entry: ElfSection,
+    pub first_entry: [u8; 0],
 }
 
 #[repr(C)]
@@ -58,7 +58,7 @@ impl Elf {
     pub fn sections(&'static self) -> ElfSectionIter {
         unsafe {
             ElfSectionIter {
-                current: &self.first_entry,
+                current: &*(self.first_entry.as_ptr() as *const ElfSection),
                 remaining: self.num - 1,
                 entry_size: self.entsize,
             }

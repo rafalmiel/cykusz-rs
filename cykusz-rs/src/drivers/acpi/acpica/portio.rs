@@ -15,9 +15,9 @@ extern "C" fn AcpiOsReadPort(
     //println!("Read port 0x{:x} width: {}", Address, Width);
     unsafe {
         *Value = match Width {
-            8 => Port::<u8>::new(Address as u16).read() as u32,
-            16 => Port::<u16>::new(Address as u16).read() as u32,
-            32 => Port::<u32>::new(Address as u16).read() as u32,
+            8 => Port::<u8>::new(Address as u16).read() as i32,
+            16 => Port::<u16>::new(Address as u16).read() as i32,
+            32 => Port::<u32>::new(Address as u16).read() as i32,
             _ => panic!("Unsupported port"),
         };
 

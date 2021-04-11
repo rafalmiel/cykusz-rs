@@ -8,7 +8,7 @@ use crate::kernel::timer::busy_sleep;
 #[no_mangle]
 #[linkage = "external"]
 extern "C" fn AcpiOsGetThreadId() -> UINT64 {
-    crate::kernel::sched::current_id() as u64 + 1
+    crate::kernel::sched::current_id() as i64 + 1
 }
 
 #[no_mangle]

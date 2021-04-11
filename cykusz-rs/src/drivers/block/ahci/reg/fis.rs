@@ -18,7 +18,7 @@ pub enum FisType {
     DevBits = 0xA1,
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct FisRegH2D {
     fis_type: VCell<FisType>,
     flags: VCell<u8>,
@@ -235,7 +235,7 @@ impl FisRegH2D {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct FisRegD2H {
     fis_type: VCell<FisType>,
     flags: VCell<u8>,
@@ -390,7 +390,7 @@ impl FisRegD2H {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct FisData {
     fis_type: VCell<FisType>,
 
@@ -436,7 +436,7 @@ impl FisData {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct FisPioSetup {
     fis_type: VCell<FisType>,
     flags: VCell<u8>,
@@ -617,7 +617,7 @@ impl FisPioSetup {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct FisSetDeviceBits {
     fis_type: VCell<FisType>,
 
@@ -691,7 +691,7 @@ impl FisSetDeviceBits {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct FisDmaSetup {
     fis_type: VCell<FisType>,
 
@@ -699,7 +699,8 @@ pub struct FisDmaSetup {
 
     _rsv1: [u8; 2],
 
-    dma_buf_id: VCell<u64>,
+    dma_buf_id_low: VCell<u32>,
+    dma_buf_id_high: VCell<u32>,
 
     _rsv2: u32,
 
@@ -763,13 +764,12 @@ impl FisDmaSetup {
     }
 
     pub fn buf_id(&self) -> u64 {
-        unsafe { self.dma_buf_id.get() }
+        (self.dma_buf_id_high.get() << 32) as u64 | self.dma_buf_id_low.get() as u64
     }
 
     pub fn set_buf_id(&mut self, id: u64) {
-        unsafe {
-            self.dma_buf_id.set(id);
-        }
+        self.dma_buf_id_low.set(id as u32);
+        self.dma_buf_id_high.set((id >> 32) as u32)
     }
 
     pub fn buf_offset(&self) -> usize {
@@ -793,7 +793,7 @@ impl FisDmaSetup {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct HbaFis {
     dma_setup: FisDmaSetup,
     _pad1: [u8; 4],

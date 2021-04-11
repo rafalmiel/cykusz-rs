@@ -12,7 +12,7 @@ use crate::kernel::sync::{Spin, SpinGuard};
 
 fn call_pic1() {
     let mut arg = ACPI_OBJECT {
-        Type: ACPI_TYPE_INTEGER,
+        Type: ACPI_TYPE_INTEGER as i32,
     };
     arg.Integer.Value = 1;
 
@@ -52,11 +52,11 @@ unsafe extern "C" fn get_irq_resource(
     let tbl = &*data.tbl;
     let bridge = &mut *data.bridge;
 
-    match res.Type {
+    match res.Type as u32 {
         ACPI_RESOURCE_TYPE_IRQ => {
             //println!("I Count {}", res.Data.Irq.InterruptCount);
             bridge.add_irq(
-                tbl.Address >> 16,
+                tbl.Address as u64 >> 16,
                 tbl.Pin as u8,
                 *res.Data
                     .Irq
@@ -67,14 +67,16 @@ unsafe extern "C" fn get_irq_resource(
         }
         ACPI_RESOURCE_TYPE_EXTENDED_IRQ => {
             //println!("I Count {}", res.Data.ExtendedIrq.InterruptCount);
+            use core::mem::size_of;
+
+            // Hack to silence unaligned reference warning
+            let mut ptr = &res.Data.ExtendedIrq as *const _ as *const u8;
+            ptr = ptr.offset(size_of::<ACPI_RESOURCE_EXTENDED_IRQ>() as isize - size_of::<u32>() as isize);
+            let int = (ptr as *const u32).offset(tbl.SourceIndex as u8 as isize).read_unaligned();
             bridge.add_irq(
-                tbl.Address >> 16,
+                tbl.Address as u64 >> 16,
                 tbl.Pin as u8,
-                *res.Data
-                    .ExtendedIrq
-                    .Interrupts
-                    .as_ptr()
-                    .offset(tbl.SourceIndex as u8 as isize),
+                int
             );
         }
         _ => {}
@@ -251,7 +253,7 @@ impl PciBridge {
 
         while tbl.Length != 0 {
             if tbl.Source[0] == 0 {
-                self.add_irq(tbl.Address >> 16, tbl.Pin as u8, tbl.SourceIndex);
+                self.add_irq(tbl.Address as u64 >> 16, tbl.Pin as u8, tbl.SourceIndex as u32);
             } else {
                 let mut src_handle: ACPI_HANDLE = null_mut();
 

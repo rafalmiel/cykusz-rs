@@ -108,7 +108,7 @@ impl HbaMemEmLocReg {
 }
 
 bitflags! {
-    pub struct HbaMemEmlCtlReg: u32{
+    pub struct HbaMemEmlCtlReg: u32 {
         const STS_MR =      1 << 0;  // Message Received
         const CTL_TM =      1 << 8;  // Transmit Message
         const CTL_RST =     1 << 9;  // Reset
@@ -144,7 +144,7 @@ bitflags! {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct HbaMem {
     cap: VCell<HbaMemCapReg>,
     ghc: VCell<HbaMemGhcReg>,

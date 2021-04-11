@@ -14,13 +14,13 @@ extern "C" fn AcpiOsReadPciConfiguration(
     unsafe {
         //println!("PCI read: {:?} {} {}", *PciId, Reg, Width);
         *Value = crate::drivers::pci::read(
-            (*PciId).Segment,
-            (*PciId).Bus,
-            (*PciId).Device,
-            (*PciId).Function,
-            Reg,
-            Width,
-        );
+            (*PciId).Segment as u16,
+            (*PciId).Bus as u16,
+            (*PciId).Device as u16,
+            (*PciId).Function as u16,
+            Reg as u32,
+            Width as u32,
+        ) as i64;
     }
     AE_OK
 }
@@ -36,13 +36,13 @@ extern "C" fn AcpiOsWritePciConfiguration(
     unsafe {
         //println!("PCI write: {:?} {} {} {}", *PciId, Reg, Value, Width);
         crate::drivers::pci::write(
-            (*PciId).Segment,
-            (*PciId).Bus,
-            (*PciId).Device,
-            (*PciId).Function,
-            Reg,
-            Value,
-            Width,
+            (*PciId).Segment as u16,
+            (*PciId).Bus as u16,
+            (*PciId).Device as u16,
+            (*PciId).Function as u16,
+            Reg as u32,
+            Value as u64,
+            Width as u32,
         );
     }
     AE_OK

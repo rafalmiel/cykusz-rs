@@ -33,7 +33,7 @@ impl HbaCmdHeaderFlags {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct HbaCmdHeader {
     flags: VCell<HbaCmdHeaderFlags>,
 
@@ -83,7 +83,7 @@ impl HbaCmdHeader {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct HbaCmdTbl {
     cfis: [u8; 64],
 
@@ -104,7 +104,7 @@ impl HbaCmdTbl {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct HbaPrdtEntry {
     dba: VCell<PhysAddr>,
 

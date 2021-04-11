@@ -65,7 +65,7 @@ impl<'a> PrdTable<'a> {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 struct PrdEntry {
     addr: u32,
     cnt: u32,
@@ -78,15 +78,11 @@ impl PrdEntry {
 
     pub fn set_byte_count(&mut self, bytes: usize) {
         //assert!(bytes < 0xFFFF && bytes % 2 == 0);
-        unsafe {
-            self.cnt.set_bits(0..16, bytes as u32);
-        }
+        self.cnt.set_bits(0..16, bytes as u32);
     }
 
     pub fn set_last_entry(&mut self, last: bool) {
-        unsafe {
-            self.cnt.set_bit(31, last);
-        }
+        self.cnt.set_bit(31, last);
     }
 }
 

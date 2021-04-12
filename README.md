@@ -1,4 +1,4 @@
-![CI](https://github.com/rafalmiel/cykusz-rs/actions/workflows/main.yml/badge.svg)
+[![CI](https://github.com/rafalmiel/cykusz-rs/actions/workflows/main.yml/badge.svg)](https://github.com/rafalmiel/cykusz-rs/actions/workflows/main.yml)
 
 # cykusz-rs
 

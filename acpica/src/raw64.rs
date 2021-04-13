@@ -5064,12 +5064,7 @@ extern "C" {
     ) -> ACPI_STATUS;
 }
 extern "C" {
-    pub fn AcpiError(
-        ModuleName: *const i8,
-        LineNumber: UINT32,
-        Format: *const i8,
-        ...
-    );
+    pub fn AcpiError(ModuleName: *const i8, LineNumber: UINT32, Format: *const i8, ...);
 }
 extern "C" {
     pub fn AcpiException(
@@ -5081,23 +5076,13 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn AcpiWarning(
-        ModuleName: *const i8,
-        LineNumber: UINT32,
-        Format: *const i8,
-        ...
-    );
+    pub fn AcpiWarning(ModuleName: *const i8, LineNumber: UINT32, Format: *const i8, ...);
 }
 extern "C" {
     pub fn AcpiInfo(Format: *const i8, ...);
 }
 extern "C" {
-    pub fn AcpiBiosError(
-        ModuleName: *const i8,
-        LineNumber: UINT32,
-        Format: *const i8,
-        ...
-    );
+    pub fn AcpiBiosError(ModuleName: *const i8, LineNumber: UINT32, Format: *const i8, ...);
 }
 extern "C" {
     pub fn AcpiBiosException(
@@ -5109,12 +5094,7 @@ extern "C" {
     );
 }
 extern "C" {
-    pub fn AcpiBiosWarning(
-        ModuleName: *const i8,
-        LineNumber: UINT32,
-        Format: *const i8,
-        ...
-    );
+    pub fn AcpiBiosWarning(ModuleName: *const i8, LineNumber: UINT32, Format: *const i8, ...);
 }
 extern "C" {
     pub fn AcpiInitializeDebugger() -> ACPI_STATUS;

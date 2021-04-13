@@ -71,13 +71,13 @@ unsafe extern "C" fn get_irq_resource(
 
             // Hack to silence unaligned reference warning
             let mut ptr = &res.Data.ExtendedIrq as *const _ as *const u8;
-            ptr = ptr.offset(size_of::<ACPI_RESOURCE_EXTENDED_IRQ>() as isize - size_of::<u32>() as isize);
-            let int = (ptr as *const u32).offset(tbl.SourceIndex as u8 as isize).read_unaligned();
-            bridge.add_irq(
-                tbl.Address as u64 >> 16,
-                tbl.Pin as u8,
-                int
+            ptr = ptr.offset(
+                size_of::<ACPI_RESOURCE_EXTENDED_IRQ>() as isize - size_of::<u32>() as isize,
             );
+            let int = (ptr as *const u32)
+                .offset(tbl.SourceIndex as u8 as isize)
+                .read_unaligned();
+            bridge.add_irq(tbl.Address as u64 >> 16, tbl.Pin as u8, int);
         }
         _ => {}
     }
@@ -253,7 +253,11 @@ impl PciBridge {
 
         while tbl.Length != 0 {
             if tbl.Source[0] == 0 {
-                self.add_irq(tbl.Address as u64 >> 16, tbl.Pin as u8, tbl.SourceIndex as u32);
+                self.add_irq(
+                    tbl.Address as u64 >> 16,
+                    tbl.Pin as u8,
+                    tbl.SourceIndex as u32,
+                );
             } else {
                 let mut src_handle: ACPI_HANDLE = null_mut();
 

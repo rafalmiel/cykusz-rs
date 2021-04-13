@@ -6,13 +6,16 @@ use spin::Once;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::fs::{lookup_by_real_path, LookupMode};
+use crate::kernel::session::Group;
 use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::task::Task;
 
 pub trait TerminalDevice: Send + Sync {
     fn id(&self) -> usize;
+    fn ctrl_process(&self) -> Option<Arc<Task>>;
     fn attach(&self, task: Arc<Task>) -> bool;
     fn detach(&self, task: Arc<Task>) -> bool;
+    fn set_fg_group(&self, group: Arc<Group>) -> bool;
 }
 
 static TTY_DEVS: RwSpin<BTreeMap<usize, Arc<dyn TerminalDevice>>> = RwSpin::new(BTreeMap::new());
@@ -38,14 +41,14 @@ pub fn get_tty_by_id(id: usize) -> Option<Arc<dyn TerminalDevice>> {
 }
 
 pub struct Terminal {
-    attached_to: Spin<Option<Arc<dyn TerminalDevice>>>,
+    ctrl_term: Arc<Spin<Option<Arc<dyn TerminalDevice>>>>,
     proc: Once<Weak<Task>>,
 }
 
 impl Default for Terminal {
     fn default() -> Self {
         Terminal {
-            attached_to: Default::default(),
+            ctrl_term: Default::default(),
             proc: Once::new(),
         }
     }
@@ -69,78 +72,88 @@ impl Terminal {
     }
 
     fn task(&self) -> Option<Arc<Task>> {
-        self.proc.get().unwrap().upgrade()
+        unsafe { self.proc.get_unchecked().upgrade() }
     }
 
-    pub fn detach(&self) -> bool {
-        let task = self.task().expect("terminal: Task not set");
+    pub fn terminal(&self) -> Option<Arc<dyn TerminalDevice>> {
+        self.ctrl_term.lock().as_ref().cloned()
+    }
 
-        let mut term = self.attached_to.lock();
-
-        if let Some(t) = term.as_ref() {
-            if t.detach(task) {
-                *term = None;
-
-                return true;
-            }
+    pub fn is_connected(&self, to: Arc<dyn TerminalDevice>) -> bool {
+        if let Some(t) = self.ctrl_term.lock().as_ref() {
+            t.id() == to.id()
+        } else {
+            false
         }
-
-        false
     }
 
-    pub fn detach_term(&self, terminal: Arc<dyn TerminalDevice>) -> bool {
+    pub fn connect(&self, terminal: Arc<dyn TerminalDevice>) -> bool {
         let task = self.task().expect("terminal: Task not set");
 
-        let mut term = self.attached_to.lock();
+        let mut term = self.ctrl_term.lock();
 
-        if let Some(t) = term.as_ref() {
-            if t.id() == terminal.id() {
-                if t.detach(task) {
-                    *term = None;
+        if let Some(our) = term.as_ref() {
+            return our.id() == terminal.id();
+        } else {
+            let is_leader = task.is_session_leader();
+
+            if let Some(ctrl) = &terminal.ctrl_process() {
+                if !is_leader && ctrl.sid() == task.sid() {
+                    *term = Some(terminal);
 
                     return true;
                 }
-            }
-        }
 
-        false
-    }
+                false
+            } else if is_leader {
+                if !terminal.attach(task) {
+                    return false;
+                }
 
-    pub fn attach(&self, terminal: Arc<dyn TerminalDevice>) -> bool {
-        let task = self.task().expect("terminal: Task not set");
-
-        let mut term = self.attached_to.lock();
-
-        if term.is_none() {
-            if terminal.attach(task) {
                 *term = Some(terminal);
 
-                return true;
+                true
+            } else {
+                false
             }
         }
-
-        false
     }
 
-    pub fn try_transfer_to(&self, task: Arc<Task>) {
-        let mut term = self.attached_to.lock();
+    pub fn disconnect(&self, terminal: Option<Arc<dyn TerminalDevice>>) -> bool {
+        let task = self.task().expect("terminal: Task not set");
+
+        let mut term = self.ctrl_term.lock();
 
         if let Some(t) = term.as_ref() {
-            if let Some(me) = self.task() {
-                if t.detach(me) {
-                    if task.terminal().attach(t.clone()) {
-                        *term = None;
-                    } else {
-                        panic!("Failed to attach terminal to task {}", task.tid());
-                    }
-                } else {
-                    println!("detach failed");
+            if let Some(target) = terminal {
+                if target.id() != t.id() {
+                    return false;
                 }
+            }
+
+            let is_leader = task.is_session_leader();
+
+            if !is_leader {
+                *term = None;
+
+                return true;
             } else {
-                println!("no task found");
+                if let Some(ctrl) = t.ctrl_process() {
+                    if ctrl.pid() == task.pid() && t.detach(task) {
+                        *term = None;
+
+                        return true;
+                    }
+                }
+
+                false
             }
         } else {
-            println!("no terminal found");
+            false
         }
+    }
+
+    pub fn share_with(&self, term: &mut Terminal) {
+        term.ctrl_term = self.ctrl_term.clone();
     }
 }

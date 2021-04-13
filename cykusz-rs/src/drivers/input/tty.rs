@@ -3,6 +3,9 @@ use alloc::sync::{Arc, Weak};
 use core::fmt::Debug;
 use core::fmt::{Error, Formatter};
 
+use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT};
+use syscall_defs::OpenFlags;
+
 use crate::arch::output::ConsoleDriver;
 use crate::drivers::input::keymap;
 use crate::drivers::input::keys::KeyCode;
@@ -10,7 +13,8 @@ use crate::drivers::input::KeyListener;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sched::current_task;
+use crate::kernel::sched::{current_task, current_task_ref};
+use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::syscall::sys::PollTable;
@@ -126,6 +130,7 @@ struct Tty {
     buffer: Spin<Buffer>,
     wait_queue: WaitQueue,
     ctrl_task: Spin<Option<Arc<Task>>>,
+    fg_group: Spin<Option<Arc<Group>>>,
     self_ptr: Weak<Tty>,
 }
 
@@ -166,27 +171,16 @@ impl State {
 }
 
 impl Tty {
-    fn new() -> Tty {
-        Tty {
+    fn new() -> Arc<Tty> {
+        Arc::new_cyclic(|me| Tty {
             dev_id: crate::kernel::device::alloc_id(),
             state: Spin::new(State::new()),
             buffer: Spin::new(Buffer::new()),
             wait_queue: WaitQueue::new(),
             ctrl_task: Spin::new(None),
-            self_ptr: Weak::default(),
-        }
-    }
-
-    fn wrap(self) -> Arc<Self> {
-        let arc = Arc::new(self);
-
-        let weak = Arc::downgrade(&arc);
-        let ptr = Arc::into_raw(arc) as *mut Self;
-
-        unsafe {
-            (*ptr).self_ptr = weak;
-            Arc::from_raw(ptr)
-        }
+            fg_group: Spin::new(None),
+            self_ptr: me.clone(),
+        })
     }
 
     fn read(&self, buf: *mut u8, len: usize) -> SignalResult<usize> {
@@ -252,13 +246,17 @@ impl KeyListener for Tty {
                 }
             }
             KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.ctrl_task.lock_irq().clone() {
-                    t.signal(syscall_defs::signal::SIGINT);
+                if let Some(t) = self.fg_group.lock().as_ref() {
+                    t.for_each(&|t| {
+                        t.signal(SIGINT);
+                    })
                 }
             }
             KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.ctrl_task.lock_irq().clone() {
-                    t.signal(syscall_defs::signal::SIGQUIT);
+                if let Some(t) = self.fg_group.lock().as_ref() {
+                    t.for_each(&|t| {
+                        t.signal(SIGQUIT);
+                    })
                 }
             }
             _ if !released => {
@@ -302,11 +300,23 @@ impl TerminalDevice for Tty {
         self.dev_id
     }
 
+    fn ctrl_process(&self) -> Option<Arc<Task>> {
+        self.ctrl_task.lock().as_ref().cloned()
+    }
+
     fn attach(&self, task: Arc<Task>) -> bool {
+        if !task.is_session_leader() {
+            return false;
+        }
+
         let mut cur = self.ctrl_task.lock_irq();
 
         if cur.is_none() {
             println!("[ TTY ] Attached task {}", task.tid());
+            if let Some(group) = sessions().get_group(task.sid(), task.gid()) {
+                self.set_fg_group(group);
+            }
+
             *cur = Some(task);
 
             return true;
@@ -319,15 +329,42 @@ impl TerminalDevice for Tty {
         let mut ctrl = self.ctrl_task.lock_irq();
 
         if let Some(cur) = ctrl.as_ref() {
-            if cur.tid() == task.tid() {
+            if cur.pid() == task.pid() {
                 println!("[ TTY ] Detached task {}", cur.tid());
                 *ctrl = None;
+
+                let mut group = self.fg_group.lock();
+
+                if let Some(group) = &*group {
+                    group.for_each(&|t| {
+                        t.signal(SIGHUP);
+                    })
+                }
+
+                *group = None;
+
+                drop(group);
+                drop(ctrl);
+
+                if let Some(session) = sessions().get_session(task.sid()) {
+                    session.for_each(|t| {
+                        if t.pid() != task.pid() {
+                            t.terminal().disconnect(None);
+                        }
+                    })
+                }
 
                 return true;
             }
         }
 
         false
+    }
+
+    fn set_fg_group(&self, group: Arc<Group>) -> bool {
+        *self.fg_group.lock() = Some(group);
+
+        true
     }
 }
 
@@ -346,21 +383,64 @@ impl INode for Tty {
         Ok(has_data)
     }
 
-    fn ioctl(&self, cmd: usize, _arg: usize) -> Result<usize, FsError> {
+    fn open(&self, _flags: OpenFlags) -> Result<(), FsError> {
+        let current_task = current_task_ref();
+
+        let ctrl = self.ctrl_task.lock_irq();
+
+        if ctrl.is_none() && current_task.is_session_leader() {
+            if current_task.terminal().terminal().is_none() {
+                drop(ctrl);
+
+                current_task.terminal().connect(tty().clone());
+            }
+        }
+
+        Ok(())
+    }
+
+    fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize, FsError> {
         match cmd {
             syscall_defs::ioctl::tty::TIOCSCTTY => {
-                if current_task().terminal().attach(tty().clone()) {
+                let current = current_task_ref();
+
+                if !current.is_session_leader() {
+                    return Err(FsError::NoPermission);
+                }
+
+                if current_task().terminal().connect(tty().clone()) {
                     Ok(0)
                 } else {
                     Err(FsError::EntryExists)
                 }
             }
             syscall_defs::ioctl::tty::TIOCNOTTY => {
-                if current_task().terminal().detach_term(tty().clone()) {
+                if current_task().terminal().disconnect(Some(tty().clone())) {
                     Ok(0)
                 } else {
                     Err(FsError::EntryNotFound)
                 }
+            }
+            syscall_defs::ioctl::tty::TIOCSPGRP => {
+                let gid = arg;
+
+                let task = current_task_ref();
+
+                if !task.terminal().is_connected(tty().clone()) {
+                    return Err(FsError::NoTty);
+                }
+
+                if let Some(ctrl) = self.ctrl_task.lock_irq().as_ref() {
+                    if ctrl.sid() == task.sid() {
+                        if let Some(group) = sessions().get_group(task.sid(), gid) {
+                            self.set_fg_group(group);
+
+                            return Ok(0);
+                        }
+                    }
+                }
+
+                Err(FsError::NoTty)
             }
             _ => Err(FsError::NotSupported),
         }
@@ -368,7 +448,7 @@ impl INode for Tty {
 }
 
 lazy_static! {
-    static ref TTY: Arc<Tty> = Tty::new().wrap();
+    static ref TTY: Arc<Tty> = Tty::new();
 }
 
 fn tty() -> &'static Arc<Tty> {

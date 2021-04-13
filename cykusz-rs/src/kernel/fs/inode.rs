@@ -3,7 +3,7 @@ use alloc::sync::Weak;
 
 use downcast_rs::DowncastSync;
 
-use syscall_defs::FileType;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;
@@ -64,6 +64,10 @@ pub trait INode: Send + Sync + DowncastSync {
 
     fn create(&self, _parent: DirEntryItem, _name: &str) -> Result<DirEntryItem> {
         Err(FsError::NotSupported)
+    }
+
+    fn open(&self, _flags: OpenFlags) -> Result<()> {
+        Ok(())
     }
 
     fn close(&self) {}

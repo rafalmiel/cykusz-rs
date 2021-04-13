@@ -202,7 +202,11 @@ impl FileTable {
         }
     }
 
-    pub fn open_file(&self, dentry: DirEntryItem, mut flags: OpenFlags) -> Option<usize> {
+    pub fn open_file(
+        &self,
+        dentry: DirEntryItem,
+        mut flags: OpenFlags,
+    ) -> crate::kernel::fs::vfs::Result<usize> {
         let mut files = self.files.write();
 
         flags.remove(OpenFlags::CREAT);
@@ -225,21 +229,30 @@ impl FileTable {
 
         if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
             if let Some(h) = mk_handle(idx, dentry) {
+                h.inode.inode().open(flags)?;
+
                 *f = Some(h);
 
-                Some(idx)
+                Ok(idx)
             } else {
                 println!("[ WARN ] Failed to open file");
 
-                None
+                Err(FsError::NotSupported)
             }
         } else if files.len() < FILE_NUM {
             let len = files.len();
-            files.push(mk_handle(len, dentry));
 
-            Some(len)
+            if let Some(h) = mk_handle(len, dentry) {
+                h.inode.inode().open(flags)?;
+
+                files.push(Some(h));
+
+                Ok(len)
+            } else {
+                Err(FsError::Busy)
+            }
         } else {
-            None
+            Err(FsError::Busy)
         }
     }
 

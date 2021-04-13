@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
-use syscall_defs::FileType;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::devnode::DevNode;
@@ -153,6 +153,14 @@ impl INode for LockedRamINode {
             self.make_inode(name, FileType::File, |_| Ok(()))?,
             String::from(name),
         ))
+    }
+
+    fn open(&self, flags: OpenFlags) -> Result<()> {
+        if let Content::DevNode(Some(d)) = &self.0.read().content {
+            d.open(flags)
+        } else {
+            Ok(())
+        }
     }
 
     fn mknode(&self, name: &str, devid: usize) -> Result<INodeItem> {

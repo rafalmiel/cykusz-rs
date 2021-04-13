@@ -1,3 +1,4 @@
+pub const SIGHUP: usize = 1;
 pub const SIGINT: usize = 2;
 pub const SIGQUIT: usize = 3;
 pub const SIGILL: usize = 4;

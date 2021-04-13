@@ -1,5 +1,7 @@
 use alloc::sync::Arc;
 
+use syscall_defs::OpenFlags;
+
 use crate::kernel::device::Result as DevResult;
 use crate::kernel::device::{DevError, Device};
 use crate::kernel::fs::inode::INode;
@@ -37,6 +39,10 @@ impl INode for DevNode {
 
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
         self.dev.inode().poll(ptable)
+    }
+
+    fn open(&self, flags: OpenFlags) -> Result<()> {
+        self.dev.inode().open(flags)
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {

@@ -55,6 +55,30 @@ impl Group {
             panic!("Task already registered");
         }
     }
+
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    pub fn has_process(&self, pid: usize) -> bool {
+        self.processes.lock().contains_key(&pid)
+    }
+
+    pub fn signal(&self, sig: usize) {
+        let procs = self.processes.lock();
+
+        for (_pid, proc) in procs.iter() {
+            proc.signal(sig);
+        }
+    }
+
+    pub fn for_each(&self, f: &impl Fn(&Arc<Task>)) {
+        let procs = self.processes.lock();
+
+        for (_id, task) in procs.iter() {
+            f(task);
+        }
+    }
 }
 
 pub struct Session {
@@ -132,6 +156,18 @@ impl Session {
             groups.insert(process.gid(), Group::new(process));
         }
     }
+
+    fn get_group(&self, gid: usize) -> Option<Arc<Group>> {
+        self.groups.lock().get(&gid).cloned()
+    }
+
+    pub fn for_each(&self, f: impl Fn(&Arc<Task>)) {
+        let groups = self.groups.lock();
+
+        for (_id, group) in groups.iter() {
+            group.for_each(&f);
+        }
+    }
 }
 
 pub struct Sessions {
@@ -197,6 +233,18 @@ impl Sessions {
 
             self.create_session(process);
         }
+    }
+
+    pub fn get_group(&self, sid: usize, gid: usize) -> Option<Arc<Group>> {
+        let sessions = self.sessions.lock();
+
+        sessions.get(&sid)?.get_group(gid)
+    }
+
+    pub fn get_session(&self, sid: usize) -> Option<Arc<Session>> {
+        let sessions = self.sessions.lock();
+
+        sessions.get(&sid).cloned()
     }
 
     pub fn set_sid(&self, process: Arc<Task>) -> SyscallResult {

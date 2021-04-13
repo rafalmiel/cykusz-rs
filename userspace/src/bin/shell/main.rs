@@ -117,6 +117,11 @@ impl Tty {
         syscall::ioctl(self.fd, syscall_defs::ioctl::tty::TIOCSCTTY, 0)
             .expect("Failed to attach tty");
     }
+
+    fn set_fg(&self, gid: usize) {
+        syscall::ioctl(self.fd, syscall_defs::ioctl::tty::TIOCSPGRP, gid)
+            .expect("Failed to set fg terminal group");
+    }
 }
 
 impl Drop for Tty {
@@ -127,7 +132,7 @@ impl Drop for Tty {
 
 fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
     let tty = Tty::new();
-    tty.detach();
+
     if let Ok(id) = syscall::fork() {
         if id == 0 {
             // Make the process a group leader
@@ -137,8 +142,8 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
                 syscall::exit();
             }
 
-            tty.attach();
-            drop(tty);
+            tty.set_fg(syscall::getpid().expect("Failed to get pid"));
+
             if let Err(e) = syscall::exec(path, args, env) {
                 println!("shell: {:?}", e);
             } else {
@@ -152,11 +157,12 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
             }
 
             while let Err(SyscallError::EINTR) = syscall::waitpid(id) {}
+
+            tty.set_fg(syscall::getpid().expect("Failed to get pid"));
         }
     } else {
         println!("fork failed");
     }
-    tty.attach();
 }
 
 fn exec(cmd: &str) {
@@ -446,6 +452,9 @@ fn exec(cmd: &str) {
             if id > 0 {
                 syscall::exit();
             } else {
+                if let Err(e) = syscall::setsid() {
+                    println!("setsid failed {:?}", e);
+                }
                 tty.attach();
             }
         } else {
@@ -459,7 +468,10 @@ fn exec(cmd: &str) {
                 println!("Exec new shell with id: {}", id);
             }
             if id == 0 {
-                drop(tty);
+                if let Err(e) = syscall::setsid() {
+                    println!("setsid failed {:?}", e);
+                }
+                tty.attach();
                 syscall::exec("/bin/shell", None, None).expect("Failed to exec shell");
             } else {
                 syscall::exit();
@@ -615,6 +627,14 @@ pub fn main() {
     }
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGCHLD,
+        syscall_defs::signal::SignalHandler::Ignore,
+        syscall_defs::signal::SignalFlags::RESTART,
+        0,
+    ) {
+        println!("Failed to install signal handler: {:?}", e);
+    }
+    if let Err(e) = syscall::sigaction(
+        syscall_defs::signal::SIGHUP,
         syscall_defs::signal::SignalHandler::Ignore,
         syscall_defs::signal::SignalFlags::RESTART,
         0,

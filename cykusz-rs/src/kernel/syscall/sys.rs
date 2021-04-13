@@ -49,11 +49,7 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
             }
         }
 
-        if let Some(fd) = task.open_file(inode, flags) {
-            return Ok(fd);
-        } else {
-            Err(SyscallError::ENODEV)
-        }
+        Ok(task.open_file(inode, flags)?)
     } else {
         Err(SyscallError::EINVAL)
     }
@@ -421,11 +417,7 @@ pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
 
         let item = cache.make_item_no_cache(INodeItemStruct::from(socket));
 
-        if let Some(fd) = task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR) {
-            Ok(fd)
-        } else {
-            Err(SyscallError::EFAULT)
-        }
+        Ok(task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR)?)
     } else {
         Err(SyscallError::EBUSY)
     }
@@ -452,11 +444,7 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
 
         let item = cache.make_item_no_cache(INodeItemStruct::from(socket));
 
-        if let Some(fd) = task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR) {
-            Ok(fd)
-        } else {
-            Err(SyscallError::EFAULT)
-        }
+        Ok(task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR)?)
     } else {
         Err(SyscallError::EBUSY)
     }
@@ -655,7 +643,13 @@ pub fn sys_gettid() -> SyscallResult {
 }
 
 pub fn sys_setsid() -> SyscallResult {
-    crate::kernel::session::sessions().set_sid(current_task())
+    let task = current_task();
+
+    crate::kernel::session::sessions().set_sid(task.clone())?;
+
+    task.terminal().disconnect(None);
+
+    Ok(0)
 }
 
 pub fn sys_setpgid(pid: u64, pgid: u64) -> SyscallResult {

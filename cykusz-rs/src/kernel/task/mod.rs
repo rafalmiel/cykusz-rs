@@ -173,6 +173,10 @@ impl Task {
 
         task.signals().copy_from(self.signals());
 
+        if let Some(term) = self.terminal().terminal() {
+            task.terminal().connect(term);
+        }
+
         task
     }
 
@@ -220,6 +224,8 @@ impl Task {
             thread.set_cwd(d);
         }
         thread.signals = process_leader.signals().clone();
+
+        self.terminal().share_with(&mut thread.terminal);
 
         let thread = Self::make_ptr(thread);
 
@@ -300,7 +306,11 @@ impl Task {
         Some((*cwd).as_ref()?.pwd())
     }
 
-    pub fn open_file(&self, inode: DirEntryItem, flags: OpenFlags) -> Option<usize> {
+    pub fn open_file(
+        &self,
+        inode: DirEntryItem,
+        flags: OpenFlags,
+    ) -> crate::kernel::fs::vfs::Result<usize> {
         self.filetable.open_file(inode, flags)
     }
 
@@ -535,9 +545,9 @@ impl Task {
     }
 
     pub fn make_zombie(&self) {
-        if self.is_process_leader() {
-            self.terminal().detach();
+        self.terminal().disconnect(None);
 
+        if self.is_process_leader() {
             if let Some(parent) = self.get_parent() {
                 parent.zombies.add_zombie(self.me());
 

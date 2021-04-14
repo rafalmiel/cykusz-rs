@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use syscall_defs::{OpenFlags, SysDirEntry};
+use syscall_defs::{FileType, OpenFlags, SysDirEntry};
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
@@ -39,7 +39,7 @@ impl FileHandle {
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let offset = self.offset.load(Ordering::SeqCst);
 
-        let read = self.inode.inode().read_at(offset, buf)?;
+        let read = self.read_at(buf, offset)?;
 
         self.offset.fetch_add(read, Ordering::SeqCst);
 
@@ -70,7 +70,19 @@ impl FileHandle {
         let offset = self.offset.load(Ordering::SeqCst);
 
         //println!("writing to inode handle");
-        let wrote = match self.inode.inode().as_cacheable() {
+        let wrote = self.write_at(buf, offset)?;
+
+        self.offset.fetch_add(wrote, Ordering::SeqCst);
+
+        Ok(wrote)
+    }
+
+    pub fn read_at(&self, buf: &mut [u8], offset: usize) -> Result<usize> {
+        Ok(self.inode.inode().read_at(offset, buf)?)
+    }
+
+    pub fn write_at(&self, buf: &[u8], offset: usize) -> Result<usize> {
+        Ok(match self.inode.inode().as_cacheable() {
             Some(cacheable) => {
                 if let Some(w) = cacheable.write_cached(offset, buf) {
                     w
@@ -79,11 +91,37 @@ impl FileHandle {
                 }
             }
             None => self.inode.inode().write_at(offset, buf)?,
-        };
+        })
+    }
 
-        self.offset.fetch_add(wrote, Ordering::SeqCst);
+    pub fn seek(&self, off: isize, whence: syscall_defs::SeekWhence) -> Result<usize> {
+        let meta = self.inode.inode().metadata()?;
 
-        Ok(wrote)
+        if meta.typ == FileType::File {
+            match whence {
+                syscall_defs::SeekWhence::SeekSet => {
+                    self.offset.store(off as usize, Ordering::SeqCst);
+                }
+                syscall_defs::SeekWhence::SeekCur => {
+                    let mut offset = self.offset.load(Ordering::SeqCst) as isize;
+
+                    offset += off;
+
+                    self.offset.store(offset as usize, Ordering::SeqCst);
+                }
+                syscall_defs::SeekWhence::SeekEnd => {
+                    let mut offset = meta.size as isize;
+
+                    offset += off;
+
+                    self.offset.store(offset as usize, Ordering::SeqCst);
+                }
+            }
+
+            Ok(self.offset.load(Ordering::SeqCst))
+        } else {
+            Err(FsError::NotFile)
+        }
     }
 
     pub fn flags(&self) -> OpenFlags {

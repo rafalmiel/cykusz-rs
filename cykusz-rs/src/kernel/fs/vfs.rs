@@ -45,4 +45,5 @@ pub trait DirEntIter: Send + Sync {
 pub struct Metadata {
     pub id: usize,
     pub typ: FileType,
+    pub size: usize,
 }

@@ -96,6 +96,49 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     };
 }
 
+pub fn sys_pread(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
+    let fd = fd as usize;
+
+    let task = current_task_ref();
+
+    return if let Some(f) = task.get_handle(fd) {
+        if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
+            Ok(f.read_at(make_buf_mut(buf, len), offset as usize)?)
+        } else {
+            Err(SyscallError::EACCES)
+        }
+    } else {
+        Err(SyscallError::EBADFD)
+    };
+}
+
+pub fn sys_pwrite(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
+    let fd = fd as usize;
+
+    let task = current_task_ref();
+    return if let Some(f) = task.get_handle(fd) {
+        if f.flags.intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
+            Ok(f.write_at(make_buf(buf, len), offset as usize)?)
+        } else {
+            Err(SyscallError::EACCES)
+        }
+    } else {
+        Err(SyscallError::EBADFD)
+    };
+}
+
+pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
+    let fd = fd as usize;
+    let off = off as isize;
+
+    let task = current_task_ref();
+    return if let Some(f) = task.get_handle(fd) {
+        Ok(f.seek(off, syscall_defs::SeekWhence::from(whence))?)
+    } else {
+        Err(SyscallError::EBADFD)
+    };
+}
+
 pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
     let cmd = FcntlCmd::from(cmd);
 

@@ -164,6 +164,30 @@ bitflags! {
     }
 }
 
+#[repr(usize)]
+pub enum SeekWhence {
+    SeekSet = 0,
+    SeekCur = 1,
+    SeekEnd = 2,
+}
+
+impl From<u64> for SeekWhence {
+    fn from(v: u64) -> Self {
+        match v {
+            0 => SeekWhence::SeekSet,
+            1 => SeekWhence::SeekCur,
+            2 => SeekWhence::SeekEnd,
+            _ => panic!("Invalid SeekWhence {}", v),
+        }
+    }
+}
+
+impl From<SeekWhence> for usize {
+    fn from(s: SeekWhence) -> Self {
+        s as u64 as usize
+    }
+}
+
 bitflags! {
     pub struct ConnectionFlags: usize {
         const UDP   = (1usize << 0);

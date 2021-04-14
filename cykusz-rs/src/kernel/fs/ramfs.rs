@@ -51,9 +51,15 @@ impl INode for LockedRamINode {
     fn metadata(&self) -> Result<Metadata> {
         let i = self.0.read();
 
+        let size = match &i.content {
+            Content::Bytes(b) => b.lock().len(),
+            _ => 0,
+        };
+
         let res = Ok(Metadata {
             id: i.id,
             typ: i.typ,
+            size,
         });
 
         res

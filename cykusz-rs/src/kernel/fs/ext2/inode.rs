@@ -411,6 +411,7 @@ impl INode for LockedExt2INode {
         Ok(Metadata {
             id: inode.id,
             typ: inode.d_inode.ftype().into(),
+            size: inode.d_inode.size_lower() as usize,
         })
     }
 

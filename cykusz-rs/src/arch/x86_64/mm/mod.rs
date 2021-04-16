@@ -13,7 +13,7 @@ pub const MMAP_USER_ADDR: VirtAddr = VirtAddr(0x7000_0000_0000);
 pub const PAGE_SIZE: usize = 4096;
 
 impl PhysAddr {
-    pub fn to_mapped(&self) -> MappedAddr {
+    pub const fn to_mapped(&self) -> MappedAddr {
         if self.0 < MAPPED.0 {
             MappedAddr(self.0 + MAPPED.0)
         } else {
@@ -31,8 +31,8 @@ impl PhysAddr {
 }
 
 impl VirtAddr {
-    pub fn to_phys(&self) -> PhysAddr {
-        if self >= &VIRT {
+    pub const fn to_phys(&self) -> PhysAddr {
+        if self.0 >= VIRT.0 {
             PhysAddr(self.0 - VIRT.0)
         } else {
             PhysAddr(self.0)
@@ -49,15 +49,15 @@ impl VirtAddr {
 }
 
 impl MappedAddr {
-    pub fn to_phys(&self) -> PhysAddr {
-        if self >= &MAPPED {
+    pub const fn to_phys(&self) -> PhysAddr {
+        if self.0 >= MAPPED.0 {
             PhysAddr(self.0 - MAPPED.0)
         } else {
             PhysAddr(self.0)
         }
     }
 
-    pub fn as_virt(&self) -> VirtAddr {
+    pub const fn as_virt(&self) -> VirtAddr {
         VirtAddr(self.0)
     }
 }

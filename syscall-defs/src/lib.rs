@@ -156,11 +156,12 @@ pub enum SyscallError {
 
 bitflags! {
     pub struct OpenFlags: usize {
-        const RDONLY      = 1 << 0;
-        const WRONLY      = 1 << 1;
-        const RDWR        = 1 << 2;
-        const CREAT       = 0o100;
-        const DIRECTORY   = 0o200;
+        const RDONLY      = 2;
+        const RDWR        = 3;
+        const WRONLY      = 5;
+        const CREAT       = 0x10;
+        const DIRECTORY   = 0x20;
+        const NOCTTY      = 0x80;
     }
 }
 

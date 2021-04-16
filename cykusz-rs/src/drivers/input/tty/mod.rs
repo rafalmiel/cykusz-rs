@@ -3,12 +3,14 @@ use alloc::sync::{Arc, Weak};
 use core::fmt::Debug;
 use core::fmt::{Error, Formatter};
 
+use input::*;
 use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT};
 use syscall_defs::OpenFlags;
 
-use crate::arch::output::ConsoleDriver;
+use crate::arch::output::{video, Color, ConsoleWriter};
 use crate::drivers::input::keymap;
 use crate::drivers::input::keys::KeyCode;
+use crate::drivers::input::tty::output::OutputBuffer;
 use crate::drivers::input::KeyListener;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
@@ -21,6 +23,9 @@ use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::task::Task;
 use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::wait_queue::WaitQueue;
+
+mod input;
+mod output;
 
 struct State {
     lshift: bool,
@@ -42,92 +47,11 @@ impl Debug for State {
     }
 }
 
-const BUFFER_SIZE: usize = 256;
-
-struct Buffer {
-    data: [u8; BUFFER_SIZE],
-    e: u32,
-    w: u32,
-    r: u32,
-}
-
-impl Buffer {
-    const fn new() -> Buffer {
-        Buffer {
-            data: [0u8; BUFFER_SIZE],
-            e: 0,
-            w: 0,
-            r: 0,
-        }
-    }
-
-    fn put_char(&mut self, data: u8) {
-        if (self.e + 1) % BUFFER_SIZE as u32 != self.r {
-            self.data[self.e as usize] = data;
-            self.e = (self.e + 1) % BUFFER_SIZE as u32;
-            print!("{}", data as char);
-        }
-    }
-
-    fn remove_all_edit(&mut self) -> usize {
-        let edit_size = if self.e < self.w {
-            BUFFER_SIZE as u32 - (self.w - self.e)
-        } else {
-            self.e - self.w
-        };
-
-        self.e = self.w;
-
-        edit_size as usize
-    }
-
-    fn remove_last_n(&mut self, n: usize) -> usize {
-        let mut remaining = n;
-
-        while self.e != self.w && remaining > 0 {
-            self.e = if self.e == 0 {
-                BUFFER_SIZE as u32 - 1
-            } else {
-                self.e - 1
-            };
-
-            remaining -= 1;
-        }
-
-        n - remaining
-    }
-
-    fn read(&mut self, buf: *mut u8, n: usize) -> usize {
-        let mut remaining = n;
-        let mut store = buf;
-
-        while self.r != self.w && remaining > 0 {
-            unsafe {
-                *store = self.data[self.r as usize];
-
-                store = store.offset(1);
-            }
-
-            remaining -= 1;
-            self.r = (self.r + 1) % BUFFER_SIZE as u32;
-        }
-
-        n - remaining
-    }
-
-    fn commit_write(&mut self) {
-        self.w = self.e;
-    }
-
-    fn has_data(&self) -> bool {
-        self.r != self.w
-    }
-}
-
 struct Tty {
     dev_id: usize,
     state: Spin<State>,
-    buffer: Spin<Buffer>,
+    buffer: Spin<InputBuffer>,
+    output: Spin<OutputBuffer>,
     wait_queue: WaitQueue,
     ctrl_task: Spin<Option<Arc<Task>>>,
     fg_group: Spin<Option<Arc<Group>>>,
@@ -172,10 +96,14 @@ impl State {
 
 impl Tty {
     fn new() -> Arc<Tty> {
+        let video = video();
+        let (sx, sy) = video.dimensions();
+        let output = OutputBuffer::new(sx, sy, 1000, Color::LightGreen, Color::Black);
         Arc::new_cyclic(|me| Tty {
             dev_id: crate::kernel::device::alloc_id(),
             state: Spin::new(State::new()),
-            buffer: Spin::new(Buffer::new()),
+            buffer: Spin::new(InputBuffer::new()),
+            output: Spin::new(output),
             wait_queue: WaitQueue::new(),
             ctrl_task: Spin::new(None),
             fg_group: Spin::new(None),
@@ -220,11 +148,9 @@ impl KeyListener for Tty {
                 state.altgr = !released;
             }
             KeyCode::KEY_BACKSPACE if !released => {
-                use crate::arch::output::writer;
                 let n = self.buffer.lock().remove_last_n(1);
                 if n > 0 {
-                    let w = writer();
-                    w.remove_last_n(n);
+                    self.output.lock().remove_last_n(n);
                 }
             }
             KeyCode::KEY_ENTER | KeyCode::KEY_KPENTER if !released => {
@@ -233,16 +159,15 @@ impl KeyListener for Tty {
                     buf.put_char('\n' as u8);
                     buf.commit_write();
                 }
+                self.output.lock().put_char(b'\n');
                 if let Some(_t) = &*self.ctrl_task.lock_irq() {
                     self.wait_queue.notify_all();
                 }
             }
             KeyCode::KEY_U if (state.lctrl || state.rctrl) && !released => {
-                use crate::arch::output::writer;
                 let n = self.buffer.lock().remove_all_edit();
                 if n > 0 {
-                    let w = writer();
-                    w.remove_last_n(n);
+                    self.output.lock().remove_last_n(n);
                 }
             }
             KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
@@ -274,6 +199,7 @@ impl KeyListener for Tty {
                     let sym = ((finalmap[key as usize] & 0xff) as u8) as char;
 
                     self.buffer.lock().put_char(sym as u8);
+                    self.output.lock().put_char(sym as u8);
                 }
             }
             _ => {}
@@ -373,6 +299,14 @@ impl INode for Tty {
         Ok(self.read(buf.as_mut_ptr(), buf.len())?)
     }
 
+    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, FsError> {
+        if let Err(_) = self.write_str(unsafe { core::str::from_utf8_unchecked(buf) }) {
+            Err(FsError::InvalidParam)
+        } else {
+            Ok(buf.len())
+        }
+    }
+
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool, FsError> {
         let has_data = self.buffer.lock().has_data();
 
@@ -383,16 +317,20 @@ impl INode for Tty {
         Ok(has_data)
     }
 
-    fn open(&self, _flags: OpenFlags) -> Result<(), FsError> {
+    fn open(&self, flags: OpenFlags) -> Result<(), FsError> {
         let current_task = current_task_ref();
 
-        let ctrl = self.ctrl_task.lock_irq();
+        let ctty = !flags.contains(OpenFlags::NOCTTY);
 
-        if ctrl.is_none() && current_task.is_session_leader() {
-            if current_task.terminal().terminal().is_none() {
-                drop(ctrl);
+        if ctty {
+            let ctrl = self.ctrl_task.lock_irq();
 
-                current_task.terminal().connect(tty().clone());
+            if ctrl.is_none() && current_task.is_session_leader() {
+                if current_task.terminal().terminal().is_none() {
+                    drop(ctrl);
+
+                    current_task.terminal().connect(tty().clone());
+                }
             }
         }
 
@@ -447,6 +385,13 @@ impl INode for Tty {
     }
 }
 
+impl ConsoleWriter for Tty {
+    fn write_str(&self, s: &str) -> core::fmt::Result {
+        self.output.lock().write_str(s);
+        Ok(())
+    }
+}
+
 lazy_static! {
     static ref TTY: Arc<Tty> = Tty::new();
 }
@@ -473,6 +418,8 @@ fn init() {
     if let Err(v) = crate::kernel::tty::register_tty(tty().clone()) {
         panic!("Failed to register Tty terminal {:?}", v);
     }
+    crate::arch::output::register_output_driver(tty().as_ref());
+    video().clear();
 }
 
 module_init!(init);

@@ -21,7 +21,7 @@ macro_rules! align_impl {
                 } else if align == 0 {
                     self
                 } else {
-                    panic!("`align` must be a power of 2: {}", align);
+                    self - (self % align)
                 }
             }
 

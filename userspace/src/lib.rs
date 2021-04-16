@@ -31,16 +31,19 @@ pub fn main() {}
 pub extern "C" fn _start() -> ! {
     /* fd 0 stdin */
     if syscall::fcntl(0, FcntlCmd::GetFL) == Err(SyscallError::EBADFD) {
-        syscall::open("/dev/stdin", OpenFlags::RDONLY).expect("Failed to open /dev/stdin");
+        syscall::open("/dev/tty", OpenFlags::RDONLY | OpenFlags::NOCTTY)
+            .expect("Failed to open /dev/stdin");
     }
     /* fd 1 stdout */
     if syscall::fcntl(1, FcntlCmd::GetFL) == Err(SyscallError::EBADFD) {
-        syscall::open("/dev/stdout", OpenFlags::WRONLY).expect("Failed to open /dev/stdout");
+        syscall::open("/dev/tty", OpenFlags::WRONLY | OpenFlags::NOCTTY)
+            .expect("Failed to open /dev/stdout");
     }
 
     /* fd 2 stderr*/
     if syscall::fcntl(2, FcntlCmd::GetFL) == Err(SyscallError::EBADFD) {
-        syscall::open("/dev/stdout", OpenFlags::WRONLY).expect("Failed to open /dev/stdout");
+        syscall::open("/dev/tty", OpenFlags::WRONLY | OpenFlags::NOCTTY)
+            .expect("Failed to open /dev/stdout");
     }
 
     user_alloc::init();

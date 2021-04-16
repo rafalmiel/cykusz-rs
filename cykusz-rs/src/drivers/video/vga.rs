@@ -1,48 +1,12 @@
 use core::ptr::Unique;
 
-use crate::arch::output::ConsoleDriver;
+use crate::arch::mm::PhysAddr;
+use crate::arch::output::{Color, ColorCode, ScreenChar, VideoDriver};
 use crate::arch::raw::cpuio::Port;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sync::Spin;
 
-#[allow(unused)]
-#[repr(u8)]
-pub enum Color {
-    Black = 0,
-    Blue = 1,
-    Green = 2,
-    Cyan = 3,
-    Red = 4,
-    Magenta = 5,
-    Brown = 6,
-    LightGray = 7,
-    DarkGray = 8,
-    LightBlue = 9,
-    LightGreen = 10,
-    LightCyan = 11,
-    LightRed = 12,
-    Pink = 13,
-    Yellow = 14,
-    White = 15,
-}
-
-#[derive(Clone, Copy)]
-pub struct ColorCode(u8);
-
-impl ColorCode {
-    pub const fn new(foreground: Color, background: Color) -> ColorCode {
-        ColorCode((background as u8) << 4 | (foreground as u8))
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-struct ScreenChar {
-    char: u8,
-    color: ColorCode,
-}
-
-const VGA_BUFFER: MappedAddr = MappedAddr(0xffff8000000b8000);
+const VGA_BUFFER: MappedAddr = PhysAddr(0xb8000).to_mapped();
 
 static CURSOR_INDEX: Spin<Port<u8>> = Spin::new(unsafe { Port::new(0x3D4) });
 static CURSOR_DATA: Spin<Port<u8>> = Spin::new(unsafe { Port::new(0x3D5) });
@@ -77,10 +41,7 @@ pub struct Writer {
 }
 
 fn mk_scr_char(c: u8, clr: ColorCode) -> ScreenChar {
-    ScreenChar {
-        char: c,
-        color: clr,
-    }
+    ScreenChar::new(c, clr)
 }
 
 impl State {
@@ -167,28 +128,8 @@ impl State {
     fn clear(&mut self) {
         let blank = mk_scr_char(b' ', self.color);
 
-        for i in 0..(BUFFER_HEIGHT * BUFFER_WIDTH) {
-            self.buffer().chars[i] = blank;
-        }
-        update_cursor(self.buffer_pos());
-    }
+        self.buffer().chars.fill(blank);
 
-    fn remove_last_n(&mut self, mut n: usize) {
-        let blank = mk_scr_char(b' ', self.color);
-        while n > 0 {
-            let pos = self.buffer_pos();
-            if pos == 0 {
-                return;
-            }
-            self.buffer().chars[pos as usize - 1] = blank;
-            if self.column == 0 {
-                self.column = 79;
-                self.row -= 1;
-            } else {
-                self.column -= 1;
-            }
-            n -= 1;
-        }
         update_cursor(self.buffer_pos());
     }
 }
@@ -201,23 +142,40 @@ impl Writer {
     }
 }
 
-impl ConsoleDriver for Writer {
+impl VideoDriver for Writer {
     fn write_str(&self, s: &str) -> ::core::fmt::Result {
-        crate::arch::dev::serial::write(s);
         self.state.lock().write_str(s)
+    }
+
+    fn update_cursor(&self, x: usize, y: usize) {
+        update_cursor((x + y * BUFFER_WIDTH) as u16)
     }
 
     fn clear(&self) {
         self.state.lock().clear()
     }
 
-    fn remove_last_n(&self, n: usize) {
-        self.state.lock().remove_last_n(n)
+    fn dimensions(&self) -> (usize, usize) {
+        (BUFFER_WIDTH, BUFFER_HEIGHT)
+    }
+
+    fn copy_txt_buffer(&self, x: usize, y: usize, buf: &[ScreenChar]) {
+        if x >= BUFFER_WIDTH || y >= BUFFER_HEIGHT {
+            return;
+        }
+
+        let offset = y * BUFFER_WIDTH + x;
+        let len = core::cmp::min(BUFFER_HEIGHT * BUFFER_WIDTH - offset, buf.len());
+
+        let mut state = self.state.lock();
+        unsafe {
+            state.buffer.as_mut().chars[offset..offset + len].copy_from_slice(buf);
+        }
     }
 }
 
-static WRITER: Writer = Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER);
+static VGA: Writer = Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER);
 
 pub fn init() {
-    crate::arch::output::register_console_driver(&WRITER);
+    crate::arch::output::register_video_driver(&VGA);
 }

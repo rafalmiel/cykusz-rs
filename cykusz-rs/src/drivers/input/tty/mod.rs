@@ -184,6 +184,18 @@ impl KeyListener for Tty {
                     })
                 }
             }
+            KeyCode::KEY_PAGEDOWN if !released => {
+                self.output.lock().scroll_down(20);
+            }
+            KeyCode::KEY_PAGEUP if !released => {
+                self.output.lock().scroll_up(20);
+            }
+            KeyCode::KEY_HOME if !released => {
+                self.output.lock().scroll_top();
+            }
+            KeyCode::KEY_END if !released => {
+                self.output.lock().scroll_bottom();
+            }
             _ if !released => {
                 if let Some(finalmap) = state.map(false).map_or(None, |map| {
                     match state.caps {

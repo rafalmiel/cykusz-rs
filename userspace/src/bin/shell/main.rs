@@ -547,7 +547,7 @@ fn exec(cmd: &str) {
     } else if cmd.is_empty() {
         return;
     } else if cmd == "hello_test" {
-        for _ in 0..10000 {
+        for _ in 0..100 {
             start_process("/bin/hello", Some(&["hello"]), None);
         }
     } else {

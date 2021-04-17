@@ -1,11 +1,9 @@
 use alloc::vec::Vec;
 
-use crate::drivers::input::keys::KeyCode;
+use crate::kernel::kbd::keys::KeyCode;
 use crate::kernel::sync::RwSpin;
 
-pub mod keymap;
 pub mod keys;
-pub mod tty;
 
 pub trait KeyListener: Sync {
     fn on_new_key(&self, key: keys::KeyCode, released: bool);

@@ -1,4 +1,4 @@
-use crate::drivers::input::keys::KeyCode;
+use crate::kernel::kbd::keys::KeyCode;
 
 macro_rules! init_arr (
     ($a: ident, $([$k: expr, $v: expr]),+) => {

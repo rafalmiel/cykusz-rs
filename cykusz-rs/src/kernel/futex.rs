@@ -69,11 +69,9 @@ impl FutexContainer {
                     Ok(0)
                 }
             } else {
-                println!("futex eagain");
                 Err(SyscallError::EAGAIN)
             }
         } else {
-            println!("futex einval");
             Err(SyscallError::EINVAL)
         }
     }

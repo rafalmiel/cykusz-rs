@@ -25,14 +25,11 @@ pub struct StdIn {
 
 impl INode for StdIn {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        Ok(crate::drivers::input::tty::read(
-            buf.as_mut_ptr(),
-            buf.len(),
-        )?)
+        Ok(crate::drivers::tty::read(buf.as_mut_ptr(), buf.len())?)
     }
 
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
-        crate::drivers::input::tty::poll_listen(ptable)
+        crate::drivers::tty::poll_listen(ptable)
     }
 }
 

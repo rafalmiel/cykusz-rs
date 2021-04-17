@@ -8,13 +8,11 @@ use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT};
 use syscall_defs::OpenFlags;
 
 use crate::arch::output::{video, Color, ConsoleWriter};
-use crate::drivers::input::keymap;
-use crate::drivers::input::keys::KeyCode;
-use crate::drivers::input::tty::output::OutputBuffer;
-use crate::drivers::input::KeyListener;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
+use crate::kernel::kbd::keys::KeyCode;
+use crate::kernel::kbd::KeyListener;
 use crate::kernel::sched::{current_task, current_task_ref};
 use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::SignalResult;
@@ -24,7 +22,10 @@ use crate::kernel::task::Task;
 use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
+use self::output::OutputBuffer;
+
 mod input;
+mod keymap;
 mod output;
 
 struct State {
@@ -98,7 +99,7 @@ impl Tty {
     fn new() -> Arc<Tty> {
         let video = video();
         let (sx, sy) = video.dimensions();
-        let output = OutputBuffer::new(sx, sy, 1000, Color::LightGreen, Color::Black);
+        let output = OutputBuffer::new(sx, sy, 10000, Color::LightGreen, Color::Black);
         Arc::new_cyclic(|me| Tty {
             dev_id: crate::kernel::device::alloc_id(),
             state: Spin::new(State::new()),
@@ -195,6 +196,12 @@ impl KeyListener for Tty {
             }
             KeyCode::KEY_END if !released => {
                 self.output.lock().scroll_bottom();
+            }
+            KeyCode::KEY_UP if !released => {
+                self.output.lock().scroll_up(1);
+            }
+            KeyCode::KEY_DOWN if !released => {
+                self.output.lock().scroll_down(1);
             }
             _ if !released => {
                 if let Some(finalmap) = state.map(false).map_or(None, |map| {
@@ -412,18 +419,8 @@ fn tty() -> &'static Arc<Tty> {
     &TTY
 }
 
-pub fn read(buf: *mut u8, len: usize) -> SignalResult<usize> {
-    let l = tty();
-
-    l.read(buf, len)
-}
-
-pub fn poll_listen(ptable: Option<&mut PollTable>) -> Result<bool, FsError> {
-    tty().poll(ptable)
-}
-
 fn init() {
-    crate::drivers::input::register_key_listener(tty().as_ref());
+    crate::kernel::kbd::register_key_listener(tty().as_ref());
     if let Err(v) = crate::kernel::device::register_device(tty().clone()) {
         panic!("Failed to register Tty device: {:?}", v);
     }

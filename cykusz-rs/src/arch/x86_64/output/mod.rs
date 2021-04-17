@@ -2,7 +2,7 @@ use core::fmt::Error;
 
 use crate::kernel::sync::{Spin, SpinGuard};
 
-#[allow(unused)]
+#[derive(Copy, Clone)]
 #[repr(u8)]
 pub enum Color {
     Black = 0,

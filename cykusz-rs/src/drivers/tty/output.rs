@@ -43,16 +43,17 @@ impl OutputUpdate {
 }
 
 impl OutputBuffer {
+    fn blank(&self) -> ScreenChar {
+        ScreenChar::new(b' ', self.color)
+    }
+
     pub fn new(size_x: usize, size_y: usize, backlog: usize, fg: Color, bg: Color) -> OutputBuffer {
         let y = core::cmp::max(size_y, backlog);
 
         let buf_size = size_x * y;
 
         let mut buffer = Vec::<ScreenChar>::with_capacity(buf_size);
-        buffer.resize(
-            buf_size,
-            ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)),
-        );
+        buffer.resize(buf_size, ScreenChar::new(b' ', ColorCode::new(fg, bg)));
 
         OutputBuffer {
             buffer,
@@ -89,11 +90,23 @@ impl OutputBuffer {
 
         self.line_count += 1;
 
-        let line_pos = (self.buffer_start_y + self.line_count) % self.buffer_lines;
+        let blank = self.blank();
 
-        self.buffer[line_pos * self.size_x..line_pos * self.size_x + self.size_x].fill(
-            ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)),
-        );
+        self.get_buffer_line_mut(self.cursor_y).fill(blank);
+    }
+
+    fn set_viewport_line(&mut self, line: usize) {
+        assert!(line < self.buffer_lines);
+
+        self.viewport_y = (self.buffer_start_y + line) % self.buffer_lines;
+    }
+
+    fn inc_viewport_y(&mut self, by: usize) {
+        self.viewport_y = (self.viewport_y + by) % self.buffer_lines;
+    }
+
+    fn inc_buffer_start_y(&mut self, by: usize) {
+        self.buffer_start_y = (self.buffer_start_y + by) % self.buffer_lines;
     }
 
     fn store_char(&mut self, char: u8, update: &mut OutputUpdate) {
@@ -129,7 +142,8 @@ impl OutputBuffer {
             let off = self.cursor_y - self.size_y + 1;
 
             self.cursor_y = self.size_y - 1;
-            self.viewport_y = (off + self.viewport_y) % self.buffer_lines;
+
+            self.inc_viewport_y(off);
 
             *update = OutputUpdate::Viewport;
         }
@@ -137,34 +151,30 @@ impl OutputBuffer {
         if self.line_count > self.buffer_lines {
             let amount = self.line_count - self.buffer_lines;
 
-            //let old_y = self.buffer_start_y;
-            self.buffer_start_y = (self.buffer_start_y + amount) % self.buffer_lines;
-
-            //if old_y < self.buffer_start_y {
-            //    let old_pos = old_y * self.size_x;
-
-            //    self.buffer[old_pos + self.cursor_x..old_pos + amount * self.size_x].fill(
-            //        ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)),
-            //    )
-            //} else {
-            //    //self.buffer[old_y * self.size_x..].fill(ScreenChar::new(
-            //    //    0,
-            //    //    ColorCode::new(Color::Black, Color::Black),
-            //    //));
-            //    //self.buffer[..self.buffer_start_y * self.size_x].fill(ScreenChar::new(
-            //    //    0,
-            //    //    ColorCode::new(Color::Black, Color::Black),
-            //    //));
-            //}
+            self.inc_buffer_start_y(amount);
 
             self.line_count = self.buffer_lines;
         }
+    }
+
+    fn get_buffer_line_mut(&mut self, line: usize) -> &mut [ScreenChar] {
+        let buf = (self.viewport_y * self.size_x + line * self.size_x) % self.buffer.len();
+
+        &mut self.buffer[buf..buf + self.size_x]
     }
 
     fn get_buffer_line(&self, line: usize) -> &[ScreenChar] {
         let buf = (self.viewport_y * self.size_x + line * self.size_x) % self.buffer.len();
 
         &self.buffer[buf..buf + self.size_x]
+    }
+
+    fn viewport_buf_start(&self) -> usize {
+        self.viewport_y * self.size_x
+    }
+
+    fn viewport_buf_end(&self) -> usize {
+        (self.viewport_buf_start() + self.size_x * self.size_y) % self.buffer.len()
     }
 
     fn update_screen(&mut self, update: OutputUpdate) {
@@ -177,23 +187,16 @@ impl OutputBuffer {
                 }
             }
             OutputUpdate::Viewport => {
-                if self.viewport_y * self.size_x + self.size_x * self.size_y < self.buffer.len() {
-                    video.copy_txt_buffer(
-                        0,
-                        0,
-                        &self.buffer[self.viewport_y * self.size_x
-                            ..self.viewport_y * self.size_x + self.size_x * self.size_y],
-                    );
+                let viewport_start = self.viewport_buf_start();
+                let viewport_end = self.viewport_buf_end();
+
+                if viewport_start < viewport_end {
+                    video.copy_txt_buffer(0, 0, &self.buffer[viewport_start..viewport_end]);
                 } else {
-                    let split = self.buffer.len() - self.viewport_y * self.size_x;
                     let split_lines = self.buffer_lines - self.viewport_y;
 
-                    video.copy_txt_buffer(0, 0, &self.buffer[self.viewport_y * self.size_x..]);
-                    video.copy_txt_buffer(
-                        0,
-                        split_lines,
-                        &self.buffer[..self.size_x * self.size_y - split],
-                    );
+                    video.copy_txt_buffer(0, 0, &self.buffer[viewport_start..]);
+                    video.copy_txt_buffer(0, split_lines, &self.buffer[..viewport_end]);
                 }
             }
         }
@@ -226,10 +229,8 @@ impl OutputBuffer {
             current_line - lines
         };
 
-        let target_viewport_y = (self.buffer_start_y + target_line) % self.buffer_lines;
-
-        if target_viewport_y != self.viewport_y {
-            self.viewport_y = target_viewport_y;
+        if current_line != target_line {
+            self.set_viewport_line(target_line);
 
             true
         } else {
@@ -245,7 +246,7 @@ impl OutputBuffer {
         if current_line < max_line {
             current_line = core::cmp::min(current_line + lines, max_line);
 
-            self.viewport_y = (self.buffer_start_y + current_line) % self.buffer_lines;
+            self.set_viewport_line(current_line);
 
             true
         } else {
@@ -259,7 +260,7 @@ impl OutputBuffer {
         let current_line = self.viewport_line();
 
         if current_line < max_line {
-            self.viewport_y = (self.buffer_start_y + max_line) % self.buffer_lines;
+            self.set_viewport_line(max_line);
 
             true
         } else {
@@ -268,8 +269,8 @@ impl OutputBuffer {
     }
 
     fn _scroll_top(&mut self) -> bool {
-        if self.viewport_line() > self.size_y {
-            self.viewport_y = self.buffer_start_y;
+        if self.viewport_line() > 0 {
+            self.set_viewport_line(0);
 
             true
         } else {
@@ -334,7 +335,7 @@ impl OutputBuffer {
     }
 
     pub fn remove_last_n(&mut self, mut n: usize) {
-        let blank = ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black));
+        let blank = self.blank();
 
         let mut update = OutputUpdate::Line(self.cursor_y, 1);
 

@@ -47,7 +47,7 @@ impl KbdState {
 
                 drop(state);
 
-                crate::drivers::input::key_notify(key, released);
+                crate::kernel::kbd::key_notify(key, released);
             }
         }
     }

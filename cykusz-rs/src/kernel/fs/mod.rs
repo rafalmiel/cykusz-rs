@@ -30,7 +30,6 @@ pub mod mount;
 pub mod path;
 pub mod pcache;
 pub mod ramfs;
-pub mod stdio;
 pub mod vfs;
 
 static ROOT_MOUNT: Once<Arc<dyn Filesystem>> = Once::new();
@@ -100,10 +99,6 @@ pub fn init() {
 
         dev
     });
-
-    //init_cdboot();
-
-    stdio::init();
 }
 
 pub fn mount_root() {

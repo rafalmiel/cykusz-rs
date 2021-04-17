@@ -102,7 +102,7 @@ pub fn init() {
 struct Writer {}
 
 impl core::fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
         let console = OUTPUT_WRITER.lock_irq();
         console.write_str(s)
     }
@@ -111,17 +111,17 @@ impl core::fmt::Write for Writer {
 struct Log {}
 
 impl core::fmt::Write for Log {
-    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
         crate::arch::dev::serial::write(s);
         Ok(())
     }
 }
 
-pub fn write_fmt(args: ::core::fmt::Arguments) -> ::core::fmt::Result {
+pub fn write_fmt(args: core::fmt::Arguments) -> core::fmt::Result {
     core::fmt::write(&mut Writer {}, args)
 }
 
-pub fn log_fmt(args: ::core::fmt::Arguments) -> ::core::fmt::Result {
+pub fn log_fmt(args: core::fmt::Arguments) -> core::fmt::Result {
     core::fmt::write(&mut Log {}, args)
 }
 

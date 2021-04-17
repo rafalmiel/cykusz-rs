@@ -99,7 +99,7 @@ impl Tty {
     fn new() -> Arc<Tty> {
         let video = video();
         let (sx, sy) = video.dimensions();
-        let output = OutputBuffer::new(sx, sy, 10000, Color::LightGreen, Color::Black);
+        let output = OutputBuffer::new(sx, sy, 1000, Color::LightGreen, Color::Black);
         Arc::new_cyclic(|me| Tty {
             dev_id: crate::kernel::device::alloc_id(),
             state: Spin::new(State::new()),

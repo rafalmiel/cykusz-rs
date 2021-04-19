@@ -550,6 +550,8 @@ fn exec(cmd: &str) {
         for _ in 0..100 {
             start_process("/bin/hello", Some(&["hello"]), None);
         }
+    } else if cmd == "ansi_test" {
+        println!("\x1b[78G===========================");
     } else {
         let mut split = cmd.split_whitespace();
 

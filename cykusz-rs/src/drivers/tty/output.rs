@@ -20,25 +20,35 @@ pub struct OutputBuffer {
     size_y: usize,
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum OutputUpdate {
+    None,
     Line(usize, usize), // (x, num)
     Viewport,
 }
 
 impl OutputUpdate {
-    fn inc_lines(&mut self, by: usize) {
-        if let OutputUpdate::Line(_x, y) = self {
-            *y = *y + by;
+    fn update_line(&mut self, line: usize) {
+        match self {
+            OutputUpdate::None => *self = OutputUpdate::Line(line, 1),
+            OutputUpdate::Line(cur, len) => {
+                if line < *cur {
+                    let offset = *cur - line;
+
+                    *cur = line;
+                    *len += offset;
+                } else if *cur + *len < line {
+                    let offset = line - *cur + *len;
+
+                    *len += offset;
+                }
+            }
+            _ => {}
         }
     }
 
-    fn move_prev(&mut self) {
-        if let OutputUpdate::Line(x, y) = self {
-            if *x > 0 {
-                *x = *x - 1;
-            }
-            *y = *y + 1;
-        }
+    fn update_viewport(&mut self) {
+        *self = OutputUpdate::Viewport;
     }
 }
 
@@ -88,8 +98,6 @@ impl OutputBuffer {
         self.cursor_x = 0;
         self.cursor_y += 1;
 
-        self.line_count += 1;
-
         let blank = self.blank();
 
         self.get_buffer_line_mut(self.cursor_y).fill(blank);
@@ -110,11 +118,11 @@ impl OutputBuffer {
     }
 
     fn store_char(&mut self, char: u8, update: &mut OutputUpdate) {
+        log!("{}", char as char);
+
         match char {
             b'\n' => {
                 self.new_line();
-
-                update.inc_lines(1);
             }
             c => {
                 let pos = self.cursor_buf_pos();
@@ -122,21 +130,19 @@ impl OutputBuffer {
                 self.buffer[pos] = ScreenChar::new(c, self.color);
 
                 self.cursor_x += 1;
+
+                if self.cursor_x >= self.size_x {
+                    self.cursor_x = 0;
+                    self.cursor_y += 1;
+                }
             }
         }
+
+        update.update_line(self.cursor_y);
     }
 
     fn scroll(&mut self, update: &mut OutputUpdate) {
-        if self.cursor_x >= self.size_x {
-            let lines = self.cursor_x / self.size_x;
-
-            self.cursor_y += lines;
-            self.cursor_x = self.cursor_x % self.size_x;
-
-            self.line_count += lines;
-
-            update.inc_lines(lines);
-        }
+        self.line_count = self.current_line() + 1;
 
         if self.cursor_y >= self.size_y {
             let off = self.cursor_y - self.size_y + 1;
@@ -145,7 +151,7 @@ impl OutputBuffer {
 
             self.inc_viewport_y(off);
 
-            *update = OutputUpdate::Viewport;
+            update.update_viewport();
         }
 
         if self.line_count > self.buffer_lines {
@@ -181,6 +187,7 @@ impl OutputBuffer {
         let video = video();
 
         match update {
+            OutputUpdate::None => {}
             OutputUpdate::Line(line, num) => {
                 for l in line..line + num {
                     video.copy_txt_buffer(0, l, self.get_buffer_line(l));
@@ -202,6 +209,10 @@ impl OutputBuffer {
         }
 
         video.update_cursor(self.cursor_x, self.cursor_y);
+    }
+
+    fn current_line(&self) -> usize {
+        self.viewport_line() + self.cursor_y
     }
 
     fn viewport_line(&self) -> usize {
@@ -303,12 +314,11 @@ impl OutputBuffer {
     }
 
     pub fn put_char(&mut self, char: u8) {
-        log!("{}", char as char);
 
-        let mut update = OutputUpdate::Line(self.cursor_y, 1);
+        let mut update = OutputUpdate::None;
 
         if self._scroll_bottom() {
-            update = OutputUpdate::Viewport;
+            update.update_viewport();
         }
 
         self.store_char(char, &mut update);
@@ -319,16 +329,23 @@ impl OutputBuffer {
     }
 
     pub fn write_str(&mut self, str: &str) {
-        log!("{}", str);
-        let mut update = OutputUpdate::Line(self.cursor_y, 1);
+        let mut update = OutputUpdate::None;
 
         if self._scroll_bottom() {
-            update = OutputUpdate::Viewport;
+            update.update_viewport();
         }
 
-        for c in str.as_bytes().iter() {
-            self.store_char(*c, &mut update);
+        let mut performer = AnsiEscape::new(self, update);
+        let mut state = vte::Parser::new();
+
+        let bytes = str.as_bytes();
+
+        for c in bytes.iter() {
+            state.advance(&mut performer, *c);
         }
+
+        let mut update = performer.update_delta();
+
         self.scroll(&mut update);
 
         self.update_screen(update);
@@ -337,10 +354,10 @@ impl OutputBuffer {
     pub fn remove_last_n(&mut self, mut n: usize) {
         let blank = self.blank();
 
-        let mut update = OutputUpdate::Line(self.cursor_y, 1);
+        let mut update = OutputUpdate::None;
 
         if self._scroll_bottom() {
-            update = OutputUpdate::Viewport;
+            update.update_viewport();
         }
 
         while n > 0 && (self.cursor_x != 0 || self.cursor_y != 0) {
@@ -351,14 +368,122 @@ impl OutputBuffer {
             if self.cursor_x == 0 {
                 self.cursor_x = self.size_x - 1;
                 self.cursor_y -= 1;
-
-                update.move_prev();
             } else {
                 self.cursor_x -= 1;
             }
+
+            update.update_line(self.cursor_y);
+
             n -= 1;
         }
 
         self.update_screen(update);
+    }
+}
+
+struct AnsiEscape<'a> {
+    output: &'a mut OutputBuffer,
+    update: OutputUpdate,
+}
+
+impl<'a> AnsiEscape<'a> {
+    fn new(output: &'a mut OutputBuffer, update: OutputUpdate) -> AnsiEscape<'a> {
+        AnsiEscape::<'a> { output, update }
+    }
+
+    fn update_delta(&self) -> OutputUpdate {
+        self.update
+    }
+}
+
+impl<'a> vte::Perform for AnsiEscape<'a> {
+    fn print(&mut self, c: char) {
+        self.output.store_char(c as u8, &mut self.update);
+    }
+
+    fn execute(&mut self, byte: u8) {
+        if byte == b'\n' {
+            self.output.store_char(byte, &mut self.update);
+        }
+    }
+
+    fn csi_dispatch(
+        &mut self,
+        params: &vte::Params,
+        _intermediates: &[u8],
+        ignore: bool,
+        action: char,
+    ) {
+        use core::cmp::min;
+
+        if ignore {
+            return;
+        }
+
+        match action {
+            'H' | 'f' => {
+                let mut iter = params.iter();
+                let y = iter.next().unwrap_or(&[0u16])[0] as usize;
+                let x = iter.next().unwrap_or(&[0u16])[0] as usize;
+                self.output.cursor_y = min(y, self.output.size_y - 1);
+                self.output.cursor_x = min(x, self.output.size_x - 1);
+            }
+            'A' | 'F' => {
+                let mut iter = params.iter();
+
+                if let Some(&[x, ..]) = iter.next() {
+                    if self.output.cursor_y >= x as usize {
+                        self.output.cursor_y -= x as usize;
+                    } else {
+                        self.output.cursor_y = 0;
+                    }
+
+                    if action == 'F' {
+                        self.output.cursor_x = 0;
+                    }
+                }
+            }
+            'B' | 'E' => {
+                let mut iter = params.iter();
+
+                if let Some(&[x, ..]) = iter.next() {
+                    let cur = self.output.cursor_y;
+
+                    self.output.cursor_y = min(self.output.size_y - 1, cur + x as usize);
+
+                    if action == 'E' {
+                        self.output.cursor_x = 0;
+                    }
+                }
+            }
+            'C' => {
+                let mut iter = params.iter();
+
+                if let Some(&[x, ..]) = iter.next() {
+                    let cur = self.output.cursor_x;
+
+                    self.output.cursor_x = min(self.output.size_x - 1, cur + x as usize);
+                }
+            }
+            'D' => {
+                let mut iter = params.iter();
+
+                if let Some(&[x, ..]) = iter.next() {
+                    if self.output.cursor_x >= x as usize {
+                        self.output.cursor_x -= x as usize;
+                    } else {
+                        self.output.cursor_x = 0;
+                    }
+                }
+            }
+            'G' => {
+                let mut iter = params.iter();
+
+                if let Some(&[x, ..]) = iter.next() {
+                    self.output.cursor_x = min(x as usize, self.output.size_x - 1);
+                }
+            }
+            _ => {}
+        }
     }
 }

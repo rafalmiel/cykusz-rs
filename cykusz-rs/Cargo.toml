@@ -18,6 +18,7 @@ mmio = "*"
 downcast-rs = { version = "*", default-features = false }
 hashbrown = "*"
 lru = "*"
+vte = "*"
 
 [dependencies.chrono]
 default-features = false

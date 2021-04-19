@@ -13,6 +13,7 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::kbd::keys::KeyCode;
 use crate::kernel::kbd::KeyListener;
+use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::{current_task, current_task_ref};
 use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::SignalResult;
@@ -27,6 +28,8 @@ use self::output::OutputBuffer;
 mod input;
 mod keymap;
 mod output;
+
+const BACKLOG_SIZE: usize = 1000;
 
 struct State {
     lshift: bool,
@@ -99,7 +102,7 @@ impl Tty {
     fn new() -> Arc<Tty> {
         let video = video();
         let (sx, sy) = video.dimensions();
-        let output = OutputBuffer::new(sx, sy, 1000, Color::LightGreen, Color::Black);
+        let output = OutputBuffer::new(sx, sy, BACKLOG_SIZE, Color::LightGreen, Color::Black);
         Arc::new_cyclic(|me| Tty {
             dev_id: crate::kernel::device::alloc_id(),
             state: Spin::new(State::new()),
@@ -398,6 +401,18 @@ impl INode for Tty {
                 }
 
                 Err(FsError::NoTty)
+            }
+            syscall_defs::ioctl::tty::TIOCSWINSZ => Err(FsError::NotSupported),
+            syscall_defs::ioctl::tty::TIOCGWINSZ => {
+                let winsize =
+                    unsafe { VirtAddr(arg).read_mut::<syscall_defs::ioctl::tty::WinSize>() };
+
+                let (cols, rows) = video().dimensions();
+
+                winsize.ws_col = cols as u16;
+                winsize.ws_row = rows as u16;
+
+                Ok(0)
             }
             _ => Err(FsError::NotSupported),
         }

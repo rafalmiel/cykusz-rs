@@ -4,10 +4,6 @@ fn send(fd: usize) -> bool {
     let mut buf = [0u8; 1300];
 
     if let Ok(read) = syscall::read(0, &mut buf) {
-        if read == 1 {
-            return false;
-        }
-
         if let Err(err) = syscall::write(fd, &buf[..read]) {
             println!("Send failed {:?}", err);
 

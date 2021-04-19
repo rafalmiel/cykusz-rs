@@ -1,5 +1,7 @@
 use core::fmt::Error;
 
+use bit_field::BitField;
+
 use crate::kernel::sync::{Spin, SpinGuard};
 
 #[derive(Copy, Clone)]
@@ -23,12 +25,50 @@ pub enum Color {
     White = 15,
 }
 
+impl Color {
+    pub fn brighten(self) -> Color {
+        match self {
+            Color::Black => Color::DarkGray,
+            Color::Blue => Color::LightBlue,
+            Color::Green => Color::LightGreen,
+            Color::Cyan => Color::LightCyan,
+            Color::Red => Color::LightRed,
+            Color::Magenta => Color::Pink,
+            Color::Brown => Color::Yellow,
+            Color::LightGray => Color::White,
+            _ => self,
+        }
+    }
+
+    pub fn dim(self) -> Color {
+        match self {
+            Color::DarkGray => Color::Black,
+            Color::LightBlue => Color::Blue,
+            Color::LightGreen => Color::Green,
+            Color::LightCyan => Color::Cyan,
+            Color::LightRed => Color::Red,
+            Color::Pink => Color::Magenta,
+            Color::Yellow => Color::Brown,
+            Color::White => Color::LightGray,
+            _ => self,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct ColorCode(u8);
 
 impl ColorCode {
     pub const fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
+    }
+
+    pub fn set_fg(&mut self, c: Color) {
+        self.0.set_bits(0..=3, c as u8);
+    }
+
+    pub fn set_bg(&mut self, c: Color) {
+        self.0.set_bits(4..=7, c as u8);
     }
 }
 

@@ -551,7 +551,7 @@ fn exec(cmd: &str) {
             start_process("/bin/hello", Some(&["hello"]), None);
         }
     } else if cmd == "ansi_test" {
-        println!("\x1b[78G===========================");
+        println!("\x1b[1;31;107m===========================\x1b[0m");
     } else {
         let mut split = cmd.split_whitespace();
 

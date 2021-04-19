@@ -314,7 +314,6 @@ impl OutputBuffer {
     }
 
     pub fn put_char(&mut self, char: u8) {
-
         let mut update = OutputUpdate::None;
 
         if self._scroll_bottom() {
@@ -394,6 +393,52 @@ impl<'a> AnsiEscape<'a> {
     fn update_delta(&self) -> OutputUpdate {
         self.update
     }
+}
+
+enum ParsedColor {
+    Unknown,
+    Foreground(Color),
+    Background(Color),
+}
+
+fn to_color(code: u16) -> ParsedColor {
+    match code {
+        30 => return ParsedColor::Foreground(Color::Black),
+        31 => return ParsedColor::Foreground(Color::Red),
+        32 => return ParsedColor::Foreground(Color::Green),
+        33 => return ParsedColor::Foreground(Color::Brown),
+        34 => return ParsedColor::Foreground(Color::Blue),
+        35 => return ParsedColor::Foreground(Color::Magenta),
+        36 => return ParsedColor::Foreground(Color::Cyan),
+        37 => return ParsedColor::Foreground(Color::LightGray),
+        40 => return ParsedColor::Background(Color::Black),
+        41 => return ParsedColor::Background(Color::Red),
+        42 => return ParsedColor::Background(Color::Green),
+        43 => return ParsedColor::Background(Color::Brown),
+        44 => return ParsedColor::Background(Color::Blue),
+        45 => return ParsedColor::Background(Color::Magenta),
+        46 => return ParsedColor::Background(Color::Cyan),
+        47 => return ParsedColor::Background(Color::LightGray),
+        90 => return ParsedColor::Foreground(Color::DarkGray),
+        91 => return ParsedColor::Foreground(Color::LightRed),
+        92 => return ParsedColor::Foreground(Color::LightGreen),
+        93 => return ParsedColor::Foreground(Color::Yellow),
+        94 => return ParsedColor::Foreground(Color::LightBlue),
+        95 => return ParsedColor::Foreground(Color::Pink),
+        96 => return ParsedColor::Foreground(Color::LightCyan),
+        97 => return ParsedColor::Foreground(Color::White),
+        100 => return ParsedColor::Background(Color::DarkGray),
+        101 => return ParsedColor::Background(Color::LightRed),
+        102 => return ParsedColor::Background(Color::LightGreen),
+        103 => return ParsedColor::Background(Color::Yellow),
+        104 => return ParsedColor::Background(Color::LightBlue),
+        105 => return ParsedColor::Background(Color::Pink),
+        106 => return ParsedColor::Background(Color::LightCyan),
+        107 => return ParsedColor::Background(Color::White),
+        _ => {}
+    };
+
+    ParsedColor::Unknown
 }
 
 impl<'a> vte::Perform for AnsiEscape<'a> {
@@ -481,6 +526,49 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
 
                 if let Some(&[x, ..]) = iter.next() {
                     self.output.cursor_x = min(x as usize, self.output.size_x - 1);
+                }
+            }
+            'm' => {
+                let iter = params.iter();
+
+                let mut bright = false;
+                let mut dim = false;
+
+                for m in iter {
+                    if !m.is_empty() {
+                        let m = m[0];
+
+                        match m {
+                            0 => {
+                                bright = false;
+                                dim = false;
+                                self.output.color = ColorCode::new(Color::LightGreen, Color::Black);
+                            }
+                            1 => {
+                                bright = true;
+                                dim = false;
+                            }
+                            2 => {
+                                dim = true;
+                                bright = false;
+                            }
+                            m => match to_color(m) {
+                                ParsedColor::Background(c) => {
+                                    self.output.color.set_bg(c);
+                                }
+                                ParsedColor::Foreground(mut c) => {
+                                    if dim {
+                                        c = c.dim();
+                                    } else if bright {
+                                        c = c.brighten();
+                                    }
+
+                                    self.output.color.set_fg(c);
+                                }
+                                ParsedColor::Unknown => {}
+                            },
+                        }
+                    }
                 }
             }
             _ => {}

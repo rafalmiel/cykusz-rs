@@ -2,6 +2,8 @@ use alloc::vec::Vec;
 
 use crate::arch::output::{video, Color, ColorCode, ScreenChar};
 
+use crate::kernel::utils::types::Align;
+
 pub struct OutputBuffer {
     buffer: Vec<ScreenChar>,
 
@@ -100,7 +102,9 @@ impl OutputBuffer {
 
         let blank = self.blank();
 
-        self.get_buffer_line_mut(self.cursor_y).fill(blank);
+        if self.cursor_y >= self.size_y {
+            self.get_buffer_line_mut(self.cursor_y).fill(blank);
+        }
     }
 
     fn set_viewport_line(&mut self, line: usize) {
@@ -468,8 +472,10 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
         match action {
             'H' | 'f' => {
                 let mut iter = params.iter();
-                let y = iter.next().unwrap_or(&[0u16])[0] as usize;
-                let x = iter.next().unwrap_or(&[0u16])[0] as usize;
+                let y = iter.next().unwrap_or(&[1u16])[0] as usize;
+                let x = iter.next().unwrap_or(&[1u16])[0] as usize;
+                let y = if y != 0 { y - 1} else { y };
+                let x = if x != 0 { x - 1} else { x };
                 self.output.cursor_y = min(y, self.output.size_y - 1);
                 self.output.cursor_x = min(x, self.output.size_x - 1);
             }
@@ -570,6 +576,75 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                         }
                     }
                 }
+            }
+            'K' => {
+                let mut iter = params.iter();
+                if let Some(&[x, ..]) = iter.next() {
+                    let buf_pos = self.output.cursor_buf_pos();
+
+                    let blank = self.output.blank();
+
+                    match x {
+                        0 => {
+                            let end = buf_pos.align_up(self.output.size_x);
+
+                            self.output.buffer[buf_pos..end].fill(blank);
+
+                            self.update.update_line(self.output.cursor_y);
+                        },
+                        1 => {
+                            let beg = buf_pos.align_down(self.output.size_x);
+
+                            self.output.buffer[beg..=buf_pos].fill(blank);
+
+                            self.update.update_line(self.output.cursor_y);
+                        },
+                        2 => {
+                            let beg = buf_pos.align_down(self.output.size_x);
+                            let end = buf_pos.align_up(self.output.size_x);
+
+                            self.output.buffer[beg..end].fill(blank);
+
+                            self.update.update_line(self.output.cursor_y);
+                        },
+                        _ => {}
+                    }
+                }
+            }
+            'J' => {
+                let mut iter = params.iter();
+                if let Some(&[x, ..]) = iter.next() {
+                    let v_buf_start = self.output.viewport_buf_start();
+                    let v_buf_end = self.output.viewport_buf_end();
+                    let c_buf_pos = self.output.cursor_buf_pos();
+
+                    if let Some((clear_start, clear_end)) = match x {
+                        0 => {
+                            Some((c_buf_pos, v_buf_end))
+                        },
+                        1 => {
+                            Some((v_buf_start, c_buf_pos + 1))
+                        },
+                        2 => {
+                            Some((v_buf_start, v_buf_end))
+                        },
+                        _ => {
+                            None
+                        }
+                    } {
+                        let blank = self.output.blank();
+
+                        if clear_start < clear_end {
+                            self.output.buffer[clear_start..clear_end].fill(blank);
+                        } else {
+                            self.output.buffer[clear_start..].fill(blank);
+                            self.output.buffer[..clear_end].fill(blank);
+                        }
+
+                        self.update.update_viewport();
+                    }
+                }
+
             }
             _ => {}
         }

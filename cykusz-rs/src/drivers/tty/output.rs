@@ -146,7 +146,7 @@ impl OutputBuffer {
     }
 
     fn scroll(&mut self, update: &mut OutputUpdate) {
-        self.line_count = self.current_line() + 1;
+        self.line_count = core::cmp::max(self.line_count, self.current_line() + 1);
 
         if self.cursor_y >= self.size_y {
             let off = self.cursor_y - self.size_y + 1;

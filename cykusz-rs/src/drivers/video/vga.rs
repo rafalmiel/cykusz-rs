@@ -1,3 +1,5 @@
+use bit_field::BitField;
+
 use core::ptr::Unique;
 
 use crate::arch::mm::PhysAddr;
@@ -176,6 +178,25 @@ impl VideoDriver for Writer {
 
 static VGA: Writer = Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER);
 
+// References:
+// - http://www.osdever.net/FreeVGA/vga/attrreg.htm#10
+// - http://www.osdever.net/FreeVGA/vga/vgareg.htm#attribute
+fn disable_text_blink() {
+    let mut input_status = unsafe { Port::<u8>::new(0x3da) };
+
+    let mut attr_reg = unsafe { Port::<u8>::new(0x3c0) };
+
+    input_status.read();
+    let attr = attr_reg.read();
+    attr_reg.write(0x10 | 0b100000);
+    let mut val = attr_reg.read();
+    val.set_bit(3, false);
+    attr_reg.write(val);
+    attr_reg.write(attr);
+}
+
 pub fn init() {
+    disable_text_blink();
+
     crate::arch::output::register_video_driver(&VGA);
 }

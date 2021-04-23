@@ -32,6 +32,7 @@ pub enum TaskState {
     Unused = 0,
     Runnable = 2,
     AwaitingIo = 4,
+    Stopped = 5,
 }
 
 impl From<usize> for TaskState {
@@ -42,6 +43,7 @@ impl From<usize> for TaskState {
             0 => Unused,
             2 => Runnable,
             4 => AwaitingIo,
+            5 => Stopped,
             _ => unreachable!(),
         }
     }
@@ -503,6 +505,11 @@ impl Task {
             TriggerResult::Ignored => {
                 return false;
             }
+            TriggerResult::Execute(f) => {
+                f(self.me());
+
+                true
+            }
             TriggerResult::Blocked => {
                 // Find other thread in process to notify
                 let process_leader = self.process_leader();
@@ -567,7 +574,7 @@ impl Task {
             }
 
             unsafe {
-                self.arch_task_mut().deallocate_kernel();
+                self.arch_task_mut().deallocate();
             }
         }
     }

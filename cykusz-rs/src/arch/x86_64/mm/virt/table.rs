@@ -360,6 +360,18 @@ impl Table<Level4> {
         }
     }
 
+    pub fn unref_table_with(&mut self, f: impl Fn(&mut P4Table)) {
+        if let Some(page) = self.phys_page() {
+            if page.dec_vm_use_count() == 0 {
+                f(self);
+
+                let frame = Frame::new(self.phys_addr());
+
+                crate::kernel::mm::deallocate(&frame);
+            }
+        }
+    }
+
     pub fn to_phys(&self, addr: VirtAddr) -> Option<PhysAddr> {
         let _g = self.lock();
 

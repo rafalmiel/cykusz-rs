@@ -52,7 +52,7 @@ impl Group {
         let mut procs = self.processes.lock();
 
         if procs.insert(process.pid(), process).is_some() {
-            panic!("Task already registered");
+            println!("[ SESSION ] Registered task replaced");
         }
     }
 

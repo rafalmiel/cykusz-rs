@@ -39,6 +39,8 @@ struct Queues {
 
     awaiting: LinkedList<SchedTaskAdapter>,
 
+    stopped: LinkedList<SchedTaskAdapter>,
+
     dead: LinkedList<SchedTaskAdapter>,
     dead_wq: WaitQueue,
 
@@ -57,6 +59,7 @@ impl Default for Queues {
             runnable: LinkedList::new(SchedTaskAdapter::new()),
             deadline_awaiting: LinkedList::new(SchedTaskAdapter::new()),
             awaiting: LinkedList::new(SchedTaskAdapter::new()),
+            stopped: LinkedList::new(SchedTaskAdapter::new()),
 
             dead: LinkedList::new(SchedTaskAdapter::new()),
             dead_wq: WaitQueue::new(),
@@ -208,6 +211,30 @@ impl Queues {
         }
     }
 
+    fn stop(&mut self, lock: SpinGuard<()>) {
+        let task = get_current().clone();
+
+        assert_ne!(
+            task.tid(),
+            self.idle_task.tid(),
+            "Idle task should not sleep"
+        );
+
+        self.push_stopped(task);
+
+        self.reschedule(lock);
+    }
+
+    fn cont(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
+        if task.state() == TaskState::Stopped {
+            let mut cursor = unsafe { self.stopped.cursor_mut_from_ptr(task.as_ref()) };
+
+            if let Some(task) = cursor.remove() {
+                self.push_runnable(task);
+            }
+        }
+    }
+
     fn exit(&mut self, lock: SpinGuard<()>) -> ! {
         let current = get_current().process_leader();
 
@@ -256,6 +283,16 @@ impl Queues {
         task.set_sleep_until(0);
 
         self.awaiting.push_back(task);
+    }
+
+    fn push_stopped(&mut self, task: Arc<Task>) {
+        assert_eq!(task.sched.is_linked(), false);
+        assert_ne!(task.tid(), self.idle_task.tid());
+
+        task.set_state(TaskState::Stopped);
+        task.set_sleep_until(0);
+
+        self.stopped.push_back(task);
     }
 
     fn push_deadline_awaiting(&mut self, task: Arc<Task>, time_ns: usize) {
@@ -333,6 +370,22 @@ impl SchedulerInterface for RRScheduler {
         let lock = lock.lock_irq();
 
         queue.wake(task, lock);
+    }
+
+    fn stop(&self) {
+        let (lock, queue) = self.queues.this_cpu_mut();
+
+        let lock = lock.lock_irq();
+
+        queue.stop(lock);
+    }
+
+    fn cont(&self, task: Arc<Task>) {
+        let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
+
+        let lock = lock.lock_irq();
+
+        queue.cont(task, lock);
     }
 
     fn exit(&self, _status: isize) -> ! {

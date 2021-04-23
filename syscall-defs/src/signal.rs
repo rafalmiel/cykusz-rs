@@ -6,6 +6,8 @@ pub const SIGBUS: usize = 7;
 pub const SIGFPE: usize = 8;
 pub const SIGSEGV: usize = 11;
 pub const SIGCHLD: usize = 17;
+pub const SIGCONT: usize = 18;
+pub const SIGSTOP: usize = 19;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SignalHandler {

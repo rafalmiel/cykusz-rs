@@ -49,6 +49,8 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn queue_task(&self, task: Arc<Task>);
     fn sleep(&self, until: Option<usize>) -> SignalResult<()>;
     fn wake(&self, task: Arc<Task>);
+    fn cont(&self, task: Arc<Task>);
+    fn stop(&self);
     fn exit(&self, status: isize) -> !;
     fn exit_thread(&self) -> !;
 }
@@ -139,6 +141,14 @@ impl Scheduler {
 
     fn wake(&self, task: Arc<Task>) {
         self.sched.wake(task);
+    }
+
+    fn stop(&self) {
+        self.sched.stop();
+    }
+
+    fn cont(&self, task: Arc<Task>) {
+        self.sched.cont(task);
     }
 
     fn close_all_tasks(&self) {
@@ -320,6 +330,14 @@ pub fn sleep(time_ns: Option<usize>) -> SignalResult<()> {
 
 pub fn wake(task: Arc<Task>) {
     scheduler().wake(task);
+}
+
+pub fn stop() {
+    scheduler().stop();
+}
+
+pub fn cont(task: Arc<Task>) {
+    scheduler().cont(task);
 }
 
 pub fn fork() -> Arc<Task> {

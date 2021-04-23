@@ -557,29 +557,20 @@ impl Task {
         let cr3 = self.cr3;
 
         self.ctx = Unique::dangling();
+
         if self.is_user() {
             let p4 = p4_table(PhysAddr(cr3));
-            p4.deallocate_user();
-            p4.unref_table();
+
+            p4.unref_table_with(|p| {
+                p.deallocate_user();
+            });
         }
+
         deallocate_order(
             &Frame::new(MappedAddr(self.stack_top).to_phys()),
             KERN_STACK_ORDER,
         );
-        self.stack_top = 0;
-    }
 
-    pub fn deallocate_kernel(&mut self) {
-        let cr3 = self.cr3;
-
-        if self.is_user() {
-            let p4 = p4_table(PhysAddr(cr3));
-            p4.unref_table();
-        }
-        deallocate_order(
-            &Frame::new(MappedAddr(self.stack_top).to_phys()),
-            KERN_STACK_ORDER,
-        );
         self.stack_top = 0;
     }
 

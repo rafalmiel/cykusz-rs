@@ -12,13 +12,25 @@ use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
+use crate::kernel::signal::default::Action;
 use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::task::Task;
 
 mod default;
 
 #[derive(Debug, PartialEq)]
 pub enum SignalError {
     Interrupted,
+}
+
+const IMMUTABLE_MASK: u64 = {
+    let a = (1u64 << syscall_defs::signal::SIGSTOP) | (1u64 << syscall_defs::signal::SIGCONT);
+
+    a
+};
+
+fn can_override(sig: usize) -> bool {
+    IMMUTABLE_MASK.get_bit(sig)
 }
 
 pub type SignalResult<T> = core::result::Result<T, SignalError>;
@@ -68,7 +80,7 @@ impl SignalEntry {
     }
 }
 
-const SIGNAL_COUNT: usize = 18;
+const SIGNAL_COUNT: usize = 20;
 
 #[derive(Copy, Clone, Default)]
 pub struct Entries {
@@ -131,6 +143,7 @@ pub enum TriggerResult {
     Ignored,
     Blocked,
     Triggered,
+    Execute(fn(Arc<Task>)),
 }
 
 impl Signals {
@@ -159,7 +172,17 @@ impl Signals {
 
         if match handler {
             SignalHandler::Ignore => false,
-            SignalHandler::Default => !default::ignore_by_default(signal),
+            SignalHandler::Default => {
+                let action = default::action(signal);
+
+                match action {
+                    Action::Ignore => false,
+                    Action::Handle(_) => true,
+                    Action::Exec(f) => {
+                        return TriggerResult::Execute(f);
+                    }
+                }
+            }
             SignalHandler::Handle(_) => true,
         } {
             sigs.set_pending(signal as u64);
@@ -188,6 +211,10 @@ impl Signals {
     ) {
         assert!(signal < SIGNAL_COUNT);
 
+        if !can_override(signal) {
+            return;
+        }
+
         let mut signals = self.entries();
 
         signals[signal] = SignalEntry {
@@ -215,6 +242,8 @@ impl Signals {
         if let Some(old) = old_set {
             *old = self.blocked_mask.load(Ordering::SeqCst);
         }
+
+        let set = set & !IMMUTABLE_MASK;
 
         match how {
             syscall_defs::signal::SigProcMask::Block => {

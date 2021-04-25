@@ -14,7 +14,7 @@ use crate::kernel::fs::vfs::FsError;
 use crate::kernel::kbd::keys::KeyCode;
 use crate::kernel::kbd::KeyListener;
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::sched::{current_task, current_task_ref};
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
@@ -152,59 +152,55 @@ impl KeyListener for Tty {
                 state.altgr = !released;
             }
             KeyCode::KEY_BACKSPACE if !released => {
-                let n = self.buffer.lock().remove_last_n(1);
+                let n = self.buffer.lock_irq().remove_last_n(1);
                 if n > 0 {
-                    self.output.lock().remove_last_n(n);
+                    self.output.lock_irq().remove_last_n(n);
                 }
             }
             KeyCode::KEY_ENTER | KeyCode::KEY_KPENTER if !released => {
                 {
-                    let mut buf = self.buffer.lock();
+                    let mut buf = self.buffer.lock_irq();
                     buf.put_char('\n' as u8);
                     buf.commit_write();
                 }
-                self.output.lock().put_char(b'\n');
+                self.output.lock_irq().put_char(b'\n');
                 if let Some(_t) = &*self.ctrl_task.lock_irq() {
                     self.wait_queue.notify_all();
                 }
             }
             KeyCode::KEY_U if (state.lctrl || state.rctrl) && !released => {
-                let n = self.buffer.lock().remove_all_edit();
+                let n = self.buffer.lock_irq().remove_all_edit();
                 if n > 0 {
-                    self.output.lock().remove_last_n(n);
+                    self.output.lock_irq().remove_last_n(n);
                 }
             }
             KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.fg_group.lock().as_ref() {
-                    t.for_each(&|t| {
-                        t.signal(SIGINT);
-                    })
+                if let Some(t) = self.fg_group.lock_irq().as_ref() {
+                    t.signal(SIGINT);
                 }
             }
             KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.fg_group.lock().as_ref() {
-                    t.for_each(&|t| {
-                        t.signal(SIGQUIT);
-                    })
+                if let Some(t) = self.fg_group.lock_irq().as_ref() {
+                    t.signal(SIGQUIT);
                 }
             }
             KeyCode::KEY_PAGEDOWN if !released => {
-                self.output.lock().scroll_down(20);
+                self.output.lock_irq().scroll_down(20);
             }
             KeyCode::KEY_PAGEUP if !released => {
-                self.output.lock().scroll_up(20);
+                self.output.lock_irq().scroll_up(20);
             }
             KeyCode::KEY_HOME if !released => {
-                self.output.lock().scroll_top();
+                self.output.lock_irq().scroll_top();
             }
             KeyCode::KEY_END if !released => {
-                self.output.lock().scroll_bottom();
+                self.output.lock_irq().scroll_bottom();
             }
             KeyCode::KEY_UP if !released => {
-                self.output.lock().scroll_up(1);
+                self.output.lock_irq().scroll_up(1);
             }
             KeyCode::KEY_DOWN if !released => {
-                self.output.lock().scroll_down(1);
+                self.output.lock_irq().scroll_down(1);
             }
             _ if !released => {
                 if let Some(finalmap) = state.map(false).map_or(None, |map| {
@@ -220,8 +216,8 @@ impl KeyListener for Tty {
                 }) {
                     let sym = ((finalmap[key as usize] & 0xff) as u8) as char;
 
-                    self.buffer.lock().put_char(sym as u8);
-                    self.output.lock().put_char(sym as u8);
+                    self.buffer.lock_irq().put_char(sym as u8);
+                    self.output.lock_irq().put_char(sym as u8);
                 }
             }
             _ => {}
@@ -330,7 +326,7 @@ impl INode for Tty {
     }
 
     fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool, FsError> {
-        let has_data = self.buffer.lock().has_data();
+        let has_data = self.buffer.lock_irq().has_data();
 
         if let Some(p) = ptable {
             p.listen(&self.wait_queue);
@@ -368,14 +364,17 @@ impl INode for Tty {
                     return Err(FsError::NoPermission);
                 }
 
-                if current_task().terminal().connect(tty().clone()) {
+                if current_task_ref().terminal().connect(tty().clone()) {
                     Ok(0)
                 } else {
                     Err(FsError::EntryExists)
                 }
             }
             syscall_defs::ioctl::tty::TIOCNOTTY => {
-                if current_task().terminal().disconnect(Some(tty().clone())) {
+                if current_task_ref()
+                    .terminal()
+                    .disconnect(Some(tty().clone()))
+                {
                     Ok(0)
                 } else {
                     Err(FsError::EntryNotFound)
@@ -421,7 +420,7 @@ impl INode for Tty {
 
 impl ConsoleWriter for Tty {
     fn write_str(&self, s: &str) -> core::fmt::Result {
-        self.output.lock().write_str(s);
+        self.output.lock_irq().write_str(s);
         Ok(())
     }
 }

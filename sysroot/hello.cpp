@@ -28,22 +28,33 @@ static int CNT = 0;
 static std::mutex MUT;
 
 void print_thread() {
-		for (int i = 0;i < 10; ++i) {
-		//for(;;) {
+		//for (int i = 0;i < 10; ++i) {
+		for(;;) {
 			//std::unique_lock<std::mutex> lck{MUT};
 			//std::cout << "Hello from thread one " << i << std::endl;
 			//write(1, "TT1. Hello printf one\n", 22);
-			printf("Hello printf one\n");
+//			printf("Hello printf one\n");
 		}
 }
 
-void print_thread2() {
-		for (int i = 0;i < 10; ++i) {
-		//for (;;) {
-			printf("Hello, from thread two\n");
-			//std::unique_lock<std::mutex> lck{MUT};
-			//std::cout << "Hello from thread two " << i << std::endl;
-			//write(1, "TT2. Hello printf two\n", 22);
+void print_thread2(int v) {
+		//for (int i = 0;i < 10; ++i) {
+		if (v != 7) {
+			for (;;) {
+				//printf("%d", v);
+	//			printf("Hello, from thread two\n");
+				//std::unique_lock<std::mutex> lck{MUT};
+				//std::cout << "Hello from thread two " << i << std::endl;
+				//write(1, "TT2. Hello printf two\n", 22);
+			}
+		} else {
+			for (int i = 0; i < 1000; ++i) {
+				printf("%d", v);
+			}
+
+			printf("exec stack\n");
+
+			execve("/bin/stack", nullptr, nullptr);
 		}
 }
 
@@ -61,16 +72,24 @@ int main(int argc, char *argv[]) {
 	std::string input{};
 	//std::cout << "Enter your name: ";
 
-	std::thread thr{print_thread};
-	std::thread thr2{print_thread2};
+	std::thread thr1{print_thread2, 1};
+	std::thread thr2{print_thread2, 2};
+	std::thread thr3{print_thread2, 3};
+	std::thread thr4{print_thread2, 4};
+	std::thread thr5{print_thread2, 5};
+	std::thread thr6{print_thread2, 6};
+	std::thread thr7{print_thread2, 7};
+	std::thread thr8{print_thread2, 8};
+	std::thread thr9{print_thread2, 9};
 
-	for(int i = 0;i < 10; ++i) {
-	//for (;;) {
+	//for(int i = 0;i < 10; ++i) {
+	for (;;) {
+		//printf("%d", 0);
 		//std::unique_lock<std::mutex> lck{MUT};
 		//std::cout << "Hello, from main " << i << std::endl;
 		//write(1, "TT0. Hello printf main\n", 23);
 		//lock.unlock();
-		printf("Hello printf main\n");
+	//	printf("Hello printf main\n");
 	}
 
 	//std::cin >> input;
@@ -85,6 +104,6 @@ int main(int argc, char *argv[]) {
 	char* const args[3] = {"-arg1", "-arg2", nullptr};
 	char* const envs[1] = {nullptr};
 
-	thr.join();
+	thr1.join();
 	thr2.join();
 }

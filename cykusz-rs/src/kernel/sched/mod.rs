@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::any::Any;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use downcast_rs::DowncastSync;
@@ -172,7 +173,18 @@ impl Scheduler {
     pub fn exec(&self, exe: DirEntryItem, args: Option<ExeArgs>, envs: Option<ExeArgs>) -> ! {
         let current = self.sched.current_task();
 
-        current.exec(exe, args, envs);
+        if current.is_process_leader() {
+            current.terminate_threads();
+
+            current.exec(exe, args, envs);
+        } else {
+            current
+                .process_leader()
+                .signals()
+                .setup_sig_exec(sigexec_exec, Arc::new(ExecParams { exe, args, envs }));
+
+            self.exit_thread();
+        }
     }
 
     pub fn spawn_thread(&self, entry: VirtAddr, stack: VirtAddr) -> Arc<Task> {
@@ -189,16 +201,19 @@ impl Scheduler {
 
     pub fn exit(&self) -> ! {
         let current = current_task_ref();
+
+        logln!(
+            "exit tid {} is pl: {}, sc: {}, wc: {}",
+            current.tid(),
+            current.is_process_leader(),
+            Arc::strong_count(current),
+            Arc::weak_count(current)
+        );
+
         assert_eq!(current.locks(), 0, "Killing thread holding a locks");
 
         if current.is_process_leader() {
-            for c in current
-                .children()
-                .iter()
-                .filter(|t| t.pid() == current.pid())
-            {
-                c.terminate_thread();
-            }
+            current.terminate_threads();
 
             self.tasks.remove_task(current.tid());
 
@@ -210,19 +225,11 @@ impl Scheduler {
 
             self.sched.exit(0)
         } else {
-            let leader = current.get_parent().expect("Thread has no parent");
+            current
+                .process_leader()
+                .signal_thread(syscall_defs::signal::SIGKILL);
 
-            for c in leader
-                .children()
-                .iter()
-                .filter(|t| t.pid() == current.pid() && t.tid() != current.tid())
-            {
-                c.terminate_thread();
-            }
-
-            leader.terminate_thread();
-
-            self.sched.exit_thread();
+            self.exit_thread();
         }
     }
 
@@ -230,6 +237,8 @@ impl Scheduler {
         let task = current_task_ref();
 
         if task.is_process_leader() {
+            logln!("[ WARN ] exit thread of a process leader");
+
             self.exit();
         } else {
             self.tasks.remove_task(task.tid());
@@ -240,6 +249,24 @@ impl Scheduler {
 
     pub fn get_task(&self, tid: usize) -> Option<Arc<Task>> {
         self.tasks.get(tid)
+    }
+}
+
+pub struct ExecParams {
+    exe: DirEntryItem,
+    args: Option<ExeArgs>,
+    envs: Option<ExeArgs>,
+}
+
+fn sigexec_exec(param: Arc<dyn Any + Send + Sync>) {
+    if let Ok(param) = param.downcast::<ExecParams>() {
+        let exe = param.exe.clone();
+        let args = param.args.clone();
+        let envs = param.envs.clone();
+
+        drop(param);
+
+        exec(exe, args, envs);
     }
 }
 

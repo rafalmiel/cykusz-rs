@@ -1,7 +1,6 @@
 use alloc::vec::Vec;
 
 use crate::arch::output::{video, Color, ColorCode, ScreenChar};
-
 use crate::kernel::utils::types::Align;
 
 pub struct OutputBuffer {
@@ -100,9 +99,9 @@ impl OutputBuffer {
         self.cursor_x = 0;
         self.cursor_y += 1;
 
-        let blank = self.blank();
-
         if self.cursor_y >= self.size_y {
+            let blank = self.blank();
+
             self.get_buffer_line_mut(self.cursor_y).fill(blank);
         }
     }
@@ -136,8 +135,7 @@ impl OutputBuffer {
                 self.cursor_x += 1;
 
                 if self.cursor_x >= self.size_x {
-                    self.cursor_x = 0;
-                    self.cursor_y += 1;
+                    self.new_line();
                 }
             }
         }

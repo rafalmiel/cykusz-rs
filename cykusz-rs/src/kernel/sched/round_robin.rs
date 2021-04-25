@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use intrusive_collections::LinkedList;
 
-use crate::kernel::sched::{current_task_ref, SchedulerInterface};
+use crate::kernel::sched::SchedulerInterface;
 use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
@@ -188,7 +188,7 @@ impl Queues {
 
         let task = get_current();
 
-        if task.signals().has_pending() || task.is_terminate_thread() {
+        if task.signals().has_pending() {
             Err(SignalError::Interrupted)
         } else {
             Ok(())
@@ -236,20 +236,38 @@ impl Queues {
     }
 
     fn exit(&mut self, lock: SpinGuard<()>) -> ! {
-        let current = get_current().process_leader();
+        let current = get_current();
+
+        logln!(
+            "exit tid: {}, sc: {}, wc: {}",
+            current.tid(),
+            Arc::strong_count(current),
+            Arc::weak_count(current)
+        );
 
         assert_eq!(current.state(), TaskState::Runnable);
         assert_eq!(current.sched.is_linked(), false);
+        assert!(current.is_process_leader());
 
-        self.dead.push_back(current);
+        self.dead.push_back(current.clone());
 
-        self.switch_to_sched(get_current(), lock);
+        self.switch_to_sched(current, lock);
 
         unreachable!()
     }
 
     fn exit_thread(&mut self, _lock: SpinGuard<()>) -> ! {
-        let task = current_task_ref();
+        let task = get_current();
+
+        assert_eq!(task.state(), TaskState::Runnable);
+        assert_eq!(task.sched.is_linked(), false);
+
+        logln!(
+            "exit_thread tid: {}, sc: {}, wc: {}",
+            task.tid(),
+            Arc::strong_count(task),
+            Arc::weak_count(task)
+        );
 
         self.dead.push_back(task.clone());
 
@@ -263,15 +281,17 @@ impl Queues {
         while let Some(dead) = self.dead.pop_front() {
             dead.set_state(TaskState::Unused);
 
-            println!(
-                "reap thread {} pl: {}",
-                dead.tid(),
-                dead.is_process_leader()
-            );
-
             drop(locked);
             dead.make_zombie();
             locked = lock.lock_irq();
+
+            logln!(
+                "reap thread zombie {} pl: {} sc: {}, wc: {}",
+                dead.tid(),
+                dead.is_process_leader(),
+                Arc::strong_count(&dead),
+                Arc::weak_count(&dead),
+            );
         }
     }
 
@@ -372,20 +392,20 @@ impl SchedulerInterface for RRScheduler {
         queue.wake(task, lock);
     }
 
-    fn stop(&self) {
-        let (lock, queue) = self.queues.this_cpu_mut();
-
-        let lock = lock.lock_irq();
-
-        queue.stop(lock);
-    }
-
     fn cont(&self, task: Arc<Task>) {
         let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
 
         let lock = lock.lock_irq();
 
         queue.cont(task, lock);
+    }
+
+    fn stop(&self) {
+        let (lock, queue) = self.queues.this_cpu_mut();
+
+        let lock = lock.lock_irq();
+
+        queue.stop(lock);
     }
 
     fn exit(&self, _status: isize) -> ! {

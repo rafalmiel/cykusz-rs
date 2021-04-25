@@ -553,18 +553,23 @@ impl Task {
         }
     }
 
-    pub fn deallocate(&mut self) {
-        let cr3 = self.cr3;
-
-        self.ctx = Unique::dangling();
+    fn unref_page_table(&mut self) {
+        let p4 = p4_table(PhysAddr(self.cr3));
 
         if self.is_user() {
-            let p4 = p4_table(PhysAddr(cr3));
-
             p4.unref_table_with(|p| {
+                logln!("dealloc user");
                 p.deallocate_user();
             });
+        } else {
+            p4.unref_table();
         }
+    }
+
+    pub fn deallocate(&mut self) {
+        self.ctx = Unique::dangling();
+
+        self.unref_page_table();
 
         deallocate_order(
             &Frame::new(MappedAddr(self.stack_top).to_phys()),

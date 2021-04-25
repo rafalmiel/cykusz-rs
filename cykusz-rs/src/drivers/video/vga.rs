@@ -1,6 +1,6 @@
-use bit_field::BitField;
-
 use core::ptr::Unique;
+
+use bit_field::BitField;
 
 use crate::arch::mm::PhysAddr;
 use crate::arch::output::{Color, ColorCode, ScreenChar, VideoDriver};

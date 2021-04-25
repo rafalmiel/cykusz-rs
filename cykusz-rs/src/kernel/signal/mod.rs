@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use alloc::sync::Arc;
+use core::any::Any;
 use core::ops::{Index, IndexMut};
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -18,19 +19,24 @@ use crate::kernel::task::Task;
 
 mod default;
 
+pub const KSIGKILLTHR: usize = 32;
+pub const KSIGEXEC: usize = 63;
+
 #[derive(Debug, PartialEq)]
 pub enum SignalError {
     Interrupted,
 }
 
 const IMMUTABLE_MASK: u64 = {
-    let a = (1u64 << syscall_defs::signal::SIGSTOP) | (1u64 << syscall_defs::signal::SIGCONT);
+    let a = (1u64 << syscall_defs::signal::SIGSTOP)
+        | (1u64 << syscall_defs::signal::SIGCONT)
+        | (1u64 << syscall_defs::signal::SIGKILL);
 
     a
 };
 
 fn can_override(sig: usize) -> bool {
-    IMMUTABLE_MASK.get_bit(sig)
+    IMMUTABLE_MASK.get_bit(sig) == false
 }
 
 pub type SignalResult<T> = core::result::Result<T, SignalError>;
@@ -80,12 +86,21 @@ impl SignalEntry {
     }
 }
 
-const SIGNAL_COUNT: usize = 20;
+const SIGNAL_COUNT: usize = 33;
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct Entries {
     entries: [SignalEntry; SIGNAL_COUNT],
     pending_mask: u64,
+}
+
+impl Default for Entries {
+    fn default() -> Entries {
+        Entries {
+            entries: [SignalEntry::default(); SIGNAL_COUNT],
+            pending_mask: 0,
+        }
+    }
 }
 
 impl Index<usize> for Entries {
@@ -124,10 +139,20 @@ impl Entries {
     }
 }
 
+pub type SigExecParam = Arc<dyn Any + Send + Sync>;
+
+pub struct SigExec {
+    handler: fn(SigExecParam),
+    param: SigExecParam,
+}
+
 #[derive(Default)]
 pub struct Signals {
     entries: Arc<Spin<Entries>>,
     blocked_mask: AtomicU64,
+    thread_pending_mask: AtomicU64,
+
+    sig_exec: Spin<Option<SigExec>>,
 }
 
 impl Clone for Signals {
@@ -135,6 +160,9 @@ impl Clone for Signals {
         Signals {
             entries: self.entries.clone(),
             blocked_mask: AtomicU64::new(self.blocked_mask.load(Ordering::SeqCst)),
+            thread_pending_mask: AtomicU64::new(0),
+
+            sig_exec: Spin::new(None),
         }
     }
 }
@@ -151,8 +179,38 @@ impl Signals {
         self.entries.lock_irq()
     }
 
+    pub fn thread_pending(&self) -> u64 {
+        self.thread_pending_mask.load(Ordering::SeqCst)
+    }
+
+    pub fn pending(&self) -> u64 {
+        self.thread_pending() | self.entries().pending()
+    }
+
+    pub fn is_pending(&self, sig: u64) -> bool {
+        self.pending().get_bit(sig as usize)
+    }
+
+    pub fn clear_pending(&self, sig: u64) {
+        if self.thread_pending().get_bit(sig as usize) {
+            self.thread_pending_mask
+                .fetch_and(!(1u64 << sig), Ordering::SeqCst);
+        } else {
+            self.entries().clear_pending(sig);
+        }
+    }
+
+    pub fn set_pending(&self, sig: u64, thread_scope: bool) {
+        if thread_scope {
+            self.thread_pending_mask
+                .fetch_or(1u64 << sig, Ordering::SeqCst);
+        } else {
+            self.entries().set_pending(sig);
+        }
+    }
+
     pub fn has_pending(&self) -> bool {
-        self.entries().pending() & !self.blocked_mask() > 0
+        (self.entries().pending() | self.thread_pending()) & !self.blocked_mask() > 0
     }
 
     pub fn blocked_mask(&self) -> u64 {
@@ -163,10 +221,32 @@ impl Signals {
         self.blocked_mask().get_bit(signal)
     }
 
-    pub fn trigger(&self, signal: usize) -> TriggerResult {
+    pub fn setup_sig_exec(&self, f: fn(SigExecParam), param: SigExecParam) -> bool {
+        if !self.is_pending(KSIGEXEC as u64) {
+            *self.sig_exec.lock() = Some(SigExec { handler: f, param });
+
+            self.set_pending(KSIGEXEC as u64, true);
+
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn sig_exec(&self) {
+        if self.is_pending(KSIGEXEC as u64) {
+            self.clear_pending(KSIGEXEC as u64);
+
+            if let Some(SigExec { handler, param }) = self.sig_exec.lock().take() {
+                (handler)(param);
+            }
+        }
+    }
+
+    pub fn trigger(&self, signal: usize, this_thread: bool) -> TriggerResult {
         assert!(signal < SIGNAL_COUNT);
 
-        let mut sigs = self.entries();
+        let sigs = self.entries();
 
         let handler = sigs[signal].handler();
 
@@ -185,7 +265,9 @@ impl Signals {
             }
             SignalHandler::Handle(_) => true,
         } {
-            sigs.set_pending(signal as u64);
+            drop(sigs);
+
+            self.set_pending(signal as u64, this_thread);
 
             if self.is_blocked(signal) {
                 TriggerResult::Blocked
@@ -262,29 +344,39 @@ impl Signals {
 pub fn do_signals() -> Option<(usize, SignalEntry)> {
     let task = current_task_ref();
 
-    if task.is_terminate_thread() {
-        crate::kernel::sched::exit_thread();
-    }
-
     let signals = task.signals();
 
     if !signals.has_pending() {
         return None;
     }
 
-    let mut entries = signals.entries();
+    if signals.is_pending(syscall_defs::signal::SIGKILL as u64) {
+        logln!(
+            "sigkill: {} sc: {}, wc: {}",
+            task.tid(),
+            Arc::strong_count(task),
+            Arc::weak_count(task)
+        );
+
+        signals.clear_pending(syscall_defs::signal::SIGKILL as u64);
+
+        crate::kernel::sched::exit();
+    }
+
+    signals.sig_exec();
 
     for s in 0..SIGNAL_COUNT {
-        if !signals.is_blocked(s) && entries.is_pending(s as u64) {
-            let entry = entries[s];
+        if !signals.is_blocked(s) && signals.is_pending(s as u64) {
+            signals.clear_pending(s as u64);
 
-            entries.clear_pending(s as u64);
+            let entries = signals.entries();
+
+            let entry = entries[s];
 
             match entry.handler() {
                 SignalHandler::Default => {
                     drop(entries);
                     default::handle_default(s);
-                    entries = task.signals().entries();
                 }
                 SignalHandler::Handle(_) => {
                     return Some((s, entry));

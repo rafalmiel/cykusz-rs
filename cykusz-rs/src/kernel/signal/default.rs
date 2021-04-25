@@ -1,6 +1,6 @@
-use crate::kernel::task::Task;
-
 use alloc::sync::Arc;
+
+use crate::kernel::task::Task;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Action {
@@ -10,30 +10,47 @@ pub enum Action {
 }
 
 static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
-    Action::Ignore,            // UNUSED
-    Action::Handle(terminate), // SIGHUP
-    Action::Handle(terminate), // SIGINT
-    Action::Handle(terminate), // SIGQUIT
-    Action::Handle(terminate), // SIGILL
-    Action::Ignore,            // UNUSED
-    Action::Ignore,            // UNUSED
-    Action::Handle(terminate), // SIGBUS
-    Action::Handle(terminate), // SIGFPE
-    Action::Ignore,            // UNUSED
-    Action::Ignore,            // UNUSED
-    Action::Handle(terminate), // SIGSEGV
-    Action::Ignore,            // UNUSED
-    Action::Ignore,            // UNUSED
-    Action::Ignore,            // UNUSED
-    Action::Ignore,            // UNUSED
-    Action::Ignore,            // UNUSED
-    Action::Ignore,            // SIGCHLD
-    Action::Exec(cont),        // SIGCONT
-    Action::Handle(stop),      // SIGSTOP
+    Action::Ignore,                   // UNUSED
+    Action::Handle(terminate),        // SIGHUP
+    Action::Handle(terminate),        // SIGINT
+    Action::Handle(terminate),        // SIGQUIT
+    Action::Handle(terminate),        // SIGILL
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Handle(terminate),        // SIGBUS
+    Action::Handle(terminate),        // SIGFPE
+    Action::Handle(terminate),        // SIGKILL
+    Action::Ignore,                   // UNUSED
+    Action::Handle(terminate),        // SIGSEGV
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // SIGCHLD
+    Action::Exec(cont),               // SIGCONT
+    Action::Handle(stop),             // SIGSTOP
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Ignore,                   // UNUSED
+    Action::Handle(terminate_thread), // UNUSED
 ];
 
 fn terminate() {
     crate::kernel::sched::exit();
+}
+
+fn terminate_thread() {
+    crate::kernel::sched::exit_thread()
 }
 
 fn stop() {

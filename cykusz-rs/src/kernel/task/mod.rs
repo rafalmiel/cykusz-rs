@@ -76,7 +76,6 @@ pub struct Task {
     signals: Signals,
     terminal: Terminal,
     zombies: Zombies,
-    terminate_thread: AtomicBool,
 }
 
 unsafe impl Sync for Task {}
@@ -170,7 +169,6 @@ impl Task {
 
         let task = Self::make_ptr(task);
 
-        task.set_parent(Some(self.me()));
         self.add_child(task.clone());
 
         task.signals().copy_from(self.signals());
@@ -231,7 +229,7 @@ impl Task {
 
         let thread = Self::make_ptr(thread);
 
-        thread.set_parent(Some(process_leader.clone()));
+        logln!("set parent {} -> {}", process_leader.tid(), thread.tid());
         process_leader.add_child(thread.clone());
 
         thread
@@ -253,8 +251,16 @@ impl Task {
         }
     }
 
+    pub fn remove_from_parent(&self) {
+        if let Some(parent) = self.get_parent() {
+            parent.remove_child(self);
+        }
+    }
+
     pub fn add_child(&self, child: Arc<Task>) {
         let mut children = self.children.lock();
+
+        child.set_parent(Some(self.me()));
 
         children.push_back(child);
     }
@@ -282,7 +288,6 @@ impl Task {
 
         while let Some(child) = cursor.get() {
             if child.is_process_leader() {
-                child.set_parent(Some(parent.clone()));
                 parent.add_child(child.me());
 
                 cursor.remove();
@@ -444,6 +449,24 @@ impl Task {
         self.pending_io.store(has, Ordering::SeqCst);
     }
 
+    pub fn terminate_threads(&self) {
+        assert!(self.is_process_leader());
+
+        let mut count = 0;
+
+        for c in self.children().iter().filter(|t| t.pid() == self.pid()) {
+            c.signal_thread(crate::kernel::signal::KSIGKILLTHR);
+
+            count += 1;
+        }
+
+        while count > 0 {
+            while let Err(_e) = self.wait_thread(0) {}
+
+            count -= 1;
+        }
+    }
+
     pub fn await_io(&self) -> SignalResult<()> {
         let res = crate::kernel::sched::sleep(None);
 
@@ -493,10 +516,10 @@ impl Task {
         &self.signals
     }
 
-    pub fn signal(&self, sig: usize) -> bool {
+    fn do_signal(&self, sig: usize, this_thread: bool) -> bool {
         use crate::kernel::signal::TriggerResult;
 
-        match self.signals().trigger(sig) {
+        match self.signals().trigger(sig, this_thread) {
             TriggerResult::Triggered => {
                 self.wake_up();
 
@@ -510,7 +533,7 @@ impl Task {
 
                 true
             }
-            TriggerResult::Blocked => {
+            TriggerResult::Blocked if !this_thread => {
                 // Find other thread in process to notify
                 let process_leader = self.process_leader();
 
@@ -534,58 +557,51 @@ impl Task {
 
                 false
             }
+            TriggerResult::Blocked => false,
         }
+    }
+
+    pub fn signal(&self, sig: usize) -> bool {
+        self.do_signal(sig, false)
+    }
+
+    pub fn signal_thread(&self, sig: usize) -> bool {
+        self.do_signal(sig, true)
     }
 
     pub fn terminal(&self) -> &Terminal {
         &self.terminal
     }
 
-    pub fn is_terminate_thread(&self) -> bool {
-        self.terminate_thread.load(Ordering::SeqCst)
-    }
-
-    pub fn terminate_thread(&self) {
-        self.terminate_thread.store(true, Ordering::SeqCst);
-
-        self.wake_up();
-    }
-
     pub fn make_zombie(&self) {
         self.terminal().disconnect(None);
 
-        if self.is_process_leader() {
-            if let Some(parent) = self.get_parent() {
-                parent.zombies.add_zombie(self.me());
+        if let Some(parent) = self.get_parent() {
+            parent.zombies.add_zombie(self.me());
 
-                parent.remove_child(self);
-                self.set_parent(None);
+            parent.remove_child(self);
 
+            if self.is_process_leader() {
                 parent.signal(SIGCHLD);
             }
+        }
 
-            unsafe {
-                self.arch_task_mut().deallocate();
-            }
-        } else {
-            if let Some(parent) = self.get_parent() {
-                parent.remove_child(self);
-                self.set_parent(None);
-            }
-
-            unsafe {
-                self.arch_task_mut().deallocate();
-            }
+        unsafe {
+            self.arch_task_mut().deallocate();
         }
     }
 
     pub fn wait_pid(&self, pid: usize) -> SignalResult<usize> {
         self.zombies.wait_pid(pid)
     }
+
+    pub fn wait_thread(&self, tid: usize) -> SignalResult<usize> {
+        self.zombies.wait_thread(self.pid(), tid)
+    }
 }
 
 impl Drop for Task {
     fn drop(&mut self) {
-        println!("drop task {}", self.tid());
+        logln!("drop task {}", self.tid());
     }
 }

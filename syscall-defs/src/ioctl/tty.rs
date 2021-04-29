@@ -2,7 +2,7 @@ pub const TIOCSCTTY: usize = 1;
 pub const TIOCNOTTY: usize = 2;
 pub const TIOCSPGRP: usize = 3;
 
-pub const TIOCGWINSZ: usize = 4;
+pub const TIOCGWINSZ: usize = 0x5413;
 pub const TIOCSWINSZ: usize = 5;
 
 #[repr(C)]

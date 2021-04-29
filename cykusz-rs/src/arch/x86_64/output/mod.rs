@@ -91,6 +91,7 @@ pub trait VideoDriver: Sync + Send {
     }
     fn update_cursor(&self, _x: usize, _y: usize) {}
     fn clear(&self) {}
+    fn set_cursor_visible(&self, _vis: bool) {}
 
     fn dimensions(&self) -> (usize, usize) {
         (0, 0)

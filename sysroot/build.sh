@@ -12,11 +12,13 @@ SRC_DIR=$CYKUSZ_DIR/sysroot/src
 BINUTILS_SRC_DIR=$SRC_DIR/binutils-gdb
 GCC_SRC_DIR=$SRC_DIR/gcc
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
+NYANCAT_SRC_DIR=$SRC_DIR/nyancat
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
+
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
 CROSS=$CYKUSZ_DIR/sysroot/cross
@@ -42,10 +44,18 @@ function _prepare_gcc {
 	fi
 }
 
+function _prepare_nyancat {
+	if [ ! -d $NYANCAT_SRC_DIR ]; then
+		mkdir -p $SRC_DIR
+		git clone --depth 1 -b cykusz https://github.com/rafalmiel/nyancat.git $NYANCAT_SRC_DIR
+	fi
+}
+
 function _prepare {
 	_prepare_mlibc
 	_prepare_binutils
 	_prepare_gcc
+	_prepare_nyancat
 }
 
 function _sysroot {
@@ -105,12 +115,25 @@ function _libstd {
 	make -C $GCC_BUILD_DIR install-target-libstdc++-v3
 }
 
+function _nyancat {
+	pushd .
+
+	cd $NYANCAT_SRC_DIR/src
+	make clean
+	CC=$CROSS/bin/x86_64-cykusz-gcc make
+	cp nyancat $BUILD_DIR
+	make clean
+
+	popd
+}
+
 function _build {
 	_sysroot
 	_binutils
 	_gcc
 	_mlibc
 	_libstd
+	_nyancat
 }
 
 function _all {
@@ -131,7 +154,7 @@ function _check_build {
 }
 
 if [ -z "$1" ]; then
-	echo "Usage: $0 (clean/prepare/binutils/gcc/mlibc/check_build/build/all)"
+	echo "Usage: $0 (clean/prepare/binutils/gcc/mlibc/nyancat/check_build/build/all)"
 else
 	cd $SPATH
 	_$1

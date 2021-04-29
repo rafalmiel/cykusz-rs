@@ -17,8 +17,13 @@ pub struct OutputBuffer {
     cursor_x: usize,
     cursor_y: usize,
 
+    saved_x: usize,
+    saved_y: usize,
+
     size_x: usize,
     size_y: usize,
+
+    state: vte::Parser,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -80,8 +85,13 @@ impl OutputBuffer {
             cursor_x: 0,
             cursor_y: 0,
 
+            saved_x: 0,
+            saved_y: 0,
+
             size_x,
             size_y,
+
+            state: vte::Parser::new(),
         }
     }
 
@@ -121,22 +131,21 @@ impl OutputBuffer {
     }
 
     fn store_char(&mut self, char: u8, update: &mut OutputUpdate) {
-        log!("{}", char as char);
-
+        //log!("{}", char as char);
         match char {
             b'\n' => {
                 self.new_line();
             }
             c => {
+                if self.cursor_x >= self.size_x {
+                    self.new_line();
+                }
+
                 let pos = self.cursor_buf_pos();
 
                 self.buffer[pos] = ScreenChar::new(c, self.color);
 
                 self.cursor_x += 1;
-
-                if self.cursor_x >= self.size_x {
-                    self.new_line();
-                }
             }
         }
 
@@ -322,7 +331,13 @@ impl OutputBuffer {
             update.update_viewport();
         }
 
-        self.store_char(char, &mut update);
+        let me = unsafe { &mut *(self as *mut OutputBuffer) };
+
+        let mut performer = AnsiEscape::new(me, update);
+
+        self.state.advance(&mut performer, char);
+
+        let mut update = performer.update_delta();
 
         self.scroll(&mut update);
 
@@ -336,13 +351,14 @@ impl OutputBuffer {
             update.update_viewport();
         }
 
-        let mut performer = AnsiEscape::new(self, update);
-        let mut state = vte::Parser::new();
+        let me = unsafe { &mut *(self as *mut OutputBuffer) };
+
+        let mut performer = AnsiEscape::new(me, update);
 
         let bytes = str.as_bytes();
 
         for c in bytes.iter() {
-            state.advance(&mut performer, *c);
+            self.state.advance(&mut performer, *c);
         }
 
         let mut update = performer.update_delta();
@@ -635,7 +651,23 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                     }
                 }
             }
-            _ => {}
+            'l' | 'h' => match params.iter().next() {
+                Some([25]) => {
+                    video().set_cursor_visible(action == 'h');
+                }
+                _ => {}
+            },
+            's' => {
+                self.output.saved_x = self.output.cursor_x;
+                self.output.saved_y = self.output.cursor_y;
+            }
+            'u' => {
+                self.output.cursor_x = self.output.saved_x;
+                self.output.cursor_y = self.output.saved_y;
+            }
+            a => {
+                logln!("Unhandled cmd {}", a);
+            }
         }
     }
 }

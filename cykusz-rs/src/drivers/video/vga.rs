@@ -174,6 +174,10 @@ impl VideoDriver for Writer {
             state.buffer.as_mut().chars[offset..offset + len].copy_from_slice(buf);
         }
     }
+
+    fn set_cursor_visible(&self, vis: bool) {
+        set_cursor_vis(vis);
+    }
 }
 
 static VGA: Writer = Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER);
@@ -193,6 +197,19 @@ fn disable_text_blink() {
     val.set_bit(3, false);
     attr_reg.write(val);
     attr_reg.write(attr);
+}
+
+fn set_cursor_vis(vis: bool) {
+    let idx = &mut *CURSOR_INDEX.lock_irq();
+    let dta = &mut *CURSOR_DATA.lock_irq();
+
+    idx.write(0x0A);
+
+    let mut dat = dta.read();
+    dat.set_bit(5, !vis);
+
+    idx.write(0x0A);
+    dta.write(dat);
 }
 
 pub fn init() {

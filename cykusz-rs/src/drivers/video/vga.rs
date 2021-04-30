@@ -157,6 +157,10 @@ impl VideoDriver for Writer {
         self.state.lock().clear()
     }
 
+    fn set_cursor_visible(&self, vis: bool) {
+        set_cursor_vis(vis);
+    }
+
     fn dimensions(&self) -> (usize, usize) {
         (BUFFER_WIDTH, BUFFER_HEIGHT)
     }
@@ -173,10 +177,6 @@ impl VideoDriver for Writer {
         unsafe {
             state.buffer.as_mut().chars[offset..offset + len].copy_from_slice(buf);
         }
-    }
-
-    fn set_cursor_visible(&self, vis: bool) {
-        set_cursor_vis(vis);
     }
 }
 

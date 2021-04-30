@@ -19,12 +19,10 @@ downcast-rs = { version = "*", default-features = false }
 hashbrown = "*"
 lru = "*"
 vte = "*"
+linked_list_allocator = "*"
 
 [dependencies.chrono]
 default-features = false
-version = "*"
-
-[dependencies.linked_list_allocator]
 version = "*"
 
 [dependencies.syscall-defs]

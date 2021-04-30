@@ -7,9 +7,7 @@ edition = "2018"
 [dependencies]
 rlibc = "*"
 spin = "*"
-
-[dependencies.linked_list_allocator]
-version = "*"
+linked_list_allocator = "*"
 
 [dependencies.syscall-defs]
 path = "../syscall-defs"

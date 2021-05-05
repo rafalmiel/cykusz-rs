@@ -120,7 +120,7 @@ impl UdpService for Socket {
         self.set_dst_port(header.src_port.value() as u32);
         self.set_dst_ip(ip_header.src_ip);
 
-        self.buffer.append_data(packet.data());
+        self.buffer.try_append_data(packet.data());
     }
 
     fn port_unreachable(&self, _port: u32, dst_port: u32) {

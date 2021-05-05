@@ -9,8 +9,9 @@ use spin::Once;
 
 use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable};
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::icache::INodeItem;
+use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
+use crate::kernel::fs::inode::INode;
 
 type CacheKey = (usize, String);
 
@@ -159,7 +160,17 @@ impl DirEntry {
         })
     }
 
-    pub fn inode_wrap(inode: INodeItem) -> DirEntryItem {
+    pub fn inode_wrap(inode: Arc<dyn INode>) -> DirEntryItem {
+        use crate::kernel::fs::icache;
+
+        let cache = icache::cache();
+
+        let item = cache.make_item_no_cache(INodeItemStruct::from(inode));
+
+        DirEntry::inode_item_wrap(item)
+    }
+
+    pub fn inode_item_wrap(inode: INodeItem) -> DirEntryItem {
         cache().make_item_no_cache(DirEntry {
             data: RwSpin::new(DirEntryData {
                 parent: None,

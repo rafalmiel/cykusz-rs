@@ -29,6 +29,7 @@ pub mod inode;
 pub mod mount;
 pub mod path;
 pub mod pcache;
+pub mod pipe;
 pub mod ramfs;
 pub mod vfs;
 

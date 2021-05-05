@@ -7,7 +7,8 @@ use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub struct BufferQueue {
     buffer: Spin<Buffer>,
-    wait_queue: WaitQueue,
+    writer_queue: WaitQueue,
+    reader_queue: WaitQueue,
 }
 
 impl Default for BufferQueue {
@@ -33,23 +34,24 @@ impl BufferQueue {
     pub fn new(init_size: usize) -> BufferQueue {
         BufferQueue {
             buffer: Spin::new(Buffer::new(init_size)),
-            wait_queue: WaitQueue::new(),
+            writer_queue: WaitQueue::new(),
+            reader_queue: WaitQueue::new(),
         }
     }
 
     pub fn listen(&self) {
-        self.wait_queue.add_task(current_task());
+        self.reader_queue.add_task(current_task());
     }
 
     pub fn unlisten(&self) {
-        self.wait_queue.remove_task(current_task());
+        self.reader_queue.remove_task(current_task());
     }
 
     pub fn has_data(&self) -> bool {
         self.buffer.lock().has_data()
     }
 
-    pub fn append_data(&self, data: &[u8]) -> usize {
+    pub fn try_append_data(&self, data: &[u8]) -> usize {
         if data.is_empty() {
             return 0;
         }
@@ -59,10 +61,26 @@ impl BufferQueue {
         let written = buf.append_data(data);
 
         if written > 0 {
-            self.wait_queue.notify_one();
+            self.reader_queue.notify_one();
         }
 
         written
+    }
+
+    pub fn append_data(&self, data: &[u8]) -> SignalResult<usize> {
+        if data.is_empty() {
+            return Ok(0);
+        }
+
+        let mut buffer = self
+            .writer_queue
+            .wait_lock_for(&self.buffer, |lck| lck.available_size() >= data.len())?;
+
+        let written = buffer.append_data(data);
+
+        self.reader_queue.notify_one();
+
+        Ok(written)
     }
 
     pub fn available_size(&self) -> usize {
@@ -79,10 +97,14 @@ impl BufferQueue {
 
     pub fn read_data(&self, buf: &mut [u8]) -> SignalResult<usize> {
         let mut buffer = self
-            .wait_queue
+            .reader_queue
             .wait_lock_for(&self.buffer, |lck| lck.has_data())?;
 
-        Ok(buffer.read_data(buf))
+        let read = buffer.read_data(buf);
+
+        self.writer_queue.notify_one();
+
+        Ok(read)
     }
 
     pub fn try_read_data_transient(&self, buf: &mut [u8]) -> usize {
@@ -98,7 +120,7 @@ impl BufferQueue {
     }
 
     pub fn wait_queue(&self) -> &WaitQueue {
-        &self.wait_queue
+        &self.reader_queue
     }
 }
 

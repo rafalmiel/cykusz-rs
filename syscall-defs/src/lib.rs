@@ -61,6 +61,9 @@ pub const SYS_GETPID: usize = 43;
 pub const SYS_GETTID: usize = 44;
 pub const SYS_SETSID: usize = 45;
 pub const SYS_SETPGID: usize = 46;
+pub const SYS_PIPE: usize = 47;
+pub const SYS_DUP: usize = 48;
+pub const SYS_DUP2: usize = 49;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

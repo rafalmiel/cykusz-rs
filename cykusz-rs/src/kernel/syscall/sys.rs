@@ -9,7 +9,6 @@ use syscall_defs::{ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, Sys
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntry;
-use crate::kernel::fs::icache::INodeItemStruct;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
@@ -454,13 +453,7 @@ pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
     if let Some(socket) = socket {
         let task = current_task_ref();
 
-        use crate::kernel::fs::icache;
-
-        let cache = icache::cache();
-
-        let item = cache.make_item_no_cache(INodeItemStruct::from(socket));
-
-        Ok(task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR)?)
+        Ok(task.open_file(DirEntry::inode_wrap(socket), OpenFlags::RDWR)?)
     } else {
         Err(SyscallError::EBUSY)
     }
@@ -481,13 +474,7 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
     if let Some(socket) = socket {
         let task = current_task_ref();
 
-        use crate::kernel::fs::icache;
-
-        let cache = icache::cache();
-
-        let item = cache.make_item_no_cache(INodeItemStruct::from(socket));
-
-        Ok(task.open_file(DirEntry::inode_wrap(item), OpenFlags::RDWR)?)
+        Ok(task.open_file(DirEntry::inode_wrap(socket), OpenFlags::RDWR)?)
     } else {
         Err(SyscallError::EBUSY)
     }
@@ -755,7 +742,24 @@ pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
 }
 
 pub fn sys_pipe(fds: u64, _flags: u64) -> SyscallResult {
-    let _fds = unsafe { core::slice::from_raw_parts_mut(fds as *mut u64, 2) };
+    let fds = unsafe { core::slice::from_raw_parts_mut(fds as *mut u64, 2) };
+
+    let pipe = crate::kernel::fs::pipe::Pipe::new();
+
+    let entry = DirEntry::inode_wrap(pipe);
+
+    let task = current_task_ref();
+
+    if let Ok(fd1) = task.open_file(entry.clone(), OpenFlags::RDONLY) {
+        if let Ok(fd2) = task.open_file(entry, OpenFlags::WRONLY) {
+            fds[0] = fd1 as u64;
+            fds[1] = fd2 as u64;
+
+            return Ok(0);
+        } else {
+            task.close_file(fd1);
+        }
+    }
 
     Err(SyscallError::EINVAL)
 }

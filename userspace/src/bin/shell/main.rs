@@ -561,6 +561,34 @@ fn exec(cmd: &str) {
 
             syscall::close(new_fd).expect("Failed to close dup fd");
         }
+    } else if cmd == "pipe_test" {
+        let mut fds = [0u64; 2];
+
+        if let Ok(_) = syscall::pipe(&mut fds, 0) {
+            if let Ok(id) = syscall::fork() {
+                if id > 0 {
+                    syscall::write(fds[1] as usize, b"Hello from pipe\n").expect("write failed");
+
+                    syscall::close(fds[0] as usize).expect("close failed");
+
+                    syscall::waitpid(id).expect("waitpid failed");
+
+                    syscall::close(fds[1] as usize).expect("close failed");
+                } else {
+                    syscall::close(fds[1] as usize).expect("close failed");
+
+                    let mut buf = [0u8; 128];
+
+                    if let Ok(r) = syscall::read(fds[0] as usize, &mut buf) {
+                        syscall::write(1, &mut buf[..r]).expect("write failed");
+                    }
+
+                    syscall::exit();
+                }
+            } else {
+                println!("fork failed");
+            }
+        }
     } else {
         let mut split = cmd.split_whitespace();
 

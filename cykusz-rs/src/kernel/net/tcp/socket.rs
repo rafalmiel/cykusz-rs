@@ -455,7 +455,7 @@ impl SocketData {
         }
 
         if !data.is_empty() || hdr.flag_fin() {
-            self.in_buffer.append_data(data);
+            self.in_buffer.try_append_data(data);
 
             self.send_ack();
 
@@ -472,7 +472,7 @@ impl SocketData {
 
         if !data.is_empty() || hdr.flag_fin() {
             if hdr.seq_nr() == self.ctl.rcv_nxt {
-                if self.in_buffer.append_data(data) == data.len() {
+                if self.in_buffer.try_append_data(data) == data.len() {
                     //println!("[ TCP ] Stored {} bytes", data.len());
                     self.update_rcv_next(packet);
 
@@ -791,7 +791,7 @@ impl INode for Socket {
                     data = self.data.lock();
                 }
 
-                data.proxy_buffer.append_data(buf);
+                data.proxy_buffer.try_append_data(buf);
 
                 data.proxy_buffer.wait_queue().remove_task(task);
             //data.send_queue.add_task(task.clone());

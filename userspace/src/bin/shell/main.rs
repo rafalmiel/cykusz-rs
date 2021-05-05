@@ -555,6 +555,12 @@ fn exec(cmd: &str) {
             "\x1b[0;0H\x1b[0;107;91m===========================\x1b[0;6H\x1b[1K\x1b[0m\x1b[0J"
         );
         //println!("\x1b[22;3HHi")
+    } else if cmd == "dup_test" {
+        if let Ok(new_fd) = syscall::dup(1, 0) {
+            println!("duplicate fd: {}", new_fd);
+
+            syscall::close(new_fd).expect("Failed to close dup fd");
+        }
     } else {
         let mut split = cmd.split_whitespace();
 

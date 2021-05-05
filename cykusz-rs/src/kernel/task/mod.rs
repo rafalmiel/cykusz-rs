@@ -321,6 +321,10 @@ impl Task {
         self.filetable.open_file(inode, flags)
     }
 
+    pub fn filetable(&self) -> &filetable::FileTable {
+        &self.filetable
+    }
+
     pub fn close_file(&self, fd: usize) -> bool {
         self.filetable.close_file(fd)
     }

@@ -72,6 +72,9 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_GETTID => sys::sys_gettid(),
         SYS_SETSID => sys::sys_setsid(),
         SYS_SETPGID => sys::sys_setpgid(a, b),
+        SYS_PIPE => sys::sys_pipe(a, b),
+        SYS_DUP => sys::sys_dup(a, b),
+        SYS_DUP2 => sys::sys_dup2(a, b, c),
 
         _ => Err(SyscallError::ENOSYS),
     }

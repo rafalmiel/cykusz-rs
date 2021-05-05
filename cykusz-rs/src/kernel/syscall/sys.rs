@@ -754,6 +754,24 @@ pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
     crate::kernel::futex::futex().wait(uaddr, expected)
 }
 
+pub fn sys_pipe(fds: u64, _flags: u64) -> SyscallResult {
+    let _fds = unsafe { core::slice::from_raw_parts_mut(fds as *mut u64, 2) };
+
+    Err(SyscallError::EINVAL)
+}
+
+pub fn sys_dup(fd: u64, _flags: u64) -> SyscallResult {
+    let task = current_task_ref();
+
+    task.filetable().duplicate(fd as usize)
+}
+
+pub fn sys_dup2(fd: u64, new_fd: u64, _flags: u64) -> SyscallResult {
+    let task = current_task_ref();
+
+    task.filetable().duplicate_at(fd as usize, new_fd as usize)
+}
+
 pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
     let uaddr = VirtAddr(uaddr as usize);
 

@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use syscall_defs::{FileType, OpenFlags, SysDirEntry};
+use syscall_defs::{FileType, OpenFlags, SysDirEntry, SyscallError, SyscallResult};
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
@@ -328,5 +328,49 @@ impl FileTable {
         }
 
         None
+    }
+
+    pub fn duplicate(&self, fd: usize) -> SyscallResult {
+        let handle = self.get_handle(fd).ok_or(SyscallError::EINVAL)?;
+
+        let mut files = self.files.write();
+
+        if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
+            *f = Some(handle);
+
+            Ok(idx)
+        } else if files.len() < FILE_NUM {
+            let len = files.len();
+
+            files.push(Some(handle));
+
+            Ok(len)
+        } else {
+            Err(SyscallError::EINVAL)
+        }
+    }
+
+    pub fn duplicate_at(&self, fd: usize, at: usize) -> SyscallResult {
+        if at >= FILE_NUM {
+            return Err(SyscallError::EINVAL);
+        }
+
+        let handle = self.get_handle(fd).ok_or(SyscallError::EINVAL)?;
+
+        let mut files = self.files.write();
+
+        if files[at].is_none() {
+            files[at] = Some(handle);
+
+            Ok(0)
+        } else {
+            let old = files[at].take().unwrap();
+
+            old.inode.inode().close();
+
+            files[at] = Some(handle);
+
+            Ok(0)
+        }
     }
 }

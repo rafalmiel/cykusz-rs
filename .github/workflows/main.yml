@@ -47,3 +47,6 @@ jobs:
       # Runs a single command using the runners shell
       - name: Build OS
         run: make iso
+
+      - name: Build Toolchain
+        run: ./sysroot/build.sh all

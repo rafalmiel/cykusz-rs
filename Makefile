@@ -27,6 +27,7 @@ cross_strip := sysroot/cross/bin/x86_64-cykusz-strip
 cross_hello := sysroot/build/hello
 cross_stack := sysroot/build/stack
 cross_nyancat := sysroot/build/nyancat
+cross_ttytest := sysroot/build/ttytest
 
 .PHONY: all clean run ata bochs iso toolchain fsck
 
@@ -103,6 +104,7 @@ $(cross_cpp): toolchain
 hello: $(cross_cpp) sysroot/hello.cpp sysroot/stack.c
 	$(cross_cpp) sysroot/hello.cpp -o $(cross_hello)
 	$(cross_c) sysroot/stack.c -o $(cross_stack)
+	$(cross_c) sysroot/ttytest.c -o $(cross_ttytest)
 	sysroot/build.sh nyancat
 #	$(cross_strip) $(cross_hello)
 

@@ -18,6 +18,7 @@ cp -f target/x86_64-unknown-none-gnu/release/shell mnt/bin/shell
 cp -f sysroot/build/hello mnt/bin/hello
 cp -f sysroot/build/stack mnt/bin/stack
 cp -f sysroot/build/nyancat mnt/bin/nyancat
+cp -f sysroot/build/ttytest mnt/bin/ttytest
 umount mnt
 
 losetup -D

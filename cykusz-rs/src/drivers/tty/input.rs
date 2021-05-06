@@ -5,6 +5,7 @@ pub(crate) struct InputBuffer {
     e: u32,
     w: u32,
     r: u32,
+    eof: bool,
 }
 
 impl InputBuffer {
@@ -14,7 +15,18 @@ impl InputBuffer {
             e: 0,
             w: 0,
             r: 0,
+            eof: false,
         }
+    }
+
+    pub(crate) fn trigger_eof(&mut self) {
+        self.commit_write();
+
+        self.eof = true;
+    }
+
+    fn clear_eof(&mut self) {
+        self.eof = false;
     }
 
     pub(crate) fn put_char(&mut self, data: u8) {
@@ -67,6 +79,8 @@ impl InputBuffer {
             self.r = (self.r + 1) % BUFFER_SIZE as u32;
         }
 
+        self.clear_eof();
+
         n - remaining
     }
 
@@ -75,6 +89,6 @@ impl InputBuffer {
     }
 
     pub(crate) fn has_data(&self) -> bool {
-        self.r != self.w
+        self.r != self.w || self.eof
     }
 }

@@ -179,6 +179,11 @@ impl KeyListener for Tty {
                     t.signal(SIGINT);
                 }
             }
+            KeyCode::KEY_D if (state.lctrl || state.rctrl) && !released => {
+                self.buffer.lock_irq().trigger_eof();
+
+                self.wait_queue.notify_one();
+            }
             KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
                 if let Some(t) = self.fg_group.lock_irq().as_ref() {
                     t.signal(SIGQUIT);

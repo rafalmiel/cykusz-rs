@@ -422,20 +422,20 @@ pub fn setpgid(pid: usize, pgid: usize) -> SyscallResult {
     unsafe { syscall2(SYS_SETPGID, pid, pgid) }
 }
 
-pub fn pipe(fds: &mut [u64], flags: u64) -> SyscallResult {
+pub fn pipe(fds: &mut [u64], flags: OpenFlags) -> SyscallResult {
     if fds.len() < 2 {
         return Err(SyscallError::EINVAL);
     }
 
-    unsafe { syscall2(SYS_PIPE, fds.as_ptr() as usize, flags as usize) }
+    unsafe { syscall2(SYS_PIPE, fds.as_ptr() as usize, flags.bits()) }
 }
 
-pub fn dup(fd: usize, flags: u64) -> SyscallResult {
-    unsafe { syscall2(SYS_DUP, fd, flags as usize) }
+pub fn dup(fd: usize, flags: OpenFlags) -> SyscallResult {
+    unsafe { syscall2(SYS_DUP, fd, flags.bits()) }
 }
 
-pub fn dup2(fd: usize, new_fd: usize, flags: u64) -> SyscallResult {
-    unsafe { syscall3(SYS_DUP2, fd, new_fd, flags as usize) }
+pub fn dup2(fd: usize, new_fd: usize, flags: OpenFlags) -> SyscallResult {
+    unsafe { syscall3(SYS_DUP2, fd, new_fd, flags.bits()) }
 }
 
 pub fn poweroff() -> ! {

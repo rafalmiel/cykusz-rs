@@ -187,6 +187,8 @@ impl Task {
         self.signals().clear();
         self.set_locks(0);
 
+        self.filetable().close_on_exec();
+
         if let Some((entry, tls_vm)) = vm.load_bin(exe) {
             unsafe { self.arch_task_mut().exec(entry, vm, tls_vm, args, envs) }
         } else {

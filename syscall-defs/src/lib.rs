@@ -165,6 +165,7 @@ bitflags! {
         const CREAT       = 0x10;
         const DIRECTORY   = 0x20;
         const NOCTTY      = 0x80;
+        const CLOEXEC     = 0x4000;
     }
 }
 

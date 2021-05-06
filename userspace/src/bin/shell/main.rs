@@ -556,7 +556,7 @@ fn exec(cmd: &str) {
         );
         //println!("\x1b[22;3HHi")
     } else if cmd == "dup_test" {
-        if let Ok(new_fd) = syscall::dup(1, 0) {
+        if let Ok(new_fd) = syscall::dup(1, syscall_defs::OpenFlags::empty()) {
             println!("duplicate fd: {}", new_fd);
 
             syscall::close(new_fd).expect("Failed to close dup fd");
@@ -564,7 +564,7 @@ fn exec(cmd: &str) {
     } else if cmd == "pipe_test" {
         let mut fds = [0u64; 2];
 
-        if let Ok(_) = syscall::pipe(&mut fds, 0) {
+        if let Ok(_) = syscall::pipe(&mut fds, syscall_defs::OpenFlags::empty()) {
             if let Ok(id) = syscall::fork() {
                 if id > 0 {
                     syscall::write(fds[1] as usize, b"Hello from pipe\n").expect("write failed");

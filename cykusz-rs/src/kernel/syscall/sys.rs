@@ -741,7 +741,7 @@ pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
     crate::kernel::futex::futex().wait(uaddr, expected)
 }
 
-pub fn sys_pipe(fds: u64, _flags: u64) -> SyscallResult {
+pub fn sys_pipe(fds: u64, flags: u64) -> SyscallResult {
     let fds = unsafe { core::slice::from_raw_parts_mut(fds as *mut u64, 2) };
 
     let pipe = crate::kernel::fs::pipe::Pipe::new();
@@ -750,8 +750,13 @@ pub fn sys_pipe(fds: u64, _flags: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    if let Ok(fd1) = task.open_file(entry.clone(), OpenFlags::RDONLY) {
-        if let Ok(fd2) = task.open_file(entry, OpenFlags::WRONLY) {
+    let flags = OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)?;
+
+    let f1 = OpenFlags::RDONLY | (flags & OpenFlags::CLOEXEC);
+    let f2 = OpenFlags::WRONLY | (flags & OpenFlags::CLOEXEC);
+
+    if let Ok(fd1) = task.open_file(entry.clone(), f1) {
+        if let Ok(fd2) = task.open_file(entry, f2) {
             fds[0] = fd1 as u64;
             fds[1] = fd2 as u64;
 
@@ -764,16 +769,23 @@ pub fn sys_pipe(fds: u64, _flags: u64) -> SyscallResult {
     Err(SyscallError::EINVAL)
 }
 
-pub fn sys_dup(fd: u64, _flags: u64) -> SyscallResult {
+pub fn sys_dup(fd: u64, flags: u64) -> SyscallResult {
     let task = current_task_ref();
 
-    task.filetable().duplicate(fd as usize)
+    let flags =
+        OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)? & OpenFlags::CLOEXEC;
+
+    task.filetable().duplicate(fd as usize, flags)
 }
 
-pub fn sys_dup2(fd: u64, new_fd: u64, _flags: u64) -> SyscallResult {
+pub fn sys_dup2(fd: u64, new_fd: u64, flags: u64) -> SyscallResult {
     let task = current_task_ref();
 
-    task.filetable().duplicate_at(fd as usize, new_fd as usize)
+    let flags =
+        OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)? & OpenFlags::CLOEXEC;
+
+    task.filetable()
+        .duplicate_at(fd as usize, new_fd as usize, flags)
 }
 
 pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {

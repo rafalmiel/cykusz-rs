@@ -21,8 +21,8 @@ pub struct FileHandle {
 }
 
 impl FileHandle {
-    pub fn new(fd: usize, inode: DirEntryItem, flags: OpenFlags) -> Option<FileHandle> {
-        Some(FileHandle {
+    pub fn new(fd: usize, inode: DirEntryItem, flags: OpenFlags) -> FileHandle {
+        FileHandle {
             fd,
             inode: inode.clone(),
             offset: AtomicUsize::new(0),
@@ -33,7 +33,13 @@ impl FileHandle {
             //} else {
             //    None
             //},
-        })
+        }
+    }
+
+    pub fn duplicate(&self, flags: OpenFlags) -> Arc<FileHandle> {
+        let flags = self.flags | flags;
+
+        Arc::new(FileHandle::new(self.fd, self.inode.clone(), flags))
     }
 
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
@@ -306,6 +312,20 @@ impl FileTable {
         false
     }
 
+    pub fn close_on_exec(&self) {
+        let mut files = self.files.write();
+
+        for f in files.iter_mut() {
+            if let Some(h) = f {
+                if h.flags.contains(OpenFlags::CLOEXEC) {
+                    h.inode.inode().close();
+
+                    *f = None;
+                }
+            }
+        }
+    }
+
     pub fn close_all_files(&self) {
         let mut files = self.files.write();
 
@@ -330,19 +350,19 @@ impl FileTable {
         None
     }
 
-    pub fn duplicate(&self, fd: usize) -> SyscallResult {
+    pub fn duplicate(&self, fd: usize, flags: OpenFlags) -> SyscallResult {
         let handle = self.get_handle(fd).ok_or(SyscallError::EINVAL)?;
 
         let mut files = self.files.write();
 
         if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
-            *f = Some(handle);
+            *f = Some(handle.duplicate(flags));
 
             Ok(idx)
         } else if files.len() < FILE_NUM {
             let len = files.len();
 
-            files.push(Some(handle));
+            files.push(Some(handle.duplicate(flags)));
 
             Ok(len)
         } else {
@@ -350,7 +370,7 @@ impl FileTable {
         }
     }
 
-    pub fn duplicate_at(&self, fd: usize, at: usize) -> SyscallResult {
+    pub fn duplicate_at(&self, fd: usize, at: usize, flags: OpenFlags) -> SyscallResult {
         if at >= FILE_NUM {
             return Err(SyscallError::EINVAL);
         }
@@ -360,7 +380,7 @@ impl FileTable {
         let mut files = self.files.write();
 
         if files[at].is_none() {
-            files[at] = Some(handle);
+            files[at] = Some(handle.duplicate(flags));
 
             Ok(0)
         } else {
@@ -368,7 +388,7 @@ impl FileTable {
 
             old.inode.inode().close();
 
-            files[at] = Some(handle);
+            files[at] = Some(handle.duplicate(flags));
 
             Ok(0)
         }

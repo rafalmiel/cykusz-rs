@@ -1,17 +1,17 @@
-use crate::kernel::utils::buffer::BufferQueue;
-
 use alloc::sync::Arc;
+
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
+use crate::kernel::utils::buffer::BufferQueue;
 
 pub struct Pipe {
-    buf: BufferQueue
+    buf: BufferQueue,
 }
 
 impl Pipe {
     pub fn new() -> Arc<Pipe> {
         Arc::new(Pipe {
-            buf: BufferQueue::new(4096*4),
+            buf: BufferQueue::new(4096 * 4),
         })
     }
 }

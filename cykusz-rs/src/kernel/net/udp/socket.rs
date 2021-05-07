@@ -3,6 +3,8 @@ use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicU32;
 use core::sync::atomic::Ordering;
 
+use syscall_defs::OpenFlags;
+
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::{Ip4, IpHeader};
@@ -100,13 +102,13 @@ impl INode for Socket {
         let has_data = self.buffer.has_data();
 
         if let Some(p) = listen {
-            p.listen(self.buffer.wait_queue());
+            p.listen(self.buffer.readers_queue());
         }
 
         Ok(has_data)
     }
 
-    fn close(&self) {
+    fn close(&self, _flags: OpenFlags) {
         crate::kernel::net::udp::release_handler(self.src_port());
     }
 }
@@ -127,7 +129,7 @@ impl UdpService for Socket {
         println!("Failed to send to port {}", dst_port);
 
         self.set_error(true);
-        self.buffer.wait_queue().notify_all();
+        self.buffer.readers_queue().notify_all();
     }
 }
 

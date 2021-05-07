@@ -1,5 +1,7 @@
 use alloc::sync::{Arc, Weak};
 
+use syscall_defs::OpenFlags;
+
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::{Ip4, IpHeader};
@@ -327,7 +329,7 @@ impl SocketData {
                 window = self.ctl.available_window();
             }
 
-            self.proxy_buffer.wait_queue().notify_one();
+            self.proxy_buffer.readers_queue().notify_one();
         }
     }
 
@@ -460,7 +462,7 @@ impl SocketData {
             self.send_ack();
 
             if hdr.flag_fin() && data.is_empty() {
-                self.in_buffer.wait_queue().notify_all();
+                self.in_buffer.readers_queue().notify_all();
             }
         }
     }
@@ -638,7 +640,7 @@ impl SocketData {
 
         crate::kernel::net::tcp::release_handler(self.src_port as u32);
 
-        self.in_buffer.wait_queue().notify_all();
+        self.in_buffer.readers_queue().notify_all();
     }
 
     fn close(&mut self) {
@@ -775,7 +777,7 @@ impl INode for Socket {
             if data.ctl.available_window() < buf.len() {
                 let task = current_task();
 
-                data.proxy_buffer.wait_queue().add_task(task.clone());
+                data.proxy_buffer.readers_queue().add_task(task.clone());
 
                 //println!("[ TCP ] Proxy Buffer avail: {}", data.proxy_buffer.available_size());
 
@@ -783,7 +785,7 @@ impl INode for Socket {
                     if let Err(e) = WaitQueue::wait_lock(data) {
                         data = self.data.lock();
 
-                        data.proxy_buffer.wait_queue().remove_task(task);
+                        data.proxy_buffer.readers_queue().remove_task(task);
 
                         return Err(e)?;
                     }
@@ -793,7 +795,7 @@ impl INode for Socket {
 
                 data.proxy_buffer.try_append_data(buf);
 
-                data.proxy_buffer.wait_queue().remove_task(task);
+                data.proxy_buffer.readers_queue().remove_task(task);
             //data.send_queue.add_task(task.clone());
 
             //while data.ctl.available_window() < buf.len() && data.state == State::Established {
@@ -829,7 +831,7 @@ impl INode for Socket {
         let data = self.data.lock();
 
         if let Some(pt) = listen {
-            pt.listen(&data.in_buffer.wait_queue());
+            pt.listen(&data.in_buffer.readers_queue());
         }
 
         if (data.state == State::Closed || data.state == State::CloseWait)
@@ -841,7 +843,7 @@ impl INode for Socket {
         }
     }
 
-    fn close(&self) {
+    fn close(&self, _flags: OpenFlags) {
         self.data.lock().close();
     }
 }
@@ -853,7 +855,7 @@ impl TcpService for Socket {
         data.process(packet);
 
         if data.state == State::Closed {
-            data.in_buffer.wait_queue().notify_all();
+            data.in_buffer.readers_queue().notify_all();
         }
     }
 

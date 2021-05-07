@@ -254,4 +254,14 @@ impl WaitQueue {
 
         res
     }
+
+    pub fn signal_all(&self, sig: usize) {
+        let tasks = self.tasks.lock_irq();
+
+        for t in tasks.iter() {
+            if !t.signal(sig) {
+                t.wake_up();
+            }
+        }
+    }
 }

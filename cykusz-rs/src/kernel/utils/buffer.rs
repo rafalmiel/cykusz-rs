@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 
+use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task;
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
@@ -22,6 +23,8 @@ pub struct Buffer {
     r: usize,
     w: usize,
     full: bool, // r == w may indicate both empty and full buffer, full boolean disambiguate that
+    has_writers: bool,
+    has_readers: bool,
 }
 
 impl Default for Buffer {
@@ -36,6 +39,22 @@ impl BufferQueue {
             buffer: Spin::new(Buffer::new(init_size)),
             writer_queue: WaitQueue::new(),
             reader_queue: WaitQueue::new(),
+        }
+    }
+
+    pub fn set_has_readers(&self, has: bool) {
+        self.buffer.lock().has_readers = has;
+
+        if !has {
+            self.writer_queue.signal_all(syscall_defs::signal::SIGPIPE);
+        }
+    }
+
+    pub fn set_has_writers(&self, has: bool) {
+        self.buffer.lock().has_writers = has;
+
+        if !has {
+            self.reader_queue.notify_all();
         }
     }
 
@@ -67,14 +86,18 @@ impl BufferQueue {
         written
     }
 
-    pub fn append_data(&self, data: &[u8]) -> SignalResult<usize> {
+    pub fn append_data(&self, data: &[u8]) -> crate::kernel::fs::vfs::Result<usize> {
         if data.is_empty() {
             return Ok(0);
         }
 
-        let mut buffer = self
-            .writer_queue
-            .wait_lock_for(&self.buffer, |lck| lck.available_size() >= data.len())?;
+        let mut buffer = self.writer_queue.wait_lock_for(&self.buffer, |lck| {
+            !lck.has_readres() || lck.available_size() >= data.len()
+        })?;
+
+        if !buffer.has_readres() {
+            return Err(FsError::Pipe);
+        }
 
         let written = buffer.append_data(data);
 
@@ -102,7 +125,9 @@ impl BufferQueue {
 
         let read = buffer.read_data(buf);
 
-        self.writer_queue.notify_one();
+        if read > 0 {
+            self.writer_queue.notify_one();
+        }
 
         Ok(read)
     }
@@ -119,7 +144,11 @@ impl BufferQueue {
         buffer.read_data(buf)
     }
 
-    pub fn wait_queue(&self) -> &WaitQueue {
+    pub fn writers_queue(&self) -> &WaitQueue {
+        &self.writer_queue
+    }
+
+    pub fn readers_queue(&self) -> &WaitQueue {
         &self.reader_queue
     }
 }
@@ -131,10 +160,20 @@ impl Buffer {
             r: 0,
             w: 0,
             full: false,
+            has_writers: true,
+            has_readers: true,
         };
         buf.data.resize(init_size, 0);
 
         buf
+    }
+
+    pub fn has_readres(&self) -> bool {
+        self.has_readers
+    }
+
+    pub fn has_writers(&self) -> bool {
+        self.has_writers
     }
 
     pub fn available_size(&self) -> usize {
@@ -181,7 +220,7 @@ impl Buffer {
     }
 
     pub fn has_data(&self) -> bool {
-        self.r != self.w || self.full
+        self.r != self.w || self.full || !self.has_writers
     }
 
     pub fn read_data(&mut self, buf: &mut [u8]) -> usize {

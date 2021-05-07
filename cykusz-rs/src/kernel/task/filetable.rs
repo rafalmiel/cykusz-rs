@@ -36,10 +36,14 @@ impl FileHandle {
         }
     }
 
-    pub fn duplicate(&self, flags: OpenFlags) -> Arc<FileHandle> {
+    pub fn duplicate(&self, flags: OpenFlags) -> Result<Arc<FileHandle>> {
         let flags = self.flags | flags;
 
-        Arc::new(FileHandle::new(self.fd, self.inode.clone(), flags))
+        let new = Arc::new(FileHandle::new(self.fd, self.inode.clone(), flags));
+
+        new.inode.inode().open(flags)?;
+
+        Ok(new)
     }
 
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
@@ -304,7 +308,7 @@ impl FileTable {
         let mut files = self.files.write();
 
         if let Some(f) = &files[fd] {
-            f.inode.inode().close();
+            f.inode.inode().close(f.flags);
             files[fd] = None;
             return true;
         }
@@ -318,7 +322,7 @@ impl FileTable {
         for f in files.iter_mut() {
             if let Some(h) = f {
                 if h.flags.contains(OpenFlags::CLOEXEC) {
-                    h.inode.inode().close();
+                    h.inode.inode().close(h.flags);
 
                     *f = None;
                 }
@@ -331,7 +335,7 @@ impl FileTable {
 
         for f in files.iter_mut() {
             if let Some(file) = f {
-                file.inode.inode().close();
+                file.inode.inode().close(file.flags);
 
                 *f = None;
             }
@@ -356,13 +360,13 @@ impl FileTable {
         let mut files = self.files.write();
 
         if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
-            *f = Some(handle.duplicate(flags));
+            *f = Some(handle.duplicate(flags)?);
 
             Ok(idx)
         } else if files.len() < FILE_NUM {
             let len = files.len();
 
-            files.push(Some(handle.duplicate(flags)));
+            files.push(Some(handle.duplicate(flags)?));
 
             Ok(len)
         } else {
@@ -380,17 +384,22 @@ impl FileTable {
         let mut files = self.files.write();
 
         if files[at].is_none() {
-            files[at] = Some(handle.duplicate(flags));
+            files[at] = Some(handle.duplicate(flags)?);
 
             Ok(0)
         } else {
-            let old = files[at].take().unwrap();
+            match handle.duplicate(flags) {
+                Ok(handle) => {
+                    let old = files[at].take().unwrap();
 
-            old.inode.inode().close();
+                    old.inode.inode().close(old.flags);
 
-            files[at] = Some(handle.duplicate(flags));
+                    files[at] = Some(handle);
 
-            Ok(0)
+                    Ok(0)
+                }
+                Err(e) => Err(e)?,
+            }
         }
     }
 }

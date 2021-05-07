@@ -570,16 +570,18 @@ fn exec(cmd: &str) {
                     syscall::write(fds[1] as usize, b"Hello from pipe\n").expect("write failed");
 
                     syscall::close(fds[0] as usize).expect("close failed");
+                    syscall::close(fds[1] as usize).expect("close failed");
 
                     syscall::waitpid(id).expect("waitpid failed");
-
-                    syscall::close(fds[1] as usize).expect("close failed");
                 } else {
                     syscall::close(fds[1] as usize).expect("close failed");
 
                     let mut buf = [0u8; 128];
 
-                    if let Ok(r) = syscall::read(fds[0] as usize, &mut buf) {
+                    while let Ok(r) = syscall::read(fds[0] as usize, &mut buf) {
+                        if r == 0 {
+                            break;
+                        }
                         syscall::write(1, &mut buf[..r]).expect("write failed");
                     }
 

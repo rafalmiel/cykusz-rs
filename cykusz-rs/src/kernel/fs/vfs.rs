@@ -14,6 +14,7 @@ pub enum FsError {
     Busy,
     NoPermission,
     NoTty,
+    Pipe,
     Interrupted,
 }
 
@@ -28,9 +29,10 @@ impl From<FsError> for syscall_defs::SyscallError {
             FsError::EntryExists => SyscallError::EEXIST,
             FsError::InvalidParam => SyscallError::EINVAL,
             FsError::Busy => SyscallError::EBUSY,
-            FsError::Interrupted => SyscallError::EINTR,
             FsError::NoPermission => SyscallError::EPERM,
             FsError::NoTty => SyscallError::ENOTTY,
+            FsError::Pipe => SyscallError::EPIPE,
+            FsError::Interrupted => SyscallError::EINTR,
         }
     }
 }

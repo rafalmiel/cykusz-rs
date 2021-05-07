@@ -70,7 +70,7 @@ pub trait INode: Send + Sync + DowncastSync {
         Ok(())
     }
 
-    fn close(&self) {}
+    fn close(&self, _flags: OpenFlags) {}
 
     fn mknode(&self, _name: &str, _devid: usize) -> Result<INodeItem> {
         return Err(FsError::NotSupported);

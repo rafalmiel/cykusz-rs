@@ -6,7 +6,7 @@ cd $SPATH/..
 export CYKUSZ_DIR=$(pwd)
 cd $SPATH
 
-set -x
+set -x -e
 
 SRC_DIR=$CYKUSZ_DIR/sysroot/src
 BINUTILS_SRC_DIR=$SRC_DIR/binutils-gdb

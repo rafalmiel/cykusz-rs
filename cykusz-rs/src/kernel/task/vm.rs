@@ -724,6 +724,25 @@ impl VMData {
         }
     }
 
+    fn log_vm(&self) {
+        for e in self.maps.iter() {
+            if let Some(f) = &e.mmaped_file {
+                logln!(
+                    "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
+                    e.start,
+                    e.end,
+                    e.prot,
+                    e.flags,
+                    f.file.full_path(),
+                    f.starting_offset,
+                    f.len,
+                );
+            } else {
+                logln!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
+            }
+        }
+    }
+
     fn fork(&mut self, vm: &VM) {
         let other = vm.data.lock();
 
@@ -739,7 +758,7 @@ impl VMData {
         let mut success = false;
 
         while let Some(c) = cursor.current() {
-            if c.end < start {
+            if c.end <= start {
                 cursor.move_next();
             } else {
                 match c.unmap(start, end) {
@@ -839,5 +858,9 @@ impl VM {
 
     pub fn print_vm(&self) {
         self.data.lock().print_vm();
+    }
+
+    pub fn log_vm(&self) {
+        self.data.lock().log_vm();
     }
 }

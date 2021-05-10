@@ -26,6 +26,10 @@ pub trait INode: Send + Sync + DowncastSync {
         Err(FsError::NotSupported)
     }
 
+    fn stat(&self) -> Result<syscall_defs::stat::Stat> {
+        Err(FsError::NotSupported)
+    }
+
     fn lookup(
         &self,
         _parent: crate::kernel::fs::dirent::DirEntryItem,

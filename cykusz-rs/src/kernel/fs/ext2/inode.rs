@@ -415,6 +415,24 @@ impl INode for LockedExt2INode {
         })
     }
 
+    fn stat(&self) -> Result<syscall_defs::stat::Stat> {
+        let mut stat = syscall_defs::stat::Stat::default();
+
+        let inode = self.read();
+
+        stat.st_ino = inode.id as u64;
+        stat.st_nlink = inode.d_inode.hl_count() as u32;
+        stat.st_blksize = self.ext2_fs().superblock().block_size() as u64;
+        stat.st_blocks = inode.d_inode.sector_count() as u64;
+        stat.st_size = inode.d_inode.size_lower() as i64;
+        stat.st_mode.insert(syscall_defs::stat::Mode::IFREG);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
+
+        Ok(stat)
+    }
+
     fn lookup(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);

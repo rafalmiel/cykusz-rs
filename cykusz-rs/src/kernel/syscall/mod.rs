@@ -75,6 +75,9 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_PIPE => sys::sys_pipe(a, b),
         SYS_DUP => sys::sys_dup(a, b),
         SYS_DUP2 => sys::sys_dup2(a, b, c),
+        SYS_STAT => sys::sys_stat(a, b, c),
+        SYS_FSTAT => sys::sys_fstat(a, b),
+        SYS_GETRLIMIT => sys::sys_getrlimit(a, b),
 
         _ => Err(SyscallError::ENOSYS),
     }

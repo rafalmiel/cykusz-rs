@@ -8,7 +8,10 @@ extern crate bitflags;
 pub mod exec;
 pub mod ioctl;
 pub mod prctl;
+pub mod resource;
 pub mod signal;
+pub mod stat;
+pub mod time;
 
 pub const SYS_READ: usize = 0;
 pub const SYS_WRITE: usize = 1;
@@ -64,6 +67,10 @@ pub const SYS_SETPGID: usize = 46;
 pub const SYS_PIPE: usize = 47;
 pub const SYS_DUP: usize = 48;
 pub const SYS_DUP2: usize = 49;
+pub const SYS_STAT: usize = 50;
+pub const SYS_FSTAT: usize = 51;
+
+pub const SYS_GETRLIMIT: usize = 52;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

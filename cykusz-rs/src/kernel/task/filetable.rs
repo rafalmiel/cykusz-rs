@@ -100,12 +100,14 @@ impl FileHandle {
                     return Err(FsError::NotSupported);
                 }
             }
-            None => self.inode.inode().write_at(offset, buf)?,
+            None => {
+                self.inode.inode().write_at(offset, buf)?
+            },
         })
     }
 
     pub fn seek(&self, off: isize, whence: syscall_defs::SeekWhence) -> Result<usize> {
-        let meta = self.inode.inode().metadata()?;
+        let meta = self.inode.inode().metadata().ok().ok_or(FsError::IsPipe)?;
 
         if meta.typ == FileType::File {
             match whence {
@@ -130,7 +132,7 @@ impl FileHandle {
 
             Ok(self.offset.load(Ordering::SeqCst))
         } else {
-            Err(FsError::NotFile)
+            Err(FsError::IsPipe)
         }
     }
 

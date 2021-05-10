@@ -15,6 +15,7 @@ pub enum FsError {
     NoPermission,
     NoTty,
     Pipe,
+    IsPipe,
     Interrupted,
 }
 
@@ -32,6 +33,7 @@ impl From<FsError> for syscall_defs::SyscallError {
             FsError::NoPermission => SyscallError::EPERM,
             FsError::NoTty => SyscallError::ENOTTY,
             FsError::Pipe => SyscallError::EPIPE,
+            FsError::IsPipe => SyscallError::ESPIPE,
             FsError::Interrupted => SyscallError::EINTR,
         }
     }

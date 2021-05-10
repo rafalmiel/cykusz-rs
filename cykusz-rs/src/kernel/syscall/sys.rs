@@ -158,6 +158,8 @@ pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
 pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) -> SyscallResult {
     let task = current_task_ref();
 
+    logln!("mmap: {:#x}", addr);
+
     let addr = if addr != 0 {
         Some(VirtAddr(addr as usize))
     } else {
@@ -796,6 +798,62 @@ pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
     //});
 
     crate::kernel::futex::futex().wake(uaddr)
+}
+
+pub fn sys_stat(path: u64, path_len: u64, stat: u64) -> SyscallResult {
+    let str = make_str(path, path_len);
+    let path = Path::new(make_str(path, path_len));
+
+    let stat = unsafe {
+        VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>()
+    };
+
+    let inode = lookup_by_path(path, LookupMode::None)?;
+
+    *stat = inode.inode().stat()?;
+
+    logln!("stat {}, {:?}", str, stat);
+
+    Ok(0)
+}
+
+pub fn sys_fstat(fd: u64, stat: u64) -> SyscallResult {
+    let file =
+        current_task_ref()
+            .filetable()
+            .get_handle(fd as usize)
+            .ok_or(SyscallError::EBADFD)?;
+
+    let stat = unsafe {
+        VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>()
+    };
+
+    *stat = file.inode.inode().stat()?;
+
+    Ok(0)
+}
+
+pub fn sys_getrlimit(resource: u64, rlimit: u64) -> SyscallResult {
+    use core::convert::TryFrom;
+
+    let resource = syscall_defs::resource::RLimitKind::try_from(resource)?;
+
+    let out = unsafe {
+        VirtAddr(rlimit as usize).read_mut::<syscall_defs::resource::RLimit>()
+    };
+
+    match resource {
+        syscall_defs::resource::RLimitKind::NOFile => {
+            out.cur = 256;
+            out.max = 256;
+        },
+        _ => {
+            out.cur = u64::MAX;
+            out.cur = u64::MAX;
+        }
+    }
+
+    Ok(0)
 }
 
 pub fn sys_poweroff() -> ! {

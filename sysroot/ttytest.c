@@ -2,7 +2,7 @@
 #include <unistd.h>
 
 int main() {
-	setbuf(stdout, NULL);
+	//setbuf(stdout, NULL);
 
 	while (1) {
 		char buf[256];

@@ -709,6 +709,9 @@ pub fn sys_sigaction(
     _sigmask: u64,
     sigreturn: u64,
 ) -> SyscallResult {
+    if sig == 34 { //temporary hack to make mlibc happy
+        return Err(SyscallError::ENOSYS);
+    }
     let handler: syscall_defs::signal::SignalHandler = handler.into();
 
     if let Some(flags) = syscall_defs::signal::SignalFlags::from_bits(flags) {

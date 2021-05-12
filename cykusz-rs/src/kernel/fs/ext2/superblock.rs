@@ -47,6 +47,10 @@ impl Superblock {
         self.d_superblock.read().inodes_in_group() as usize
     }
 
+    pub fn inode_size(&self) -> usize {
+        self.d_superblock.read().inode_size() as usize
+    }
+
     pub fn inodes_per_block(&self) -> usize {
         self.d_superblock.read().inodes_per_block()
     }

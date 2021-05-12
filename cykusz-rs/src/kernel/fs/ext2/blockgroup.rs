@@ -15,7 +15,7 @@ use crate::kernel::utils::types::Align;
 use super::disk;
 
 pub struct INodeVec {
-    vec: Vec<disk::inode::INode>,
+    vec: Vec<u8>,
     src_block: usize,
     dirty: bool,
 }
@@ -26,17 +26,32 @@ pub struct INodeGroup {
 }
 
 impl INodeVec {
-    pub fn get(&self, id: usize) -> &disk::inode::INode {
-        &self.vec[(id - 1) % self.vec.len()]
+    pub fn get(&self, id: usize, inode_size: usize) -> &disk::inode::INode {
+        let offset = ((id - 1) * inode_size) % self.vec.len();
+
+        unsafe {
+            core::mem::transmute(&self.vec[offset])
+        }
     }
-    pub fn get_mut(&mut self, id: usize) -> &mut disk::inode::INode {
-        let len = self.vec.len();
+    pub fn get_mut(&mut self, id: usize, inode_size: usize) -> &mut disk::inode::INode {
         self.dirty = true;
-        &mut self.vec[(id - 1) % len]
+        let offset = ((id - 1) * inode_size) % self.vec.len();
+
+        unsafe {
+            core::mem::transmute(&mut self.vec[offset])
+        }
     }
 }
 
 impl INodeGroup {
+    fn fs(&self) -> Arc<Ext2Filesystem> {
+        self.fs.upgrade().unwrap()
+    }
+
+    fn inode_size(&self) -> usize {
+        self.fs().superblock().inode_size()
+    }
+
     pub fn read(&self) -> RwSpinReadGuard<INodeVec> {
         self.inodes.read()
     }
@@ -273,10 +288,10 @@ impl BlockGroupDescriptors {
             let sb = fs.superblock().read_inner();
 
             //load
-            let mut vec = Vec::<disk::inode::INode>::new();
-            vec.resize(sb.inodes_per_block(), disk::inode::INode::default());
+            let mut vec = Vec::<u8>::new();
+            vec.resize(sb.block_size(), 0);
 
-            fs.read_block(block, vec.as_mut_slice().to_bytes_mut());
+            fs.read_block(block, vec.as_mut_slice());
 
             let res = Arc::new(INodeGroup {
                 fs: Arc::downgrade(&fs),
@@ -297,14 +312,14 @@ impl BlockGroupDescriptors {
         let group = self.get_d_inode(id);
         let mut vec = group.write();
 
-        *vec.get_mut(id) = *d_inode;
+        *vec.get_mut(id, group.inode_size()) = *d_inode;
     }
 
     pub fn read_d_inode(&self, id: usize, d_inode: &mut disk::inode::INode) {
         let group = self.get_d_inode(id);
         let vec = group.read();
 
-        *d_inode = *vec.get(id);
+        *d_inode = *vec.get(id, group.inode_size());
     }
 
     pub fn debug(&self) {

@@ -81,11 +81,11 @@ impl Superblock {
     }
 
     pub fn debug(&self) {
-        println!(
+        logln!(
             "SIZE: {}",
             core::mem::size_of::<disk::superblock::Superblock>()
         );
-        println!("{:?}", *self.d_superblock.read());
+        logln!("{:?}", *self.d_superblock.read());
     }
 
     pub fn block_groups_sector(&self) -> usize {
@@ -97,6 +97,12 @@ impl Superblock {
     }
 
     pub fn first_block(&self) -> usize {
-        1
+        match self.block_size() {
+            1024 => 1,
+            a if a > 1024 => {
+                0
+            },
+            _ => panic!("invalid block size")
+        }
     }
 }

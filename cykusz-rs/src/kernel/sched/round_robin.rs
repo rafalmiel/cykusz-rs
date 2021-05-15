@@ -276,14 +276,12 @@ impl Queues {
         unreachable!()
     }
 
-    fn reap_dead(&mut self, lock: &mut Spin<()>) {
-        let mut locked = lock.lock_irq();
-        while let Some(dead) = self.dead.pop_front() {
+    fn reap_dead(&mut self, locked: SpinGuard<()>) {
+        if let Some(dead) = self.dead.pop_front() {
             dead.set_state(TaskState::Unused);
 
             drop(locked);
             dead.make_zombie();
-            locked = lock.lock_irq();
 
             logln!(
                 "reap thread zombie {} pl: {} sc: {}, wc: {}",
@@ -443,21 +441,21 @@ impl RRScheduler {
     fn reaper(&self) {
         let (lock, queue) = self.queues.this_cpu_mut();
 
-        queue
-            .dead_wq
-            .wait_lock_irq_for(lock, |_sg| !queue.dead.is_empty())
-            .expect("[ SCHED ] Unexpected signal in reaper thread");
+        loop {
+            let locked = queue
+                .dead_wq
+                .wait_lock_irq_for(lock, |_sg| !queue.dead.is_empty())
+                .expect("[ SCHED ] Unexpected signal in reaper thread");
 
-        queue.reap_dead(lock);
+            queue.reap_dead(locked);
+        }
     }
 }
 
 fn reaper() {
     let rr_scheduler = super::scheduler().as_impl::<RRScheduler>();
 
-    loop {
-        rr_scheduler.reaper();
-    }
+    rr_scheduler.reaper();
 }
 
 fn scheduler_main() {

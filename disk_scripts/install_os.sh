@@ -19,7 +19,8 @@ cp -f sysroot/build/hello mnt/bin/hello
 cp -f sysroot/build/stack mnt/bin/stack
 cp -f sysroot/build/nyancat mnt/bin/nyancat
 cp -f sysroot/build/ttytest mnt/bin/ttytest
-cp -f sysroot/cykusz/usr/local/bin/* mnt/bin/
+cp -r sysroot/cykusz/usr mnt/
+#cp sysroot/cykusz/usr/bin/{readelf,objdump,nm,strings,size} mnt/bin/
 umount mnt
 
 losetup -D

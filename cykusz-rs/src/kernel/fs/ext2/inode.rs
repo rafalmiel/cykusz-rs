@@ -2,7 +2,7 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::ops::{Deref, DerefMut};
 
-use syscall_defs::FileType;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::arch::mm::PAGE_SIZE;
 use crate::kernel::fs::cache::Cacheable;
@@ -614,6 +614,12 @@ impl INode for LockedExt2INode {
         } else {
             Ok(DirEntry::new(parent, new_inode, String::from(name)))
         }
+    }
+
+    fn open(&self, _flags: OpenFlags) -> Result<()> {
+        //logln!("open inode: {:?}", self.read().d_inode);
+
+        Ok(())
     }
 
     fn symlink(&self, name: &str, target: &str) -> Result<()> {

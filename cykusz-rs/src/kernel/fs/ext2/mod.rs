@@ -56,7 +56,7 @@ impl Ext2Filesystem {
             .call_once(|| self.superblock.sectors_per_block());
         self.blockgroupdesc.init(self.self_ref.clone());
 
-        //self.debug();
+        self.debug();
 
         true
     }

@@ -16,6 +16,7 @@ MPC_SRC_DIR=$SRC_DIR/mpc
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
 BINUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-binutils-gdb
+GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
@@ -46,6 +47,13 @@ function _prepare_gcc {
 	if [ ! -d $GCC_SRC_DIR ]; then
 		mkdir -p $SRC_DIR
 		git clone --depth 1 -b cykusz https://github.com/rafalmiel/gcc.git $GCC_SRC_DIR
+
+		pushd .
+
+		cd $GCC_SRC_DIR
+		./contrib/download_prerequisites
+
+		popd
 	fi
 }
 
@@ -56,40 +64,11 @@ function _prepare_nyancat {
 	fi
 }
 
-function _prepare_gmp {
-	if [ ! -d $GMP_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/gmp.git $GMP_SRC_DIR
-	fi
-}
-
-function _prepare_mpfr {
-	if [ ! -d $MPFR_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/mpfr.git $MPFR_SRC_DIR
-
-		pushd .
-		cd $MPFR_SRC_DIR
-		autoreconf
-		popd
-	fi
-}
-
-function _prepare_mpc {
-	if [ ! -d $MPC_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/mpc.git $MPC_SRC_DIR
-	fi
-}
-
 function _prepare {
 	_prepare_mlibc
 	_prepare_binutils
 	_prepare_gcc
 	_prepare_nyancat
-	_prepare_gmp
-	_prepare_mpfr
-	_prepare_mpc
 }
 
 function _sysroot {
@@ -164,55 +143,6 @@ function _nyancat {
 	popd
 }
 
-function _gmp {
-	_prepare_gmp
-
-	mkdir -p $GMP_BUILD_DIR
-
-	pushd .
-
-	cd $GMP_BUILD_DIR
-	$GMP_SRC_DIR/configure --host=x86_64-cykusz --prefix=/usr
-
-	popd
-
-	make -C $GMP_BUILD_DIR
-	make -C $GMP_BUILD_DIR DESTDIR=$SYSROOT install
-}
-
-function _mpfr {
-	_prepare_mpfr
-
-	mkdir -p $MPFR_BUILD_DIR
-
-	pushd .
-
-	cd $MPFR_BUILD_DIR
-	$MPFR_SRC_DIR/configure --host=x86_64-cykusz --prefix=/usr
-
-	popd
-
-	make -C $MPFR_BUILD_DIR
-	make -C $MPFR_BUILD_DIR DESTDIR=$SYSROOT install
-}
-
-function _mpc {
-	_prepare_mpc
-
-	mkdir -p $MPC_BUILD_DIR
-
-	pushd .
-
-	cd $MPC_BUILD_DIR
-	$MPC_SRC_DIR/configure --host=x86_64-cykusz --prefix=/usr
-
-	popd
-
-	make -C $MPC_BUILD_DIR
-	make -C $MPC_BUILD_DIR DESTDIR=$SYSROOT install
-
-}
-
 function _cykusz_binutils {
 	_prepare_binutils
 
@@ -229,6 +159,28 @@ function _cykusz_binutils {
 	make -C $BINUTILS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
+function _cykusz_gcc {
+	_prepare_gcc
+
+	mkdir -p $GCC_CYKUSZ_BUILD_DIR
+
+	pushd .
+
+	cd $GCC_CYKUSZ_BUILD_DIR
+	$GCC_SRC_DIR/configure --host=x86_64-cykusz --with-build-sysroot=$SYSROOT --prefix=/usr --enable-languages=c,c++ --enable-threads=posix
+
+	popd
+
+
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc all-target-libgcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc install-target-libgcc
+}
+
+function _cykusz_libstd {
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libstdc++-v3
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libstdc++-v3
+}
+
 function _build {
 	_sysroot
 	_binutils
@@ -236,10 +188,9 @@ function _build {
 	_mlibc
 	_libstd
 	_nyancat
-	#_gmp
-	#_mpfr
-	#_mpc
 	_cykusz_binutils
+	_cykusz_gcc
+	_cykusz_libstd
 }
 
 function _all {

@@ -21,7 +21,7 @@ pub struct Timer {
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        println!("[ TCP ] Timer dropped");
+        logln!("[ TCP ] Timer dropped");
     }
 }
 

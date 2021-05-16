@@ -66,7 +66,7 @@ impl Drop for INodeGroup {
 
         if l.dirty {
             if let Some(fs) = self.fs.upgrade() {
-                fs.write_block(l.src_block, l.vec.as_slice().to_bytes());
+                fs.write_block(l.src_block, l.vec.as_slice());
             }
         }
     }
@@ -326,7 +326,7 @@ impl BlockGroupDescriptors {
         let l = self.d_desc.read();
 
         for d in l.vec.iter() {
-            println!("{:?}", d);
+            logln!("{:?}", d);
         }
     }
 

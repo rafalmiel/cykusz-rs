@@ -105,7 +105,8 @@ pub fn write(fd: usize, buf: &[u8]) -> SyscallResult {
 }
 
 pub fn open(path: &str, flags: syscall_defs::OpenFlags) -> SyscallResult {
-    unsafe { syscall3(SYS_OPEN, path.as_ptr() as usize, path.len(), flags.bits()) }
+    let fd = OpenFD::Cwd;
+    unsafe { syscall4(SYS_OPEN, fd.into(), path.as_ptr() as usize, path.len(), flags.bits()) }
 }
 
 pub fn close(fd: usize) -> SyscallResult {

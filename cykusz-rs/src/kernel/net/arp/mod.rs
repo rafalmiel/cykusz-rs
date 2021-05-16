@@ -143,7 +143,7 @@ pub fn process_packet(packet: Packet<Arp>) {
             ohdr.set_dst_ip(header.src_ip());
             ohdr.set_dst_mac(header.src_mac());
 
-            println!("[ ARP ] Send reply to {:?}", header.src_ip());
+            logln!("[ ARP ] Send reply to {:?}", header.src_ip());
 
             crate::kernel::net::eth::send_packet(packet.downgrade(), header.src_ip);
         }
@@ -165,7 +165,7 @@ pub fn request_ip(target: Ip4, to_cache: Packet<Eth>) {
     ohdr.set_dst_ip(target);
     ohdr.set_dst_mac(&[0, 0, 0, 0, 0, 0]);
 
-    println!("[ ARP ] Send request to {:?}", target);
+    logln!("[ ARP ] Send request to {:?}", target);
 
     cache::request_ip(target, to_cache);
 

@@ -27,6 +27,8 @@ MPC_BUILD_DIR=$BUILD_DIR/mpc
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
 CROSS=$CYKUSZ_DIR/sysroot/cross
 
+TRIPLE=x86_64-cykusz
+
 export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:$PATH
 
 function _prepare_mlibc {
@@ -50,8 +52,10 @@ function _prepare_gcc {
 
 		pushd .
 
-		cd $GCC_SRC_DIR
-		./contrib/download_prerequisites
+		cd $GCC_SRC_DIR/mpfr
+		autoreconf
+		cd $GCC_SRC_DIR/isl
+		autoreconf
 
 		popd
 	fi
@@ -87,7 +91,7 @@ function _binutils {
 	pushd .
 
 	cd $BINUTILS_BUILD_DIR
-	$BINUTILS_SRC_DIR/configure --target=x86_64-cykusz --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb
+	$BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb
 
 	popd
 
@@ -104,7 +108,7 @@ function _gcc {
 	pushd .
 
 	cd $GCC_BUILD_DIR
-	$GCC_SRC_DIR/configure --target=x86_64-cykusz --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix
+	$GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix
 
 	popd
 
@@ -136,7 +140,7 @@ function _nyancat {
 
 	cd $NYANCAT_SRC_DIR/src
 	make clean
-	CC=x86_64-cykusz-gcc make
+	CC=$TRIPLE-gcc make
 	cp nyancat $BUILD_DIR
 	make clean
 
@@ -151,7 +155,7 @@ function _cykusz_binutils {
 	pushd .
 
 	cd $BINUTILS_CYKUSZ_BUILD_DIR
-	$BINUTILS_SRC_DIR/configure --host=x86_64-cykusz --with-build-sysroot=$SYSROOT --prefix=/usr --disable-werror --disable-gdb
+	$BINUTILS_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --prefix=/usr --disable-werror --disable-gdb
 
 	popd
 
@@ -167,13 +171,16 @@ function _cykusz_gcc {
 	pushd .
 
 	cd $GCC_CYKUSZ_BUILD_DIR
-	$GCC_SRC_DIR/configure --host=x86_64-cykusz --with-build-sysroot=$SYSROOT --prefix=/usr --enable-languages=c,c++ --enable-threads=posix
+	$GCC_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --prefix=/usr --enable-languages=c,c++ --enable-threads=posix --disable-multilib
 
 	popd
 
 
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc all-target-libgcc
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc install-target-libgcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libgcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libgcc
+
 }
 
 function _cykusz_libstd {
@@ -205,7 +212,7 @@ function _clean {
 }
 
 function _check_build {
-	if [ ! -f $CROSS/bin/x86_64-cykusz-gcc ]; then
+	if [ ! -f $CROSS/bin/$TRIPLE-gcc ]; then
 		_all
 	fi
 }

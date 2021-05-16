@@ -272,6 +272,10 @@ fn lookup_by_path_from(
     Ok(cur)
 }
 
+pub fn lookup_by_path_at(dir: DirEntryItem, path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
+    lookup_by_path_from(path, lookup_mode, dir, false, 0)
+}
+
 pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
     if let Some(cur) = if !path.is_absolute() {
         current_task().get_dent()

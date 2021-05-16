@@ -251,7 +251,7 @@ impl CachedBlockDev for BlockDevice {
     }
 
     fn sync_all(&self) {
-        println!(
+        logln!(
             "Syncing... inodes {}, pages {}",
             self.dirty_inode_pages.lock().len(),
             self.dirty_pages.lock().len(),

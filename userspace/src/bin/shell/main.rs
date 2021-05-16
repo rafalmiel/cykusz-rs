@@ -604,7 +604,7 @@ fn exec(cmd: &str) {
             start_process(
                 args[0],
                 Some(args.as_slice()),
-                Some(&["env1=TRUE", "env2=FALSE"]),
+                Some(&["PATH=/usr/bin"]),
             );
         }
     }

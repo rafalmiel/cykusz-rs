@@ -5,6 +5,8 @@ extern crate alloc;
 #[macro_use]
 extern crate bitflags;
 
+use core::convert::TryFrom;
+
 pub mod exec;
 pub mod ioctl;
 pub mod prctl;
@@ -71,6 +73,7 @@ pub const SYS_STAT: usize = 50;
 pub const SYS_FSTAT: usize = 51;
 
 pub const SYS_GETRLIMIT: usize = 52;
+pub const SYS_DEBUG: usize = 53;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]
@@ -164,6 +167,38 @@ pub enum SyscallError {
     UnknownError = 0xffff,
 }
 
+pub enum OpenFD {
+    Fd(usize),
+    Cwd,
+}
+
+impl TryFrom<u64> for OpenFD {
+    type Error = SyscallError;
+
+    fn try_from(v: u64) -> Result<OpenFD, SyscallError> {
+        let v = v as isize;
+
+        match v {
+            -100 => Ok(OpenFD::Cwd),
+            a if a >= 0 && a < 256 => Ok(OpenFD::Fd(a as usize)),
+            _ => Err(SyscallError::EINVAL),
+        }
+    }
+}
+
+impl From<OpenFD> for usize {
+    fn from(v: OpenFD) -> Self {
+        match v {
+            OpenFD::Fd(a) => {
+                a
+            },
+            OpenFD::Cwd => {
+                (-100isize) as usize
+            }
+        }
+    }
+}
+
 bitflags! {
     pub struct OpenFlags: usize {
         const RDONLY      = 2;
@@ -172,11 +207,13 @@ bitflags! {
         const CREAT       = 0x10;
         const DIRECTORY   = 0x20;
         const NOCTTY      = 0x80;
+        const TRUNC      = 0x0200;
         const CLOEXEC     = 0x4000;
     }
 }
 
 #[repr(usize)]
+#[derive(Debug)]
 pub enum SeekWhence {
     SeekSet = 0,
     SeekCur = 1,

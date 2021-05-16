@@ -116,6 +116,10 @@ impl OutputBuffer {
         }
     }
 
+    fn tab(&mut self) {
+        self.cursor_x = (self.cursor_x + 8).align_down(8);
+    }
+
     fn set_viewport_line(&mut self, line: usize) {
         assert!(line < self.buffer_lines);
 
@@ -135,6 +139,13 @@ impl OutputBuffer {
         match char {
             b'\n' => {
                 self.new_line();
+            },
+            b'\t' => {
+                self.tab();
+
+                if self.cursor_x >= self.size_x {
+                    self.new_line();
+                }
             }
             c => {
                 if self.cursor_x >= self.size_x {
@@ -466,6 +477,8 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
 
     fn execute(&mut self, byte: u8) {
         if byte == b'\n' {
+            self.output.store_char(byte, &mut self.update);
+        } else if byte == b'\t' {
             self.output.store_char(byte, &mut self.update);
         }
     }

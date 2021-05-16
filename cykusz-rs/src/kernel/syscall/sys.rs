@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 use intrusive_collections::UnsafeRef;
 
-use syscall_defs::{ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, SyscallResult};
+use syscall_defs::{ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, SyscallResult, OpenFD};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntry;
@@ -30,10 +30,19 @@ fn make_str<'a>(b: u64, len: u64) -> &'a str {
     core::str::from_utf8(make_buf(b, len)).expect("Invalid str")
 }
 
-pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
+pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
+    use core::convert::TryFrom;
+
     let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
+    let at = OpenFD::try_from(at)?;
+
+    if let OpenFD::Fd(_) = at {
+        logln!("open: at fd currently not supported");
+        return Err(SyscallError::EBADFD);
+    }
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
+        logln!("open: {}", path);
         let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
 
         let task = current_task_ref();
@@ -42,13 +51,17 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
             return Err(SyscallError::ENOTDIR);
         }
 
-        if flags.contains(OpenFlags::CREAT) {
+        if flags.contains(OpenFlags::TRUNC) {
             if let Err(e) = inode.inode().truncate(0) {
                 println!("Truncate failed: {:?}", e);
             }
         }
 
-        Ok(task.open_file(inode, flags)?)
+        let res = Ok(task.open_file(inode, flags)?);
+
+        logln!("opened fd: {}", res.unwrap());
+
+        res
     } else {
         Err(SyscallError::EINVAL)
     }
@@ -57,10 +70,12 @@ pub fn sys_open(path: u64, len: u64, mode: u64) -> SyscallResult {
 pub fn sys_close(fd: u64) -> SyscallResult {
     let task = current_task_ref();
 
-    if task.close_file(fd as usize) {
-        return Ok(0);
+    logln!("sys_close: {} task: {}", fd, task.tid());
+
+    return if task.close_file(fd as usize) {
+        Ok(0)
     } else {
-        return Err(SyscallError::EBADFD);
+        Err(SyscallError::EBADFD)
     }
 }
 
@@ -83,6 +98,8 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
+
+    logln!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
 
     return if let Some(f) = task.get_handle(fd) {
         if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
@@ -833,6 +850,8 @@ pub fn sys_fstat(fd: u64, stat: u64) -> SyscallResult {
 
     *stat = file.inode.inode().stat()?;
 
+    logln!("fstat {}, {:?}", fd, stat);
+
     Ok(0)
 }
 
@@ -855,6 +874,12 @@ pub fn sys_getrlimit(resource: u64, rlimit: u64) -> SyscallResult {
             out.cur = u64::MAX;
         }
     }
+
+    Ok(0)
+}
+
+pub fn sys_debug(str: u64, str_len: u64) -> SyscallResult {
+    logln!("{}", make_str(str, str_len));
 
     Ok(0)
 }

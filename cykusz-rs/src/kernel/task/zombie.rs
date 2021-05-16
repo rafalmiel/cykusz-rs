@@ -20,9 +20,9 @@ impl Zombies {
 
         let mut list = self.list.lock();
 
-        list.push_back(zombie);
+        logln!("add zombie pid {}", zombie.pid());
 
-        drop(list);
+        list.push_back(zombie);
 
         self.wq.notify_one();
     }
@@ -55,6 +55,10 @@ impl Zombies {
     }
 
     pub fn wait_pid(&self, pid: usize) -> SignalResult<usize> {
-        self.wait_on(|t| t.is_process_leader() && (t.pid() == pid || pid == 0))
+        logln!("wait on {}", pid);
+        let ret = self.wait_on(|t| t.is_process_leader() && (t.pid() == pid || pid == 0));
+        logln!("wait {} finished", pid);
+
+        ret
     }
 }

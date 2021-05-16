@@ -54,7 +54,10 @@ void print_thread2(int v) {
 
 			printf("exec stack\n");
 
-			execve("/bin/stack", nullptr, nullptr);
+			char* args[] = {"/bin/stack", "-arg1", "-arg2", 0};
+			char* envs[] = {"PATH=/usr/bin:/bin", 0};
+
+			execve("/bin/stack", args, envs);
 		}
 }
 

@@ -582,18 +582,18 @@ impl Task {
     pub fn make_zombie(&self) {
         self.terminal().disconnect(None);
 
-        if let Some(parent) = self.get_parent() {
-            parent.zombies.add_zombie(self.me());
+        unsafe {
+            self.arch_task_mut().deallocate();
+        }
 
+        if let Some(parent) = self.get_parent() {
             parent.remove_child(self);
+
+            parent.zombies.add_zombie(self.me());
 
             if self.is_process_leader() {
                 parent.signal(SIGCHLD);
             }
-        }
-
-        unsafe {
-            self.arch_task_mut().deallocate();
         }
     }
 

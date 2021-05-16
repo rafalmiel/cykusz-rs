@@ -33,7 +33,7 @@ impl ArpCache {
             }
 
             for p in &v.packets {
-                println!("[ ARP ] Send cached packet");
+                logln!("[ ARP ] Send cached packet");
                 crate::kernel::net::eth::send_packet_to_mac(*p, &v.mac);
             }
 
@@ -63,7 +63,7 @@ impl ArpCache {
     fn request(&mut self, ip: Ip4, packet: Packet<Eth>) {
         if let Some(v) = self.cache.get_mut(&ip) {
             if v.status == EntryStatus::Pending {
-                println!("[ ARP ] Enqueuing packet");
+                logln!("[ ARP ] Enqueuing packet");
                 v.packets.push(packet)
             } else {
                 //panic!("How did we get here");
@@ -71,7 +71,7 @@ impl ArpCache {
         } else {
             let mut vec = Vec::new();
             vec.push(packet);
-            println!("[ ARP ] Enqueuing packet");
+            logln!("[ ARP ] Enqueuing packet");
 
             self.cache.insert(
                 ip,
@@ -88,7 +88,7 @@ impl ArpCache {
 static CACHE: Once<RwSpin<ArpCache>> = Once::new();
 
 pub fn insert(ip: Ip4, mac: &[u8; 6]) {
-    //println!("[ ARP ] Cache {:?} -> {:?}", ip, mac);
+    //logln!("[ ARP ] Cache {:?} -> {:?}", ip, mac);
 
     CACHE.get().as_ref().unwrap().write().insert(ip, mac);
 }

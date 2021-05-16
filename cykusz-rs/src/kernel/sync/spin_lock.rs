@@ -76,7 +76,7 @@ impl<T> Spin<T> {
     }
 
     pub fn lock_debug(&self, id: usize) -> SpinGuard<T> {
-        println!(
+        logln!(
             "-{} ints: {} {}",
             id,
             crate::kernel::int::is_enabled(),
@@ -87,7 +87,7 @@ impl<T> Spin<T> {
         } else {
             (self.l.lock(), false)
         };
-        println!("+{} {}", id, current_id());
+        logln!("+{} {}", id, current_id());
 
         SpinGuard {
             g: Some(lock),
@@ -111,14 +111,14 @@ impl<T> Spin<T> {
 
     pub fn lock_irq_debug(&self, id: usize) -> SpinGuard<T> {
         let ints = int::is_enabled();
-        println!(
+        logln!(
             "-{} ints: {} {}",
             id,
             crate::kernel::int::is_enabled(),
             current_id()
         );
         let l = self.l.lock_with_int();
-        println!("+{} {}", id, current_id());
+        logln!("+{} {}", id, current_id());
         SpinGuard {
             g: Some(l),
             //reenable ints if they were enabled before
@@ -156,7 +156,7 @@ impl<'a, T: ?Sized> Drop for SpinGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
         if self.debug > 0 {
-            println!("U {} {}", self.debug, current_id());
+            logln!("U {} {}", self.debug, current_id());
         }
         if self.irq {
             int::enable();

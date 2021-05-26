@@ -8,6 +8,7 @@ use crate::arch::raw::mm::UserAddr;
 use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, CacheItemAdapter, Cacheable, WeakWrap};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, unmap, PhysAddr, PAGE_SIZE};
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 
@@ -123,11 +124,13 @@ impl PageItemStruct {
         self.mark_dirty(false);
 
         {
-            let umaps = self.user_dirty_mappings.lock();
+            let mut umaps = self.user_dirty_mappings.lock();
 
             for map in umaps.iter() {
                 map.remove_flags(PageFlags::WRITABLE);
             }
+
+            umaps.clear();
         }
 
         map_flags(self.page.to_virt(), PageFlags::empty());
@@ -174,6 +177,10 @@ pub trait CachedAccess: RawAccess {
     fn sync_page(&self, page: &PageItemInt);
 
     fn get_mmap_page(&self, offset: usize) -> Option<PageItem> {
+        if current_task_ref().locks() > 0 {
+            logln!("get_mmap_page: locks > 0");
+        }
+
         let page_cache = cache();
 
         let dev = self.this();
@@ -207,6 +214,9 @@ pub trait CachedAccess: RawAccess {
         let mut dest_offset = 0;
 
         while dest_offset < dest.len() {
+            if current_task_ref().locks() > 0 {
+                logln!("read_cached: locks > 0");
+            }
             if let Some(page) = self.get_mmap_page(offset) {
                 use core::cmp::min;
 
@@ -238,6 +248,9 @@ pub trait CachedAccess: RawAccess {
         let mut copied = 0;
 
         while copied < buf.len() {
+            if current_task_ref().locks() > 0 {
+                logln!("update_cached_synced: locks > 0");
+            }
             if let Some(page) = self.get_mmap_page(offset) {
                 use core::cmp::min;
 

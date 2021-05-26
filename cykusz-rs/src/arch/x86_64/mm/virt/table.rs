@@ -285,9 +285,9 @@ impl Table<Level1> {
         let entry = &mut self.entries[idx];
 
         if !entry.contains(Entry::PRESENT) {
-            let frame = crate::arch::mm::phys::allocate().expect("Out of memory!");
+            let mut frame = crate::arch::mm::phys::allocate().expect("Out of memory!");
 
-            Self::new_at_frame_mut(&frame).clear();
+            frame.clear();
 
             entry.set_frame_flags(&frame, flags | Entry::PRESENT);
 

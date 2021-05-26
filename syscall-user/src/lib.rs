@@ -104,9 +104,36 @@ pub fn write(fd: usize, buf: &[u8]) -> SyscallResult {
     unsafe { syscall3(SYS_WRITE, fd, buf.as_ptr() as usize, buf.len()) }
 }
 
+pub fn debug(str: &str) -> SyscallResult {
+    unsafe { syscall2(SYS_DEBUG, str.as_ptr() as usize, str.len() as usize) }
+}
+
 pub fn open(path: &str, flags: syscall_defs::OpenFlags) -> SyscallResult {
     let fd = OpenFD::Cwd;
-    unsafe { syscall4(SYS_OPEN, fd.into(), path.as_ptr() as usize, path.len(), flags.bits()) }
+    unsafe {
+        syscall4(
+            SYS_OPEN,
+            fd.into(),
+            path.as_ptr() as usize,
+            path.len(),
+            flags.bits(),
+        )
+    }
+}
+
+pub fn access(path: &str) -> SyscallResult {
+    let fd = OpenFD::Cwd;
+
+    unsafe {
+        syscall5(
+            SYS_ACCESS,
+            fd.into(),
+            path.as_ptr() as usize,
+            path.len(),
+            0,
+            0,
+        )
+    }
 }
 
 pub fn close(fd: usize) -> SyscallResult {
@@ -202,7 +229,8 @@ pub fn rmdir(path: &str) -> SyscallResult {
 }
 
 pub fn unlink(path: &str) -> SyscallResult {
-    unsafe { syscall2(SYS_UNLINK, path.as_ptr() as usize, path.len()) }
+    let fd = OpenFD::Cwd;
+    unsafe { syscall4(SYS_UNLINK, fd.into(), path.as_ptr() as usize, path.len(), 0) }
 }
 
 pub fn rename(oldpath: &str, newpath: &str) -> SyscallResult {
@@ -289,9 +317,9 @@ pub fn umount(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_UMOUNT, path.as_ptr() as usize, path.len()) }
 }
 
-pub fn exit() -> ! {
+pub fn exit(status: isize) -> ! {
     unsafe {
-        syscall0(SYS_EXIT).expect("Failed to exit");
+        syscall1(SYS_EXIT, status as usize).expect("Failed to exit");
     }
 
     unreachable!()
@@ -330,8 +358,8 @@ pub fn exec(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) -> SyscallR
     }
 }
 
-pub fn waitpid(pid: usize) -> SyscallResult {
-    unsafe { syscall1(SYS_WAITPID, pid as usize) }
+pub fn waitpid(pid: usize, status: &mut u32) -> SyscallResult {
+    unsafe { syscall3(SYS_WAITPID, pid as usize, status as *const u32 as usize, 0) }
 }
 
 pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {

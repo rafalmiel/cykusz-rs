@@ -7,6 +7,7 @@ use crate::kernel::fs::ext2::disk::inode::{FileType, INode};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::vfs::{FsError, Result};
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 use crate::kernel::utils::types::{Align, CeilDiv};
 
@@ -114,7 +115,7 @@ impl INodeData {
         let fs = self.fs();
         let sb = fs.superblock();
 
-        let inode = self.inode.read();
+        let inode = self.inode.read_debug(21);
         let inode = inode.d_inode();
 
         let block_size = sb.block_size();
@@ -130,7 +131,7 @@ impl INodeData {
         let id = inode.id();
 
         if let Some(new_block) = fs.alloc_block(id) {
-            logln!("allocated block {}", new_block.block());
+            logln_disabled!("allocated block {}", new_block.block());
             if let Some(new_blocks) = self.set_block(block_num, new_block.block(), id, &mut inode) {
                 inode.inc_sector_count(new_blocks as u32 * sb.sectors_per_block() as u32);
 
@@ -153,7 +154,7 @@ impl INodeData {
         let fs = self.fs();
         let sb = fs.superblock();
 
-        let size = self.inode.read().d_inode().size_lower();
+        let size = self.inode.read_debug(22).d_inode().size_lower();
 
         let block_size = sb.block_size();
 
@@ -233,7 +234,18 @@ impl INodeData {
             };
 
             let sync = if last == i {
-                assert_eq!(ptrs[o], 0);
+                if ptrs[o] != 0 {
+                    drop(ptrs);
+                    logln!("INode {} corrupted: {:?}", inode_id, inode);
+                    logln!(
+                        "block_num: {}, offsets: {:?}, i: {}, o: {}",
+                        block_num,
+                        offsets.slice(),
+                        i,
+                        o
+                    );
+                    panic!("INode corrupted");
+                }
                 ptrs[o] = val as u32;
 
                 new_blocks += 1;
@@ -272,7 +284,7 @@ impl INodeData {
         Some(new_blocks)
     }
 
-    fn get_block(&self, block_num: usize, _inode: &INode) -> Option<usize> {
+    fn get_block(&self, block_num: usize, d_inode: &INode) -> Option<usize> {
         let fs = self.fs();
 
         let block_size = fs.superblock().block_size();
@@ -282,9 +294,6 @@ impl INodeData {
         let mut ptr = 0;
 
         let mut buf = fs.make_slice_buf::<u32>();
-
-        let inode = self.inode.read();
-        let d_inode = inode.d_inode();
 
         for (i, &o) in offsets.slice().iter().enumerate() {
             if i == 0 {
@@ -307,7 +316,7 @@ impl INodeData {
     }
 
     pub fn read_block_at(&mut self, block_num: usize) -> Option<BufBlock> {
-        let linode = self.inode.read();
+        let linode = self.inode.read_debug(23);
         let inode = linode.d_inode();
 
         let file_size = inode.size_lower() as usize;
@@ -328,7 +337,7 @@ impl INodeData {
     }
 
     pub fn read_next_block(&mut self) -> Option<BufBlock> {
-        let linode = self.inode.read();
+        let linode = self.inode.read_debug(24);
         let inode = linode.d_inode();
 
         let file_size = inode.size_lower() as usize;
@@ -352,6 +361,9 @@ impl INodeData {
 
         if let Some(ptr) = self.get_block(block_num, inode) {
             let mut buf = fs.make_buf_size(rem);
+            if current_task_ref().locks() > 0 {
+                logln!("idata read next: locks > 0");
+            }
             fs.read_block(ptr, buf.slice_mut());
             buf.set_block(ptr);
 
@@ -395,6 +407,9 @@ impl INodeData {
             buf.resize(block_size, 0);
 
             if let Some(block) = self.get_block(block_num, inode) {
+                if current_task_ref().locks() > 0 {
+                    logln!("idata read: locks > 0");
+                }
                 if let None = fs.read_block(block, buf.as_mut_slice()) {
                     break;
                 }
@@ -414,7 +429,7 @@ impl INodeData {
     }
 
     pub fn write(&mut self, mut data: &[u8], allow_grow: bool) -> Result<usize> {
-        let linode = self.inode.read();
+        let linode = self.inode.read_debug(26);
         let inode = linode.d_inode();
 
         let mut file_size = inode.size_lower() as usize;

@@ -1,7 +1,6 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::ops::Try;
 
 use spin::Once;
 
@@ -202,13 +201,21 @@ fn lookup_by_path_from(
                 }
             },
             s => {
-                let r = dirent::get(cur.clone(), &String::from(s))
-                    .into_result()
-                    .or_else(|_| {
-                        let current = cur.read();
+                let r = dirent::get(cur.clone(), &String::from(s));
 
-                        current.inode.lookup(cur.clone(), s)
-                    });
+                let r = if let Some(r) = r {
+                    Ok(r)
+                } else {
+                    let current = cur.read();
+
+                    current.inode.lookup(cur.clone(), s)
+                };
+
+                //     .or_else(|_| {
+                //         let current = cur.read();
+
+                //         Some(current.inode.lookup(cur.clone(), s)?)
+                //     }).ok_or(FsError::EntryNotFound);
 
                 match r {
                     Ok(mut res) => {
@@ -272,7 +279,11 @@ fn lookup_by_path_from(
     Ok(cur)
 }
 
-pub fn lookup_by_path_at(dir: DirEntryItem, path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
+pub fn lookup_by_path_at(
+    dir: DirEntryItem,
+    path: Path,
+    lookup_mode: LookupMode,
+) -> Result<DirEntryItem> {
     lookup_by_path_from(path, lookup_mode, dir, false, 0)
 }
 

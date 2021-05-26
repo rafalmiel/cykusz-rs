@@ -18,11 +18,11 @@ use crate::kernel::fs::pcache::{CachedAccess, PageItem, PageItemInt, RawAccess};
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
-use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
+use crate::kernel::sync::{RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
 use crate::kernel::utils::slice::ToBytes;
 
 pub struct LockedExt2INode {
-    node: RwSpin<Ext2INode>,
+    node: RwMutex<Ext2INode>,
     fs: Weak<Ext2Filesystem>,
     self_ref: Weak<LockedExt2INode>,
 }
@@ -38,7 +38,7 @@ impl LockedExt2INode {
         } else {
             cache.make_item(INodeItemStruct::from(Arc::new_cyclic(|me| {
                 LockedExt2INode {
-                    node: RwSpin::new(Ext2INode::new(fs.clone(), id)),
+                    node: RwMutex::new(Ext2INode::new(fs.clone(), id)),
                     fs,
                     self_ref: me.clone(),
                 }
@@ -96,19 +96,27 @@ impl LockedExt2INode {
         Err(FsError::NotSupported)
     }
 
-    pub fn read(&self) -> RwSpinReadGuard<Ext2INode> {
+    pub fn read(&self) -> RwMutexReadGuard<Ext2INode> {
+        self.node.read()
+    }
+
+    pub fn read_debug(&self, _id: usize) -> RwMutexReadGuard<Ext2INode> {
         self.node.read()
     }
 
     pub fn d_inode_writer(&self) -> DINodeWriter {
         DINodeWriter {
-            locked: self.write(),
+            locked: self.write_debug(16),
             fs: self.fs.clone(),
             dirty: false,
         }
     }
 
-    pub fn write(&self) -> RwSpinWriteGuard<Ext2INode> {
+    pub fn write(&self) -> RwMutexWriteGuard<Ext2INode> {
+        self.node.write()
+    }
+
+    pub fn write_debug(&self, _id: usize) -> RwMutexWriteGuard<Ext2INode> {
         self.node.write()
     }
 
@@ -130,17 +138,19 @@ impl LockedExt2INode {
         if hl_count > 0 {
             let mut writer = self.d_inode_writer();
 
+            logln_disabled!("dec_hl_count {}", hl_count - 1);
             writer.dec_hl_count();
 
             if hl_count == 1 {
                 writer.set_deletion_time(crate::kernel::time::unix_timestamp() as u32);
             }
 
-            //println!("unref {} hl: {}", id, hl_count - 1);
+            logln_disabled!("unref {} hl: {}", id, hl_count - 1);
         }
 
         if hl_count == 1 {
             //It's 0 after decrement
+            logln_disabled!("drop from cache {}", id);
             self.ext2_fs().drop_from_cache(id);
         }
     }
@@ -163,13 +173,14 @@ impl LockedExt2INode {
 impl Drop for LockedExt2INode {
     fn drop(&mut self) {
         let inode = self.node.read();
+        logln!("drop inode {}", inode.id);
 
         let hl_count = inode.d_inode.hl_count();
-        let _id = inode.id;
+        let id = inode.id;
 
         drop(inode);
 
-        //println!("Dropping inode {} hl {}", id, hl_count);
+        logln!("Dropping inode {} hl {}", id, hl_count);
 
         if hl_count == 0 {
             self.ext2_fs().free_inode(self)
@@ -178,7 +189,7 @@ impl Drop for LockedExt2INode {
 }
 
 pub struct DINodeWriter<'a> {
-    locked: RwSpinWriteGuard<'a, Ext2INode>,
+    locked: RwMutexWriteGuard<'a, Ext2INode>,
     fs: Weak<Ext2Filesystem>,
     dirty: bool,
 }
@@ -272,7 +283,7 @@ impl Ext2INode {
 
                 *p = 0;
             } else {
-                break;
+                continue;
             }
         }
         fs.write_block(ptr, block.slice().to_bytes());
@@ -319,11 +330,13 @@ impl Ext2INode {
             return;
         }
 
+        logln!("free inode blocks {} {:?}", self.id, self.d_inode);
+
         for i in 0usize..15 {
             let ptr = self.d_inode.block_ptrs()[i] as usize;
 
             if ptr == 0 {
-                return;
+                continue;
             }
 
             if i < 12 {
@@ -345,6 +358,9 @@ impl Ext2INode {
 
             self.d_inode.block_ptrs_mut()[i] = 0;
         }
+        self.d_inode.set_size_lower(0);
+        self.d_inode.set_sector_count(0);
+        logln!("freed inode blocks {} {:?}", self.id, self.d_inode);
 
         fs.group_descs().write_d_inode(self.id, self.d_inode());
     }
@@ -418,14 +434,25 @@ impl INode for LockedExt2INode {
     fn stat(&self) -> Result<syscall_defs::stat::Stat> {
         let mut stat = syscall_defs::stat::Stat::default();
 
-        let inode = self.read();
+        let inode = self.read_debug(28);
 
         stat.st_ino = inode.id as u64;
         stat.st_nlink = inode.d_inode.hl_count() as u32;
         stat.st_blksize = self.ext2_fs().superblock().block_size() as u64;
         stat.st_blocks = inode.d_inode.sector_count() as u64;
         stat.st_size = inode.d_inode.size_lower() as i64;
-        stat.st_mode.insert(syscall_defs::stat::Mode::IFREG);
+
+        let ftype = inode.ftype();
+        if ftype == FileType::File {
+            stat.st_mode.insert(syscall_defs::stat::Mode::IFREG);
+        } else if ftype == FileType::Dir {
+            stat.st_mode.insert(syscall_defs::stat::Mode::IFDIR);
+        } else if ftype == FileType::Symlink {
+            stat.st_mode.insert(syscall_defs::stat::Mode::IFLNK);
+        } else {
+            stat.st_mode.insert(syscall_defs::stat::Mode::IFCHR);
+        }
+
         stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
         stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
         stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
@@ -534,6 +561,8 @@ impl INode for LockedExt2INode {
     }
 
     fn unlink(&self, name: &str) -> Result<()> {
+        logln_disabled!("unlink started");
+
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);
         }
@@ -558,6 +587,7 @@ impl INode for LockedExt2INode {
 
         let mut iter = DirEntIter::new(self.self_ref());
 
+        logln!("unlink: Remove dir entry: {}", name);
         iter.remove_dir_entry(name)?;
 
         Ok(())
@@ -608,6 +638,7 @@ impl INode for LockedExt2INode {
         let mut iter = DirEntIter::new_no_skip(self.self_ref());
 
         if let Err(e) = iter.add_dir_entry(new_inode.as_ext2_inode(), name) {
+            logln!("Create failed");
             self.ext2_fs().free_inode(&new_inode.as_ext2_inode());
 
             Err(e)
@@ -617,9 +648,13 @@ impl INode for LockedExt2INode {
     }
 
     fn open(&self, _flags: OpenFlags) -> Result<()> {
-        //logln!("open inode: {:?}", self.read().d_inode);
+        logln!("open inode: {:?}", self.read_debug(29).d_inode);
 
         Ok(())
+    }
+
+    fn close(&self, _flags: OpenFlags) {
+        logln!("close inode: {:?}", self.read_debug(30).d_inode);
     }
 
     fn symlink(&self, name: &str, target: &str) -> Result<()> {
@@ -698,7 +733,14 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotSupported);
         }
 
-        if old.inode().as_ext2_inode().read().d_inode().hl_count() == 0 {
+        if old
+            .inode()
+            .as_ext2_inode()
+            .read_debug(31)
+            .d_inode()
+            .hl_count()
+            == 0
+        {
             return Err(FsError::NotSupported);
         }
 
@@ -750,6 +792,13 @@ impl INode for LockedExt2INode {
 
                 node.set_size_lower(size as u32);
 
+                logln_disabled!(
+                    "truncate: fd: {} size: {} {:?}",
+                    node.id(),
+                    size,
+                    node.locked.d_inode
+                );
+
                 Ok(())
             } else {
                 Err(FsError::NotSupported)
@@ -788,5 +837,9 @@ impl INode for LockedExt2INode {
         } else {
             None
         }
+    }
+
+    fn debug(&self) {
+        logln_disabled!("INode debug: {:?}", self.read_debug(32).d_inode());
     }
 }

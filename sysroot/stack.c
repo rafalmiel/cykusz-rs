@@ -47,5 +47,5 @@ int main(int argc, char **argv) {
 		printf("%s\n", *env);
 		env += 1;
 	}
-        return 0;
+        return 42;
 }

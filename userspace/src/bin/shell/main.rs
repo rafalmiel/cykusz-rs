@@ -139,7 +139,7 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
             if let Err(e) = syscall::setpgid(0, 0) {
                 println!("setpgid failed {:?}", e);
 
-                syscall::exit();
+                syscall::exit(0);
             }
 
             tty.set_fg(syscall::getpid().expect("Failed to get pid"));
@@ -150,13 +150,17 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
                 unreachable!();
             }
 
-            syscall::exit();
+            syscall::exit(0);
         } else {
             if let Err(e) = syscall::setpgid(id, id) {
                 println!("parent setpgid failed {:?}", e);
             }
 
-            while let Err(SyscallError::EINTR) = syscall::waitpid(id) {}
+            let mut status = 0u32;
+
+            while let Err(SyscallError::EINTR) = syscall::waitpid(id, &mut status) {}
+
+            println!("shell: process exit with status: {:#x}", status);
 
             tty.set_fg(syscall::getpid().expect("Failed to get pid"));
         }
@@ -220,7 +224,7 @@ fn exec(cmd: &str) {
     } else if cmd == "cd" {
         // do nothing for now, TODO: move to home?
     } else if cmd == "exit" {
-        syscall::exit();
+        syscall::exit(0);
     } else if cmd.starts_with("sleep") {
         let mut args = cmd.split_whitespace();
         let ms = if let Some(arg) = args.nth(1) {
@@ -450,7 +454,7 @@ fn exec(cmd: &str) {
         tty.detach();
         if let Ok(id) = syscall::fork() {
             if id > 0 {
-                syscall::exit();
+                syscall::exit(0);
             } else {
                 if let Err(e) = syscall::setsid() {
                     println!("setsid failed {:?}", e);
@@ -474,7 +478,7 @@ fn exec(cmd: &str) {
                 tty.attach();
                 syscall::exec("/bin/shell", None, None).expect("Failed to exec shell");
             } else {
-                syscall::exit();
+                syscall::exit(0);
             }
         } else {
             println!("fork failed");
@@ -561,6 +565,14 @@ fn exec(cmd: &str) {
 
             syscall::close(new_fd).expect("Failed to close dup fd");
         }
+    } else if cmd == "gcc_test" {
+        for _ in 0..50 {
+            start_process(
+                "/usr/bin/gcc",
+                Some(&["/usr/bin/gcc", "/test.c", "-o", "/test"]),
+                Some(&["PATH=/usr/bin"]),
+            );
+        }
     } else if cmd == "pipe_test" {
         let mut fds = [0u64; 2];
 
@@ -572,7 +584,8 @@ fn exec(cmd: &str) {
                     syscall::close(fds[0] as usize).expect("close failed");
                     syscall::close(fds[1] as usize).expect("close failed");
 
-                    syscall::waitpid(id).expect("waitpid failed");
+                    let mut status = 0u32;
+                    syscall::waitpid(id, &mut status).expect("waitpid failed");
                 } else {
                     syscall::close(fds[1] as usize).expect("close failed");
 
@@ -585,7 +598,7 @@ fn exec(cmd: &str) {
                         syscall::write(1, &mut buf[..r]).expect("write failed");
                     }
 
-                    syscall::exit();
+                    syscall::exit(0);
                 }
             } else {
                 println!("fork failed");
@@ -601,11 +614,7 @@ fn exec(cmd: &str) {
         }
 
         if !cmd.is_empty() {
-            start_process(
-                args[0],
-                Some(args.as_slice()),
-                Some(&["PATH=/usr/bin"]),
-            );
+            start_process(args[0], Some(args.as_slice()), Some(&["PATH=/usr/bin"]));
         }
     }
 }
@@ -636,10 +645,11 @@ fn signal_test() {
 
 #[allow(dead_code)]
 fn sigchld_handler(_sig: usize) {
-    let pid = syscall::waitpid(0);
+    let mut status = 0u32;
+    let pid = syscall::waitpid(0, &mut status);
 
     if let Ok(pid) = pid {
-        println!("child died: {}", pid);
+        println!("child died: {}, status: {:#x}", pid, status);
     }
 }
 

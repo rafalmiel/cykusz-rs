@@ -28,6 +28,7 @@ cross_hello := sysroot/build/hello
 cross_stack := sysroot/build/stack
 cross_nyancat := sysroot/build/nyancat
 cross_ttytest := sysroot/build/ttytest
+cross_fork := sysroot/build/fork
 
 .PHONY: all clean run ata bochs iso toolchain fsck
 
@@ -43,7 +44,7 @@ purge: clean
 
 run: $(iso) $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -m 512 -smp cpus=1  -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
-	qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host
+	qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=1 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host -enable-kvm
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host
 
 run_ata: $(iso) $(disk)
@@ -55,17 +56,17 @@ vbox: $(iso) $(vdi)
 
 debug: $(iso) $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -s -S -smp cpus=4 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
-	qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 512 -smp cpus=4 -no-shutdown -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -monitor /dev/stdout
+	qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 512 -smp cpus=1 -no-shutdown -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -monitor /dev/stdout -enable-kvm
 
 gdb:
 	@rust-gdb "$(kernel)" -ex "target remote :1234"
 
 kdbg:
-	@kdbg -r localhost:1234 "$(kernel)"
+	@kdbg -r localhost:1234
 
 bochs: $(iso) $(disk)
 	@rm -f disk.img.lock
-	/home/ck/code/bochs-svn/src/bochs-svn/bochs -f bochsrc.txt -q
+	bochs -f bochsrc.txt -q
 
 iso: $(iso)
 
@@ -77,6 +78,7 @@ $(iso): $(kernel) $(grub_cfg) $(rust_shell)
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
 $(disk): $(kernel) $(rust_shell) $(rust_init) hello
+	#echo fake install_os
 	sudo disk_scripts/install_os.sh
 
 $(vdi): $(disk)
@@ -105,6 +107,7 @@ hello: $(cross_cpp) sysroot/hello.cpp sysroot/stack.c
 	$(cross_cpp) sysroot/hello.cpp -o $(cross_hello)
 	$(cross_c) sysroot/stack.c -o $(cross_stack)
 	$(cross_c) sysroot/ttytest.c -o $(cross_ttytest)
+	$(cross_c) sysroot/fork.c -o $(cross_fork)
 	sysroot/build.sh nyancat
 #	$(cross_strip) $(cross_hello)
 

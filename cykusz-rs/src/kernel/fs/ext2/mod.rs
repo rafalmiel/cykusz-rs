@@ -9,6 +9,8 @@ use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::pcache::CachedBlockDev;
+use crate::kernel::sched::current_task_ref;
+use crate::kernel::sync::{Mutex, MutexGuard};
 use crate::kernel::utils::slice::ToBytesMut;
 
 mod blockgroup;
@@ -25,6 +27,7 @@ pub struct Ext2Filesystem {
     sectors_per_block: Once<usize>,
     superblock: superblock::Superblock,
     blockgroupdesc: blockgroup::BlockGroupDescriptors,
+    dir_lock: Mutex<()>,
 }
 
 impl Ext2Filesystem {
@@ -35,6 +38,7 @@ impl Ext2Filesystem {
             sectors_per_block: Once::new(),
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
+            dir_lock: Mutex::new(()),
         });
 
         if !a.init() {
@@ -66,6 +70,9 @@ impl Ext2Filesystem {
     }
 
     pub fn read_block(&self, block: usize, dest: &mut [u8]) -> Option<usize> {
+        if current_task_ref().locks() > 0 {
+            logln!("read_block: locks > 0");
+        }
         self.dev
             .read_cached(block * self.sectors_per_block() * 512, dest)
     }
@@ -73,6 +80,10 @@ impl Ext2Filesystem {
     pub fn write_block(&self, block: usize, buf: &[u8]) -> Option<usize> {
         self.dev
             .update_cached(block * self.sectors_per_block() * 512, buf)
+    }
+
+    pub fn dir_lock(&self) -> MutexGuard<()> {
+        self.dir_lock.lock()
     }
 
     pub fn superblock(&self) -> &superblock::Superblock {
@@ -108,10 +119,11 @@ impl Ext2Filesystem {
     }
 
     pub fn free_inode(&self, inode: &LockedExt2INode) {
-        //println!("Free inode: {}", inode.read().id());
-        inode.write().free_blocks(self);
+        logln_disabled!("Free inode: {}", inode.read_debug(33).id());
 
-        let id = inode.read().id();
+        inode.write_debug(17).free_blocks(self);
+
+        let id = inode.read_debug(34).id();
 
         self.group_descs().free_inode_id(id);
     }
@@ -173,7 +185,7 @@ impl Ext2Filesystem {
 
         let imp = i.as_impl::<LockedExt2INode>();
 
-        let lock = imp.read();
+        let lock = imp.read_debug(35);
 
         let d_inode = lock.d_inode();
 

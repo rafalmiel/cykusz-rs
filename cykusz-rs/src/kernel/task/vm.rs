@@ -14,7 +14,9 @@ use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{
     allocate_order, map_flags, map_to_flags, unmap, update_flags, VirtAddr, MAX_USER_ADDR,
 };
-use crate::kernel::sync::Spin;
+
+use crate::kernel::sched::current_task_ref;
+use crate::kernel::sync::Mutex;
 use crate::kernel::utils::types::Align;
 
 impl From<MMapProt> for PageFlags {
@@ -179,15 +181,15 @@ impl Mapping {
 
         if !reason.contains(PageFaultReason::PRESENT) {
             // Page not present so just make it available
-            //println!("map: private read");
+            logln_disabled!("map: private read");
             map_flags(addr_aligned, PageFlags::USER | self.prot.into());
 
             true
         } else if reason.contains(PageFaultReason::WRITE) {
-            //println!("map: handle cow");
+            logln_disabled!("map: handle cow anon");
             return self.handle_cow(addr_aligned, false, PAGE_SIZE);
         } else {
-            //println!("map: present read fail");
+            logln_disabled!("map: present read fail");
             false
         }
     }
@@ -201,6 +203,9 @@ impl Mapping {
             let addr_offset = (addr_aligned - self.start).0;
             let bytes = core::cmp::min(PAGE_SIZE, f.len - addr_offset);
 
+            if current_task_ref().locks() > 0 {
+                logln!("handle_pf_private_file: locks > 0");
+            }
             if let Some(p) = f.file.inode().as_cacheable().unwrap().get_mmap_page(offset) {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
@@ -209,14 +214,14 @@ impl Mapping {
                         // Page is not present and we are reading from it, so map it readable
                         f.active_mappings.insert(addr_aligned, p.clone());
 
-                        //println!("map read {}", addr_aligned);
+                        logln_disabled!("map read {}", addr_aligned);
 
                         let mut flags: PageFlags = PageFlags::USER | self.prot.into();
                         flags.remove(PageFlags::WRITABLE);
 
                         map_to_flags(addr_aligned, p.page(), flags);
                     } else {
-                        //println!("map read copy {} {}", addr_aligned, bytes);
+                        logln_disabled!("map read copy {} {}", addr_aligned, bytes);
 
                         Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
 
@@ -228,7 +233,7 @@ impl Mapping {
                     // We are writing to private file mapping so copy the content of the page.
                     // Changes made to private mapping should not be persistent
 
-                    //println!("map copy {} {}", addr_aligned, bytes);
+                    logln_disabled!("map copy {} {}", addr_aligned, bytes);
 
                     Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
 
@@ -236,7 +241,21 @@ impl Mapping {
                 } else if reason.contains(PageFaultReason::PRESENT)
                     && reason.contains(PageFaultReason::WRITE)
                 {
-                    return self.handle_cow(addr_aligned, true, bytes);
+                    drop(f);
+
+                    logln_disabled!("map: handle cow priv file");
+
+                    return if self.handle_cow(addr_aligned, true, PAGE_SIZE) {
+                        self.mmaped_file
+                            .as_mut()
+                            .expect("unreachable")
+                            .active_mappings
+                            .remove(&addr_aligned);
+
+                        true
+                    } else {
+                        false
+                    };
                 }
 
                 true
@@ -256,8 +275,10 @@ impl Mapping {
                 // If there is more than one process mapping this page, make a private copy
                 // Otherwise, this page is not shared with anyone, so just make it writable
                 if phys_page.vm_use_count() > 1 || do_copy {
+                    logln_disabled!("mmap cow: map_copy {}", bytes);
                     Self::map_copy(addr_aligned, addr_aligned, bytes, self.prot);
                 } else {
+                    logln_disabled!("mmap cow: update flags");
                     if !update_flags(addr_aligned, PageFlags::USER | self.prot.into()) {
                         panic!("Update flags failed");
                     }
@@ -274,6 +295,9 @@ impl Mapping {
         if let Some(f) = self.mmaped_file.as_mut() {
             let offset = (addr - self.start).0 + f.starting_offset;
 
+            if current_task_ref().locks() > 0 {
+                logln!("handle_pf_shared: locks > 0");
+            }
             if let Some(p) = f.file.inode().as_cacheable().unwrap().get_mmap_page(offset) {
                 let is_present = reason.contains(PageFaultReason::PRESENT);
                 let is_write = reason.contains(PageFaultReason::WRITE);
@@ -598,10 +622,14 @@ impl VMData {
             let is_private = map.flags.contains(MMapFlags::MAP_PRIVATE);
             let is_anonymous = map.flags.contains(MMapFlags::MAP_ANONYOMUS);
 
-            //println!(
-            //    "page fault {} p {} a {} {:?} pid {}",
-            //    addr.align_down(PAGE_SIZE), is_private, is_anonymous, reason, current_task_ref().tid(),
-            //);
+            logln_disabled!(
+                "page fault {} p {} a {} {:?} pid {}",
+                addr.align_down(PAGE_SIZE),
+                is_private,
+                is_anonymous,
+                reason,
+                current_task_ref().tid(),
+            );
 
             return match (is_private, is_anonymous) {
                 (false, _) => {
@@ -615,7 +643,7 @@ impl VMData {
                 (true, true) => map.handle_pf_private_anon(reason, addr),
             };
         } else {
-            //println!("task {}: mmap not found", current_task_ref().id());
+            logln_disabled!("task {}: mmap not found", current_task_ref().tid());
             //self.print_vm();
             false
         }
@@ -625,8 +653,8 @@ impl VMData {
         if let Some(elf_page) = exe.inode().as_cacheable().unwrap().get_mmap_page(0) {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
 
-            let mut last_mmap_end = VirtAddr(0);
-            let mut tls_vm_info = None;
+            //let mut last_mmap_end = VirtAddr(0);
+            let tls_vm_info = None;
 
             for p in hdr
                 .programs()
@@ -649,7 +677,7 @@ impl VMData {
                     //    virt_begin, virt_fend, file_offset
                     //);
 
-                    last_mmap_end = self
+                    let virt_fend = self
                         .mmap_vm(
                             Some(virt_begin),
                             len,
@@ -661,41 +689,38 @@ impl VMData {
                         .expect("Failed to mmap")
                         + len.align_up(PAGE_SIZE);
 
-                    let virt_fend = last_mmap_end;
-
                     if virt_fend < virt_end {
                         //println!("mmap {} - {} offset {:#x}", virt_fend, virt_end, 0);
-                        let len = (virt_end - virt_fend).0;
 
-                        last_mmap_end = self
-                            .mmap_vm(
-                                Some(virt_fend),
-                                virt_end.0 - virt_fend.0,
-                                p.p_flags.into(),
-                                MMapFlags::MAP_PRIVATE
-                                    | MMapFlags::MAP_ANONYOMUS
-                                    | MMapFlags::MAP_FIXED,
-                                None,
-                                0,
-                            )
-                            .expect("Failed to mmap")
-                            + len;
+                        self.mmap_vm(
+                            Some(virt_fend),
+                            virt_end.0 - virt_fend.0,
+                            p.p_flags.into(),
+                            MMapFlags::MAP_PRIVATE
+                                | MMapFlags::MAP_ANONYOMUS
+                                | MMapFlags::MAP_FIXED,
+                            None,
+                            0,
+                        )
+                        .expect("Failed to mmap");
                     }
                 } else {
-                    if tls_vm_info.is_some() {
-                        panic!("TLS already setup");
-                    }
-                    let tls_mem_size = p.p_memsz as usize;
-                    let tls_file_size = p.p_filesz as usize;
-                    let tls_file_offset = p.p_offset as usize;
+                    // We setup tls in userspace now
+                    continue;
+                    //if tls_vm_info.is_some() {
+                    //    panic!("TLS already setup");
+                    //}
+                    //let tls_mem_size = p.p_memsz as usize;
+                    //let tls_file_size = p.p_filesz as usize;
+                    //let tls_file_offset = p.p_offset as usize;
 
-                    tls_vm_info = Some(TlsVmInfo {
-                        file: exe.clone(),
-                        file_offset: tls_file_offset,
-                        file_size: tls_file_size,
-                        mem_size: tls_mem_size,
-                        mmap_addr_hint: last_mmap_end,
-                    });
+                    //tls_vm_info = Some(TlsVmInfo {
+                    //    file: exe.clone(),
+                    //    file_offset: tls_file_offset,
+                    //    file_size: tls_file_size,
+                    //    mem_size: tls_mem_size,
+                    //    mmap_addr_hint: last_mmap_end,
+                    //});
                 }
             }
 
@@ -726,8 +751,8 @@ impl VMData {
 
     fn log_vm(&self) {
         for e in self.maps.iter() {
-            if let Some(f) = &e.mmaped_file {
-                logln!(
+            if let Some(_f) = &e.mmaped_file {
+                logln_disabled!(
                     "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
                     e.start,
                     e.end,
@@ -738,7 +763,7 @@ impl VMData {
                     f.len,
                 );
             } else {
-                logln!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
+                logln_disabled!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
             }
         }
     }
@@ -792,7 +817,7 @@ impl VMData {
 }
 
 pub struct VM {
-    data: Spin<VMData>,
+    data: Mutex<VMData>,
 }
 
 impl Default for VM {
@@ -814,7 +839,7 @@ bitflags! {
 impl VM {
     pub fn new() -> VM {
         VM {
-            data: Spin::new(VMData::new()),
+            data: Mutex::new(VMData::new()),
         }
     }
 
@@ -843,9 +868,11 @@ impl VM {
     }
 
     pub fn handle_pagefault(&self, reason: PageFaultReason, addr: VirtAddr) -> bool {
-        let res = self.data.lock().handle_pagefault(reason, addr);
+        let mut res = self.data.lock();
 
-        res
+        let ret = res.handle_pagefault(reason, addr);
+
+        ret
     }
 
     pub fn load_bin(&self, exe: DirEntryItem) -> Option<(VirtAddr, Option<TlsVmInfo>)> {

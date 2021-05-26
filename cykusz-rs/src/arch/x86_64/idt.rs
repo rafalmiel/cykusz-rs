@@ -201,7 +201,7 @@ pub extern "C" fn isr_handler(
         // Special case for local timer int
         SHARED_IRQS.irqs[int].read_irq()
     } else {
-        SHARED_IRQS.irqs[int].read()
+        SHARED_IRQS.irqs[int].read_irq()
     };
 
     match &*irqs {
@@ -236,8 +236,6 @@ pub extern "C" fn isr_handler(
     }
 
     let ret_addr = VirtAddr(frame.ip as usize);
-
-    crate::kernel::int::disable();
 
     if ret_addr.is_user() {
         crate::arch::signal::arch_int_check_signals(frame, regs);
@@ -466,18 +464,21 @@ fn stack_segment_fault(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, e
     loop {}
 }
 
-fn general_protection_fault(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, err: u64) {
+fn general_protection_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!(
-            "[ SIGBUS ] Task {} general_protecion error {:#x}",
+        logln!(
+            "[ SIGBUS ] Task {} general_protecion error {:#x} {:?}",
             task.tid(),
-            frame.ip
+            frame.ip,
+            regs
         );
         task.signal(syscall_defs::signal::SIGBUS);
+
+        return;
     }
-    println!(
+    logln!(
         "General Protection Fault error! 0x{:x} frame: {:?}",
         err,
         frame //unsafe { crate::CPU_ID }

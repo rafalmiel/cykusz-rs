@@ -199,10 +199,10 @@ impl Scheduler {
         thread
     }
 
-    pub fn exit(&self) -> ! {
+    pub fn exit(&self, status: isize) -> ! {
         let current = current_task_ref();
 
-        logln!(
+        logln_disabled!(
             "exit tid {} is pl: {}, sc: {}, wc: {}",
             current.tid(),
             current.is_process_leader(),
@@ -223,7 +223,7 @@ impl Scheduler {
 
             current.migrate_children_to_init();
 
-            self.sched.exit(0)
+            self.sched.exit(status)
         } else {
             current
                 .process_leader()
@@ -237,9 +237,9 @@ impl Scheduler {
         let task = current_task_ref();
 
         if task.is_process_leader() {
-            logln!("[ WARN ] exit thread of a process leader");
+            logln_disabled!("[ WARN ] exit thread of a process leader");
 
-            self.exit();
+            self.exit(0);
         } else {
             self.tasks.remove_task(task.tid());
 
@@ -331,8 +331,8 @@ pub fn current_id() -> isize {
     scheduler().current_id()
 }
 
-pub fn exit() -> ! {
-    scheduler().exit()
+pub fn exit(status: isize) -> ! {
+    scheduler().exit(status)
 }
 
 pub fn exit_thread() -> ! {
@@ -387,7 +387,7 @@ fn lock_protection_ready() -> bool {
     crate::kernel::tls::is_ready() && LOCK_PROTECTION.load(Ordering::SeqCst)
 }
 
-pub fn enter_critical_section() -> bool {
+pub fn preempt_disable() -> bool {
     if lock_protection_ready() {
         let current = scheduler().current_task();
 
@@ -407,11 +407,13 @@ pub fn current_locks_var<'a>() -> Option<&'a AtomicUsize> {
     }
 }
 
-pub fn leave_critical_section() {
+pub fn preempt_enable() {
     if lock_protection_ready() {
         let current = scheduler().current_task();
 
-        current.dec_locks();
+        if current.dec_locks() == 0 && current.to_reschedule() {
+            crate::kernel::sched::reschedule();
+        }
     }
 }
 

@@ -75,6 +75,8 @@ pub const SYS_FSTAT: usize = 51;
 pub const SYS_GETRLIMIT: usize = 52;
 pub const SYS_DEBUG: usize = 53;
 
+pub const SYS_ACCESS: usize = 54;
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]
 pub enum SyscallError {
@@ -189,12 +191,8 @@ impl TryFrom<u64> for OpenFD {
 impl From<OpenFD> for usize {
     fn from(v: OpenFD) -> Self {
         match v {
-            OpenFD::Fd(a) => {
-                a
-            },
-            OpenFD::Cwd => {
-                (-100isize) as usize
-            }
+            OpenFD::Fd(a) => a,
+            OpenFD::Cwd => (-100isize) as usize,
         }
     }
 }
@@ -206,8 +204,9 @@ bitflags! {
         const WRONLY      = 5;
         const CREAT       = 0x10;
         const DIRECTORY   = 0x20;
+        const EXCL        = 0x40;
         const NOCTTY      = 0x80;
-        const TRUNC      = 0x0200;
+        const TRUNC       = 0x0200;
         const CLOEXEC     = 0x4000;
     }
 }

@@ -5,7 +5,9 @@ use alloc::vec::Vec;
 
 use intrusive_collections::UnsafeRef;
 
-use syscall_defs::{ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, SyscallResult, OpenFD};
+use syscall_defs::{
+    ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
+};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntry;
@@ -27,7 +29,7 @@ fn make_buf(b: u64, len: u64) -> &'static [u8] {
 }
 
 fn make_str<'a>(b: u64, len: u64) -> &'a str {
-    core::str::from_utf8(make_buf(b, len)).expect("Invalid str")
+    unsafe { core::str::from_utf8_unchecked(make_buf(b, len)) }
 }
 
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
@@ -37,12 +39,11 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
     let at = OpenFD::try_from(at)?;
 
     if let OpenFD::Fd(_) = at {
-        logln!("open: at fd currently not supported");
+        //logln!("open: at fd currently not supported");
         return Err(SyscallError::EBADFD);
     }
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        logln!("open: {}", path);
         let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
 
         let task = current_task_ref();
@@ -59,7 +60,9 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
 
         let res = Ok(task.open_file(inode, flags)?);
 
-        logln!("opened fd: {}", res.unwrap());
+        logln!("sys_open: {} = {}", path, res.unwrap());
+
+        //logln!("opened fd: {}", res.unwrap());
 
         res
     } else {
@@ -76,7 +79,7 @@ pub fn sys_close(fd: u64) -> SyscallResult {
         Ok(0)
     } else {
         Err(SyscallError::EBADFD)
-    }
+    };
 }
 
 pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
@@ -99,7 +102,7 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    logln!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
+    //logln!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
 
     return if let Some(f) = task.get_handle(fd) {
         if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
@@ -155,6 +158,23 @@ pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
     };
 }
 
+pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) -> SyscallResult {
+    use core::convert::TryFrom;
+
+    let at = OpenFD::try_from(at)?;
+
+    if let OpenFD::Fd(_) = at {
+        logln_disabled!("open: at fd currently not supported");
+        return Err(SyscallError::EBADFD);
+    }
+
+    let path = Path::new(make_str(path, path_len));
+
+    lookup_by_path(path, LookupMode::None)?;
+
+    Ok(0)
+}
+
 pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
     let cmd = FcntlCmd::from(cmd);
 
@@ -175,7 +195,7 @@ pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
 pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) -> SyscallResult {
     let task = current_task_ref();
 
-    logln!("mmap: {:#x}", addr);
+    //logln!("mmap: {:#x}", addr);
 
     let addr = if addr != 0 {
         Some(VirtAddr(addr as usize))
@@ -224,14 +244,14 @@ pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
 }
 
 pub fn sys_maps() -> SyscallResult {
-    println!(
+    logln!(
         "free mem before fork: {}, used: {} heap: {}",
         crate::kernel::mm::free_mem(),
         crate::kernel::mm::used_mem(),
         crate::kernel::mm::heap::heap_mem(),
     );
 
-    current_task_ref().vm().print_vm();
+    current_task_ref().vm().log_vm();
 
     Ok(0)
 }
@@ -349,12 +369,30 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
     }
 }
 
-pub fn sys_unlink(path: u64, path_len: u64) -> SyscallResult {
+pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResult {
+    use core::convert::TryFrom;
+
+    if flags != 0 {
+        return Err(SyscallError::EINVAL);
+    }
+
+    let at = OpenFD::try_from(at)?;
+
+    if let OpenFD::Fd(_) = at {
+        logln_disabled!("open: at fd currently not supported");
+        return Err(SyscallError::EBADFD);
+    }
+
     let path = Path::new(make_str(path, path_len));
+
+    logln!("sys_unlink: {}", path.str());
 
     let (_, name) = path.containing_dir();
 
     let file = lookup_by_real_path(path, LookupMode::None)?;
+
+    log!("unlink inode: ");
+    file.inode().debug();
 
     if let Some(dir) = file.parent() {
         if dir.inode().ftype()? == FileType::Dir && file.inode().ftype()? != FileType::Dir {
@@ -616,8 +654,8 @@ pub fn sys_time() -> SyscallResult {
     Ok(crate::kernel::time::unix_timestamp() as usize)
 }
 
-pub fn sys_exit() -> ! {
-    crate::kernel::sched::exit()
+pub fn sys_exit(status: u64) -> ! {
+    crate::kernel::sched::exit(status as isize)
 }
 
 pub fn sys_sleep(time_ns: u64) -> SyscallResult {
@@ -648,7 +686,11 @@ pub fn sys_exec(
 ) -> SyscallResult {
     let path = make_str(path, path_len);
 
+    logln!("sys_exec: {}", path);
+
     let prog = lookup_by_path(Path::new(path), LookupMode::None)?;
+
+    prog.inode().debug();
 
     let args = if args_len > 0 {
         Some(syscall_defs::exec::from_syscall_slice(
@@ -658,6 +700,7 @@ pub fn sys_exec(
     } else {
         None
     };
+
     let envs = if envs_len > 0 {
         Some(syscall_defs::exec::from_syscall_slice(
             envs as usize,
@@ -677,10 +720,16 @@ pub fn sys_spawn_thread(entry: u64, stack: u64) -> SyscallResult {
     Ok(thread.tid())
 }
 
-pub fn sys_waitpid(pid: u64) -> SyscallResult {
+pub fn sys_waitpid(pid: u64, status: u64, _flags: u64) -> SyscallResult {
     let current = current_task_ref();
 
-    Ok(current.wait_pid(pid as usize)?)
+    //logln!("sys_waitpid: {} status addr: {:#x}", pid, status);
+
+    let status = unsafe { VirtAddr(status as usize).read_mut::<u32>() };
+
+    //logln!("sys_waitpid");
+
+    Ok(current.wait_pid(pid as usize, status)?)
 }
 
 pub fn sys_getpid() -> SyscallResult {
@@ -726,10 +775,13 @@ pub fn sys_sigaction(
     _sigmask: u64,
     sigreturn: u64,
 ) -> SyscallResult {
-    if sig == 34 { //temporary hack to make mlibc happy
+    if sig == 34 {
+        //temporary hack to make mlibc happy
         return Err(SyscallError::ENOSYS);
     }
     let handler: syscall_defs::signal::SignalHandler = handler.into();
+
+    logln!("sigaction: {} {:?}", sig, handler);
 
     if let Some(flags) = syscall_defs::signal::SignalFlags::from_bits(flags) {
         current_task_ref()
@@ -821,36 +873,31 @@ pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
 }
 
 pub fn sys_stat(path: u64, path_len: u64, stat: u64) -> SyscallResult {
-    let str = make_str(path, path_len);
+    let _str = make_str(path, path_len);
     let path = Path::new(make_str(path, path_len));
 
-    let stat = unsafe {
-        VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>()
-    };
+    let stat = unsafe { VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>() };
 
     let inode = lookup_by_path(path, LookupMode::None)?;
 
     *stat = inode.inode().stat()?;
 
-    logln!("stat {}, {:?}", str, stat);
+    //logln!("stat {}, {:?}", str, stat);
 
     Ok(0)
 }
 
 pub fn sys_fstat(fd: u64, stat: u64) -> SyscallResult {
-    let file =
-        current_task_ref()
-            .filetable()
-            .get_handle(fd as usize)
-            .ok_or(SyscallError::EBADFD)?;
+    let file = current_task_ref()
+        .filetable()
+        .get_handle(fd as usize)
+        .ok_or(SyscallError::EBADFD)?;
 
-    let stat = unsafe {
-        VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>()
-    };
+    let stat = unsafe { VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>() };
 
     *stat = file.inode.inode().stat()?;
 
-    logln!("fstat {}, {:?}", fd, stat);
+    //logln!("fstat {}, {:?}", fd, stat);
 
     Ok(0)
 }
@@ -860,15 +907,13 @@ pub fn sys_getrlimit(resource: u64, rlimit: u64) -> SyscallResult {
 
     let resource = syscall_defs::resource::RLimitKind::try_from(resource)?;
 
-    let out = unsafe {
-        VirtAddr(rlimit as usize).read_mut::<syscall_defs::resource::RLimit>()
-    };
+    let out = unsafe { VirtAddr(rlimit as usize).read_mut::<syscall_defs::resource::RLimit>() };
 
     match resource {
         syscall_defs::resource::RLimitKind::NOFile => {
             out.cur = 256;
             out.max = 256;
-        },
+        }
         _ => {
             out.cur = u64::MAX;
             out.cur = u64::MAX;

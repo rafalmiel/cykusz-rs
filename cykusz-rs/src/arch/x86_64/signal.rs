@@ -79,6 +79,8 @@ pub fn arch_int_check_signals(frame: &mut InterruptFrame, regs: &mut RegsFrame) 
 
             // Signal param
             regs.rdi = sig as u64;
+
+            logln!("do signal!!!");
         }
     }
 }
@@ -119,10 +121,13 @@ pub extern "C" fn arch_sys_check_signals(
                 writer.write(entry.sigreturn());
             }
 
+            logln_disabled!("sys_frame set rip: {:#x}", f as usize);
             sys_frame.rip = f as u64;
 
             // Signal param
             regs.rdi = sig as u64;
+
+            logln!("do signal!!!");
         }
     }
 }

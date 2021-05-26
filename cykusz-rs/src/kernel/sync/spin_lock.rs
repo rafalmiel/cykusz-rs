@@ -1,10 +1,11 @@
 use core::ops::{Deref, DerefMut};
 
 use crate::kernel::int;
-use crate::kernel::sched::{current_id, current_locks_var};
-use crate::kernel::sync::raw_spin::{RawSpin as M, RawSpinGuard as MG};
+use crate::kernel::sched::current_id;
+use spin::{Mutex as M, MutexGuard as MG};
 
 pub struct Spin<T: ?Sized> {
+    notify: bool,
     l: M<T>,
 }
 
@@ -24,16 +25,27 @@ pub struct SpinGuard<'a, T: ?Sized + 'a> {
 impl<T> Spin<T> {
     pub const fn new(user_data: T) -> Spin<T> {
         Spin {
+            notify: true,
+            l: M::new(user_data),
+        }
+    }
+
+    pub const fn new_no_notify(user_data: T) -> Spin<T> {
+        Spin {
+            notify: false,
             l: M::new(user_data),
         }
     }
 
     pub fn lock(&self) -> SpinGuard<T> {
-        let (lock, notify) = if let Some(locks) = current_locks_var() {
-            (self.l.lock_with_ref(locks), true)
+        let notify = if self.notify {
+            crate::kernel::sched::preempt_disable()
         } else {
-            (self.l.lock(), false)
+            false
         };
+
+        let lock = self.l.lock();
+
         SpinGuard {
             g: Some(lock),
             irq: false,
@@ -42,12 +54,28 @@ impl<T> Spin<T> {
         }
     }
 
+    pub fn lock_debug(&self, _id: usize) -> SpinGuard<T> {
+        self.lock()
+    }
+
     pub fn try_lock(&self) -> Option<SpinGuard<T>> {
-        let (lock, notify) = if let Some(locks) = current_locks_var() {
-            (self.l.try_lock_with_ref(locks), true)
+        let notify = if self.notify {
+            crate::kernel::sched::preempt_disable()
         } else {
-            (self.l.try_lock(), false)
+            false
         };
+
+        let lock = match self.l.try_lock() {
+            Some(l) => Some(l),
+            None => {
+                if notify {
+                    crate::kernel::sched::preempt_enable();
+                }
+
+                None
+            }
+        };
+
         if let Some(g) = lock {
             Some(SpinGuard {
                 g: Some(g),
@@ -61,13 +89,37 @@ impl<T> Spin<T> {
     }
 
     pub fn try_lock_irq(&self) -> Option<SpinGuard<T>> {
-        let ints = int::is_enabled();
-        if let Some(g) = self.l.try_lock_with_int() {
+        let int_enabled = crate::kernel::int::is_enabled();
+
+        crate::kernel::int::disable();
+
+        let notify = if self.notify {
+            //crate::kernel::sched::preempt_disable()
+            false
+        } else {
+            false
+        };
+
+        let lock = match self.l.try_lock() {
+            Some(l) => Some(l),
+            None => {
+                if notify {
+                    crate::kernel::sched::preempt_enable();
+                }
+
+                if int_enabled {
+                    crate::kernel::int::enable();
+                }
+
+                None
+            }
+        };
+
+        if let Some(g) = lock {
             Some(SpinGuard {
                 g: Some(g),
-                //reenable ints if they were enabled before
-                irq: ints,
-                notify: false,
+                irq: int_enabled,
+                notify,
                 debug: 0,
             })
         } else {
@@ -75,67 +127,42 @@ impl<T> Spin<T> {
         }
     }
 
-    pub fn lock_debug(&self, id: usize) -> SpinGuard<T> {
-        logln!(
-            "-{} ints: {} {}",
-            id,
-            crate::kernel::int::is_enabled(),
-            current_id()
-        );
-        let (lock, notify) = if let Some(locks) = current_locks_var() {
-            (self.l.lock_with_ref(locks), true)
-        } else {
-            (self.l.lock(), false)
-        };
-        logln!("+{} {}", id, current_id());
-
-        SpinGuard {
-            g: Some(lock),
-            irq: false,
-            notify,
-            debug: id,
-        }
-    }
-
     pub fn lock_irq(&self) -> SpinGuard<T> {
-        let ints = int::is_enabled();
-        let lock = self.l.lock_with_int();
+        let int_enabled = crate::kernel::int::is_enabled();
+
+        crate::kernel::int::disable();
+
+        let notify = if self.notify {
+            //crate::kernel::sched::preempt_disable()
+            false
+        } else {
+            false
+        };
+
+        let lock = self.l.lock();
+
         SpinGuard {
             g: Some(lock),
-            //reenable ints if they were enabled before
-            irq: ints,
-            notify: false,
+            irq: int_enabled,
+            notify,
             debug: 0,
         }
     }
 
-    pub fn lock_irq_debug(&self, id: usize) -> SpinGuard<T> {
-        let ints = int::is_enabled();
-        logln!(
-            "-{} ints: {} {}",
-            id,
-            crate::kernel::int::is_enabled(),
-            current_id()
-        );
-        let l = self.l.lock_with_int();
-        logln!("+{} {}", id, current_id());
-        SpinGuard {
-            g: Some(l),
-            //reenable ints if they were enabled before
-            irq: ints,
-            notify: false,
-            debug: id,
-        }
+    pub fn lock_irq_debug(&self, _id: usize) -> SpinGuard<T> {
+        self.lock_irq()
     }
 }
 
 impl Spin<()> {
     pub fn unguarded_release(&self) {
-        self.l.unguarded_release()
+        spin::MutexGuard::leak(self.l.lock());
     }
 
     pub fn unguarded_obtain(&self) {
-        self.l.unguarded_obtain()
+        unsafe {
+            self.l.force_unlock();
+        }
     }
 }
 
@@ -158,11 +185,11 @@ impl<'a, T: ?Sized> Drop for SpinGuard<'a, T> {
         if self.debug > 0 {
             logln!("U {} {}", self.debug, current_id());
         }
+        if self.notify {
+            crate::kernel::sched::preempt_enable();
+        }
         if self.irq {
             int::enable();
-        }
-        if self.notify {
-            crate::kernel::sched::leave_critical_section();
         }
     }
 }

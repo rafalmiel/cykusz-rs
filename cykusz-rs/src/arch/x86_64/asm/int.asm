@@ -66,8 +66,6 @@ isr_common:
     add rdx, 144
     mov rcx, rsp              ; regs frame ptr
 
-    sti
-
     cld
     call isr_handler
 

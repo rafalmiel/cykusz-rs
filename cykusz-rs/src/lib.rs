@@ -34,6 +34,7 @@ extern crate intrusive_collections;
 extern crate lazy_static;
 
 use crate::kernel::mm::VirtAddr;
+use crate::kernel::sched::current_task_ref;
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -176,6 +177,11 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 }
 
 fn idle() -> ! {
+    logln!(
+        "entering idle task {}, locks {}",
+        current_task_ref().tid(),
+        current_task_ref().locks()
+    );
     loop {
         crate::kernel::int::disable();
         if crate::kernel::sched::reschedule() {

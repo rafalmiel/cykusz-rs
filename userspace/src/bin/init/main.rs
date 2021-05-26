@@ -27,9 +27,11 @@ fn spawn_shell() {
 pub fn main() {
     spawn_shell();
 
+    let mut status = 0u32;
+
     loop {
-        if let Ok(r) = syscall::waitpid(0) {
-            println!("[ init ]: child terminated: {}", r);
+        if let Ok(r) = syscall::waitpid(0, &mut status) {
+            println!("[ init ]: child terminated: {}, status: {:#x}", r, status);
         }
     }
 }

@@ -41,10 +41,11 @@ impl Default for SignalHandler {
 
 impl From<u64> for SignalHandler {
     fn from(v: u64) -> Self {
+        let v = v as i64;
         match v {
-            0 => SignalHandler::Ignore,
-            1 => SignalHandler::Default,
-            v => SignalHandler::Handle(unsafe { core::mem::transmute::<u64, fn(usize)>(v) }),
+            -3 => SignalHandler::Ignore,
+            -2 => SignalHandler::Default,
+            v => SignalHandler::Handle(unsafe { core::mem::transmute::<u64, fn(usize)>(v as u64) }),
         }
     }
 }
@@ -52,8 +53,8 @@ impl From<u64> for SignalHandler {
 impl From<SignalHandler> for usize {
     fn from(h: SignalHandler) -> Self {
         match h {
-            SignalHandler::Ignore => 0,
-            SignalHandler::Default => 1,
+            SignalHandler::Ignore => -3isize as usize,
+            SignalHandler::Default => -2isize as usize,
             SignalHandler::Handle(f) => f as usize,
         }
     }

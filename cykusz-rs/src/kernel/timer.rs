@@ -21,7 +21,7 @@ pub struct Timer {
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        logln!("[ TCP ] Timer dropped");
+        logln_disabled!("[ TCP ] Timer dropped");
     }
 }
 
@@ -117,11 +117,9 @@ fn check_timers() {
         .expect("Timers thread should not be signalled");
 
     loop {
-        if let Some(timer) = timers.front().get() {
+        if let Some(timer) = timers.pop_front() {
             if timer.timeout() <= time {
                 let t = timer.self_ref.upgrade().unwrap();
-
-                timers.pop_front();
 
                 drop(timers);
 

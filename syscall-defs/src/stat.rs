@@ -1,4 +1,3 @@
-
 bitflags! {
     #[derive(Default)]
     pub struct Mode: u32 {

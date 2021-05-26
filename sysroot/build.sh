@@ -155,9 +155,13 @@ function _cykusz_binutils {
 	pushd .
 
 	cd $BINUTILS_CYKUSZ_BUILD_DIR
-	$BINUTILS_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --prefix=/usr --disable-werror --disable-gdb
+
+	FLAGS="-mtune=generic"
+
+	CFLAGS=$FLAGS CXXFLAGS=$FLAGS $BINUTILS_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --prefix=/usr --disable-werror --disable-gdb
 
 	popd
+
 
 	make -C $BINUTILS_CYKUSZ_BUILD_DIR -j4
 	make -C $BINUTILS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
@@ -175,17 +179,26 @@ function _cykusz_gcc {
 
 	popd
 
+	FLAGS="-mno-mmx -mno-sse -mno-sse2"
 
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libgcc
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libgcc
+	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
+	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
+	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libgcc
+	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libgcc
 
 }
 
 function _cykusz_libstd {
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libstdc++-v3
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libstdc++-v3
+	FLAGS="-mno-mmx -mno-sse -mno-sse2"
+
+	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libstdc++-v3
+	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libstdc++-v3
+}
+
+function _cykusz {
+	_cykusz_binutils
+	_cykusz_gcc
+	_cykusz_libstd
 }
 
 function _build {

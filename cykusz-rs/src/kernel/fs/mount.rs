@@ -10,7 +10,7 @@ use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::sync::RwSpin;
+use crate::kernel::sync::Mutex;
 
 #[derive(Clone)]
 pub struct Mountpoint {
@@ -28,13 +28,13 @@ impl Mountpoint {
 }
 
 struct Mounts {
-    mounts: RwSpin<BTreeMap<MountKey, Mountpoint>>,
+    mounts: Mutex<BTreeMap<MountKey, Mountpoint>>,
 }
 
 impl Mounts {
     fn new() -> Mounts {
         Mounts {
-            mounts: RwSpin::new(BTreeMap::new()),
+            mounts: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -52,7 +52,7 @@ impl Mounts {
         let key = Self::make_key(&dir);
         //println!("mounting key: {:?}", key);
 
-        let mut mounts = self.mounts.write();
+        let mut mounts = self.mounts.lock();
 
         if mounts.contains_key(&key) {
             Err(FsError::EntryExists)
@@ -92,7 +92,7 @@ impl Mounts {
         let key = Self::make_key(dir);
         //println!("find mountpoint: {:?}", key);
 
-        let mounts = self.mounts.read();
+        let mounts = self.mounts.lock();
 
         if let Some(m) = mounts.get(&key) {
             //println!("found mount: {:?}", key);
@@ -103,7 +103,7 @@ impl Mounts {
     }
 
     fn unmount_by_key(&self, key: &MountKey) -> Result<()> {
-        let mut mounts = self.mounts.write();
+        let mut mounts = self.mounts.lock();
         //println!("umount: {:?}", key);
 
         if let Some(ent) = mounts.get(&key) {
@@ -126,7 +126,7 @@ impl Mounts {
     }
 
     fn umount_all(&self) {
-        let mounts = self.mounts.write();
+        let mounts = self.mounts.lock();
 
         let keys: Vec<MountKey> = mounts.iter().map(|e| e.0.clone()).collect();
 

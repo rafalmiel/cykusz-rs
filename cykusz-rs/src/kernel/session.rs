@@ -184,7 +184,7 @@ impl Sessions {
     pub fn remove_process(&self, process: &Arc<Task>) -> SyscallResult {
         let mut sessions = self.sessions.lock();
 
-        logln!("sessions: Remove process: {}", process.tid());
+        logln_disabled!("sessions: Remove process: {}", process.tid());
 
         if let Some(session) = sessions.get(&process.sid()) {
             if let Ok(num) = session.remove_process(process) {
@@ -222,7 +222,7 @@ impl Sessions {
             return;
         }
 
-        logln!("sessions: Register process: {}", process.tid());
+        logln_disabled!("sessions: Register process: {}", process.tid());
 
         let sessions = self.sessions.lock();
 

@@ -50,14 +50,14 @@ pub extern "C" fn _start() -> ! {
 
     main();
 
-    syscall::exit();
+    syscall::exit(0);
 }
 
 /// This function is called on panic.
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("Panicked... {:?}", info);
-    syscall::exit()
+    syscall::exit(1)
 }
 
 #[allow(non_snake_case)]
@@ -73,5 +73,5 @@ extern "C" fn eh_personality() {}
 #[lang = "oom"]
 fn oom(layout: Layout) -> ! {
     println!("Out of memory! {:?}", layout);
-    syscall::exit()
+    syscall::exit(1)
 }

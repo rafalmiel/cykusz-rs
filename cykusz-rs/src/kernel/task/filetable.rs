@@ -6,7 +6,7 @@ use syscall_defs::{FileType, OpenFlags, SysDirEntry, SyscallError, SyscallResult
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
-use crate::kernel::sync::{RwSpin, Spin};
+use crate::kernel::sync::{Mutex, RwMutex};
 
 const FILE_NUM: usize = 256;
 
@@ -15,7 +15,7 @@ pub struct FileHandle {
     pub inode: DirEntryItem,
     pub offset: AtomicUsize,
     pub flags: OpenFlags,
-    pub dir_iter: Spin<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
+    pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
     //#[allow(unused)]
     //fs: Option<Arc<dyn Filesystem>>,
 }
@@ -27,7 +27,7 @@ impl FileHandle {
             inode: inode.clone(),
             offset: AtomicUsize::new(0),
             flags,
-            dir_iter: Spin::new((None, None)),
+            dir_iter: Mutex::new((None, None)),
             //fs: if let Some(fs) = inode.inode().fs() {
             //    fs.upgrade()
             //} else {
@@ -79,6 +79,7 @@ impl FileHandle {
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
         let offset = self.offset.load(Ordering::SeqCst);
 
+        //logln2!("sys_write: {}, offset: {}, len: {}", self.fd, offset, buf.len());
         //println!("writing to inode handle");
         let wrote = self.write_at(buf, offset)?;
 
@@ -100,16 +101,14 @@ impl FileHandle {
                     return Err(FsError::NotSupported);
                 }
             }
-            None => {
-                self.inode.inode().write_at(offset, buf)?
-            },
+            None => self.inode.inode().write_at(offset, buf)?,
         })
     }
 
     pub fn seek(&self, off: isize, whence: syscall_defs::SeekWhence) -> Result<usize> {
         let meta = self.inode.inode().metadata().ok().ok_or(FsError::IsPipe)?;
 
-        logln!("seek: fd: {} off: {} whence: {:?}", self.fd, off, whence);
+        //logln2!("seek: fd: {} off: {} whence: {:?}", self.fd, off, whence);
 
         if meta.typ == FileType::File {
             match whence {
@@ -227,13 +226,13 @@ impl FileHandle {
 }
 
 pub struct FileTable {
-    files: RwSpin<Vec<Option<Arc<FileHandle>>>>,
+    files: RwMutex<Vec<Option<Arc<FileHandle>>>>,
 }
 
 impl Clone for FileTable {
     fn clone(&self) -> FileTable {
         FileTable {
-            files: RwSpin::new(self.files.read().clone()),
+            files: RwMutex::new(self.files.read().clone()),
         }
     }
 }
@@ -250,7 +249,7 @@ impl FileTable {
         files.resize(FILE_NUM, None);
 
         FileTable {
-            files: RwSpin::new(files),
+            files: RwMutex::new(files),
         }
     }
 
@@ -270,7 +269,7 @@ impl FileTable {
                 inode: inode.clone(),
                 offset: AtomicUsize::new(0),
                 flags,
-                dir_iter: Spin::new((None, None)),
+                dir_iter: Mutex::new((None, None)),
                 //fs: if let Some(fs) = inode.inode().fs() {
                 //    fs.upgrade()
                 //} else {

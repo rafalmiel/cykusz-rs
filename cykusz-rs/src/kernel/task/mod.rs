@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicIsize, AtomicUsize, Ordering};
 
 use intrusive_collections::{LinkedList, LinkedListLink};
 
@@ -76,6 +76,7 @@ pub struct Task {
     signals: Signals,
     terminal: Terminal,
     zombies: Zombies,
+    exit_status: AtomicIsize,
 }
 
 unsafe impl Sync for Task {}
@@ -190,6 +191,7 @@ impl Task {
         self.filetable().close_on_exec();
 
         if let Some((entry, tls_vm)) = vm.load_bin(exe) {
+            vm.log_vm();
             unsafe { self.arch_task_mut().exec(entry, vm, tls_vm, args, envs) }
         } else {
             panic!("Failed to exec task")
@@ -231,7 +233,7 @@ impl Task {
 
         let thread = Self::make_ptr(thread);
 
-        logln!("set parent {} -> {}", process_leader.tid(), thread.tid());
+        logln_disabled!("set parent {} -> {}", process_leader.tid(), thread.tid());
         process_leader.add_child(thread.clone());
 
         thread
@@ -351,6 +353,14 @@ impl Task {
         }
     }
 
+    pub fn exit_status(&self) -> isize {
+        self.exit_status.load(Ordering::SeqCst)
+    }
+
+    pub fn set_exit_status(&self, status: isize) {
+        self.exit_status.store(status, Ordering::SeqCst);
+    }
+
     pub fn set_state(&self, state: TaskState) {
         self.state.store(state as usize, Ordering::SeqCst);
     }
@@ -371,8 +381,8 @@ impl Task {
         self.locks.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn dec_locks(&self) {
-        self.locks.fetch_sub(1, Ordering::SeqCst);
+    pub fn dec_locks(&self) -> usize {
+        self.locks.fetch_sub(1, Ordering::SeqCst) - 1
     }
 
     pub fn set_locks(&self, locks: usize) {
@@ -474,6 +484,13 @@ impl Task {
     }
 
     pub fn await_io(&self) -> SignalResult<()> {
+        if self.locks() > 0 {
+            logln!(
+                "await_io: sleeping while holding locks: {}, tid {}",
+                self.locks(),
+                self.tid()
+            );
+        }
         let res = crate::kernel::sched::sleep(None);
 
         assert_eq!(
@@ -597,8 +614,8 @@ impl Task {
         }
     }
 
-    pub fn wait_pid(&self, pid: usize) -> SignalResult<usize> {
-        self.zombies.wait_pid(pid)
+    pub fn wait_pid(&self, pid: usize, status: &mut u32) -> SignalResult<usize> {
+        self.zombies.wait_pid(pid, status)
     }
 
     pub fn wait_thread(&self, tid: usize) -> SignalResult<usize> {
@@ -608,6 +625,6 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        logln!("drop task {}", self.tid());
+        logln_disabled!("drop task {}", self.tid());
     }
 }

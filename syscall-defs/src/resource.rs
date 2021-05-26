@@ -1,6 +1,5 @@
-use core::convert::TryFrom;
 use crate::SyscallError;
-use crate::resource::RLimitKind::RTPrio;
+use core::convert::TryFrom;
 
 pub enum RLimitKind {
     Core = 1,
@@ -28,7 +27,6 @@ pub struct RLimit {
 }
 
 impl TryFrom<u64> for RLimitKind {
-
     type Error = SyscallError;
 
     fn try_from(value: u64) -> Result<Self, Self::Error> {

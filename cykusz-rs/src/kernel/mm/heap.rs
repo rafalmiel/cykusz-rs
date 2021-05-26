@@ -184,7 +184,7 @@ impl Drop for HeapDebug {
 unsafe impl GlobalAlloc for LockedHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let ptr = self
-            .allocate(&mut self.0.lock(), layout)
+            .allocate(&mut self.0.lock_irq(), layout)
             .ok()
             .map_or(0 as *mut u8, |alloc| alloc.as_ptr());
 
@@ -203,7 +203,7 @@ unsafe impl GlobalAlloc for LockedHeap {
         };
         ALLOCED_MEM.fetch_sub(layout.size(), Ordering::SeqCst);
         self.0
-            .lock()
+            .lock_irq()
             .deallocate(NonNull::new_unchecked(ptr), layout)
     }
 }

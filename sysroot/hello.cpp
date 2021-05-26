@@ -39,14 +39,17 @@ void print_thread() {
 
 void print_thread2(int v) {
 		//for (int i = 0;i < 10; ++i) {
-		if (v != 7) {
-			for (;;) {
-				//printf("%d", v);
-	//			printf("Hello, from thread two\n");
-				//std::unique_lock<std::mutex> lck{MUT};
-				//std::cout << "Hello from thread two " << i << std::endl;
-				//write(1, "TT2. Hello printf two\n", 22);
+		if (true || v != 7) {
+			for (int i = 0; i < 1000; ++i) {
+				printf("%d", v);
 			}
+			//for (;;) {
+			//	//printf("%d", v);
+	//		//	printf("Hello, from thread two\n");
+			//	//std::unique_lock<std::mutex> lck{MUT};
+			//	//std::cout << "Hello from thread two " << i << std::endl;
+			//	//write(1, "TT2. Hello printf two\n", 22);
+			//}
 		} else {
 			for (int i = 0; i < 1000; ++i) {
 				printf("%d", v);

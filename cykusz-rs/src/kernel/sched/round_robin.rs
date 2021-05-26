@@ -51,6 +51,8 @@ impl Default for Queues {
     fn default() -> Queues {
         let idle = Task::this();
 
+        logln!("idle task id {}", idle.tid());
+
         Queues {
             sched_task: Task::new_sched(scheduler_main),
             current: None,
@@ -71,9 +73,9 @@ impl Default for Queues {
 
 impl Queues {
     fn switch(&self, to: &Arc<Task>, lock: SpinGuard<()>) {
-        set_current(to);
-
         drop(lock);
+
+        set_current(to);
 
         crate::kernel::sched::finalize();
         unsafe {
@@ -167,6 +169,14 @@ impl Queues {
     fn sleep(&mut self, time_ns: Option<usize>, lock: SpinGuard<()>) -> SignalResult<()> {
         let task = get_current().clone();
 
+        if task.locks() > 0 {
+            logln!(
+                "warn: sleeping while holding {} locks, tid: {}",
+                task.locks(),
+                task.tid()
+            );
+        }
+
         assert_ne!(
             task.tid(),
             self.idle_task.tid(),
@@ -235,14 +245,15 @@ impl Queues {
         }
     }
 
-    fn exit(&mut self, lock: SpinGuard<()>) -> ! {
+    fn exit(&mut self, status: isize, lock: SpinGuard<()>) -> ! {
         let current = get_current();
 
-        logln!(
-            "exit tid: {}, sc: {}, wc: {}",
+        logln_disabled!(
+            "exit tid: {}, sc: {}, wc: {}, st: {}",
             current.tid(),
             Arc::strong_count(current),
-            Arc::weak_count(current)
+            Arc::weak_count(current),
+            status
         );
 
         assert_eq!(current.state(), TaskState::Runnable);
@@ -250,6 +261,8 @@ impl Queues {
         assert!(current.is_process_leader());
 
         self.dead.push_back(current.clone());
+
+        current.set_exit_status(status);
 
         self.switch_to_sched(current, lock);
 
@@ -262,7 +275,7 @@ impl Queues {
         assert_eq!(task.state(), TaskState::Runnable);
         assert_eq!(task.sched.is_linked(), false);
 
-        logln!(
+        logln_disabled!(
             "exit_thread tid: {}, sc: {}, wc: {}",
             task.tid(),
             Arc::strong_count(task),
@@ -283,7 +296,7 @@ impl Queues {
             drop(locked);
             dead.make_zombie();
 
-            logln!(
+            logln_disabled!(
                 "reap thread zombie {} pl: {} sc: {}, wc: {}",
                 dead.tid(),
                 dead.is_process_leader(),
@@ -406,12 +419,12 @@ impl SchedulerInterface for RRScheduler {
         queue.stop(lock);
     }
 
-    fn exit(&self, _status: isize) -> ! {
+    fn exit(&self, status: isize) -> ! {
         let (lock, queue) = self.queues.this_cpu_mut();
 
         let lock = lock.lock_irq();
 
-        queue.exit(lock);
+        queue.exit(status, lock);
     }
 
     fn exit_thread(&self) -> ! {

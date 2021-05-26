@@ -6,6 +6,7 @@ use crate::drivers::block::ahci::reg::HbaPort;
 use crate::drivers::block::ata::request::DmaRequest;
 use crate::kernel::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
+
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::CeilDiv;
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -155,7 +156,7 @@ impl Port {
             }
         }
 
-        while let Err(_e) = request.wait_queue().wait_for(|| request.is_complete()) {
+        while let Err(_e) = request.wait_queue().wait_for_irq(|| request.is_complete()) {
             // TODO: Make some waits uninterruptible
             //println!("[ AHCI ] IO interrupted, retrying");
         }

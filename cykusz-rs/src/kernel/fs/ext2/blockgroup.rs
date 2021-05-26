@@ -8,11 +8,12 @@ use spin::Once;
 
 use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
 use crate::kernel::fs::ext2::Ext2Filesystem;
-use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard, Spin};
+use crate::kernel::sync::{Mutex, MutexGuard};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 use crate::kernel::utils::types::Align;
 
 use super::disk;
+use crate::kernel::sched::current_task_ref;
 
 pub struct INodeVec {
     vec: Vec<u8>,
@@ -22,24 +23,20 @@ pub struct INodeVec {
 
 pub struct INodeGroup {
     fs: Weak<Ext2Filesystem>,
-    inodes: RwSpin<INodeVec>,
+    inodes: Mutex<INodeVec>,
 }
 
 impl INodeVec {
     pub fn get(&self, id: usize, inode_size: usize) -> &disk::inode::INode {
         let offset = ((id - 1) * inode_size) % self.vec.len();
 
-        unsafe {
-            core::mem::transmute(&self.vec[offset])
-        }
+        unsafe { core::mem::transmute(&self.vec[offset]) }
     }
     pub fn get_mut(&mut self, id: usize, inode_size: usize) -> &mut disk::inode::INode {
         self.dirty = true;
         let offset = ((id - 1) * inode_size) % self.vec.len();
 
-        unsafe {
-            core::mem::transmute(&mut self.vec[offset])
-        }
+        unsafe { core::mem::transmute(&mut self.vec[offset]) }
     }
 }
 
@@ -52,17 +49,17 @@ impl INodeGroup {
         self.fs().superblock().inode_size()
     }
 
-    pub fn read(&self) -> RwSpinReadGuard<INodeVec> {
-        self.inodes.read()
+    pub fn read(&self) -> MutexGuard<INodeVec> {
+        self.inodes.lock()
     }
-    pub fn write(&self) -> RwSpinWriteGuard<INodeVec> {
-        self.inodes.write()
+    pub fn write(&self) -> MutexGuard<INodeVec> {
+        self.inodes.lock()
     }
 }
 
 impl Drop for INodeGroup {
     fn drop(&mut self) {
-        let l = self.inodes.read();
+        let l = self.inodes.lock();
 
         if l.dirty {
             if let Some(fs) = self.fs.upgrade() {
@@ -87,6 +84,9 @@ impl GroupDescriptors {
         self.vec
             .resize(sb.group_count(), BlockGroupDescriptor::default());
 
+        if current_task_ref().locks() > 0 {
+            logln!("GroupDescriptors init: locks > 0");
+        }
         fs.dev()
             .read_cached(
                 sb.block_groups_sector() * 512,
@@ -105,6 +105,9 @@ impl GroupDescriptors {
             let mut vec = Vec::<BlockGroupDescriptor>::new();
             vec.resize(aligned_count, BlockGroupDescriptor::default());
 
+            if current_task_ref().locks() > 0 {
+                logln!("gd sync init: locks > 0");
+            }
             fs.dev().read_cached(
                 sb.block_groups_sector() * 512,
                 vec.as_mut_slice().to_bytes_mut(),
@@ -231,16 +234,16 @@ impl BlocksBitmap {
 }
 
 pub struct BlockGroupDescriptors {
-    d_desc: RwSpin<GroupDescriptors>,
-    d_inodes: Spin<lru::LruCache<usize, Arc<INodeGroup>>>,
+    d_desc: Mutex<GroupDescriptors>,
+    d_inodes: Mutex<lru::LruCache<usize, Arc<INodeGroup>>>,
     fs: Once<Weak<super::Ext2Filesystem>>,
 }
 
 impl BlockGroupDescriptors {
     pub fn new() -> BlockGroupDescriptors {
         BlockGroupDescriptors {
-            d_desc: RwSpin::new(GroupDescriptors::new()),
-            d_inodes: Spin::new(lru::LruCache::new(256)),
+            d_desc: Mutex::new(GroupDescriptors::new()),
+            d_inodes: Mutex::new(lru::LruCache::new(256)),
             fs: Once::new(),
         }
     }
@@ -254,7 +257,7 @@ impl BlockGroupDescriptors {
 
         let fs = self.fs();
 
-        let mut desc = self.d_desc.write();
+        let mut desc = self.d_desc.lock();
 
         desc.init(&fs);
     }
@@ -271,7 +274,7 @@ impl BlockGroupDescriptors {
         let idx = (id - 1) % ipg;
         let block_off = idx / ipb;
 
-        let desc = self.d_desc.read();
+        let desc = self.d_desc.lock();
 
         desc[bg_idx].inode_table() as usize + block_off
     }
@@ -295,7 +298,7 @@ impl BlockGroupDescriptors {
 
             let res = Arc::new(INodeGroup {
                 fs: Arc::downgrade(&fs),
-                inodes: RwSpin::new(INodeVec {
+                inodes: Mutex::new(INodeVec {
                     vec,
                     src_block: block,
                     dirty: false,
@@ -323,10 +326,10 @@ impl BlockGroupDescriptors {
     }
 
     pub fn debug(&self) {
-        let l = self.d_desc.read();
+        let l = self.d_desc.lock();
 
-        for d in l.vec.iter() {
-            logln!("{:?}", d);
+        for _d in l.vec.iter() {
+            logln_disabled!("{:?}", d);
         }
     }
 
@@ -339,7 +342,7 @@ impl BlockGroupDescriptors {
 
         let bg_idx = (hint_id - 1) / inodes_in_group;
 
-        let mut bg = self.d_desc.write();
+        let mut bg = self.d_desc.lock();
 
         if let Some(found_bg) = bg.find_free_blocks_group(bg_idx) {
             let bgroup = &mut bg[found_bg];
@@ -379,7 +382,7 @@ impl BlockGroupDescriptors {
             None
         };
 
-        let mut bg = self.d_desc.write();
+        let mut bg = self.d_desc.lock();
 
         if let Some(found_bg) = bg.find_free_inodes_group(bg_idx) {
             let bgroup = &mut bg[found_bg];
@@ -418,7 +421,7 @@ impl BlockGroupDescriptors {
         let group = block / blocks_in_group;
         let bit = block % blocks_in_group;
 
-        let mut descs = self.d_desc.write();
+        let mut descs = self.d_desc.lock();
 
         let bg = &mut descs.vec[group];
 
@@ -444,7 +447,7 @@ impl BlockGroupDescriptors {
         let group = inode / inodes_per_group;
         let bit = inode % inodes_per_group;
 
-        let mut descs = self.d_desc.write();
+        let mut descs = self.d_desc.lock();
 
         let bg = &mut descs.vec[group];
 
@@ -465,7 +468,7 @@ impl BlockGroupDescriptors {
 
         let idx = (inode - 1) / ipg;
 
-        self.d_desc.write().vec[idx].inc_dir_count();
+        self.d_desc.lock().vec[idx].inc_dir_count();
     }
 
     pub fn dec_dir_count(&self, inode: usize) {
@@ -474,11 +477,11 @@ impl BlockGroupDescriptors {
 
         let idx = (inode - 1) / ipg;
 
-        self.d_desc.write().vec[idx].dec_dir_count();
+        self.d_desc.lock().vec[idx].dec_dir_count();
     }
 
     pub fn sync(&self, fs: &Ext2Filesystem) {
-        let desc = self.d_desc.read();
+        let desc = self.d_desc.lock();
 
         desc.sync(fs);
 

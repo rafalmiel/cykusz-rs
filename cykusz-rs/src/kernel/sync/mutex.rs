@@ -1,7 +1,7 @@
 use core::ops::{Deref, DerefMut};
 
 use crate::kernel::sched::current_task;
-use crate::kernel::signal::SignalResult;
+
 use crate::kernel::sync::spin_lock::{Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -19,11 +19,11 @@ impl<T> Mutex<T> {
     pub const fn new(user_data: T) -> Mutex<T> {
         Mutex {
             wait_queue: WaitQueue::new(),
-            mutex: Spin::new(user_data),
+            mutex: Spin::new_no_notify(user_data),
         }
     }
 
-    pub fn lock(&self) -> SignalResult<MutexGuard<T>> {
+    pub fn lock(&self) -> MutexGuard<T> {
         let task = current_task();
 
         self.wait_queue.add_task(task.clone());
@@ -31,20 +31,17 @@ impl<T> Mutex<T> {
         loop {
             if let Some(g) = self.mutex.try_lock() {
                 self.wait_queue.remove_task(task);
-                return Ok(MutexGuard {
+                return MutexGuard {
                     g: Some(g),
                     m: &self,
-                });
+                };
             } else {
-                if let Err(e) = WaitQueue::task_wait() {
-                    self.wait_queue.remove_task(task);
-                    return Err(e);
-                }
+                while let Err(_e) = WaitQueue::task_wait() {}
             }
         }
     }
 
-    pub fn lock_irq(&self) -> SignalResult<MutexGuard<T>> {
+    pub fn lock_irq(&self) -> MutexGuard<T> {
         let task = current_task();
 
         self.wait_queue.add_task(task.clone());
@@ -52,15 +49,12 @@ impl<T> Mutex<T> {
         loop {
             if let Some(g) = self.mutex.try_lock_irq() {
                 self.wait_queue.remove_task(task);
-                return Ok(MutexGuard {
+                return MutexGuard {
                     g: Some(g),
                     m: &self,
-                });
+                };
             } else {
-                if let Err(e) = WaitQueue::task_wait() {
-                    self.wait_queue.remove_task(task);
-                    return Err(e);
-                }
+                while let Err(_e) = WaitQueue::task_wait() {}
             }
         }
     }
@@ -69,13 +63,13 @@ impl<T> Mutex<T> {
 impl<'a, T: ?Sized> Deref for MutexGuard<'a, T> {
     type Target = T;
 
-    fn deref<'b>(&'b self) -> &'b T {
+    fn deref(&self) -> &T {
         self.g.as_ref().unwrap().deref()
     }
 }
 
 impl<'a, T: ?Sized> DerefMut for MutexGuard<'a, T> {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T {
+    fn deref_mut(&mut self) -> &mut T {
         self.g.as_mut().unwrap().deref_mut()
     }
 }

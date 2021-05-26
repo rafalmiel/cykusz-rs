@@ -9,7 +9,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use intrusive_collections::{LinkedList, LinkedListLink};
 use lru::LruCache;
 
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{Mutex, Spin, SpinGuard};
 
 pub trait DropHandler {
     fn handle_drop(&self, arc: Arc<Self>);
@@ -264,8 +264,13 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
     }
 
     fn remove(&mut self, key: &K) {
+        logln_disabled!("remove key: {:?}", key);
+        self.print_stats();
         if let None = self.used.remove(key) {
-            self.unused.pop(key);
+            if let None = self.unused.pop(key) {
+                logln_disabled!("ICache remove failed for key {:?}", key);
+                self.print_stats();
+            }
         }
         //if let Some(e) = self.used.get(&key) {
         //    if let Some(e) = e.upgrade() {
@@ -316,27 +321,27 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
     }
 
     fn print_stats(&self) {
-        println!("Cache usage:");
-        println!("Used count:   {}", self.used.len());
-        for e in self.used.iter() {
-            println!("{:?} sc {}", e.0, e.1.strong_count());
+        logln_disabled!("Cache usage:");
+        logln_disabled!("Used count:   {}", self.used.len());
+        for _e in self.used.iter() {
+            logln_disabled!("{:?} sc {}", e.0, e.1.strong_count());
         }
-        println!("Unused count: {}", self.unused.len());
-        for e in self.unused.iter() {
-            println!("{:?} sc {}", e.0, Arc::strong_count(&e.1));
+        logln_disabled!("Unused count: {}", self.unused.len());
+        for _e in self.unused.iter() {
+            logln_disabled!("{:?} sc {}", e.0, Arc::strong_count(&e.1));
         }
     }
 }
 
 pub struct Cache<K: IsCacheKey, T: Cacheable<K>> {
-    data: Spin<CacheData<K, T>>,
+    data: Mutex<CacheData<K, T>>,
     sref: Weak<Cache<K, T>>,
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     pub fn new(capacity: usize) -> Arc<Cache<K, T>> {
         Arc::new_cyclic(|me| Cache::<K, T> {
-            data: Spin::new(CacheData::<K, T> {
+            data: Mutex::new(CacheData::<K, T> {
                 unused: LruCache::new(capacity),
                 used: hashbrown::HashMap::new(),
             }),

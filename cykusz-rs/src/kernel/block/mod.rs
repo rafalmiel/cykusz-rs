@@ -11,7 +11,8 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{
     CachedAccess, CachedBlockDev, PageCacheKey, PageItem, PageItemInt, PageItemWeak, RawAccess,
 };
-use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
+
+use crate::kernel::sync::{IrqGuard, Mutex, MutexGuard};
 use crate::kernel::timer::{create_timer, Timer, TimerCallback};
 use crate::kernel::utils::types::CeilDiv;
 
@@ -22,10 +23,10 @@ pub trait BlockDev: Send + Sync {
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize>;
 }
 
-static BLK_DEVS: RwSpin<BTreeMap<usize, Arc<BlockDevice>>> = RwSpin::new(BTreeMap::new());
+static BLK_DEVS: Mutex<BTreeMap<usize, Arc<BlockDevice>>> = Mutex::new(BTreeMap::new());
 
 pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
-    let mut devs = BLK_DEVS.write();
+    let mut devs = BLK_DEVS.lock();
 
     register_device(dev.clone())?;
 
@@ -37,7 +38,7 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
 }
 
 pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn CachedBlockDev>> {
-    let devs = BLK_DEVS.read();
+    let devs = BLK_DEVS.lock();
 
     if let Some(d) = devs.get(&id) {
         Some(d.clone())
@@ -51,8 +52,8 @@ pub struct BlockDevice {
     name: String,
     dev: Arc<dyn BlockDev>,
     self_ref: Weak<BlockDevice>,
-    dirty_inode_pages: Spin<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
-    dirty_pages: Spin<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
+    dirty_inode_pages: Mutex<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
+    dirty_pages: Mutex<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
     cleanup_timer: Arc<Timer>,
     sync_all_altive: AtomicBool,
 }
@@ -128,14 +129,14 @@ impl BlockDevice {
             name,
             dev: imp,
             self_ref: me.clone(),
-            dirty_inode_pages: Spin::new(hashbrown::HashMap::new()),
-            dirty_pages: Spin::new(hashbrown::HashMap::new()),
+            dirty_inode_pages: Mutex::new(hashbrown::HashMap::new()),
+            dirty_pages: Mutex::new(hashbrown::HashMap::new()),
             cleanup_timer: create_timer(TimerCallback::new(me.clone(), BlockDevice::sync_all)),
             sync_all_altive: AtomicBool::new(false),
         })
     }
 
-    fn sync_cache(&self, mut cache: SpinGuard<hashbrown::HashMap<PageCacheKey, PageItemWeak>>) {
+    fn sync_cache(&self, cache: &mut MutexGuard<hashbrown::HashMap<PageCacheKey, PageItemWeak>>) {
         for (_, a) in cache.iter() {
             if let Some(up) = a.upgrade() {
                 up.sync_to_storage(&up);
@@ -226,6 +227,8 @@ impl CachedAccess for BlockDevice {
             return;
         }
 
+        drop(dirty);
+
         dirty = self.dirty_inode_pages.lock();
         dirty.remove(&key);
     }
@@ -251,18 +254,23 @@ impl CachedBlockDev for BlockDevice {
     }
 
     fn sync_all(&self) {
-        logln!(
-            "Syncing... inodes {}, pages {}",
-            self.dirty_inode_pages.lock().len(),
-            self.dirty_pages.lock().len(),
-        );
-
+        let _irq = IrqGuard::new();
         let _guard = SyncAllGuard::new(self);
 
         //self.cleanup_timer.disable();
 
-        self.sync_cache(self.dirty_inode_pages.lock());
-        self.sync_cache(self.dirty_pages.lock());
+        {
+            let mut inodes = self.dirty_inode_pages.lock();
+            logln!("Syncing... inodes {}", inodes.len(),);
+            self.sync_cache(&mut inodes);
+        }
+        {
+            let mut pages = self.dirty_pages.lock();
+            logln!("Syncing... pages {}", pages.len(),);
+            self.sync_cache(&mut pages);
+        }
+
+        logln!("Syncing... finished");
     }
 }
 
@@ -273,7 +281,7 @@ pub fn init() {
 
     let mut devs = Vec::<Arc<BlockDevice>>::new();
 
-    for (_, dev) in BLK_DEVS.read().iter() {
+    for (_, dev) in BLK_DEVS.lock().iter() {
         devs.push(dev.clone());
     }
 

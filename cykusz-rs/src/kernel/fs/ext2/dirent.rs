@@ -11,19 +11,20 @@ use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::sync::Spin;
+use crate::kernel::sched::current_task_ref;
+use crate::kernel::sync::Mutex;
 use crate::kernel::utils::types::Align;
 
 pub struct SysDirEntIter<'a> {
     parent: DirEntryItem,
-    iter: Spin<DirEntIter<'a>>,
+    iter: Mutex<DirEntIter<'a>>,
 }
 
 impl<'a> SysDirEntIter<'a> {
     pub fn new(parent: DirEntryItem, inode: Arc<LockedExt2INode>) -> SysDirEntIter<'a> {
         SysDirEntIter::<'a> {
             parent,
-            iter: Spin::new(DirEntIter::new(inode)),
+            iter: Mutex::new(DirEntIter::new(inode)),
         }
     }
 }
@@ -74,16 +75,19 @@ impl<'a> DirEntIter<'a> {
     }
 
     pub fn remove_dir_entry(&mut self, name: &str) -> Result<()> {
+        let fs = self.fs();
+
+        let _dir_lock = fs.dir_lock();
+
         if let Some(e) = self.find(|e| e.name() == name) {
             let typ = e.ftype();
             let id = e.inode();
 
-            self.fs()
-                .get_inode(e.inode() as usize)
+            logln!("found dir entry to remove {} {}", name, id);
+
+            fs.get_inode(e.inode() as usize)
                 .as_impl::<LockedExt2INode>()
                 .unref_hardlink();
-
-            let fs = self.fs();
 
             let block_size = fs.superblock().block_size();
 
@@ -131,9 +135,11 @@ impl<'a> DirEntIter<'a> {
     }
 
     pub fn add_dir_entry(&mut self, target: &LockedExt2INode, name: &str) -> Result<()> {
-        let typ = target.read().d_inode().ftype();
+        let typ = target.read_debug(18).d_inode().ftype();
 
         let fs = self.fs();
+
+        let _dir_lock = fs.dir_lock();
 
         let required_size = (name.len() + 8).align_up(4);
 
@@ -163,7 +169,7 @@ impl<'a> DirEntIter<'a> {
 
             Ok(())
         } else {
-            let file_size = { self.inode.read().d_inode().size_lower() } as usize;
+            let file_size = { self.inode.read_debug(19).d_inode().size_lower() } as usize;
 
             if self.offset >= file_size {
                 return if let Some(new_block) =
@@ -176,6 +182,8 @@ impl<'a> DirEntIter<'a> {
                     entry.set_inode(0);
 
                     fs.write_block(new_block.block(), new_block.bytes());
+
+                    drop(_dir_lock);
 
                     self.add_dir_entry(target, name)
                 } else {
@@ -209,7 +217,7 @@ impl<'a> Iterator for DirEntIter<'a> {
         let fs = self.fs();
         let block_size = fs.superblock().block_size();
 
-        let file_size = { self.inode.read().d_inode().size_lower() };
+        let file_size = { self.inode.read_debug(20).d_inode().size_lower() };
 
         let ent = loop {
             if self.offset >= file_size as usize {
@@ -220,6 +228,9 @@ impl<'a> Iterator for DirEntIter<'a> {
 
             if self.buf.is_empty() || block > self.block {
                 self.block = block;
+                if current_task_ref().locks() > 0 {
+                    logln!("dir iter next: locks > 0");
+                }
                 if let Some(b) = self.reader.read_next_block() {
                     self.buf = b;
                 } else {

@@ -11,24 +11,24 @@ use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
-use crate::kernel::sync::{RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
+use crate::kernel::sync::{Mutex, MutexGuard};
 
 type CacheKey = (usize, String);
 
 impl Cacheable<CacheKey> for DirEntry {
     fn cache_key(&self) -> CacheKey {
-        let data = self.data.read();
+        let data = self.read();
         Self::make_key(data.parent.as_ref(), &data.name)
     }
 
     fn notify_unused(&self, _new_ref: &Weak<CacheItem<CacheKey, DirEntry>>) {
-        let mut data = self.data.write();
+        let mut data = self.write();
         data.fs_ref = None;
         data.parent = None;
     }
 
     fn notify_used(&self) {
-        let mut data = self.data.write();
+        let mut data = self.write();
 
         data.fs_ref = if let Some(fs) = self.fs.get() {
             fs.upgrade()
@@ -64,7 +64,7 @@ impl Drop for DirEntryData {
 }
 
 pub struct DirEntry {
-    data: RwSpin<DirEntryData>,
+    data: Mutex<DirEntryData>,
     mountpoint: AtomicBool,
     fs: Once<Weak<dyn Filesystem>>,
     cache_marker: usize,
@@ -98,7 +98,7 @@ impl DirEntryItem {
 impl DirEntry {
     pub fn new_root(inode: INodeItem, name: String) -> DirEntryItem {
         cache().make_item_no_cache(DirEntry {
-            data: RwSpin::new(DirEntryData {
+            data: Mutex::new(DirEntryData {
                 parent: None,
                 fs_ref: None,
                 name,
@@ -117,7 +117,7 @@ impl DirEntry {
             let do_cache = ![".", ".."].contains(&name.as_str());
 
             let e = DirEntry {
-                data: RwSpin::new(DirEntryData {
+                data: Mutex::new(DirEntryData {
                     parent: Some(parent.clone()),
                     fs_ref: None,
                     name,
@@ -144,7 +144,7 @@ impl DirEntry {
 
     pub fn new_no_cache(parent: DirEntryItem, inode: INodeItem, name: String) -> DirEntryItem {
         cache().make_item_no_cache(DirEntry {
-            data: RwSpin::new(DirEntryData {
+            data: Mutex::new(DirEntryData {
                 parent: Some(parent),
                 fs_ref: None,
                 name,
@@ -172,7 +172,7 @@ impl DirEntry {
 
     pub fn inode_item_wrap(inode: INodeItem) -> DirEntryItem {
         cache().make_item_no_cache(DirEntry {
-            data: RwSpin::new(DirEntryData {
+            data: Mutex::new(DirEntryData {
                 parent: None,
                 fs_ref: if let Some(fs) = inode.fs() {
                     if let Some(fs) = fs.upgrade() {
@@ -196,24 +196,24 @@ impl DirEntry {
         })
     }
 
-    pub fn read(&self) -> RwSpinReadGuard<DirEntryData> {
-        self.data.read()
+    pub fn read(&self) -> MutexGuard<DirEntryData> {
+        self.data.lock()
     }
 
-    pub fn write(&self) -> RwSpinWriteGuard<DirEntryData> {
-        self.data.write()
+    pub fn write(&self) -> MutexGuard<DirEntryData> {
+        self.data.lock()
     }
 
     pub fn name(&self) -> String {
-        self.data.read().name.clone()
+        self.read().name.clone()
     }
 
     pub fn inode_id(&self) -> usize {
-        self.data.read().inode.id().unwrap()
+        self.read().inode.id().unwrap()
     }
 
     pub fn inode(&self) -> INodeItem {
-        self.data.read().inode.clone()
+        self.read().inode.clone()
     }
 
     pub fn make_key(parent: Option<&DirEntryItem>, name: &String) -> CacheKey {
@@ -225,19 +225,19 @@ impl DirEntry {
     }
 
     pub fn parent(&self) -> Option<DirEntryItem> {
-        self.data.read().parent.clone()
+        self.read().parent.clone()
     }
 
     pub fn update_inode(&self, inode: INodeItem) {
-        self.data.write().inode = inode;
+        self.write().inode = inode;
     }
 
     pub fn update_parent(&self, parent: Option<DirEntryItem>) {
-        self.data.write().parent = parent;
+        self.write().parent = parent;
     }
 
     pub fn update_name(&self, name: String) {
-        self.data.write().name = name;
+        self.write().name = name;
     }
 
     pub fn is_mountpoint(&self) -> bool {

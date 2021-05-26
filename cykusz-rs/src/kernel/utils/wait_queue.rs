@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use crate::kernel::sched::current_task;
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::Task;
 
 pub struct WaitQueue {
@@ -18,6 +18,12 @@ pub struct WaitQueueGuard<'a> {
 impl<'a> WaitQueueGuard<'a> {
     pub fn new(wq: &'a WaitQueue, task: &'a Arc<Task>) -> WaitQueueGuard<'a> {
         wq.add_task(task.clone());
+
+        WaitQueueGuard::<'a> { wq, task }
+    }
+
+    pub fn new_debug(wq: &'a WaitQueue, task: &'a Arc<Task>) -> WaitQueueGuard<'a> {
+        wq.add_task_debug(task.clone());
 
         WaitQueueGuard::<'a> { wq, task }
     }
@@ -44,8 +50,14 @@ impl WaitQueue {
         }
     }
 
+    pub fn with_capacity(size: usize) -> WaitQueue {
+        WaitQueue {
+            tasks: Spin::new(Vec::with_capacity(size)),
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
-        self.tasks.lock().is_empty()
+        self.tasks.lock_irq().is_empty()
     }
 
     pub fn wait_lock<T>(lock: SpinGuard<T>) -> SignalResult<()> {
@@ -122,6 +134,20 @@ impl WaitQueue {
         Ok(lock)
     }
 
+    pub fn wait_for_irq<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
+        let _irq = IrqGuard::new();
+
+        let task = current_task();
+
+        let _guard = WaitQueueGuard::new(self, &task);
+
+        while !cond() {
+            task.await_io()?;
+        }
+
+        Ok(())
+    }
+
     pub fn wait_for<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
         let task = current_task();
 
@@ -134,10 +160,32 @@ impl WaitQueue {
         Ok(())
     }
 
+    pub fn wait_for_debug<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
+        let task = current_task();
+
+        let _guard = WaitQueueGuard::new_debug(self, &task);
+
+        while !cond() {
+            task.await_io()?;
+        }
+
+        Ok(())
+    }
+
     pub fn add_task(&self, task: Arc<Task>) {
         let mut tasks = self.tasks.lock_irq();
 
         tasks.push(task);
+    }
+
+    pub fn add_task_debug(&self, task: Arc<Task>) {
+        logln_disabled!("wq add task: {:p}", self as *const _);
+        let mut tasks = self.tasks.lock_irq_debug(2);
+
+        logln_disabled!("task adding");
+        logln_disabled!("has int {}", is_enabled());
+        tasks.push(task);
+        logln_disabled!("task added");
     }
 
     pub fn remove_task(&self, task: Arc<Task>) {
@@ -196,16 +244,18 @@ impl WaitQueue {
     }
 
     pub fn notify_one_debug(&self) -> bool {
-        let tasks = self.tasks.lock_irq();
+        logln_disabled!("wq notify: {:p}", self as *const _);
+        let tasks = self.tasks.lock_irq_debug(1);
         let len = tasks.len();
 
         if len == 0 {
+            logln_disabled!("len == 0");
             return false;
         }
 
         let t = tasks.first().unwrap();
 
-        println!("wake up {}", t.tid());
+        logln_disabled!("wake up {}", t.tid());
 
         t.wake_up();
 

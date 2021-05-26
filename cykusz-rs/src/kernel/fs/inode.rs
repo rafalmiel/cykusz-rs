@@ -117,6 +117,8 @@ pub trait INode: Send + Sync + DowncastSync {
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {
         None
     }
+
+    fn debug(&self) {}
 }
 
 impl_downcast!(sync INode);

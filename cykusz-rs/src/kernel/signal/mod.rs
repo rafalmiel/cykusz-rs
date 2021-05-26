@@ -351,7 +351,7 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
     }
 
     if signals.is_pending(syscall_defs::signal::SIGKILL as u64) {
-        logln!(
+        logln_disabled!(
             "sigkill: {} sc: {}, wc: {}",
             task.tid(),
             Arc::strong_count(task),
@@ -360,7 +360,7 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
 
         signals.clear_pending(syscall_defs::signal::SIGKILL as u64);
 
-        crate::kernel::sched::exit();
+        crate::kernel::sched::exit(1);
     }
 
     signals.sig_exec();

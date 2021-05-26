@@ -184,7 +184,7 @@ impl SocketData {
     }
 
     fn conn_timeout(&mut self) {
-        logln!("[ TCP ] SyncSent Timeout");
+        logln_disabled!("[ TCP ] SyncSent Timeout");
 
         if self.conn_timer().conn_timeout_update() {
             self.send_sync();
@@ -229,7 +229,7 @@ impl SocketData {
     }
 
     fn dc_timeout(&mut self) {
-        logln!("[ TCP ] LastAck Timeout");
+        logln_disabled!("[ TCP ] LastAck Timeout");
         self.finalize();
     }
 
@@ -282,7 +282,7 @@ impl SocketData {
     fn send_sync(&mut self) {
         let packet = self.make_packet(0, TcpFlags::SYN);
 
-        logln!("[ TCP ] Connection Syn Sent");
+        logln_disabled!("[ TCP ] Connection Syn Sent");
 
         self.state = State::SynSent;
 
@@ -398,7 +398,7 @@ impl SocketData {
 
                 self.send_ack_flags(TcpFlags::SYN);
 
-                logln!("[ TCP ] Syn Received");
+                logln_disabled!("[ TCP ] Syn Received");
 
                 self.state = State::SynReceived;
             }
@@ -412,15 +412,15 @@ impl SocketData {
         match (hdr.flag_ack(), hdr.flag_rst()) {
             (true, false) => {
                 self.conn_timer().reset();
-                logln!("[ TCP ] Connection established");
+                logln_disabled!("[ TCP ] Connection established");
                 self.state = State::Established;
             }
             (_, true) => {
-                logln!("[ TCP ] RST Received, Listening");
+                logln_disabled!("[ TCP ] RST Received, Listening");
                 self.state = State::Listen;
             }
             _ => {
-                logln!("[ TCP ] Unknown state reached");
+                logln_disabled!("[ TCP ] Unknown state reached");
             }
         }
     }
@@ -435,7 +435,7 @@ impl SocketData {
 
                 self.update_rcv_next(packet);
 
-                logln!("[ TCP ] Connection Established");
+                logln_disabled!("[ TCP ] Connection Established");
 
                 self.conn_timer().reset();
 
@@ -489,7 +489,7 @@ impl SocketData {
                         self.rx_timer().start_with_timeout(200);
                     }
                 } else {
-                    logln!("[ TCP ] Failed to store data");
+                    logln_disabled!("[ TCP ] Failed to store data");
                 }
             }
 
@@ -525,7 +525,7 @@ impl SocketData {
                 self.dc_timer().start_with_timeout(500);
             }
             _ => {
-                logln!("[ TCP ] Unexpected FinWait1 packet");
+                logln_disabled!("[ TCP ] Unexpected FinWait1 packet");
                 self.send_ack_flags(TcpFlags::RST);
 
                 self.finalize();
@@ -545,7 +545,7 @@ impl SocketData {
                 self.finalize();
             }
             _ => {
-                logln!("[ TCP ] Unexpected FinWait2 packet");
+                logln_disabled!("[ TCP ] Unexpected FinWait2 packet");
                 self.send_ack_flags(TcpFlags::RST);
 
                 self.finalize();
@@ -586,14 +586,14 @@ impl SocketData {
 
         if self.state != State::Listen && self.state != State::SynSent {
             if self.ctl.rcv_nxt != hdr.seq_nr() {
-                logln!(
+                logln_disabled!(
                     "[ TCP ] Out of Order Packet Received {}, {} vs {}",
                     (hdr.seq_nr() - self.ctl.irs),
                     self.ctl.rcv_nxt,
                     hdr.seq_nr()
                 );
 
-                logln!(
+                logln_disabled!(
                     "[ TCP ] Available buffer: {}",
                     self.in_buffer.available_size()
                 );
@@ -616,7 +616,7 @@ impl SocketData {
             State::LastAck => self.handle_lastack(packet),
             State::Closing => self.handle_closing(packet),
             _ => {
-                logln!("State not yet supported");
+                logln_disabled!("State not yet supported");
             }
         };
 
@@ -634,7 +634,7 @@ impl SocketData {
 
         self.state = State::Closed;
 
-        logln!("[ TCP ] Connection closed");
+        logln_disabled!("[ TCP ] Connection closed");
 
         self.stop_timers();
 
@@ -644,7 +644,7 @@ impl SocketData {
     }
 
     fn close(&mut self) {
-        logln!("[ TCP ] Closing");
+        logln_disabled!("[ TCP ] Closing");
         match self.state {
             State::Established | State::SynReceived => {
                 self.send_ack_flags(TcpFlags::FIN);
@@ -652,7 +652,7 @@ impl SocketData {
                 self.state = State::FinWait1;
             }
             State::CloseWait => {
-                logln!("[ TCP ] Close wait sent fin");
+                logln_disabled!("[ TCP ] Close wait sent fin");
                 self.send_ack_flags(TcpFlags::FIN);
 
                 self.state = State::LastAck;
@@ -676,7 +676,7 @@ impl SocketData {
     }
 
     pub fn listen(&mut self) {
-        logln!("[ TCP ] Listening");
+        logln_disabled!("[ TCP ] Listening");
         self.state = State::Listen;
     }
 }
@@ -868,7 +868,7 @@ impl TcpService for Socket {
 
 impl Drop for Socket {
     fn drop(&mut self) {
-        logln!("[ TCP ] Socket Removed");
+        logln_disabled!("[ TCP ] Socket Removed");
     }
 }
 

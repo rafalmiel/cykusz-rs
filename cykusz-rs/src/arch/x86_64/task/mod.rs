@@ -80,7 +80,7 @@ impl Context {
 }
 
 fn task_finished() {
-    crate::kernel::sched::exit();
+    crate::kernel::sched::exit(0);
 }
 
 fn prepare_p4<'a>() -> &'a mut P4Table {
@@ -96,6 +96,7 @@ fn prepare_p4<'a>() -> &'a mut P4Table {
     new_p4
 }
 
+#[allow(unused)]
 fn prepare_tls(vm: &VM, p_table: &mut P4Table, tls: &TlsVmInfo) -> VirtAddr {
     let mmap = vm
         .mmap_vm(
@@ -407,8 +408,9 @@ impl Task {
             0,
         );
 
-        let tls_ptr = if let Some(tls) = &tls_vm {
-            prepare_tls(vm, p_table, tls)
+        let tls_ptr = if let Some(_tls) = &tls_vm {
+            // We setup tls in userspace now
+            VirtAddr(0) //prepare_tls(vm, p_table, tls)
         } else {
             VirtAddr(0)
         };
@@ -505,8 +507,9 @@ impl Task {
             0,
         );
 
-        let tls_ptr = if let Some(tls) = &tls_vm {
-            prepare_tls(vm, p_table, tls)
+        let tls_ptr = if let Some(_tls) = &tls_vm {
+            // We setup tls in userspace now
+            VirtAddr(0) //prepare_tls(vm, p_table, tls)
         } else {
             VirtAddr(0)
         };
@@ -536,7 +539,17 @@ impl Task {
             argp = a.write_strings(&mut helper);
         }
 
-        helper.align_down(); // align to 16 bytes
+        helper.align_down();
+
+        let len = envp.len() + 1 + argp.len() + 1 + 1;
+
+        // If we write odd number of 8bytes later, add one 0u64 to keep the 16 byte alignment
+        if len % 2 == 1 {
+            unsafe {
+                helper.write(0u64);
+            }
+        }
+
         unsafe {
             helper.write(0u64);
             helper.write_slice(envp.as_slice()); // char *const envp[]
@@ -547,6 +560,7 @@ impl Task {
 
         drop(envp);
         drop(argp);
+        drop(tls_vm);
 
         unsafe {
             asm_jmp_user(helper.current() as usize, entry.0, 0x200);
@@ -558,7 +572,7 @@ impl Task {
 
         if self.is_user() {
             p4.unref_table_with(|p| {
-                logln!("dealloc user");
+                logln_disabled!("dealloc user");
                 p.deallocate_user();
             });
         } else {

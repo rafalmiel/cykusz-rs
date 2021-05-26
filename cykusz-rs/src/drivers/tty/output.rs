@@ -139,7 +139,7 @@ impl OutputBuffer {
         match char {
             b'\n' => {
                 self.new_line();
-            },
+            }
             b'\t' => {
                 self.tab();
 
@@ -678,8 +678,8 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 self.output.cursor_x = self.output.saved_x;
                 self.output.cursor_y = self.output.saved_y;
             }
-            a => {
-                logln!("Unhandled cmd {}", a);
+            _a => {
+                logln_disabled!("Unhandled cmd {}", a);
             }
         }
     }

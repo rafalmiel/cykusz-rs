@@ -6,7 +6,7 @@ use spin::Once;
 use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::mm::{PhysAddr, VirtAddr};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::Mutex;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub struct Futex {
@@ -22,13 +22,13 @@ impl Futex {
 }
 
 pub struct FutexContainer {
-    fut: Spin<hashbrown::HashMap<PhysAddr, Arc<Futex>>>,
+    fut: Mutex<hashbrown::HashMap<PhysAddr, Arc<Futex>>>,
 }
 
 impl FutexContainer {
     fn new() -> FutexContainer {
         FutexContainer {
-            fut: Spin::new(hashbrown::HashMap::new()),
+            fut: Mutex::new(hashbrown::HashMap::new()),
         }
     }
 

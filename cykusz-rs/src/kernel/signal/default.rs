@@ -46,7 +46,7 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
 ];
 
 fn terminate() {
-    crate::kernel::sched::exit();
+    crate::kernel::sched::exit(1);
 }
 
 fn terminate_thread() {

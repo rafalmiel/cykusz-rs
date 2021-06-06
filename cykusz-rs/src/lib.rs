@@ -16,10 +16,8 @@
 #![feature(nll)]
 #![feature(ptr_internals)]
 #![feature(step_trait)]
-#![feature(step_trait_ext)]
 #![feature(thread_local)]
 #![feature(try_blocks)]
-#![feature(try_trait)]
 #![feature(new_uninit)]
 #![feature(linked_list_cursors)]
 

@@ -191,7 +191,7 @@ macro_rules! enable_unsigned_ops {
             }
         }
 
-        unsafe impl ::core::iter::Step for $type_ {
+        impl ::core::iter::Step for $type_ {
             /// Returns the number of steps between two step objects. The count is
             /// inclusive of `start` and exclusive of `end`.
             ///

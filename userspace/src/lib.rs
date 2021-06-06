@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(llvm_asm)]
 #![feature(lang_items)]
-#![feature(extended_key_value_attributes)]
 #![feature(linkage)]
 
 extern crate alloc;

@@ -7,6 +7,7 @@ pub const SIGFPE: usize = 8;
 pub const SIGKILL: usize = 9;
 pub const SIGSEGV: usize = 11;
 pub const SIGPIPE: usize = 13;
+pub const SIGTERM: usize = 15;
 pub const SIGCHLD: usize = 17;
 pub const SIGCONT: usize = 18;
 pub const SIGSTOP: usize = 19;

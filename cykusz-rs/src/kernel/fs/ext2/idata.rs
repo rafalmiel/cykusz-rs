@@ -220,6 +220,8 @@ impl INodeData {
 
         let mut new_blocks = 0;
 
+        let mut was_alloc = false;
+
         for (i, &o) in offsets.slice().iter().enumerate() {
             let ptrs = if i == 0 {
                 inode.block_ptrs_mut()
@@ -228,13 +230,20 @@ impl INodeData {
                     buf.alloc(block_size / core::mem::size_of::<u32>());
                 }
 
-                fs.read_block(ptr, buf.slice_mut().to_bytes_mut())
-                    .expect("Failed to read block");
+                if !was_alloc {
+                    fs.read_block(ptr, buf.slice_mut().to_bytes_mut())
+                        .expect("Failed to read block");
+                } else {
+                    buf.slice_mut().iter_mut().for_each(|el| {
+                        *el = 0u32;
+                    })
+                }
                 buf.slice_mut()
             };
 
             let sync = if last == i {
                 if ptrs[o] != 0 {
+                    logln!("!!!INode corrupted, ptrs: {:?}", ptrs);
                     drop(ptrs);
                     logln!("INode {} corrupted: {:?}", inode_id, inode);
                     logln!(
@@ -248,6 +257,8 @@ impl INodeData {
                 }
                 ptrs[o] = val as u32;
 
+                was_alloc = false;
+
                 new_blocks += 1;
 
                 i > 0
@@ -258,6 +269,8 @@ impl INodeData {
 
                         new_blocks += 1;
 
+                        was_alloc = true;
+
                         i > 0
                     } else {
                         // Allocation failed, Revert...
@@ -266,6 +279,7 @@ impl INodeData {
                         return None;
                     }
                 } else {
+                    was_alloc = false;
                     false
                 }
             };

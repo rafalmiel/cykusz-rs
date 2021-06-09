@@ -23,6 +23,7 @@ cp -f sysroot/build/fork mnt/bin/fork
 cp -r sysroot/cykusz/usr mnt/
 cp sysroot/test.c mnt/
 cp sysroot/stack.c mnt/
+cp sysroot/test.cpp mnt/
 ##cp sysroot/cykusz/usr/bin/{readelf,objdump,nm,strings,size} mnt/bin/
 umount mnt
 

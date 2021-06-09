@@ -77,8 +77,6 @@ impl<'a> DirEntIter<'a> {
     pub fn remove_dir_entry(&mut self, name: &str) -> Result<()> {
         let fs = self.fs();
 
-        let _dir_lock = fs.dir_lock();
-
         if let Some(e) = self.find(|e| e.name() == name) {
             let typ = e.ftype();
             let id = e.inode();

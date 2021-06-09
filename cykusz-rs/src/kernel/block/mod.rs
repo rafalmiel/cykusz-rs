@@ -274,6 +274,14 @@ impl CachedBlockDev for BlockDevice {
     }
 }
 
+pub fn sync_all() {
+    let blks = BLK_DEVS.lock();
+
+    for (_k, blk) in blks.iter() {
+        blk.sync_all();
+    }
+}
+
 pub fn init() {
     use crate::alloc::string::ToString;
 

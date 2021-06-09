@@ -563,6 +563,9 @@ impl INode for LockedExt2INode {
     fn unlink(&self, name: &str) -> Result<()> {
         logln_disabled!("unlink started");
 
+        let fs = self.ext2_fs();
+        let _lock = fs.dir_lock();
+
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);
         }
@@ -588,7 +591,18 @@ impl INode for LockedExt2INode {
         let mut iter = DirEntIter::new(self.self_ref());
 
         logln!("unlink: Remove dir entry: {}", name);
+        let mut dir_iter = DirEntIter::new(self.self_ref());
+        for e in dir_iter {
+            logln!("{:?}", e);
+        }
         iter.remove_dir_entry(name)?;
+
+        let mut dir_iter = DirEntIter::new(self.self_ref());
+
+        logln!("unlink: Removed!!! dir entry: {}", name);
+        for e in dir_iter {
+            logln!("{:?}", e);
+        }
 
         Ok(())
     }

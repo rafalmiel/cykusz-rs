@@ -76,6 +76,8 @@ pub const SYS_GETRLIMIT: usize = 52;
 pub const SYS_DEBUG: usize = 53;
 
 pub const SYS_ACCESS: usize = 54;
+pub const SYS_KILL: usize = 55;
+pub const SYS_SYNC: usize = 56;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

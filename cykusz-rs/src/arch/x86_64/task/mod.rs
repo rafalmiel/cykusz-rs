@@ -24,7 +24,7 @@ use crate::kernel::task::vm::{TlsVmInfo, VM};
 
 mod args;
 
-const USER_STACK_SIZE: usize = 0x4000;
+const USER_STACK_SIZE: usize = 0x16000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
 const KERN_STACK_ORDER: usize = 2;
 
@@ -408,9 +408,8 @@ impl Task {
             0,
         );
 
-        let tls_ptr = if let Some(_tls) = &tls_vm {
-            // We setup tls in userspace now
-            VirtAddr(0) //prepare_tls(vm, p_table, tls)
+        let tls_ptr = if let Some(tls) = &tls_vm {
+            prepare_tls(vm, p_table, tls)
         } else {
             VirtAddr(0)
         };
@@ -507,9 +506,8 @@ impl Task {
             0,
         );
 
-        let tls_ptr = if let Some(_tls) = &tls_vm {
-            // We setup tls in userspace now
-            VirtAddr(0) //prepare_tls(vm, p_table, tls)
+        let tls_ptr = if let Some(tls) = &tls_vm {
+            prepare_tls(vm, p_table, tls)
         } else {
             VirtAddr(0)
         };

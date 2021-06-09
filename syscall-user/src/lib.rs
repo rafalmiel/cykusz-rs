@@ -188,6 +188,10 @@ pub fn maps() -> SyscallResult {
     unsafe { syscall0(SYS_MAPS) }
 }
 
+pub fn sync() -> SyscallResult {
+    unsafe { syscall0(SYS_SYNC) }
+}
+
 pub fn chdir(path: &str) -> SyscallResult {
     unsafe { syscall2(SYS_CHDIR, path.as_ptr() as usize, path.len()) }
 }

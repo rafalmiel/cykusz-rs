@@ -126,12 +126,18 @@ impl BuddyAlloc {
 
                             rem -= si;
                         }
-                    }
                 }
 
+                    }
                 return Some(res);
             }
         }
+
+        logln!("alloc order {} failed", order);
+        for (idx, a) in self.buddies.iter().enumerate() {
+            logln!("{}: {:?}", idx, a);
+        }
+        logln!("free mem: {}", self.free_mem());
 
         None
     }

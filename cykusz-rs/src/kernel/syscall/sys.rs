@@ -60,7 +60,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
 
         let res = Ok(task.open_file(inode, flags)?);
 
-        logln!("sys_open: {} = {}", path, res.unwrap());
+        logln!("sys_open: {} flags: {:?} = {}", path, flags, res.unwrap());
 
         //logln!("opened fd: {}", res.unwrap());
 
@@ -252,6 +252,10 @@ pub fn sys_maps() -> SyscallResult {
     );
 
     current_task_ref().vm().log_vm();
+
+    crate::kernel::fs::dirent::cache().print_stats();
+    crate::kernel::fs::icache::cache().print_stats();
+    crate::kernel::fs::pcache::cache().print_stats();
 
     Ok(0)
 }
@@ -806,6 +810,43 @@ pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {
     Ok(0)
 }
 
+pub fn sys_kill(pid: u64, sig: u64) -> SyscallResult {
+    logln!("sys_kill: pid: {}, sig: {}", pid as isize, sig);
+    match pid as isize {
+        a if a > 0 => {
+            let task = crate::kernel::sched::get_task(a as usize).ok_or(SyscallError::ESRCH)?;
+
+            task.signal(sig as usize);
+
+            Ok(0)
+        },
+        0 => {
+            let task = current_task_ref();
+
+            Ok(crate::kernel::session::sessions().get_group(task.sid(), task.gid()).and_then(|g| {
+                g.signal(sig as usize);
+
+                Some(0)
+            }).ok_or(SyscallError::ESRCH)?)
+        },
+        -1 => {
+            panic!("kill -1 not supported")
+        },
+        a if a < -1 => {
+            let task = crate::kernel::sched::get_task(-a as usize).ok_or(SyscallError::ESRCH)?;
+
+            Ok(crate::kernel::session::sessions().get_group(task.sid(), task.gid()).and_then(|g| {
+                g.signal(sig as usize);
+
+                Some(0)
+            }).ok_or(SyscallError::ESRCH)?)
+        }
+        _ => {
+            unreachable!()
+        }
+    }
+}
+
 pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
     let uaddr = VirtAddr(uaddr as usize);
     let expected = expected as u32;
@@ -927,6 +968,20 @@ pub fn sys_debug(str: u64, str_len: u64) -> SyscallResult {
     logln!("{}", make_str(str, str_len));
 
     Ok(0)
+}
+
+pub fn sys_sync() -> SyscallResult {
+    Ok(lookup_by_path(Path::new("/"), LookupMode::None)?.inode().fs().and_then(|fs| {
+        if let Some(fs) = fs.upgrade() {
+            fs.sync();
+        }
+
+        Some(0)
+    }).ok_or(SyscallError::ESRCH).and_then(|_s| {
+        crate::kernel::block::sync_all();
+
+        Ok(0)
+    })?)
 }
 
 pub fn sys_poweroff() -> ! {

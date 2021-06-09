@@ -653,8 +653,8 @@ impl VMData {
         if let Some(elf_page) = exe.inode().as_cacheable().unwrap().get_mmap_page(0) {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
 
-            //let mut last_mmap_end = VirtAddr(0);
-            let tls_vm_info = None;
+            let mut last_mmap_end = VirtAddr(0);
+            let mut tls_vm_info = None;
 
             for p in hdr
                 .programs()
@@ -677,7 +677,7 @@ impl VMData {
                     //    virt_begin, virt_fend, file_offset
                     //);
 
-                    let virt_fend = self
+                    last_mmap_end = self
                         .mmap_vm(
                             Some(virt_begin),
                             len,
@@ -689,38 +689,41 @@ impl VMData {
                         .expect("Failed to mmap")
                         + len.align_up(PAGE_SIZE);
 
+                    let virt_fend = last_mmap_end;
+
                     if virt_fend < virt_end {
                         //println!("mmap {} - {} offset {:#x}", virt_fend, virt_end, 0);
+                        let len = (virt_end - virt_fend).0;
 
-                        self.mmap_vm(
-                            Some(virt_fend),
-                            virt_end.0 - virt_fend.0,
-                            p.p_flags.into(),
-                            MMapFlags::MAP_PRIVATE
-                                | MMapFlags::MAP_ANONYOMUS
-                                | MMapFlags::MAP_FIXED,
-                            None,
-                            0,
-                        )
-                        .expect("Failed to mmap");
+                        last_mmap_end = self
+                            .mmap_vm(
+                                Some(virt_fend),
+                                virt_end.0 - virt_fend.0,
+                                p.p_flags.into(),
+                                MMapFlags::MAP_PRIVATE
+                                    | MMapFlags::MAP_ANONYOMUS
+                                    | MMapFlags::MAP_FIXED,
+                                None,
+                                0,
+                            )
+                            .expect("Failed to mmap")
+                            + len;
                     }
                 } else {
-                    // We setup tls in userspace now
-                    continue;
-                    //if tls_vm_info.is_some() {
-                    //    panic!("TLS already setup");
-                    //}
-                    //let tls_mem_size = p.p_memsz as usize;
-                    //let tls_file_size = p.p_filesz as usize;
-                    //let tls_file_offset = p.p_offset as usize;
+                    if tls_vm_info.is_some() {
+                        panic!("TLS already setup");
+                    }
+                    let tls_mem_size = p.p_memsz as usize;
+                    let tls_file_size = p.p_filesz as usize;
+                    let tls_file_offset = p.p_offset as usize;
 
-                    //tls_vm_info = Some(TlsVmInfo {
-                    //    file: exe.clone(),
-                    //    file_offset: tls_file_offset,
-                    //    file_size: tls_file_size,
-                    //    mem_size: tls_mem_size,
-                    //    mmap_addr_hint: last_mmap_end,
-                    //});
+                    tls_vm_info = Some(TlsVmInfo {
+                        file: exe.clone(),
+                        file_offset: tls_file_offset,
+                        file_size: tls_file_size,
+                        mem_size: tls_mem_size,
+                        mmap_addr_hint: last_mmap_end,
+                    });
                 }
             }
 
@@ -751,8 +754,8 @@ impl VMData {
 
     fn log_vm(&self) {
         for e in self.maps.iter() {
-            if let Some(_f) = &e.mmaped_file {
-                logln_disabled!(
+            if let Some(f) = &e.mmaped_file {
+                logln!(
                     "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
                     e.start,
                     e.end,
@@ -763,7 +766,7 @@ impl VMData {
                     f.len,
                 );
             } else {
-                logln_disabled!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
+                logln!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
             }
         }
     }

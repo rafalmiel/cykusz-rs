@@ -546,6 +546,11 @@ fn exec(cmd: &str) {
         if let Err(e) = syscall::maps() {
             println!("maps failed {:?}", e);
         }
+    } else if cmd == "sync" {
+
+        if let Err(e) = syscall::sync() {
+            println!("sync failed {:?}", e);
+        }
     } else if cmd == "signal_test" {
         signal_test();
     } else if cmd.is_empty() {
@@ -565,8 +570,22 @@ fn exec(cmd: &str) {
 
             syscall::close(new_fd).expect("Failed to close dup fd");
         }
-    } else if cmd == "gcc_test" {
-        for _ in 0..50 {
+    } else if cmd.starts_with("gcc_test ") {
+        let mut split = cmd.split_whitespace();
+
+        split.next();
+
+        let reps = if let Some(n) = split.next() {
+            if let Ok(rep) = n.parse::<usize>() {
+                rep
+            } else {
+                50
+            }
+        } else {
+            50
+        };
+
+        for _ in 0..reps {
             start_process(
                 "/usr/bin/gcc",
                 Some(&["/usr/bin/gcc", "/test.c", "-o", "/test"]),

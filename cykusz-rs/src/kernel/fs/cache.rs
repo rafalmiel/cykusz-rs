@@ -321,14 +321,14 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
     }
 
     fn print_stats(&self) {
-        logln_disabled!("Cache usage:");
-        logln_disabled!("Used count:   {}", self.used.len());
-        for _e in self.used.iter() {
-            logln_disabled!("{:?} sc {}", e.0, e.1.strong_count());
+        logln!("Cache usage:");
+        logln!("Used count:   {}", self.used.len());
+        for e in self.used.iter() {
+            logln!("{:?} sc {}", e.0, e.1.strong_count());
         }
-        logln_disabled!("Unused count: {}", self.unused.len());
-        for _e in self.unused.iter() {
-            logln_disabled!("{:?} sc {}", e.0, Arc::strong_count(&e.1));
+        logln!("Unused count: {}", self.unused.len());
+        for e in self.unused.iter() {
+            logln!("{:?} sc {}", e.0, Arc::strong_count(&e.1));
         }
     }
 }

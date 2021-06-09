@@ -24,7 +24,7 @@ use crate::kernel::task::vm::{TlsVmInfo, VM};
 
 mod args;
 
-const USER_STACK_SIZE: usize = 0x16000;
+const USER_STACK_SIZE: usize = 0x64000;
 const KERN_STACK_SIZE: usize = 4096 * 4;
 const KERN_STACK_ORDER: usize = 2;
 

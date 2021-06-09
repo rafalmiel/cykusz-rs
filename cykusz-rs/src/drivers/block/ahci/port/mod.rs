@@ -6,7 +6,6 @@ use crate::drivers::block::ahci::reg::HbaPort;
 use crate::drivers::block::ata::request::DmaRequest;
 use crate::kernel::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
-
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::CeilDiv;
 use crate::kernel::utils::wait_queue::WaitQueue;

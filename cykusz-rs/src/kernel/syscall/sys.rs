@@ -819,27 +819,33 @@ pub fn sys_kill(pid: u64, sig: u64) -> SyscallResult {
             task.signal(sig as usize);
 
             Ok(0)
-        },
+        }
         0 => {
             let task = current_task_ref();
 
-            Ok(crate::kernel::session::sessions().get_group(task.sid(), task.gid()).and_then(|g| {
-                g.signal(sig as usize);
+            Ok(crate::kernel::session::sessions()
+                .get_group(task.sid(), task.gid())
+                .and_then(|g| {
+                    g.signal(sig as usize);
 
-                Some(0)
-            }).ok_or(SyscallError::ESRCH)?)
-        },
+                    Some(0)
+                })
+                .ok_or(SyscallError::ESRCH)?)
+        }
         -1 => {
             panic!("kill -1 not supported")
-        },
+        }
         a if a < -1 => {
             let task = crate::kernel::sched::get_task(-a as usize).ok_or(SyscallError::ESRCH)?;
 
-            Ok(crate::kernel::session::sessions().get_group(task.sid(), task.gid()).and_then(|g| {
-                g.signal(sig as usize);
+            Ok(crate::kernel::session::sessions()
+                .get_group(task.sid(), task.gid())
+                .and_then(|g| {
+                    g.signal(sig as usize);
 
-                Some(0)
-            }).ok_or(SyscallError::ESRCH)?)
+                    Some(0)
+                })
+                .ok_or(SyscallError::ESRCH)?)
         }
         _ => {
             unreachable!()
@@ -971,17 +977,10 @@ pub fn sys_debug(str: u64, str_len: u64) -> SyscallResult {
 }
 
 pub fn sys_sync() -> SyscallResult {
-    Ok(lookup_by_path(Path::new("/"), LookupMode::None)?.inode().fs().and_then(|fs| {
-        if let Some(fs) = fs.upgrade() {
-            fs.sync();
-        }
+    crate::kernel::fs::mount::sync_all();
+    crate::kernel::block::sync_all();
 
-        Some(0)
-    }).ok_or(SyscallError::ESRCH).and_then(|_s| {
-        crate::kernel::block::sync_all();
-
-        Ok(0)
-    })?)
+    Ok(0)
 }
 
 pub fn sys_poweroff() -> ! {

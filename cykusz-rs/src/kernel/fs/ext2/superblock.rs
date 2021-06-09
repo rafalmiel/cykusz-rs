@@ -3,10 +3,10 @@ use alloc::sync::{Arc, Weak};
 use spin::Once;
 
 use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
 
 use super::disk;
-use crate::kernel::sched::current_task_ref;
 
 pub struct Superblock {
     d_superblock: RwMutex<disk::superblock::Superblock>,

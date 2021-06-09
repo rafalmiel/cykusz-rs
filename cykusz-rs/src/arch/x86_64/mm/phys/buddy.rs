@@ -126,9 +126,8 @@ impl BuddyAlloc {
 
                             rem -= si;
                         }
-                }
-
                     }
+                }
                 return Some(res);
             }
         }

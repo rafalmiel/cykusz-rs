@@ -547,7 +547,6 @@ fn exec(cmd: &str) {
             println!("maps failed {:?}", e);
         }
     } else if cmd == "sync" {
-
         if let Err(e) = syscall::sync() {
             println!("sync failed {:?}", e);
         }

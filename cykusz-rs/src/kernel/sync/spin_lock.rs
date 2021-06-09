@@ -1,8 +1,9 @@
 use core::ops::{Deref, DerefMut};
 
+use spin::{Mutex as M, MutexGuard as MG};
+
 use crate::kernel::int;
 use crate::kernel::sched::current_id;
-use spin::{Mutex as M, MutexGuard as MG};
 
 pub struct Spin<T: ?Sized> {
     notify: bool,

@@ -125,6 +125,14 @@ impl Mounts {
         }
     }
 
+    fn sync_all(&self) {
+        let mounts = self.mounts.lock();
+
+        for (_k, m) in mounts.iter() {
+            m.fs.sync();
+        }
+    }
+
     fn umount_all(&self) {
         let mounts = self.mounts.lock();
 
@@ -173,4 +181,8 @@ pub fn find_mount(dir: &DirEntryItem) -> Result<Mountpoint> {
 
 pub fn umount_all() {
     mounts().umount_all();
+}
+
+pub fn sync_all() {
+    mounts().sync_all();
 }

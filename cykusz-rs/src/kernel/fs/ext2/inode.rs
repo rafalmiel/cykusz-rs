@@ -591,13 +591,13 @@ impl INode for LockedExt2INode {
         let mut iter = DirEntIter::new(self.self_ref());
 
         logln!("unlink: Remove dir entry: {}", name);
-        let mut dir_iter = DirEntIter::new(self.self_ref());
+        let dir_iter = DirEntIter::new(self.self_ref());
         for e in dir_iter {
             logln!("{:?}", e);
         }
         iter.remove_dir_entry(name)?;
 
-        let mut dir_iter = DirEntIter::new(self.self_ref());
+        let dir_iter = DirEntIter::new(self.self_ref());
 
         logln!("unlink: Removed!!! dir entry: {}", name);
         for e in dir_iter {

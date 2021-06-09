@@ -8,12 +8,12 @@ use spin::Once;
 
 use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
 use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{Mutex, MutexGuard};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 use crate::kernel::utils::types::Align;
 
 use super::disk;
-use crate::kernel::sched::current_task_ref;
 
 pub struct INodeVec {
     vec: Vec<u8>,

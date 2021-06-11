@@ -17,6 +17,8 @@ use crate::arch::raw::mm::MappedAddr;
 use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::syscall::SyscallFrame;
 use crate::arch::utils::StackHelper;
+use crate::drivers::elf::ElfHeader;
+
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};
@@ -396,7 +398,10 @@ impl Task {
         )
     }
 
-    pub fn new_user(entry: VirtAddr, vm: &VM, tls_vm: Option<TlsVmInfo>) -> Task {
+    #[cfg(disabled)]
+    pub fn new_user(entry: VirtAddr, hdr: &ElfHeader, vm: &VM, tls_vm: Option<TlsVmInfo>) -> Task {
+        logln!("entry point: {}", entry);
+
         let p_table = prepare_p4();
 
         vm.mmap_vm(
@@ -478,12 +483,16 @@ impl Task {
 
     pub fn exec(
         &mut self,
+        base_addr: VirtAddr,
         entry: VirtAddr,
+        hdr: &ElfHeader,
         vm: &VM,
         tls_vm: Option<TlsVmInfo>,
         args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> ! {
+        logln!("entry point: {}", entry);
+
         let args = args.map(|a| args::Args::new(a));
         let envs = envs.map(|e| args::Args::new(e));
 
@@ -549,6 +558,10 @@ impl Task {
         }
 
         unsafe {
+            helper.write_aux(hdr, base_addr);
+        }
+
+        unsafe {
             helper.write(0u64);
             helper.write_slice(envp.as_slice()); // char *const envp[]
             helper.write(0u64);
@@ -559,6 +572,9 @@ impl Task {
         drop(envp);
         drop(argp);
         drop(tls_vm);
+
+        logln!("exec user stack: {:#x}", helper.current());
+        assert_eq!(helper.current() % 16, 0);
 
         unsafe {
             asm_jmp_user(helper.current() as usize, entry.0, 0x200);

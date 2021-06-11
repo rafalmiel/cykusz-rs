@@ -1,3 +1,7 @@
+use crate::arch::mm::VirtAddr;
+use crate::drivers::elf::types::AuxvType;
+use crate::drivers::elf::ElfHeader;
+
 use crate::kernel::utils::slice::ToBytes;
 use crate::kernel::utils::types::Align;
 
@@ -54,5 +58,18 @@ impl<'a> StackHelper<'a> {
         self.restore_by(core::mem::size_of::<T>() as u64);
 
         v
+    }
+
+    pub unsafe fn write_aux(&mut self, hdr: &ElfHeader, base_addr: VirtAddr) {
+        let hdr: [(AuxvType, usize); 4] = [
+            (AuxvType::AtPhdr, hdr.e_phoff as usize + base_addr.0),
+            (AuxvType::AtPhEnt, hdr.e_phentsize as usize),
+            (AuxvType::AtPhNum, hdr.e_phnum as usize),
+            (AuxvType::AtEntry, hdr.e_entry as usize),
+        ];
+
+        self.write(0usize); // Make it 16 bytes aligned
+        self.write(AuxvType::AtNull);
+        self.write(hdr);
     }
 }

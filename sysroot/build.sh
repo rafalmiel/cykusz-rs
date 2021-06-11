@@ -76,10 +76,12 @@ function _prepare {
 }
 
 function _sysroot {
+	_prepare_mlibc
+
 	mkdir -p $BUILD_DIR
 
 	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true -Dstatic=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 	meson install -C $MLIBC_BUILD_DIR
 }
 
@@ -91,7 +93,7 @@ function _binutils {
 	pushd .
 
 	cd $BINUTILS_BUILD_DIR
-	$BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb
+	$BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared
 
 	popd
 
@@ -108,12 +110,12 @@ function _gcc {
 	pushd .
 
 	cd $GCC_BUILD_DIR
-	$GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix
+	$GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared
 
 	popd
 
-	make -C $GCC_BUILD_DIR -j4 all-gcc all-target-libgcc
-	make -C $GCC_BUILD_DIR install-gcc install-target-libgcc
+	make -C $GCC_BUILD_DIR -j4 all-gcc
+	make -C $GCC_BUILD_DIR install-gcc
 }
 
 function _mlibc {
@@ -122,10 +124,15 @@ function _mlibc {
 	mkdir -p $BUILD_DIR
 
 	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
 	ninja -C $MLIBC_BUILD_DIR
 	meson install -C $MLIBC_BUILD_DIR
+}
+
+function _libgcc {
+	make -C $GCC_BUILD_DIR -j4 all-target-libgcc
+	make -C $GCC_BUILD_DIR install-target-libgcc
 }
 
 function _libstd {
@@ -156,12 +163,9 @@ function _cykusz_binutils {
 
 	cd $BINUTILS_CYKUSZ_BUILD_DIR
 
-	FLAGS="-mtune=generic"
-
-	CFLAGS=$FLAGS CXXFLAGS=$FLAGS $BINUTILS_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --prefix=/usr --disable-werror --disable-gdb
+	$BINUTILS_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared --prefix=/usr
 
 	popd
-
 
 	make -C $BINUTILS_CYKUSZ_BUILD_DIR -j4
 	make -C $BINUTILS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
@@ -175,42 +179,45 @@ function _cykusz_gcc {
 	pushd .
 
 	cd $GCC_CYKUSZ_BUILD_DIR
-	$GCC_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --prefix=/usr --enable-languages=c,c++ --enable-threads=posix --disable-multilib
+	$GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
 
 	popd
 
-	FLAGS="-mno-mmx -mno-sse -mno-sse2"
-
-	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
-	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
-	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libgcc
-	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libgcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
 
 }
 
-function _cykusz_libstd {
-	FLAGS="-mno-mmx -mno-sse -mno-sse2"
+function _cykusz_libgcc {
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libgcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libgcc
+}
 
-	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libstdc++-v3
-	CFLAGS=$FLAGS CXXFLAGS=$FLAGS make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libstdc++-v3
+function _cykusz_libstd {
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libstdc++-v3
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libstdc++-v3
+}
+
+function _cross {
+	_sysroot
+	_binutils
+	_gcc
+	_mlibc
+	_libgcc
+	_libstd
 }
 
 function _cykusz {
 	_cykusz_binutils
 	_cykusz_gcc
+	_cykusz_libgcc
 	_cykusz_libstd
 }
 
 function _build {
-	_sysroot
-	_binutils
-	_gcc
-	_mlibc
-	_libstd
+	_cross
 	_nyancat
-	_cykusz_binutils
-	_cykusz_gcc
-	_cykusz_libstd
+	_cykusz
 }
 
 function _all {

@@ -6,10 +6,12 @@ use syscall_defs::{MMapFlags, MMapProt};
 
 use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
-use crate::drivers::elf::types::{ProgramFlags, ProgramType};
+use crate::drivers::elf::types::{BinType, ProgramFlags, ProgramType};
 use crate::drivers::elf::ElfHeader;
 use crate::kernel::fs::dirent::DirEntryItem;
+use crate::kernel::fs::path::Path;
 use crate::kernel::fs::pcache::PageItem;
+use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{
     allocate_order, map_flags, map_to_flags, unmap, update_flags, VirtAddr, MAX_USER_ADDR,
@@ -648,33 +650,59 @@ impl VMData {
         }
     }
 
-    fn load_bin(&mut self, exe: DirEntryItem) -> Option<(VirtAddr, Option<TlsVmInfo>)> {
+    fn load_bin(
+        &mut self,
+        exe: DirEntryItem,
+    ) -> Option<(VirtAddr, VirtAddr, ElfHeader, Option<TlsVmInfo>)> {
+        let mut base_addr = VirtAddr(0);
+
         if let Some(elf_page) = exe.inode().as_cacheable().unwrap().get_mmap_page(0) {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
+
+            let load_offset = VirtAddr(if hdr.e_type == BinType::Dyn {
+                0x7500_0000_0000usize
+            } else {
+                0usize
+            });
+
+            let mut entry_addr = VirtAddr(hdr.e_entry as usize) + load_offset;
 
             let mut last_mmap_end = VirtAddr(0);
             let mut tls_vm_info = None;
 
             for p in hdr
                 .programs()
-                .filter(|p| p.p_type == ProgramType::Load || p.p_type == ProgramType::TLS)
+                .filter(|p| p.p_type == ProgramType::Load || /*p.p_type == ProgramType::TLS || */p.p_type == ProgramType::Interp)
             {
-                if p.p_type == ProgramType::Load {
-                    let virt_begin = VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);
+                if p.p_type == ProgramType::Interp {
+                    if let Ok(interp) = lookup_by_path(Path::new("/usr/lib/ld.so"), LookupMode::None) {
+                        if let Some((_base_addr, entry, _elf, _tls)) = self.load_bin(interp) {
+                            entry_addr = entry;
+                        }
+                    } else {
+                        return None;
+                    }
 
-                    let virt_fend = VirtAddr(p.p_vaddr as usize + p.p_filesz as usize);
+                } else if p.p_type == ProgramType::Load {
+                    let virt_begin = load_offset + VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);
+
+                    if base_addr == VirtAddr(0) {
+                        base_addr = virt_begin;
+                    }
+
+                    let virt_fend = load_offset + VirtAddr(p.p_vaddr as usize + p.p_filesz as usize);
 
                     let virt_end =
-                        VirtAddr(p.p_vaddr as usize + p.p_memsz as usize).align_up(PAGE_SIZE);
+                        load_offset + VirtAddr(p.p_vaddr as usize + p.p_memsz as usize).align_up(PAGE_SIZE);
 
                     let len = (virt_fend - virt_begin).0;
 
                     let file_offset = p.p_offset.align(PAGE_SIZE as u64);
 
-                    //println!(
-                    //    "mmap {} - {} offset {:#x}",
-                    //    virt_begin, virt_fend, file_offset
-                    //);
+                    logln!(
+                        "mmap {} - {} offset {:#x}",
+                        virt_begin, virt_fend, file_offset
+                    );
 
                     last_mmap_end = self
                         .mmap_vm(
@@ -726,7 +754,7 @@ impl VMData {
                 }
             }
 
-            return Some((VirtAddr(hdr.e_entry as usize), tls_vm_info));
+            return Some((base_addr, entry_addr, *hdr, tls_vm_info));
         }
 
         None
@@ -877,7 +905,10 @@ impl VM {
         ret
     }
 
-    pub fn load_bin(&self, exe: DirEntryItem) -> Option<(VirtAddr, Option<TlsVmInfo>)> {
+    pub fn load_bin(
+        &self,
+        exe: DirEntryItem,
+    ) -> Option<(VirtAddr, VirtAddr, ElfHeader, Option<TlsVmInfo>)> {
         self.data.lock().load_bin(exe)
     }
 

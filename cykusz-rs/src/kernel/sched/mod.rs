@@ -117,6 +117,7 @@ impl Scheduler {
         task
     }
 
+    #[cfg(disabled)]
     fn create_user_task(&self, exe: DirEntryItem) -> Arc<Task> {
         let task = Task::new_user(exe);
 
@@ -347,6 +348,7 @@ pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
     scheduler().create_param_task(fun, val)
 }
 
+#[cfg(disabled)]
 pub fn create_user_task(exe: DirEntryItem) -> Arc<Task> {
     scheduler().create_user_task(exe)
 }

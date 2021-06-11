@@ -1,7 +1,7 @@
 use crate::drivers::elf::types;
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct ProgramHeader {
     pub p_type: types::ProgramType,
     pub p_flags: types::ProgramFlags,

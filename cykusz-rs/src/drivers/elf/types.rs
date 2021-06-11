@@ -1,21 +1,21 @@
 #![allow(dead_code)]
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Class {
     Bit32 = 1,
     Bit64 = 2,
 }
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Endianess {
     Little = 1,
     Big = 2,
 }
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Abi {
     SysV = 0,
     HPUS = 1,
@@ -34,7 +34,7 @@ pub enum Abi {
 }
 
 #[repr(u16)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BinType {
     None = 0,
     Rel = 1,
@@ -48,7 +48,7 @@ pub enum BinType {
 }
 
 #[repr(u16)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Machine {
     None = 0x00,
     Sparc = 0x02,
@@ -65,7 +65,7 @@ pub enum Machine {
 }
 
 #[repr(u32)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ProgramType {
     Null = 0x0,
     Load = 0x1,
@@ -79,6 +79,22 @@ pub enum ProgramType {
     HiOS = 0x6FFFFFFF,
     LoProc = 0x70000000,
     HiProc = 0x7FFFFFFF,
+}
+
+#[repr(u64)]
+#[derive(Debug, Copy, Clone)]
+pub enum AuxvType {
+    AtNull = 0,
+    AtPhdr = 3,
+    AtPhEnt = 4,
+    AtPhNum = 5,
+    AtEntry = 9,
+}
+
+impl Default for AuxvType {
+    fn default() -> AuxvType {
+        AuxvType::AtNull
+    }
 }
 
 bitflags!(

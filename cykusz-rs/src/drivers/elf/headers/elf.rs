@@ -1,7 +1,7 @@
 use crate::drivers::elf::types;
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct ElfHeader {
     pub ei_magic: [u8; 4],
     pub ei_class: types::Class,

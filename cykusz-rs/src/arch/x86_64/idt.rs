@@ -502,10 +502,11 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
             return;
         } else {
             println!(
-                "[ SIGSEGV ] Task {} page_fault error {} ip: {:#x}",
+                "[ SIGSEGV ] Task {} page_fault error addr: {}, ip: {:#x}, err: {}",
                 task.tid(),
                 virt,
-                frame.ip
+                frame.ip,
+                err
             );
             if VirtAddr(frame.ip as usize).is_user() {
                 task.signal(syscall_defs::signal::SIGSEGV);

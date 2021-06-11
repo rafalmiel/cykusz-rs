@@ -11,6 +11,7 @@ use syscall_defs::OpenFlags;
 
 use crate::arch::mm::VirtAddr;
 use crate::arch::task::Task as ArchTask;
+
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::sched::new_task_tid;
@@ -138,13 +139,14 @@ impl Task {
         Self::make_ptr(task)
     }
 
+    #[cfg(disabled)]
     pub fn new_user(exe: DirEntryItem) -> Arc<Task> {
         let mut task = Task::new();
 
         let vm = task.vm();
 
-        if let Some((entry, tls_vm)) = vm.load_bin(exe) {
-            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, vm, tls_vm));
+        if let Some((_base_addr, entry, elf_hdr, tls_vm)) = vm.load_bin(exe) {
+            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, &elf_hdr, vm, tls_vm));
 
             Self::make_ptr(task)
         } else {
@@ -190,9 +192,12 @@ impl Task {
 
         self.filetable().close_on_exec();
 
-        if let Some((entry, tls_vm)) = vm.load_bin(exe) {
+        if let Some((base_addr, entry, elf_hdr, tls_vm)) = vm.load_bin(exe) {
             vm.log_vm();
-            unsafe { self.arch_task_mut().exec(entry, vm, tls_vm, args, envs) }
+            unsafe {
+                self.arch_task_mut()
+                    .exec(base_addr, entry, &elf_hdr, vm, tls_vm, args, envs)
+            }
         } else {
             panic!("Failed to exec task")
         }

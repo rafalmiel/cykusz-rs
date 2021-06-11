@@ -11,16 +11,20 @@ cp -f build/isofiles/boot/grub/grub.cfg mnt/grub/
 
 umount mnt
 
+PROGS="test testcpp hello stack nyancat ttytest fork"
+
 mount /dev/loop0p2 mnt
 mkdir -p mnt/bin
 cp -f target/x86_64-unknown-none-gnu/release/init mnt/bin/init
 cp -f target/x86_64-unknown-none-gnu/release/shell mnt/bin/shell
-cp -f sysroot/build/hello mnt/bin/hello
-cp -f sysroot/build/stack mnt/bin/stack
-cp -f sysroot/build/nyancat mnt/bin/nyancat
-cp -f sysroot/build/ttytest mnt/bin/ttytest
-cp -f sysroot/build/fork mnt/bin/fork
+
+for prog in $PROGS; do
+	cp -f sysroot/build/$prog mnt/bin/$prog
+done
+
 cp -r sysroot/cykusz/usr mnt/
+
+#cp -r sysroot/cross/x86_64-cykusz/lib/* mnt/usr/lib/
 cp sysroot/test.c mnt/
 cp sysroot/stack.c mnt/
 cp sysroot/test.cpp mnt/

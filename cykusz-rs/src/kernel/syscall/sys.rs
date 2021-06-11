@@ -35,7 +35,13 @@ fn make_str<'a>(b: u64, len: u64) -> &'a str {
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
     use core::convert::TryFrom;
 
-    let flags = syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
+    let mut flags =
+        syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
+
+    if !flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR | OpenFlags::WRONLY) {
+        flags.insert(OpenFlags::RDONLY);
+    }
+
     let at = OpenFD::try_from(at)?;
 
     if let OpenFD::Fd(_) = at {
@@ -102,15 +108,17 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    //logln!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
+    logln!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
 
     return if let Some(f) = task.get_handle(fd) {
         if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
             Ok(f.read(make_buf_mut(buf, len))?)
         } else {
+            logln!("eaccess");
             Err(SyscallError::EACCES)
         }
     } else {
+        logln!("ebadfd");
         Err(SyscallError::EBADFD)
     };
 }
@@ -253,9 +261,9 @@ pub fn sys_maps() -> SyscallResult {
 
     current_task_ref().vm().log_vm();
 
-    crate::kernel::fs::dirent::cache().print_stats();
-    crate::kernel::fs::icache::cache().print_stats();
-    crate::kernel::fs::pcache::cache().print_stats();
+    //crate::kernel::fs::dirent::cache().print_stats();
+    //crate::kernel::fs::icache::cache().print_stats();
+    //crate::kernel::fs::pcache::cache().print_stats();
 
     Ok(0)
 }

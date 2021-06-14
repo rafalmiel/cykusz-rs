@@ -160,7 +160,9 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
 
             while let Err(SyscallError::EINTR) = syscall::waitpid(id, &mut status) {}
 
-            println!("shell: process exit with status: {:#x}", status);
+            if status != 0x200 {
+                println!("shell: process exit with status: {:#x}", status);
+            }
 
             tty.set_fg(syscall::getpid().expect("Failed to get pid"));
         }
@@ -383,7 +385,7 @@ fn exec(cmd: &str) {
                 let mut buf = [0u8; 64];
                 loop {
                     if let Ok(r) = syscall::read(0, &mut buf) {
-                        if r > 1 {
+                        if r > 0 {
                             let w = file.write(&buf[..r]);
 
                             if w < r {

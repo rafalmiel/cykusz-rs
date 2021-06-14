@@ -6,9 +6,9 @@
 
 cykusz-rs is a toy operating system written in Rust programming language.
 
-## Features
+https://user-images.githubusercontent.com/3881998/121915370-0ec4d300-cd2b-11eb-9581-9981bc44ea40.mov
 
-Currently implemented:
+## Kernel
 
 - [x] 64bit higher-half kernel
 - [x] VGA text output
@@ -20,12 +20,34 @@ Currently implemented:
 - [x] SMP
 - [x] Per-CPU-Storage using thread_local
 - [x] Preemptive per-cpu scheduler
-- [x] PS2/Keyboard driver + basic TTY
+- [x] PS2/Keyboard driver
+- [x] Tty with ansi escape codes
 - [x] Virtual File System
+- [x] Page/Inode/Directory cache
+- [x] Memory mapped files (mmap interface)
+- [x] Pipes
 - [x] Storage (ide, ahci)
 - [x] Filesystem (ext2)
 - [x] Network Stack (e1000, ETH, ARP, IP, UDP, TCP, ICMP, DHCP, DNS)
-- [x] Userspace support
+
+## Userspace
+
+- [x] Basic shell
+- [x] libc (mlibc port)
+- [x] Exec/fork
+- [x] Threads
+- [x] Thread local storage
+- [x] Fs mount/umount
+- [x] Posix signals
+- [x] Futexes
+- [x] Shared libs
+
+## Ports
+
+- [x] mlibc (<https://github.com/rafalmiel/mlibc/tree/cykusz>) ([upstream](https://github.com/managarm/mlibc))
+- [x] binutils (<https://github.com/rafalmiel/binutils-gdb/tree/cykusz>)
+- [x] gcc (<https://github.com/rafalmiel/gcc/tree/cykusz>)
+- [x] nyancat (<https://github.com/rafalmiel/nyancat/tree/cykusz>)
 
 ## Building
 

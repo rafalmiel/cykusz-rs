@@ -8,7 +8,7 @@ LOGDIR=$SPATH/log
 mkdir -p $LOGDIR
 
 echo "Creating sysroot..."
-$SPATH/build.sh sysroot > $LOGDIR/sysroot.log 2>&1
+$SPATH/build.sh sysroot  > $LOGDIR/sysroot.log 2>&1
 
 echo "Building binutils..."
 $SPATH/build.sh binutils > $LOGDIR/binutils.log 2>&1

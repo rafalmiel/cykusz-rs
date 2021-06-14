@@ -338,7 +338,7 @@ pub fn send_discovery() {
         .set_parameter_request_list()
         .finish();
 
-    println!("[ DHCP ] Sending DHCP Discovery");
+    logln!("[ DHCP ] Sending DHCP Discovery");
 
     crate::kernel::net::udp::send_packet(packet.downgrade());
 }
@@ -390,11 +390,11 @@ fn process_ack(packet: Packet<Dhcp>) {
 
         drv.configure(my_ip, dg, sb, dns);
 
-        println!("[ DHCP ] Interface configured:");
-        println!("[ DHCP ] IP:              {:?}", my_ip);
-        println!("[ DHCP ] Default Gateway: {:?}", dg);
-        println!("[ DHCP ] Subnet:          {:?}", sb);
-        println!("[ DHCP ] DNS:             {:?}", dns);
+        logln!("[ DHCP ] Interface configured:");
+        logln!("[ DHCP ] IP:              {:?}", my_ip);
+        logln!("[ DHCP ] Default Gateway: {:?}", dg);
+        logln!("[ DHCP ] Subnet:          {:?}", sb);
+        logln!("[ DHCP ] DNS:             {:?}", dns);
     }
 }
 

@@ -597,6 +597,18 @@ impl VMData {
             None => self.find_any_above(MMAP_USER_ADDR, len.align_up(PAGE_SIZE)),
         }
         .and_then(|(addr, mut cur)| {
+            if let Some(prev) = cur.peek_prev() {
+                if prev.end == addr
+                    && prev.flags == flags
+                    && prev.prot == prot
+                    && prev.mmaped_file.is_none()
+                {
+                    prev.end = addr + len.align_up(PAGE_SIZE);
+
+                    return Some(addr);
+                }
+            }
+
             cur.insert_before(Mapping::new(addr, len, prot, flags, file, offset));
 
             Some(addr)

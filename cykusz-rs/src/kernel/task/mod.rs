@@ -45,7 +45,7 @@ impl From<usize> for TaskState {
             2 => Runnable,
             4 => AwaitingIo,
             5 => Stopped,
-            _ => unreachable!(),
+            _ => panic!("Invalid task state: {}", val),
         }
     }
 }

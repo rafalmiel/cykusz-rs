@@ -42,12 +42,12 @@ impl PhysPage {
     }
 
     pub fn lock_pt(&self) -> SpinGuard<()> {
-        self.pt_lock.lock_irq()
+        self.pt_lock.lock()
     }
 
     pub fn unlink_page_cache(&self) {
         unsafe {
-            let _lock = self.pt_lock.lock();
+            let _lock = self.lock_pt();
 
             let this = &mut *(self as *const _ as *mut PhysPage);
             this.p_cache = WeakWrap::empty();
@@ -59,20 +59,20 @@ impl PhysPage {
     }
 
     pub fn link_page_cache(&self, page: &PageItem) {
-        let _lock = self.pt_lock.lock();
+        let _lock = self.lock_pt();
 
         let this = self.this();
         this.p_cache = ArcWrap::downgrade(&page);
     }
 
     pub fn page_item(&self) -> Option<PageItem> {
-        let _lock = self.pt_lock.lock();
+        let _lock = self.lock_pt();
 
         self.p_cache.upgrade()
     }
 
     pub fn inc_vm_use_count(&self) {
-        let _lock = self.pt_lock.lock();
+        let _lock = self.lock_pt();
 
         let this = self.this();
 
@@ -80,7 +80,7 @@ impl PhysPage {
     }
 
     pub fn dec_vm_use_count(&self) -> usize {
-        let _lock = self.pt_lock.lock();
+        let _lock = self.lock_pt();
 
         let this = self.this();
 
@@ -92,7 +92,7 @@ impl PhysPage {
     }
 
     pub fn vm_use_count(&self) -> usize {
-        let _lock = self.pt_lock.lock();
+        let _lock = self.lock_pt();
 
         self.vm_use_count as usize
     }

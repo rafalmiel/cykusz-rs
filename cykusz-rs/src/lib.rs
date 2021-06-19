@@ -9,7 +9,6 @@
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(negative_impls)]
-#![feature(nll)]
 #![feature(ptr_internals)]
 #![feature(step_trait)]
 #![feature(thread_local)]

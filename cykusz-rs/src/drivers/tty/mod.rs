@@ -4,6 +4,7 @@ use core::fmt::Debug;
 use core::fmt::{Error, Formatter};
 
 use input::*;
+use syscall_defs::ioctl::tty;
 use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT};
 use syscall_defs::OpenFlags;
 
@@ -60,6 +61,7 @@ struct Tty {
     ctrl_task: Spin<Option<Arc<Task>>>,
     fg_group: Spin<Option<Arc<Group>>>,
     self_ptr: Weak<Tty>,
+    termios: Spin<tty::Termios>,
 }
 
 impl State {
@@ -112,6 +114,7 @@ impl Tty {
             ctrl_task: Spin::new(None),
             fg_group: Spin::new(None),
             self_ptr: me.clone(),
+            termios: Spin::new(tty::Termios::default()),
         })
     }
 
@@ -121,6 +124,32 @@ impl Tty {
             .wait_lock_irq_for(&self.buffer, |lck| lck.has_data())?;
 
         Ok(buffer.read(buf, len))
+    }
+
+    fn write_to_output(&self, symbol: u8, termios: &tty::Termios) {
+        if termios.has_lflag(tty::ECHO) {
+            self.output.lock_irq().put_char(symbol as u8);
+        }
+    }
+
+    fn write_to_buffer(&self, symbol: u8, termios: &tty::Termios) {
+        let mut buf = self.buffer.lock_irq();
+        buf.put_char(symbol as u8);
+        if !termios.has_lflag(tty::ICANON) || symbol == b'\n' {
+            {
+                buf.commit_write();
+            }
+            if let Some(_t) = &*self.ctrl_task.lock_irq() {
+                self.wait_queue.notify_all();
+            }
+        }
+    }
+
+    fn write_symbol(&self, symbol: u8) {
+        let termios = self.termios.lock_irq();
+
+        self.write_to_output(symbol, &termios);
+        self.write_to_buffer(symbol, &termios);
     }
 }
 
@@ -158,15 +187,7 @@ impl KeyListener for Tty {
                 }
             }
             KeyCode::KEY_ENTER | KeyCode::KEY_KPENTER if !released => {
-                {
-                    let mut buf = self.buffer.lock_irq();
-                    buf.put_char('\n' as u8);
-                    buf.commit_write();
-                }
-                self.output.lock_irq().put_char(b'\n');
-                if let Some(_t) = &*self.ctrl_task.lock_irq() {
-                    self.wait_queue.notify_all();
-                }
+                self.write_symbol(b'\n' as u8);
             }
             KeyCode::KEY_U if (state.lctrl || state.rctrl) && !released => {
                 let n = self.buffer.lock_irq().remove_all_edit();
@@ -221,8 +242,7 @@ impl KeyListener for Tty {
                 }) {
                     let sym = ((finalmap[key as usize] & 0xff) as u8) as char;
 
-                    self.buffer.lock_irq().put_char(sym as u8);
-                    self.output.lock_irq().put_char(sym as u8);
+                    self.write_symbol(sym as u8);
                 }
             }
             _ => {}
@@ -361,8 +381,9 @@ impl INode for Tty {
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize, FsError> {
+        logln!("TTY ioctl 0x{:x}", cmd);
         match cmd {
-            syscall_defs::ioctl::tty::TIOCSCTTY => {
+            tty::TIOCSCTTY => {
                 let current = current_task_ref();
 
                 if !current.is_session_leader() {
@@ -375,7 +396,7 @@ impl INode for Tty {
                     Err(FsError::EntryExists)
                 }
             }
-            syscall_defs::ioctl::tty::TIOCNOTTY => {
+            tty::TIOCNOTTY => {
                 if current_task_ref()
                     .terminal()
                     .disconnect(Some(tty().clone()))
@@ -385,7 +406,7 @@ impl INode for Tty {
                     Err(FsError::EntryNotFound)
                 }
             }
-            syscall_defs::ioctl::tty::TIOCSPGRP => {
+            tty::TIOCSPGRP => {
                 let gid = arg;
 
                 let task = current_task_ref();
@@ -406,8 +427,8 @@ impl INode for Tty {
 
                 Err(FsError::NoTty)
             }
-            syscall_defs::ioctl::tty::TIOCSWINSZ => Err(FsError::NotSupported),
-            syscall_defs::ioctl::tty::TIOCGWINSZ => {
+            tty::TIOCSWINSZ => Err(FsError::NotSupported),
+            tty::TIOCGWINSZ => {
                 let winsize =
                     unsafe { VirtAddr(arg).read_mut::<syscall_defs::ioctl::tty::WinSize>() };
 
@@ -417,6 +438,31 @@ impl INode for Tty {
                 winsize.ws_row = rows as u16;
 
                 Ok(0)
+            }
+            tty::TCSETS => {
+                let termios = unsafe {
+                    VirtAddr(arg).read_ref::<syscall_defs::ioctl::tty::Termios>()
+                };
+
+                logln!("termios TCSETS 0x{:x}", termios.c_lflag);
+                logln!("{:?}", termios);
+
+                *self.termios.lock_irq() = *termios;
+
+                Ok(0)
+            }
+            tty::TCGETS => {
+                let termios = unsafe {
+                    VirtAddr(arg).read_mut::<syscall_defs::ioctl::tty::Termios>()
+                };
+
+                logln!("termios TCGETS 0x{:x}", termios.c_lflag);
+                logln!("{:?}", termios);
+
+                *termios = *self.termios.lock_irq();
+
+                Ok(0)
+
             }
             _ => Err(FsError::NotSupported),
         }

@@ -9,6 +9,7 @@ BINUTILS_SRC_DIR=$SRC_DIR/binutils-gdb
 GCC_SRC_DIR=$SRC_DIR/gcc
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
+NCURSES_SRC_DIR=$SRC_DIR/ncurses
 GMP_SRC_DIR=$SRC_DIR/gmp
 MPFR_SRC_DIR=$SRC_DIR/mpfr
 MPC_SRC_DIR=$SRC_DIR/mpc
@@ -17,6 +18,7 @@ BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
 BINUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-binutils-gdb
 GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
+NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
@@ -130,6 +132,18 @@ function _mlibc {
 	meson install -C $MLIBC_BUILD_DIR
 }
 
+function _mlibc_static {
+	_prepare_mlibc
+
+	mkdir -p $BUILD_DIR
+
+	rm -rf $MLIBC_BUILD_DIR
+	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+
+	ninja -C $MLIBC_BUILD_DIR
+	meson install -C $MLIBC_BUILD_DIR
+}
+
 function _libgcc {
 	make -C $GCC_BUILD_DIR -j4 all-target-libgcc
 	make -C $GCC_BUILD_DIR install-target-libgcc
@@ -185,6 +199,20 @@ function _cykusz_gcc {
 
 	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
 	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
+}
+
+function _cykusz_ncurses {
+	mkdir -p $NCURSES_CYKUSZ_BUILD_DIR
+
+	pushd .
+
+	cd $NCURSES_CYKUSZ_BUILD_DIR
+	$NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared
+
+	popd
+
+	make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+	make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 
 }
 

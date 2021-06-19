@@ -24,6 +24,8 @@ fn conditional_enable_int(sys: usize) {
 pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> isize {
     conditional_enable_int(num as usize);
 
+    logln!("syscall: {}", num);
+
     use syscall_defs::*;
     match num as usize {
         SYS_READ => sys::sys_read(a, b, c),

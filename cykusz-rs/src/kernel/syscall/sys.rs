@@ -231,6 +231,8 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
     let offset = offset as usize;
 
     if let Some(res) = task.vm().mmap_vm(addr, len, prot, flags, file, offset) {
+        logln!("mmap at {} len: 0x{:X} | {:?}", res, len, flags);
+        task.vm().log_vm();
         Ok(res.0)
     } else {
         Err(SyscallError::EFAULT)
@@ -243,6 +245,8 @@ pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
     let task = current_task_ref();
 
     if task.vm().munmap_vm(addr, len as usize) {
+        logln!("munmap at {} len: 0x{:X}", addr, len);
+        task.vm().log_vm();
         Ok(0)
     } else {
         Err(SyscallError::EFAULT)
@@ -767,6 +771,7 @@ pub fn sys_exit_thread() -> ! {
 }
 
 pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
+    logln!("ioctl {} 0x{:x}", fd, cmd);
     let current = current_task_ref();
 
     if let Some(handle) = current.get_handle(fd as usize) {

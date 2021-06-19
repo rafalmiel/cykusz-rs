@@ -297,6 +297,8 @@ impl<'a> Iterator for OptionsIter<'a> {
 
                     let ptr = unsafe { self.ptr.offset(2) };
 
+                    logln!("shift in place o: {}, len: {}, remaining len: {}", o, len, self.len);
+
                     self.shift_inplace(2 + len as isize);
 
                     return Some((o, unsafe { core::slice::from_raw_parts(ptr, len as usize) }));
@@ -309,6 +311,7 @@ impl<'a> Iterator for OptionsIter<'a> {
 }
 
 pub fn send_discovery() {
+    logln!("DHCP: send_discovery");
     let total_len = core::mem::size_of::<DhcpHeader>();
 
     let mut packet = crate::kernel::net::udp::create_packet(
@@ -344,6 +347,8 @@ pub fn send_discovery() {
 }
 
 fn process_offer(requested_ip: Ip4) {
+    logln!("DHCP: process_offer");
+
     let total_len = core::mem::size_of::<DhcpHeader>();
 
     let mut packet = crate::kernel::net::udp::create_packet(
@@ -378,6 +383,8 @@ fn process_offer(requested_ip: Ip4) {
 }
 
 fn process_ack(packet: Packet<Dhcp>) {
+    logln!("DHCP: process_ack");
+
     let header = packet.header();
 
     let my_ip = header.your_ip();
@@ -399,6 +406,7 @@ fn process_ack(packet: Packet<Dhcp>) {
 }
 
 pub fn process_packet(packet: Packet<Dhcp>) {
+    logln!("DHCP: process packet");
     let header = packet.header();
 
     if let Some(mtype) = header.opt_message_type() {

@@ -27,7 +27,11 @@ cp -r sysroot/cykusz/usr mnt/
 #cp -r sysroot/cross/x86_64-cykusz/lib/* mnt/usr/lib/
 #cp sysroot/test.c mnt/
 #cp sysroot/stack.c mnt/
-#cp sysroot/test.cpp mnt/
+cp sysroot/sum.cpp mnt/
+cp sysroot/money.cpp mnt/
+cp sysroot/lest.hpp mnt/
+cp sysroot/ncurses.c mnt/
+cp sysroot/ncurses mnt/
 #cp sysroot/hello.cpp mnt/
 ##cp sysroot/cykusz/usr/bin/{readelf,objdump,nm,strings,size} mnt/bin/
 umount mnt

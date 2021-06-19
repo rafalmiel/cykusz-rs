@@ -16,6 +16,7 @@ use chrono::{Datelike, Timelike};
 use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry, SyscallError};
 
 use crate::file::File;
+use syscall_defs::signal::{SigAction, SignalHandler, SignalFlags};
 
 pub mod file;
 pub mod nc;
@@ -590,7 +591,7 @@ fn exec(cmd: &str) {
             start_process(
                 "/usr/bin/gcc",
                 Some(&["/usr/bin/gcc", "/test.c", "-o", "/test"]),
-                Some(&["PATH=/usr/bin"]),
+                Some(&["PATH=/usr/bin", "TERM=linux"]),
             );
         }
     } else if cmd == "pipe_test" {
@@ -634,7 +635,7 @@ fn exec(cmd: &str) {
         }
 
         if !cmd.is_empty() {
-            start_process(args[0], Some(args.as_slice()), Some(&["PATH=/usr/bin"]));
+            start_process(args[0], Some(args.as_slice()), Some(&["PATH=/usr/bin", "TERM=linux"]));
         }
     }
 }
@@ -682,33 +683,29 @@ pub fn main() {
 
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGINT,
-        syscall_defs::signal::SignalHandler::Handle(sigint_handler),
-        syscall_defs::signal::SignalFlags::RESTART,
-        0,
+        Some(&SigAction::new(SignalHandler::Handle(sigint_handler), 0, SignalFlags::RESTART)),
+        None,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGQUIT,
-        syscall_defs::signal::SignalHandler::Ignore,
-        syscall_defs::signal::SignalFlags::empty(),
-        0,
+        Some(&SigAction::new(SignalHandler::Ignore,  0, SignalFlags::empty())),
+        None,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGCHLD,
-        syscall_defs::signal::SignalHandler::Ignore,
-        syscall_defs::signal::SignalFlags::RESTART,
-        0,
+        Some(&SigAction::new(SignalHandler::Ignore,  0, SignalFlags::RESTART)),
+        None,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGHUP,
-        syscall_defs::signal::SignalHandler::Ignore,
-        syscall_defs::signal::SignalFlags::RESTART,
-        0,
+        Some(&SigAction::new(SignalHandler::Ignore,  0, SignalFlags::RESTART)),
+        None,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }

@@ -30,7 +30,7 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
     Action::Ignore,                   // SIGCHLD
     Action::Exec(cont),               // SIGCONT
     Action::Handle(stop),             // SIGSTOP
-    Action::Ignore,                   // UNUSED
+    Action::Handle(stop),             // SIGTSTP
     Action::Ignore,                   // UNUSED
     Action::Ignore,                   // UNUSED
     Action::Ignore,                   // UNUSED

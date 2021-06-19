@@ -379,7 +379,7 @@ fn overflow(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGFPE ] Task {} overflow error", task.tid());
+        logln!("[ SIGFPE ] Task {} overflow error", task.tid());
         task.signal(syscall_defs::signal::SIGFPE);
 
         return;
@@ -392,7 +392,7 @@ fn bound_range_exceeded(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) 
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGSEGV ] Task {} bound range exceeded error", task.tid());
+        logln!("[ SIGSEGV ] Task {} bound range exceeded error", task.tid());
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -405,7 +405,7 @@ fn invalid_opcode(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!(
+        logln!(
             "[ SIGILL ] Task {} invalid_opcode error {:#x}",
             task.tid(),
             frame.ip
@@ -442,7 +442,7 @@ fn segment_not_present(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, e
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGSEGV ] Task {} segment_not_present error", task.tid());
+        logln!("[ SIGSEGV ] Task {} segment_not_present error", task.tid());
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -455,7 +455,7 @@ fn stack_segment_fault(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, e
     if frame.is_user() {
         let task = current_task_ref();
 
-        println!("[ SIGSEGV ] Task {} stack_segment error", task.tid());
+        logln!("[ SIGSEGV ] Task {} stack_segment error", task.tid());
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -501,7 +501,7 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
         if task.handle_pagefault(reason, virt) {
             return;
         } else {
-            println!(
+            logln!(
                 "[ SIGSEGV ] Task {} page_fault error addr: {}, ip: {:#x}, err: {}",
                 task.tid(),
                 virt,

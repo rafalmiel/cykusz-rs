@@ -17,6 +17,8 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::{current_task, current_task_ref};
 use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::signal::SignalEntry;
+use syscall_defs::signal::SigAction;
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
@@ -782,28 +784,44 @@ pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
 
 pub fn sys_sigaction(
     sig: u64,
-    handler: u64,
-    flags: u64,
-    _sigmask: u64,
+    sigact: u64,
     sigreturn: u64,
+    old: u64,
 ) -> SyscallResult {
     if sig == 34 {
         //temporary hack to make mlibc happy
         return Err(SyscallError::ENOSYS);
     }
-    let handler: syscall_defs::signal::SignalHandler = handler.into();
 
-    logln!("sigaction: {} {:?}", sig, handler);
-
-    if let Some(flags) = syscall_defs::signal::SignalFlags::from_bits(flags) {
-        current_task_ref()
-            .signals()
-            .set_signal(sig as usize, handler, flags, sigreturn as usize);
-
-        Ok(0)
+    let new = if sigact == 0 {
+        None
     } else {
-        Err(SyscallError::EINVAL)
-    }
+        unsafe {
+            Some(VirtAddr(sigact as usize).read_ref::<SigAction>())
+        }
+    };
+
+    logln!("sigaction: {:#x} {:?} size: {}", sigact, new, core::mem::size_of::<SigAction>());
+
+    let entry = if let Some(new) = new {
+        Some(SignalEntry::from_sigaction(*new, sigreturn as usize)?)
+    } else {
+        None
+    };
+
+    let old = if old == 0 {
+        None
+    } else {
+        unsafe {
+            Some(VirtAddr(old as usize).read_mut::<SigAction>())
+        }
+    };
+
+    logln!("sigaction: {} {:?}, old: {:?}", sig, entry, old);
+
+    current_task_ref().signals().set_signal(sig as usize, entry, old);
+
+    Ok(0)
 }
 
 pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {

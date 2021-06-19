@@ -11,6 +11,7 @@ pub const SIGTERM: usize = 15;
 pub const SIGCHLD: usize = 17;
 pub const SIGCONT: usize = 18;
 pub const SIGSTOP: usize = 19;
+pub const SIGTSTP: usize = 20;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SignalHandler {
@@ -19,10 +20,30 @@ pub enum SignalHandler {
     Handle(fn(usize)),
 }
 
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct SigAction {
+    pub sa_handler: u64,
+    pub sa_mask: u64,
+    pub sa_flags: u32,
+    pub sa_sigaction: u64,
+}
+
+impl SigAction {
+    pub fn new(handler: SignalHandler, mask: u64, flags: SignalFlags) -> SigAction {
+        SigAction {
+            sa_handler: handler.into(),
+            sa_mask: mask,
+            sa_flags: flags.bits(),
+            sa_sigaction: 0,
+        }
+    }
+}
+
 bitflags! {
     #[derive(Default)]
-    pub struct SignalFlags: u64 {
-        const RESTART = (1u64 << 3);
+    pub struct SignalFlags: u32 {
+        const RESTART = (1u32 << 3);
     }
 }
 
@@ -57,6 +78,16 @@ impl From<SignalHandler> for usize {
             SignalHandler::Ignore => -3isize as usize,
             SignalHandler::Default => -2isize as usize,
             SignalHandler::Handle(f) => f as usize,
+        }
+    }
+}
+
+impl From<SignalHandler> for u64 {
+    fn from(h: SignalHandler) -> Self {
+        match h {
+            SignalHandler::Ignore => -3isize as u64,
+            SignalHandler::Default => -2isize as u64,
+            SignalHandler::Handle(f) => f as u64,
         }
     }
 }

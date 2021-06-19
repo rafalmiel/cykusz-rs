@@ -7,6 +7,7 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicU32;
 
 use syscall_defs::*;
+use syscall_defs::signal::SigAction;
 
 #[macro_use]
 pub mod print;
@@ -372,18 +373,22 @@ pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {
 
 pub fn sigaction(
     sig: usize,
-    handler: signal::SignalHandler,
-    flags: signal::SignalFlags,
-    sigmask: u64,
+    sigaction: Option<&syscall_defs::signal::SigAction>,
+    old_sigaction: Option<&mut syscall_defs::signal::SigAction>,
 ) -> SyscallResult {
+    let sigact = sigaction;
+
     unsafe {
-        syscall5(
+        syscall4(
             SYS_SIGACTION,
             sig,
-            handler.into(),
-            flags.bits() as usize,
-            sigmask as usize,
+            sigact.and_then(|f| {
+                Some(f as *const SigAction as usize)
+            }).unwrap_or(0),
             sigreturn as usize,
+            old_sigaction.and_then(|f| {
+                Some(f as *mut SigAction as usize)
+            }).unwrap_or(0)
         )
     }
 }

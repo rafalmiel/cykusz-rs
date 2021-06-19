@@ -7,9 +7,9 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 use bit_field::BitField;
 
-use syscall_defs::signal::SignalFlags;
+use syscall_defs::signal::{SignalFlags, SigAction};
 use syscall_defs::signal::SignalHandler;
-use syscall_defs::SyscallError;
+use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
@@ -61,7 +61,29 @@ impl From<SignalError> for SyscallError {
 pub struct SignalEntry {
     handler: SignalHandler,
     flags: SignalFlags,
+    mask: u64,
     sigreturn: usize,
+}
+
+impl SignalEntry {
+    pub fn from_sigaction(act: SigAction, sigreturn: usize) -> core::result::Result<SignalEntry, SyscallError> {
+        Ok(SignalEntry {
+            handler: SignalHandler::from(act.sa_handler),
+            flags: SignalFlags::from_bits(act.sa_flags).ok_or(SyscallError::EINVAL)?,
+            mask: act.sa_mask,
+            sigreturn,
+        })
+    }
+
+    pub fn to_sigaction(&self) -> SigAction {
+        let h: usize = self.handler.into();
+        SigAction {
+            sa_handler: h as u64,
+            sa_mask: self.mask,
+            sa_flags: self.flags.bits(),
+            sa_sigaction: 0
+        }
+    }
 }
 
 impl SignalEntry {
@@ -69,6 +91,7 @@ impl SignalEntry {
         SignalEntry {
             handler: SignalHandler::Ignore,
             flags: SignalFlags::empty(),
+            mask: 0,
             sigreturn: 0,
         }
     }
@@ -287,9 +310,8 @@ impl Signals {
     pub fn set_signal(
         &self,
         signal: usize,
-        handler: SignalHandler,
-        flags: SignalFlags,
-        sigreturn: usize,
+        handler: Option<SignalEntry>,
+        old: Option<&mut syscall_defs::signal::SigAction>,
     ) {
         assert!(signal < SIGNAL_COUNT);
 
@@ -299,11 +321,13 @@ impl Signals {
 
         let mut signals = self.entries();
 
-        signals[signal] = SignalEntry {
-            handler,
-            flags,
-            sigreturn,
-        };
+        if let Some(old) = old {
+            *old = signals[signal].to_sigaction();
+        }
+
+        if let Some(handler) = handler {
+            signals[signal] = handler;
+        }
     }
 
     pub fn copy_from(&self, signals: &Signals) {

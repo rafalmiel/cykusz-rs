@@ -61,7 +61,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_PWRITE => sys::sys_pwrite(a, b, c, d),
         SYS_WAITPID => sys::sys_waitpid(a, b, c),
         SYS_IOCTL => sys::sys_ioctl(a, b, c),
-        SYS_SIGACTION => sys::sys_sigaction(a, b, c, d, e),
+        SYS_SIGACTION => sys::sys_sigaction(a, b, c, d),
         SYS_SIGPROCMASK => sys::sys_sigprocmask(a, b, c),
         SYS_FUTEX_WAIT => sys::sys_futex_wait(a, b),
         SYS_FUTEX_WAKE => sys::sys_futex_wake(a),

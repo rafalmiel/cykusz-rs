@@ -14,7 +14,7 @@ spin = "*"
 bit_field = "*"
 intrusive-collections = "*"
 paste = "*"
-mmio = "*"
+mmio = "0.*"
 downcast-rs = { version = "*", default-features = false }
 hashbrown = "*"
 lru = "*"

@@ -1,3 +1,4 @@
+use core::arch::asm;
 use core::mem;
 
 use crate::arch::raw::gdt;
@@ -98,13 +99,13 @@ impl<T> DescriptorTablePointer<T> {
 }
 
 pub unsafe fn lidt(idt: &DescriptorTablePointer<idt::IdtEntry>) {
-    llvm_asm!("lidt ($0)" :: "r"(idt) : "memory");
+    asm!("lidt [{0}]", in(reg) idt);
 }
 
 pub unsafe fn lgdt(gdt: &DescriptorTablePointer<gdt::GdtEntry>) {
-    llvm_asm!("lgdt ($0)" :: "r"(gdt) : "memory");
+    asm!("lgdt [{0}]", in(reg) gdt);
 }
 
 pub unsafe fn load_tr(tr: &crate::arch::raw::segmentation::SegmentSelector) {
-    llvm_asm!("ltr $0" :: "r"(tr.bits()));
+    asm!("ltr {0:x}", in(reg) tr.bits());
 }

@@ -49,7 +49,9 @@ impl ::core::fmt::Debug for InterruptFrame {
 macro_rules! int {
     ( $x:expr) => {
         {
-            llvm_asm!("int $0" :: "N"($x));
+            unsafe {
+                core::arch::asm!("int {0}", const $x);
+            }
         }
     };
 }

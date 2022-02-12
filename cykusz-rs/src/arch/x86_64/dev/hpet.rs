@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use bit_field::BitField;
 
 use crate::arch::acpi::hpet::HpetHeader;
@@ -103,7 +105,7 @@ pub fn busy_sleep(ns: u64) {
 
     while c > current_ns() {
         unsafe {
-            llvm_asm!("pause"::::"volatile");
+            asm!("pause");
         }
     }
 }

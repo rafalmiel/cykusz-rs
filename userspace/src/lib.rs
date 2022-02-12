@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(llvm_asm)]
 #![feature(lang_items)]
 #![feature(linkage)]
 
@@ -18,7 +17,7 @@ use syscall_defs::{FcntlCmd, OpenFlags, SyscallError};
 #[allow(unused)]
 pub fn bochs() {
     unsafe {
-        llvm_asm!("xchg %bx, %bx");
+        asm!("xchg bx, bx");
     }
 }
 

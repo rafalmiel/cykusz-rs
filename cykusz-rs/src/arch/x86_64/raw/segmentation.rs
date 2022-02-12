@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 // Specifies which element to load into a segment from
 // descriptor tables (i.e., is a index to LDT or GDT table
 // with some additional flags).
@@ -41,45 +43,45 @@ impl SegmentSelector {
 
 pub fn cs() -> SegmentSelector {
     let segment: u16;
-    unsafe { llvm_asm!("mov %cs, $0" : "=r"(segment)) }
+    unsafe { asm!("mov {segment:x}, cs", segment = lateout(reg) segment) }
     SegmentSelector::from_raw(segment)
 }
 
 pub fn ds() -> SegmentSelector {
     let segment: u16;
-    unsafe { llvm_asm!("mov %ds, $0" : "=r"(segment)) }
+    unsafe { asm!("mov {segment:x}, ds", segment = lateout(reg) segment) }
     SegmentSelector::from_raw(segment)
 }
 
 pub unsafe fn set_cs(sel: SegmentSelector) {
-    llvm_asm!("pushq $0; \
-          leaq  1f(%rip), %rax; \
-          pushq %rax; \
-          lretq; \
-          1:" :: "ri" (sel.bits() as usize) : "rax" "memory");
+    asm!("pushq {};\
+        leaq 1f(%rip), %rax;\
+        pushq %rax;\
+        lretq;\
+        1:", in(reg) sel.bits() as usize, options(att_syntax))
 }
 
 /// Reload stack segment register.
 pub unsafe fn load_ss(sel: SegmentSelector) {
-    llvm_asm!("movw $0, %ss " :: "r" (sel.bits()) : "memory");
+    asm!("mov ss, {0:x} ", in(reg) sel.bits());
 }
 
 /// Reload data segment register.
 pub unsafe fn load_ds(sel: SegmentSelector) {
-    llvm_asm!("movw $0, %ds " :: "r" (sel.bits()) : "memory");
+    asm!("mov ds, {0:x} ", in(reg) sel.bits());
 }
 
 /// Reload es segment register.
 pub unsafe fn load_es(sel: SegmentSelector) {
-    llvm_asm!("movw $0, %es " :: "r" (sel.bits()) : "memory");
+    asm!("mov es, {0:x} ", in(reg) sel.bits());
 }
 
 /// Reload fs segment register.
 pub unsafe fn load_fs(sel: SegmentSelector) {
-    llvm_asm!("movw $0, %fs " :: "r" (sel.bits()) : "memory");
+    asm!("mov fs, {0:x} ", in(reg) sel.bits());
 }
 
 /// Reload gs segment register.
 pub unsafe fn load_gs(sel: SegmentSelector) {
-    llvm_asm!("movw $0, %gs " :: "r" (sel.bits()) : "memory");
+    asm!("mov gs, {0:x} ", in(reg) sel.bits());
 }

@@ -1,3 +1,4 @@
+use core::arch::asm;
 use core::ops::*;
 
 use crate::arch::mm::virt::p4_table_addr;
@@ -98,7 +99,7 @@ impl UserAddr {
 }
 
 pub unsafe fn flush(addr: usize) {
-    llvm_asm!("invlpg ($0)" :: "r" (addr) : "memory");
+    asm!("invlpg [{0}]", in(reg) addr);
 }
 
 /// Invalidate the TLB completely by reloading the CR3 register.

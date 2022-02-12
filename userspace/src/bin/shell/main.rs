@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(llvm_asm)]
 #![feature(thread_local)]
 
 extern crate alloc;
@@ -16,7 +15,7 @@ use chrono::{Datelike, Timelike};
 use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry, SyscallError};
 
 use crate::file::File;
-use syscall_defs::signal::{SigAction, SignalHandler, SignalFlags};
+use syscall_defs::signal::{SigAction, SignalFlags, SignalHandler};
 
 pub mod file;
 pub mod nc;
@@ -683,28 +682,44 @@ pub fn main() {
 
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGINT,
-        Some(&SigAction::new(SignalHandler::Handle(sigint_handler), 0, SignalFlags::RESTART)),
+        Some(&SigAction::new(
+            SignalHandler::Handle(sigint_handler),
+            0,
+            SignalFlags::RESTART,
+        )),
         None,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGQUIT,
-        Some(&SigAction::new(SignalHandler::Ignore,  0, SignalFlags::empty())),
+        Some(&SigAction::new(
+            SignalHandler::Ignore,
+            0,
+            SignalFlags::empty(),
+        )),
         None,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGCHLD,
-        Some(&SigAction::new(SignalHandler::Ignore,  0, SignalFlags::RESTART)),
+        Some(&SigAction::new(
+            SignalHandler::Ignore,
+            0,
+            SignalFlags::RESTART,
+        )),
         None,
     ) {
         println!("Failed to install signal handler: {:?}", e);
     }
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGHUP,
-        Some(&SigAction::new(SignalHandler::Ignore,  0, SignalFlags::RESTART)),
+        Some(&SigAction::new(
+            SignalHandler::Ignore,
+            0,
+            SignalFlags::RESTART,
+        )),
         None,
     ) {
         println!("Failed to install signal handler: {:?}", e);

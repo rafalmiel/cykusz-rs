@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 
 use intrusive_collections::UnsafeRef;
 
+use syscall_defs::signal::SigAction;
 use syscall_defs::{
     ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
 };
@@ -16,9 +17,8 @@ use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::{current_task, current_task_ref};
-use crate::kernel::utils::wait_queue::WaitQueue;
 use crate::kernel::signal::SignalEntry;
-use syscall_defs::signal::SigAction;
+use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
@@ -782,12 +782,7 @@ pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
     }
 }
 
-pub fn sys_sigaction(
-    sig: u64,
-    sigact: u64,
-    sigreturn: u64,
-    old: u64,
-) -> SyscallResult {
+pub fn sys_sigaction(sig: u64, sigact: u64, sigreturn: u64, old: u64) -> SyscallResult {
     if sig == 34 {
         //temporary hack to make mlibc happy
         return Err(SyscallError::ENOSYS);
@@ -796,12 +791,15 @@ pub fn sys_sigaction(
     let new = if sigact == 0 {
         None
     } else {
-        unsafe {
-            Some(VirtAddr(sigact as usize).read_ref::<SigAction>())
-        }
+        unsafe { Some(VirtAddr(sigact as usize).read_ref::<SigAction>()) }
     };
 
-    logln!("sigaction: {:#x} {:?} size: {}", sigact, new, core::mem::size_of::<SigAction>());
+    logln!(
+        "sigaction: {:#x} {:?} size: {}",
+        sigact,
+        new,
+        core::mem::size_of::<SigAction>()
+    );
 
     let entry = if let Some(new) = new {
         Some(SignalEntry::from_sigaction(*new, sigreturn as usize)?)
@@ -812,14 +810,14 @@ pub fn sys_sigaction(
     let old = if old == 0 {
         None
     } else {
-        unsafe {
-            Some(VirtAddr(old as usize).read_mut::<SigAction>())
-        }
+        unsafe { Some(VirtAddr(old as usize).read_mut::<SigAction>()) }
     };
 
     logln!("sigaction: {} {:?}, old: {:?}", sig, entry, old);
 
-    current_task_ref().signals().set_signal(sig as usize, entry, old);
+    current_task_ref()
+        .signals()
+        .set_signal(sig as usize, entry, old);
 
     Ok(0)
 }

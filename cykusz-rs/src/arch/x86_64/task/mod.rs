@@ -18,7 +18,6 @@ use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::syscall::SyscallFrame;
 use crate::arch::utils::StackHelper;
 use crate::drivers::elf::ElfHeader;
-
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};

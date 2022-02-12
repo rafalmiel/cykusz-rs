@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use crate::kernel::mm::PhysAddr;
 
 pub const TRAMPOLINE: PhysAddr = PhysAddr(0xE00);
@@ -36,7 +38,7 @@ impl Trampoline {
 
         unsafe {
             while rdy.read_volatile() == 0 {
-                llvm_asm!("pause"::::"volatile");
+                asm!("pause");
             }
         }
     }

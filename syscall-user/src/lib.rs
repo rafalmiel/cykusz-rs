@@ -1,63 +1,73 @@
 #![no_std]
-#![feature(llvm_asm)]
 
 extern crate alloc;
 
 use alloc::vec::Vec;
+use core::arch::asm;
 use core::sync::atomic::AtomicU32;
 
-use syscall_defs::*;
 use syscall_defs::signal::SigAction;
+use syscall_defs::*;
 
 #[macro_use]
 pub mod print;
 
 pub unsafe fn syscall0(mut a: usize) -> SyscallResult {
-    llvm_asm!("syscall"
-        : "={rax}"(a)
-        : "{rax}"(a)
-        : "memory", "rcx", "r11"
-        : "intel", "volatile");
+    asm!("syscall",
+         in("rax") a,
+         out("rcx") _,
+         out("r11") _,
+         lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
 }
 
 pub unsafe fn syscall1(mut a: usize, b: usize) -> SyscallResult {
-    llvm_asm!("syscall"
-        : "={rax}"(a)
-        : "{rax}"(a), "{rdi}"(b)
-        : "memory", "rcx", "r11"
-        : "intel", "volatile");
+    asm!("syscall",
+         in("rax") a,
+         in("rdi") b,
+         out("rcx") _,
+         out("r11") _,
+         lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
 }
 
 pub unsafe fn syscall2(mut a: usize, b: usize, c: usize) -> SyscallResult {
-    llvm_asm!("syscall"
-        : "={rax}"(a)
-        : "{rax}"(a), "{rdi}"(b), "{rsi}"(c)
-        : "memory", "rcx", "r11"
-        : "intel", "volatile");
+    asm!("syscall",
+         in("rax") a,
+         in("rdi") b,
+         in("rsi") c,
+         out("rcx") _,
+         out("r11") _,
+         lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
 }
 
 pub unsafe fn syscall3(mut a: usize, b: usize, c: usize, d: usize) -> SyscallResult {
-    llvm_asm!("syscall"
-        : "={rax}"(a)
-        : "{rax}"(a), "{rdi}"(b), "{rsi}"(c), "{rdx}"(d)
-        : "memory", "rcx", "r11"
-        : "intel", "volatile");
+    asm!("syscall",
+         in("rax") a,
+         in("rdi") b,
+         in("rsi") c,
+         in("rdx") d,
+         out("rcx") _,
+         out("r11") _,
+         lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
 }
 
 pub unsafe fn syscall4(mut a: usize, b: usize, c: usize, d: usize, e: usize) -> SyscallResult {
-    llvm_asm!("syscall"
-        : "={rax}"(a)
-        : "{rax}"(a), "{rdi}"(b), "{rsi}"(c), "{rdx}"(d), "{r10}"(e)
-        : "memory", "rcx", "r11"
-        : "intel", "volatile");
+    asm!("syscall",
+         in("rax") a,
+         in("rdi") b,
+         in("rsi") c,
+         in("rdx") d,
+         in("r10") e,
+         out("rcx") _,
+         out("r11") _,
+         lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
 }
@@ -70,11 +80,16 @@ pub unsafe fn syscall5(
     e: usize,
     f: usize,
 ) -> SyscallResult {
-    llvm_asm!("syscall"
-        : "={rax}"(a)
-        : "{rax}"(a), "{rdi}"(b), "{rsi}"(c), "{rdx}"(d), "{r10}"(e), "{r8}"(f)
-        : "memory", "rcx", "r11"
-        : "intel", "volatile");
+    asm!("syscall",
+         in("rax") a,
+         in("rdi") b,
+         in("rsi") c,
+         in("rdx") d,
+         in("r10") e,
+         in("r8") f,
+         out("rcx") _,
+         out("r11") _,
+         lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
 }
@@ -88,11 +103,17 @@ pub unsafe fn syscall6(
     f: usize,
     g: usize,
 ) -> SyscallResult {
-    llvm_asm!("syscall"
-        : "={rax}"(a)
-        : "{rax}"(a), "{rdi}"(b), "{rsi}"(c), "{rdx}"(d), "{r10}"(e), "{r8}"(f), "{r9}"(g)
-        : "memory", "rcx", "r11"
-        : "intel", "volatile");
+    asm!("syscall",
+         in("rax") a,
+         in("rdi") b,
+         in("rsi") c,
+         in("rdx") d,
+         in("r10") e,
+         in("r8") f,
+         in("r9") g,
+         out("rcx") _,
+         out("r11") _,
+         lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
 }
@@ -382,13 +403,13 @@ pub fn sigaction(
         syscall4(
             SYS_SIGACTION,
             sig,
-            sigact.and_then(|f| {
-                Some(f as *const SigAction as usize)
-            }).unwrap_or(0),
+            sigact
+                .and_then(|f| Some(f as *const SigAction as usize))
+                .unwrap_or(0),
             sigreturn as usize,
-            old_sigaction.and_then(|f| {
-                Some(f as *mut SigAction as usize)
-            }).unwrap_or(0)
+            old_sigaction
+                .and_then(|f| Some(f as *mut SigAction as usize))
+                .unwrap_or(0),
         )
     }
 }
@@ -410,7 +431,7 @@ pub fn sigprocmask(
 #[allow(unused)]
 pub fn bochs() {
     unsafe {
-        llvm_asm!("xchg %bx, %bx");
+        asm!("xchg bx, bx");
     }
 }
 

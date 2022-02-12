@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::raw::cpuio::UnsafePort;
@@ -99,7 +101,7 @@ pub fn early_busy_sleep(mut ms: u64) {
 
         while !pit.is_sleep_finished() {
             unsafe {
-                llvm_asm!("pause"::::"volatile");
+                asm!("pause");
             }
         }
         ms -= 1;

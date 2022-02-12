@@ -70,7 +70,7 @@ impl FisRegH2D {
         self.flags.get()
     }
 
-    pub fn set_flags(&self, v: u8) {
+    pub fn set_flags(&mut self, v: u8) {
         self.flags.set(v);
     }
 

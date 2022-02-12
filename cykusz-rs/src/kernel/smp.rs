@@ -1,3 +1,4 @@
+use core::arch::asm;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 static SMP_INITIALISED: AtomicBool = AtomicBool::new(false);
@@ -22,7 +23,7 @@ pub fn notify_ap_ready() {
     // Waiting for all CPUs to be ready
     while !is_smp_initialised() {
         unsafe {
-            llvm_asm!("pause"::::"volatile");
+            asm!("pause");
         }
     }
 }

@@ -7,9 +7,9 @@ use core::sync::atomic::{AtomicU64, Ordering};
 
 use bit_field::BitField;
 
-use syscall_defs::signal::{SignalFlags, SigAction};
 use syscall_defs::signal::SignalHandler;
-use syscall_defs::{SyscallError, SyscallResult};
+use syscall_defs::signal::{SigAction, SignalFlags};
+use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
@@ -66,7 +66,10 @@ pub struct SignalEntry {
 }
 
 impl SignalEntry {
-    pub fn from_sigaction(act: SigAction, sigreturn: usize) -> core::result::Result<SignalEntry, SyscallError> {
+    pub fn from_sigaction(
+        act: SigAction,
+        sigreturn: usize,
+    ) -> core::result::Result<SignalEntry, SyscallError> {
         Ok(SignalEntry {
             handler: SignalHandler::from(act.sa_handler),
             flags: SignalFlags::from_bits(act.sa_flags).ok_or(SyscallError::EINVAL)?,
@@ -81,7 +84,7 @@ impl SignalEntry {
             sa_handler: h as u64,
             sa_mask: self.mask,
             sa_flags: self.flags.bits(),
-            sa_sigaction: 0
+            sa_sigaction: 0,
         }
     }
 }

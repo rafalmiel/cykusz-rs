@@ -15,7 +15,9 @@ use crate::kernel::sync::Spin;
 pub fn init() {
     use crate::HEAP;
 
-    LEAK_CATCHER.call_once(|| LeakCatcher::new());
+    //t LEAK_CATCHER.call_once(|| LeakCatcher::new());
+
+    println!("init heap");
 
     for addr in (HEAP_START..(HEAP_START + HEAP_SIZE)).step_by(PAGE_SIZE) {
         map(addr);
@@ -129,6 +131,7 @@ impl LockedHeap {
     }
 
     unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, ()> {
+        //println!("Alloc request");
         ALLOCED_MEM.fetch_add(layout.size(), Ordering::SeqCst);
         heap.allocate_first_fit(layout.clone()).or_else(|_| {
             let top = heap.top();

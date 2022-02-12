@@ -1,7 +1,6 @@
 use crate::arch::mm::VirtAddr;
 use crate::drivers::elf::types::AuxvType;
 use crate::drivers::elf::ElfHeader;
-
 use crate::kernel::utils::slice::ToBytes;
 use crate::kernel::utils::types::Align;
 

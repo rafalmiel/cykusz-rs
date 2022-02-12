@@ -1,3 +1,5 @@
+use core::arch::asm;
+
 mod apic;
 mod pic;
 
@@ -13,7 +15,7 @@ pub trait InterruptController: Send + Sync {
 pub fn is_enabled() -> bool {
     unsafe {
         let r: usize;
-        llvm_asm!("pushfq; popq $0" : "=r"(r) :: "memory");
+        asm!("pushfq", "pop {r}", r = out(reg) r);
         return (r & (1usize << 9)) > 0;
     }
 }
@@ -28,7 +30,7 @@ pub fn enable() {
 
 pub fn disable() {
     unsafe {
-        llvm_asm!("cli");
+        asm!("cli");
     }
 }
 
@@ -38,9 +40,7 @@ pub fn disable() {
 #[inline(always)]
 pub fn enable_and_halt() {
     unsafe {
-        llvm_asm!("sti
-        hlt"
-        : : : : "intel", "volatile");
+        asm!("sti", "hlt");
     }
 }
 
@@ -50,9 +50,7 @@ pub fn enable_and_halt() {
 #[inline(always)]
 pub fn enable_and_nop() {
     unsafe {
-        llvm_asm!("sti
-        nop"
-        : : : : "intel", "volatile");
+        asm!("sti", "nop");
     }
 }
 

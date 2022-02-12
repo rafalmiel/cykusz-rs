@@ -1,7 +1,6 @@
 #![no_std]
-#![feature(abi_x86_interrupt)]
-#![feature(arc_new_cyclic)]
 #![feature(array_methods)]
+#![feature(asm_const)]
 #![feature(auto_traits)]
 #![feature(c_variadic)]
 #![feature(concat_idents)]
@@ -10,8 +9,6 @@
 #![feature(const_mut_refs)]
 #![feature(lang_items)]
 #![feature(linkage)]
-#![feature(llvm_asm)]
-#![feature(maybe_uninit_ref)]
 #![feature(negative_impls)]
 #![feature(nll)]
 #![feature(ptr_internals)]
@@ -30,6 +27,8 @@ extern crate downcast_rs;
 extern crate intrusive_collections;
 #[macro_use]
 extern crate lazy_static;
+
+use core::arch::asm;
 
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
@@ -68,7 +67,7 @@ pub fn is_debug() -> bool {
 
 pub fn bochs() {
     unsafe {
-        llvm_asm!("xchg %bx, %bx");
+        asm!("xchg bx, bx");
     }
 }
 
@@ -119,6 +118,8 @@ pub fn rust_main(stack_top: VirtAddr) {
     let current = crate::kernel::sched::create_task(init_task);
 
     drop(current);
+
+    int!(32);
 
     idle();
 }

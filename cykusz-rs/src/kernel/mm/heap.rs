@@ -15,16 +15,14 @@ use crate::kernel::sync::Spin;
 pub fn init() {
     use crate::HEAP;
 
-    //t LEAK_CATCHER.call_once(|| LeakCatcher::new());
-
-    println!("init heap");
-
     for addr in (HEAP_START..(HEAP_START + HEAP_SIZE)).step_by(PAGE_SIZE) {
         map(addr);
     }
     unsafe {
         HEAP.0.lock().init(HEAP_START.0, HEAP_SIZE);
     }
+
+    LEAK_CATCHER.call_once(|| LeakCatcher::new());
 }
 
 fn map_more_heap(from: *const u8, size: usize) {

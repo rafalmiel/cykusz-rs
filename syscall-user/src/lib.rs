@@ -1,3 +1,5 @@
+#![feature(naked_functions)]
+
 #![no_std]
 
 extern crate alloc;
@@ -435,8 +437,13 @@ pub fn bochs() {
     }
 }
 
-pub fn sigreturn() -> SyscallResult {
-    unsafe { syscall0(SYS_SIGRETURN) }
+#[naked]
+extern "C" fn sigreturn() {
+    unsafe {
+        asm!("mov rax, 36;\
+              syscall;\
+              ud2", options(noreturn))
+    }
 }
 
 pub fn futex_wait(val: &AtomicU32, expected: u32) -> SyscallResult {

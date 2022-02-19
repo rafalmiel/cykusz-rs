@@ -11,6 +11,7 @@ extern crate syscall_user as syscall;
 use alloc::vec::Vec;
 
 use chrono::{Datelike, Timelike};
+use syscall::bochs;
 
 use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry, SyscallError};
 
@@ -639,8 +640,9 @@ fn exec(cmd: &str) {
     }
 }
 
-pub fn sigint_handler(_sig: usize) {
-    println!("signal !!!");
+pub fn sigint_handler(sig: usize) {
+    println!("signal received! {}", sig);
+    bochs();
 
     set_ready(true);
 }

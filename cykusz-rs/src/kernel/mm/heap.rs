@@ -21,8 +21,6 @@ pub fn init() {
     unsafe {
         HEAP.0.lock().init(HEAP_START.0, HEAP_SIZE);
     }
-
-    LEAK_CATCHER.call_once(|| LeakCatcher::new());
 }
 
 fn map_more_heap(from: *const u8, size: usize) {
@@ -47,6 +45,7 @@ pub struct LeakCatcher {
 }
 
 impl LeakCatcher {
+    #[allow(unused)]
     fn new() -> LeakCatcher {
         LeakCatcher {
             enabled: AtomicBool::new(false),
@@ -129,9 +128,10 @@ impl LockedHeap {
     }
 
     unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, ()> {
-        //println!("Alloc request");
         ALLOCED_MEM.fetch_add(layout.size(), Ordering::SeqCst);
         heap.allocate_first_fit(layout.clone()).or_else(|_| {
+            let _ = &heap;
+
             let top = heap.top();
             let req = align_up(layout.size(), 0x1000);
 

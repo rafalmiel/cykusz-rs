@@ -457,7 +457,10 @@ impl RRScheduler {
         loop {
             let locked = queue
                 .dead_wq
-                .wait_lock_irq_for(lock, |_sg| !queue.dead.is_empty())
+                .wait_lock_irq_for(lock, |_sg| {
+                    let _ = &queue;
+                    !queue.dead.is_empty()
+                })
                 .expect("[ SCHED ] Unexpected signal in reaper thread");
 
             queue.reap_dead(locked);

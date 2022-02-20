@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-bindgen  --use-core -o src/raw64.rs --whitelist-type acpi.* --whitelist-var ACPI.*  --whitelist-function Acpi.* --blacklist-function AcpiOs.*  --no-layout-tests acpica/source/include/acpi.h  -- -DCYKUSZ -DACPI_LIBRARY
+bindgen  --no-derive-debug --use-core -o src/raw64.rs --whitelist-type acpi.* --whitelist-var ACPI.*  --whitelist-function Acpi.* --blacklist-function AcpiOs.*  --no-layout-tests acpica/source/include/acpi.h  -- -DCYKUSZ -DACPI_LIBRARY
 
 function replacements() {
     sed $1 -i -e 's/::std::os::raw::c_char/i8/'

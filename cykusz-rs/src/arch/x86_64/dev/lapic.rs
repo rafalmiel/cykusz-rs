@@ -207,10 +207,10 @@ impl LApic {
 
     pub fn reset_timer_counter(&mut self) {
         if !self.x2 {
-            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 1);
+            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 100);
         } else {
             unsafe {
-                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 1);
+                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 100);
             }
         }
     }

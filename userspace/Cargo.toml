@@ -2,7 +2,7 @@
 name = "program"
 version = "0.1.0"
 authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 rlibc = "*"

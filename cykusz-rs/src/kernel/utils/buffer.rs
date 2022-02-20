@@ -92,6 +92,7 @@ impl BufferQueue {
         }
 
         let mut buffer = self.writer_queue.wait_lock_for(&self.buffer, |lck| {
+            let _ = &lck;
             !lck.has_readres() || lck.available_size() >= data.len()
         })?;
 

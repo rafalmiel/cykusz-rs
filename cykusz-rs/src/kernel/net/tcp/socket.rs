@@ -690,7 +690,6 @@ pub struct Socket {
 
 impl Socket {
     pub fn new(port: u32) -> Arc<Socket> {
-        use core::convert::TryInto;
         let sock = Arc::new_cyclic(|me| Socket {
             data: Spin::new(SocketData::new(
                 port.try_into().expect("Invalid port number"),

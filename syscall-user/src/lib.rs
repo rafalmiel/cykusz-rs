@@ -1,4 +1,5 @@
 #![feature(naked_functions)]
+#![feature(asm_const)]
 
 #![no_std]
 
@@ -440,9 +441,10 @@ pub fn bochs() {
 #[naked]
 extern "C" fn sigreturn() {
     unsafe {
-        asm!("mov rax, 36;\
-              syscall;\
-              ud2", options(noreturn))
+        asm!("mov rax, {sys}",
+             "syscall",
+            sys = const SYS_SIGRETURN,
+            options(noreturn));
     }
 }
 

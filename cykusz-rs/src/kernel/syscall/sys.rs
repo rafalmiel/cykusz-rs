@@ -35,8 +35,6 @@ fn make_str<'a>(b: u64, len: u64) -> &'a str {
 }
 
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
-    use core::convert::TryFrom;
-
     let mut flags =
         syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
 
@@ -169,8 +167,6 @@ pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
 }
 
 pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) -> SyscallResult {
-    use core::convert::TryFrom;
-
     let at = OpenFD::try_from(at)?;
 
     if let OpenFD::Fd(_) = at {
@@ -384,8 +380,6 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
 }
 
 pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResult {
-    use core::convert::TryFrom;
-
     if flags != 0 {
         return Err(SyscallError::EINVAL);
     }
@@ -974,8 +968,6 @@ pub fn sys_fstat(fd: u64, stat: u64) -> SyscallResult {
 }
 
 pub fn sys_getrlimit(resource: u64, rlimit: u64) -> SyscallResult {
-    use core::convert::TryFrom;
-
     let resource = syscall_defs::resource::RLimitKind::try_from(resource)?;
 
     let out = unsafe { VirtAddr(rlimit as usize).read_mut::<syscall_defs::resource::RLimit>() };

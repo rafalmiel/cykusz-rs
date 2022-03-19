@@ -216,6 +216,8 @@ impl Scheduler {
         if current.is_process_leader() {
             current.terminate_threads();
 
+            current.close_all_files();
+
             self.tasks.remove_task(current.tid());
 
             if let Err(e) = sessions().remove_process(current) {

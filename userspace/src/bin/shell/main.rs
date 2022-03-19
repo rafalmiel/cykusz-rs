@@ -595,7 +595,7 @@ fn exec(cmd: &str) {
             );
         }
     } else if cmd == "pipe_test" {
-        let mut fds = [0u64; 2];
+        let mut fds = [0u32; 2];
 
         if let Ok(_) = syscall::pipe(&mut fds, syscall_defs::OpenFlags::empty()) {
             if let Ok(id) = syscall::fork() {

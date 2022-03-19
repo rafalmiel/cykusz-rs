@@ -490,7 +490,7 @@ pub fn setpgid(pid: usize, pgid: usize) -> SyscallResult {
     unsafe { syscall2(SYS_SETPGID, pid, pgid) }
 }
 
-pub fn pipe(fds: &mut [u64], flags: OpenFlags) -> SyscallResult {
+pub fn pipe(fds: &mut [u32], flags: OpenFlags) -> SyscallResult {
     if fds.len() < 2 {
         return Err(SyscallError::EINVAL);
     }

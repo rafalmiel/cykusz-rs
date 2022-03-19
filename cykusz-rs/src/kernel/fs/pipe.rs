@@ -51,13 +51,13 @@ impl INode for Pipe {
     }
 
     fn open(&self, flags: OpenFlags) -> Result<()> {
-        if flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
+        if flags.contains(OpenFlags::RDONLY) {
             self.inc_readers();
 
             self.buf.set_has_readers(true);
         }
 
-        if flags.intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
+        if flags.contains(OpenFlags::WRONLY) {
             self.inc_writers();
 
             self.buf.set_has_writers(true);
@@ -67,13 +67,13 @@ impl INode for Pipe {
     }
 
     fn close(&self, flags: OpenFlags) {
-        if flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
+        if flags.contains(OpenFlags::RDONLY) {
             if self.dec_readers() == 0 {
                 self.buf.set_has_readers(false);
             }
         }
 
-        if flags.intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
+        if flags.contains(OpenFlags::WRONLY) {
             if self.dec_writers() == 0 {
                 self.buf.set_has_writers(false);
             }

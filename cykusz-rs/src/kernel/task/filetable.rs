@@ -231,8 +231,16 @@ pub struct FileTable {
 
 impl Clone for FileTable {
     fn clone(&self) -> FileTable {
+        let files = self.files.read().clone();
+
+        for f in &files {
+            if let Some(f) = f {
+                f.inode.inode().open(f.flags);
+            }
+        }
+
         FileTable {
-            files: RwMutex::new(self.files.read().clone()),
+            files: RwMutex::new(files)
         }
     }
 }

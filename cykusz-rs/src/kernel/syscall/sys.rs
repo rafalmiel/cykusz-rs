@@ -881,7 +881,7 @@ pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
 }
 
 pub fn sys_pipe(fds: u64, flags: u64) -> SyscallResult {
-    let fds = unsafe { core::slice::from_raw_parts_mut(fds as *mut u64, 2) };
+    let fds = unsafe { core::slice::from_raw_parts_mut(fds as *mut u32, 2) };
 
     let pipe = crate::kernel::fs::pipe::Pipe::new();
 
@@ -896,8 +896,8 @@ pub fn sys_pipe(fds: u64, flags: u64) -> SyscallResult {
 
     if let Ok(fd1) = task.open_file(entry.clone(), f1) {
         if let Ok(fd2) = task.open_file(entry, f2) {
-            fds[0] = fd1 as u64;
-            fds[1] = fd2 as u64;
+            fds[0] = fd1 as u32;
+            fds[1] = fd2 as u32;
 
             return Ok(0);
         } else {

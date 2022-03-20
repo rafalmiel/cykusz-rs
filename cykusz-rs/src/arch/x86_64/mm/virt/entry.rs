@@ -118,8 +118,12 @@ impl Entry {
             self.unref_phys_page();
         }
 
-        self.bits &= !ADDRESS_MASK;
-        self.bits |= frame.address().0;
+        let mut bits = *self;
+
+        bits.bits &= !ADDRESS_MASK;
+        bits.bits |= frame.address().0;
+
+        *self = bits;
 
         if ref_page {
             self.ref_phys_page();
@@ -127,8 +131,11 @@ impl Entry {
     }
 
     pub fn set_flags(&mut self, flags: Entry) {
-        self.bits &= !FLAG_MASK;
-        self.insert(Entry::from_bits(flags.bits & FLAG_MASK).unwrap());
+        let mut bits = *self;
+        bits.bits &= !FLAG_MASK;
+        bits.insert(Entry::from_bits(flags.bits & FLAG_MASK).unwrap());
+
+        *self = bits;
     }
 
     pub fn get_entry_count(&self) -> usize {

@@ -24,6 +24,8 @@ const REG_TIMDIV: u32 = 0x3E0;
 const REG_TIMINIT: u32 = 0x380;
 const REG_TIMCUR: u32 = 0x390;
 
+const TIMER_MS: usize = 10;
+
 pub struct LApic {
     lapic_base: Option<MappedAddr>,
     x2: bool,
@@ -192,7 +194,7 @@ impl LApic {
         if !self.x2 {
             self.reg_write(REG_TIMDIV, 0b11);
             self.reg_write(REG_TIM, 32 | (if one_shot { 0 } else { 1 } << 17));
-            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 1);
+            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * TIMER_MS as u32);
         } else {
             unsafe {
                 msr::wrmsr(msr::IA32_X2APIC_DIV_CONF, 0b11);
@@ -200,17 +202,17 @@ impl LApic {
                     msr::IA32_X2APIC_LVT_TIMER,
                     32 | (if one_shot { 0 } else { 1 } << 17),
                 );
-                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 1);
+                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * TIMER_MS as u64);
             }
         }
     }
 
     pub fn reset_timer_counter(&mut self) {
         if !self.x2 {
-            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * 100);
+            self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * TIMER_MS as u32);
         } else {
             unsafe {
-                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * 100);
+                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * TIMER_MS as u64);
             }
         }
     }

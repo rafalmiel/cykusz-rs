@@ -235,7 +235,7 @@ impl Clone for FileTable {
 
         for f in &files {
             if let Some(f) = f {
-                f.inode.inode().open(f.flags);
+                f.inode.inode().open(f.flags).expect("Open failed");
             }
         }
 

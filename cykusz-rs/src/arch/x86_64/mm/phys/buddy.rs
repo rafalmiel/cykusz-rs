@@ -6,23 +6,24 @@ use super::bump;
 
 type BMType = u64;
 const BMTYPE_BITS: usize = core::mem::size_of::<BMType>() * 8;
+const BUDDY_COUNT: usize = 7;
 
 pub struct BuddyAlloc {
     start: PhysAddr,
     end: PhysAddr,
-    buddies: [&'static mut [BMType]; 6],
-    freecnt: [usize; 6],
+    buddies: [&'static mut [BMType]; BUDDY_COUNT],
+    freecnt: [usize; BUDDY_COUNT],
 }
 
-pub static BSIZE: [usize; 6] = [0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000];
+pub static BSIZE: [usize; BUDDY_COUNT] = [0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000, 0x40000];
 
 impl BuddyAlloc {
     pub const fn new() -> BuddyAlloc {
         BuddyAlloc {
             start: PhysAddr(0),
             end: PhysAddr(0),
-            buddies: [&mut [], &mut [], &mut [], &mut [], &mut [], &mut []],
-            freecnt: [0usize; 6],
+            buddies: [&mut [], &mut [], &mut [], &mut [], &mut [], &mut [], &mut []],
+            freecnt: [0usize; BUDDY_COUNT],
         }
     }
 

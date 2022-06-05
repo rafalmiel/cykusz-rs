@@ -207,7 +207,7 @@ function _cykusz_ncurses {
 	pushd .
 
 	cd $NCURSES_CYKUSZ_BUILD_DIR
-	$NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-shared --prefix=/usr
+	$NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared
 
 	popd
 

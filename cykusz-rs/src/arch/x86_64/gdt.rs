@@ -84,6 +84,7 @@ fn init_tss(stack_top: VirtAddr, fs_base: u64) {
 
         {
             let gdt_low = &mut GDT[5];
+            //logln!("here {:p}", gdt_low as *mut _);
 
             gdt_low.set_offset(&TSS as *const _ as u32);
             gdt_low.set_limit(::core::mem::size_of::<TaskStateSegment>() as u32);

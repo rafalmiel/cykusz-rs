@@ -147,6 +147,9 @@ impl OutputBuffer {
                     self.new_line();
                 }
             }
+            b'\r' => {
+                self.cursor_x = 0;
+            }
             c => {
                 if self.cursor_x >= self.size_x {
                     self.new_line();
@@ -480,6 +483,8 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
             self.output.store_char(byte, &mut self.update);
         } else if byte == b'\t' {
             self.output.store_char(byte, &mut self.update);
+        } else if byte == b'\r' {
+            self.output.store_char(byte, &mut self.update);
         }
     }
 
@@ -678,8 +683,15 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 self.output.cursor_x = self.output.saved_x;
                 self.output.cursor_y = self.output.saved_y;
             }
-            _a => {
-                logln_disabled!("Unhandled cmd {}", a);
+            'r' => {
+                let mut iter = params.iter();
+                let y = iter.next().unwrap_or(&[1u16])[0] as usize;
+                let x = iter.next().unwrap_or(&[1u16])[0] as usize;
+
+                logln!("r command {} {}", x, y);
+            }
+            a => {
+                logln!("Unhandled cmd {}", a);
             }
         }
     }

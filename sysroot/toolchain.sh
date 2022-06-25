@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -xe
 
 SPATH=$(dirname $(readlink -f "$0"))
 LOGDIR=$SPATH/log
@@ -36,5 +36,8 @@ $SPATH/build.sh cykusz_libgcc > $LOGDIR/cykusz_libgcc.log 2>&1
 
 echo "Cross building libstdc++..."
 $SPATH/build.sh cykusz_libstd > $LOGDIR/cykusz_libstd.log 2>&1
+
+echo "Cross building ncurses..."
+$SPATH/build.sh cykusz_ncurses > $LOGDIR/cykusz_ncurses.log 2>&1
 
 echo "Success!"

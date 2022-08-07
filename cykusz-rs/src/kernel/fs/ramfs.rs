@@ -8,6 +8,7 @@ use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::poll::PollEventFlags;
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::devnode::DevNode;
@@ -15,10 +16,10 @@ use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemInt, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::fs::vfs::{FsError, Metadata};
 use crate::kernel::sync::{RwSpin, Spin};
-use crate::kernel::syscall::sys::PollTable;
 
 struct LockedRamINode(RwSpin<RamINode>);
 
@@ -135,7 +136,7 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
+    fn poll(&self, ptable: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags> {
         let i = self.0.read();
 
         match &i.content {
@@ -143,7 +144,7 @@ impl INode for LockedRamINode {
                 let n = n.clone();
                 drop(i);
 
-                n.poll(ptable)
+                n.poll(ptable, flags)
             }
             _ => Err(FsError::NotSupported),
         }

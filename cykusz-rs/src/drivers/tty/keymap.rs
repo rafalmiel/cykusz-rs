@@ -1,3 +1,5 @@
+use crate::kernel::kbd::keys::KeyCode;
+
 pub static PLAIN_MAP: [u16; 128] = [
     0xf200, 0xf01b, 0xf031, 0xf032, 0xf033, 0xf034, 0xf035, 0xf036, 0xf037, 0xf038, 0xf039, 0xf030,
     0xf02d, 0xf03d, 0xf07f, 0xf009, 0xfb71, 0xfb77, 0xfb65, 0xfb72, 0xfb74, 0xfb79, 0xfb75, 0xfb69,
@@ -95,3 +97,36 @@ pub static CTRL_ALT_MAP: [u16; 128] = [
     0xf600, 0xf119, 0xf115, 0xf20c, 0xf11a, 0xf10c, 0xf10d, 0xf11b, 0xf11c, 0xf110, 0xf311, 0xf11d,
     0xf200, 0xf200, 0xf200, 0xf200, 0xf200, 0xf200, 0xf200, 0xf200,
 ];
+
+macro_rules! init_arr (
+    ($a: ident, $([$k: expr, $v: expr]),+) => {
+        $($a[$k as usize] = Some($v);)*
+    };
+);
+
+pub static RAW_MODE_MAP: [Option<&'static [u8]>; 128] = {
+    let mut arr: [Option<&'static [u8]>; 128] = [None; 128];
+
+    init_arr!(
+        arr,
+        [KeyCode::KEY_F1, b"\x1bOP"],
+        [KeyCode::KEY_F2, b"\x1bOQ"],
+        [KeyCode::KEY_F3, b"\x1bOR"],
+        [KeyCode::KEY_F4, b"\x1bOS"],
+        [KeyCode::KEY_F5, b"\x1bOt"],
+        [KeyCode::KEY_F6, b"\x1bOu"],
+        [KeyCode::KEY_F7, b"\x1bOv"],
+        [KeyCode::KEY_F8, b"\x1bOl"],
+        [KeyCode::KEY_F9, b"\x1bOw"],
+        [KeyCode::KEY_F10, b"\x1bOx"],
+        [KeyCode::KEY_UP, b"\x1bOA"],
+        [KeyCode::KEY_DOWN, b"\x1bOB"],
+        [KeyCode::KEY_RIGHT, b"\x1bOC"],
+        [KeyCode::KEY_LEFT, b"\x1bOD"],
+        [KeyCode::KEY_ENTER, b"\x1bOM"],
+        [KeyCode::KEY_KPENTER, b"\x1bOM"],
+        [KeyCode::KEY_BACKSPACE, b"\x08"]
+        );
+
+    arr
+};

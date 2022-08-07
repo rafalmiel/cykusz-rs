@@ -10,10 +10,13 @@ use syscall_defs::{
     ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
 };
 use syscall_defs::{OpenFlags, SyscallError};
+use syscall_defs::poll::{FdSet, PollEventFlags};
+use syscall_defs::time::Timespec;
 
 use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::{current_task, current_task_ref};
@@ -549,71 +552,105 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
     }
 }
 
-pub struct PollTable {
-    queues: Vec<UnsafeRef<WaitQueue>>,
-}
-
-impl PollTable {
-    pub fn listen(&mut self, queue: &WaitQueue) {
-        queue.add_task(current_task());
-        self.queues
-            .push(unsafe { UnsafeRef::from_raw(queue as *const _) });
-    }
-}
-
-impl Drop for PollTable {
-    fn drop(&mut self) {
-        let task = current_task();
-        for q in &self.queues {
-            q.remove_task(task.clone());
+pub fn sys_select(nfds: u64, readfds: u64, writefds: u64, _exceptfds: u64, timeout: u64, _sigmask: u64) -> SyscallResult {
+    let timeout = if timeout == 0 { None } else {
+        unsafe {
+            Some(VirtAddr(timeout as usize).read_ref::<Timespec>())
         }
-    }
-}
-
-pub fn sys_select(fds: u64, fds_len: u64) -> SyscallResult {
-    let buf = make_buf(fds, fds_len);
-
-    let task = current_task_ref();
-
-    let mut fd_found: Option<usize> = None;
-    let mut first = true;
-    let mut poll_table = PollTable {
-        queues: Vec::with_capacity(fds_len as usize),
     };
 
+    let mut input: [Option<(&mut FdSet, PollEventFlags)>; 3] = [None, None, None];
+
+    let mut initfds = |idx: usize, addr: usize, flags: PollEventFlags| {
+        if addr == 0 {
+            return;
+        }
+
+        let fdset = unsafe {
+            VirtAddr(addr as usize).read_mut::<FdSet>()
+        };
+
+        logln_disabled!("select fdset {} {:?}", idx, fdset.fds);
+
+        input[idx] = Some((fdset, flags));
+    };
+
+    initfds(0, readfds as usize, PollEventFlags::READ);
+    initfds(1, writefds as usize, PollEventFlags::WRITE);
+
+    let mut to_poll = Vec::<(usize, PollEventFlags)>::new();
+
+    for fd in 0..256 {
+        let mut tp: Option<(usize, PollEventFlags)> = None;
+        for inp in &mut input {
+            if let Some(i) = inp {
+                if i.0.is_set(fd) {
+                    if let Some(t) = &mut tp {
+                        t.1.insert(i.1);
+                    } else {
+                        tp = Some((fd, i.1));
+                    }
+                }
+            }
+        }
+        if let Some(t) = tp {
+            to_poll.push(t);
+        }
+    }
+
+    if let Some(fd) = &mut input[0] { fd.0.zero() }
+    if let Some(fd) = &mut input[1] { fd.0.zero() }
+
+    let task = current_task_ref();
+    let mut first = true;
+    let mut found = 0;
+    let mut poll_table = PollTable::new(nfds as usize);
+
+    let mut timed_out = false;
+
     'search: loop {
-        for fd in buf {
-            if let Some(handle) = task.get_handle(*fd as usize) {
-                if let Ok(f) =
-                    handle
-                        .inode
-                        .inode()
-                        .poll(if first { Some(&mut poll_table) } else { None })
-                {
-                    if f {
-                        fd_found = Some(*fd as usize);
-                        break 'search;
+        for (fd, flags) in &to_poll {
+            logln_disabled!("select: checking fd {}", fd);
+            if let Some(handle) = task.get_handle(*fd) {
+                if let Ok(f) = handle
+                    .inode
+                    .inode()
+                    .poll(if first { Some(&mut poll_table) } else { None }, *flags) {
+
+                    if !f.is_empty() {
+                        found += 1;
+
+                        if f.contains(PollEventFlags::READ) {
+                            if let Some(fd2) = &mut input[0] { fd2.0.set(*fd); }
+                        }
+                        if f.contains(PollEventFlags::WRITE) {
+                            if let Some(fd2) = &mut input[1] { fd2.0.set(*fd); }
+                        }
                     }
                 } else {
                     break 'search;
                 }
-            } else {
-                println!("fd {} not found", fd);
             }
         }
 
-        if fd_found.is_none() {
-            task.await_io()?;
+        logln_disabled!("select await io timeout: {:?}", timeout.and_then(|t| Some(t.to_nanoseconds())));
+        if found == 0 && !timed_out {
+            task.await_io_timeout(timeout.and_then(|t| {
+                Some(t.to_nanoseconds())
+            }))?;
+
+            timed_out = task.sleep_until() == 0;
+            logln_disabled!("timedout: {}", timed_out);
+        } else {
+            break 'search;
         }
 
         first = false;
     }
 
-    if let Some(fd) = fd_found {
-        Ok(fd)
-    } else {
-        Err(SyscallError::EFAULT)
-    }
+    logln_disabled!("select found {}", found);
+
+    return Ok(found)
 }
 
 pub fn sys_mount(
@@ -702,8 +739,6 @@ pub fn sys_exec(
 
     let prog = lookup_by_path(Path::new(path), LookupMode::None)?;
 
-    prog.inode().debug();
-
     let args = if args_len > 0 {
         Some(syscall_defs::exec::from_syscall_slice(
             args as usize,
@@ -735,11 +770,7 @@ pub fn sys_spawn_thread(entry: u64, stack: u64) -> SyscallResult {
 pub fn sys_waitpid(pid: u64, status: u64, _flags: u64) -> SyscallResult {
     let current = current_task_ref();
 
-    //logln!("sys_waitpid: {} status addr: {:#x}", pid, status);
-
     let status = unsafe { VirtAddr(status as usize).read_mut::<u32>() };
-
-    //logln!("sys_waitpid");
 
     Ok(current.wait_pid(pid as usize, status)?)
 }

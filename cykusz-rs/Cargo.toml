@@ -23,7 +23,7 @@ linked_list_allocator = "*"
 
 [dependencies.chrono]
 default-features = false
-version = "*"
+version = "=0.4.19"
 
 [dependencies.syscall-defs]
 path = "../syscall-defs"

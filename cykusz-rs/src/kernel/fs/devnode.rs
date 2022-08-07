@@ -1,12 +1,13 @@
 use alloc::sync::Arc;
 
 use syscall_defs::OpenFlags;
+use syscall_defs::poll::PollEventFlags;
 
 use crate::kernel::device::Result as DevResult;
 use crate::kernel::device::{DevError, Device};
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Result;
-use crate::kernel::syscall::sys::PollTable;
 
 pub struct DevNode {
     dev: Arc<dyn Device>,
@@ -37,8 +38,8 @@ impl INode for DevNode {
         self.dev.inode().write_at(offset, buf)
     }
 
-    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool> {
-        self.dev.inode().poll(ptable)
+    fn poll(&self, ptable: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags> {
+        self.dev.inode().poll(ptable, flags)
     }
 
     fn open(&self, flags: OpenFlags) -> Result<()> {

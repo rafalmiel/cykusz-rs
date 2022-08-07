@@ -10,6 +10,7 @@ GCC_SRC_DIR=$SRC_DIR/gcc
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
 NCURSES_SRC_DIR=$SRC_DIR/ncurses
+NANO_SRC_DIR=$SRC_DIR/nano
 GMP_SRC_DIR=$SRC_DIR/gmp
 MPFR_SRC_DIR=$SRC_DIR/mpfr
 MPC_SRC_DIR=$SRC_DIR/mpc
@@ -19,6 +20,7 @@ BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
 BINUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-binutils-gdb
 GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
 NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
+NANO_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-nano
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
@@ -70,11 +72,34 @@ function _prepare_nyancat {
 	fi
 }
 
+function _prepare_ncurses {
+	if [ ! -d $NCURSES_SRC_DIR ]; then
+		mkdir -p $SRC_DIR
+		git clone --depth 1 -b cykusz https://github.com/rafalmiel/ncurses.git $NCURSES_SRC_DIR
+	fi
+}
+
+function _prepare_nano {
+	if [ ! -d $NANO_SRC_DIR ]; then
+		mkdir -p $SRC_DIR
+		git clone --depth 1 -b cykusz https://github.com/rafalmiel/nano.git $NANO_SRC_DIR
+
+        pushd .
+        cd $NANO_SRC_DIR
+        ./autogen.sh
+        rm config.sub
+        mv config.sub.cykusz config.sub
+        popd
+	fi
+}
+
 function _prepare {
 	_prepare_mlibc
 	_prepare_binutils
 	_prepare_gcc
 	_prepare_nyancat
+	_prepare_ncurses
+	_prepare_nano
 }
 
 function _sysroot {
@@ -154,20 +179,6 @@ function _libstd {
 	make -C $GCC_BUILD_DIR install-target-libstdc++-v3
 }
 
-function _nyancat {
-	_prepare_nyancat
-
-	pushd .
-
-	cd $NYANCAT_SRC_DIR/src
-	make clean
-	CC=$TRIPLE-gcc make
-	cp nyancat $BUILD_DIR
-	make clean
-
-	popd
-}
-
 function _cykusz_binutils {
 	_prepare_binutils
 
@@ -201,21 +212,6 @@ function _cykusz_gcc {
 	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
 }
 
-function _cykusz_ncurses {
-	mkdir -p $NCURSES_CYKUSZ_BUILD_DIR
-
-	pushd .
-
-	cd $NCURSES_CYKUSZ_BUILD_DIR
-	$NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared
-
-	popd
-
-	make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
-	make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
-
-}
-
 function _cykusz_libgcc {
 	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libgcc
 	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libgcc
@@ -224,6 +220,52 @@ function _cykusz_libgcc {
 function _cykusz_libstd {
 	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libstdc++-v3
 	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libstdc++-v3
+}
+
+function _cykusz_nyancat {
+	_prepare_nyancat
+
+	pushd .
+
+	cd $NYANCAT_SRC_DIR/src
+	make clean
+	CC=$TRIPLE-gcc make
+	cp nyancat $BUILD_DIR
+	make clean
+
+	popd
+}
+
+function _cykusz_ncurses {
+    _prepare_ncurses
+
+	mkdir -p $NCURSES_CYKUSZ_BUILD_DIR
+
+	pushd .
+
+	cd $NCURSES_CYKUSZ_BUILD_DIR
+	$NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --disable-stripping --with-debug --enable-widec
+
+	popd
+
+	make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+	make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+}
+
+function _cykusz_nano {
+    _prepare_nano
+
+	mkdir -p $NANO_CYKUSZ_BUILD_DIR
+
+	pushd .
+
+	cd $NANO_CYKUSZ_BUILD_DIR
+	$NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
+
+	popd
+
+	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
 function _cross {
@@ -240,11 +282,13 @@ function _cykusz {
 	_cykusz_gcc
 	_cykusz_libgcc
 	_cykusz_libstd
+	_cykusz_nyancat
+	_cykusz_ncurses
+	_cykusz_nano
 }
 
 function _build {
 	_cross
-	_nyancat
 	_cykusz
 }
 
@@ -266,7 +310,7 @@ function _check_build {
 }
 
 if [ -z "$1" ]; then
-	echo "Usage: $0 (clean/prepare/binutils/gcc/mlibc/nyancat/check_build/build/all)"
+	echo "Usage: $0 (clean/prepare/binutils/gcc/mlibc/cykusz_nyancat/cykusz_ncurses/cykusz_nano/check_build/build/all)"
 else
 	cd $SPATH
 	_$1

@@ -1,15 +1,16 @@
 use alloc::sync::{Arc, Weak};
 
 use syscall_defs::OpenFlags;
+use syscall_defs::poll::PollEventFlags;
 
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::{Ip4, IpHeader};
 use crate::kernel::net::tcp::{Tcp, TcpHeader, TcpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::Spin;
-use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::timer::{create_timer, current_ns, Timer, TimerCallback};
 use crate::kernel::utils::buffer::{Buffer, BufferQueue};
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -826,7 +827,10 @@ impl INode for Socket {
         }
     }
 
-    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
+    fn poll(&self, listen: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags> {
+        if !flags.contains(PollEventFlags::READ) {
+            return Err(FsError::NotSupported);
+        }
         let data = self.data.lock();
 
         if let Some(pt) = listen {
@@ -838,7 +842,11 @@ impl INode for Socket {
         {
             Err(FsError::NotSupported)
         } else {
-            Ok(data.in_buffer.has_data())
+            Ok(if data.in_buffer.has_data() {
+                PollEventFlags::READ
+            } else {
+                PollEventFlags::empty()
+            })
         }
     }
 

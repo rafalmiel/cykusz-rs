@@ -24,7 +24,7 @@ const REG_TIMDIV: u32 = 0x3E0;
 const REG_TIMINIT: u32 = 0x380;
 const REG_TIMCUR: u32 = 0x390;
 
-const TIMER_MS: usize = 10;
+const TIMER_MS: usize = 1;
 
 pub struct LApic {
     lapic_base: Option<MappedAddr>,

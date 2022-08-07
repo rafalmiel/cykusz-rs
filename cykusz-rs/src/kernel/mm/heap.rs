@@ -11,6 +11,7 @@ use crate::kernel::mm::map;
 use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::mm::*;
 use crate::kernel::sync::Spin;
+use crate::kernel::utils::types::Align;
 
 pub fn init() {
     use crate::HEAP;
@@ -19,7 +20,7 @@ pub fn init() {
         map(addr);
     }
     unsafe {
-        HEAP.0.lock().init(HEAP_START.0, HEAP_SIZE);
+        HEAP.0.lock().init(HEAP_START.0 as *mut u8, HEAP_SIZE);
     }
 }
 
@@ -133,7 +134,7 @@ impl LockedHeap {
             let _ = &heap;
 
             let top = heap.top();
-            let req = align_up(layout.size(), 0x1000);
+            let req = layout.size().align_up(0x1000);
 
             if top as usize + req as usize > HEAP_END.0 {
                 panic!("Out of mem!");
@@ -185,7 +186,7 @@ impl Drop for HeapDebug {
 unsafe impl GlobalAlloc for LockedHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let ptr = self
-            .allocate(&mut self.0.lock_irq(), layout)
+            .allocate(&mut self.0.lock_irq_debug(0), layout)
             .ok()
             .map_or(0 as *mut u8, |alloc| alloc.as_ptr());
 
@@ -204,7 +205,7 @@ unsafe impl GlobalAlloc for LockedHeap {
         };
         ALLOCED_MEM.fetch_sub(layout.size(), Ordering::SeqCst);
         self.0
-            .lock_irq()
+            .lock_irq_debug(0)
             .deallocate(NonNull::new_unchecked(ptr), layout)
     }
 }

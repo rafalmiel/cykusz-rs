@@ -591,7 +591,7 @@ fn exec(cmd: &str) {
             start_process(
                 "/usr/bin/gcc",
                 Some(&["/usr/bin/gcc", "/test.c", "-o", "/test"]),
-                Some(&["PATH=/usr/bin", "TERM=linux"]),
+                Some(&["PATH=/usr/bin", "TERM=cykusz"]),
             );
         }
     } else if cmd == "pipe_test" {
@@ -635,7 +635,7 @@ fn exec(cmd: &str) {
         }
 
         if !cmd.is_empty() {
-            start_process(args[0], Some(args.as_slice()), Some(&["PATH=/usr/bin", "TERM=vt100"]));
+            start_process(args[0], Some(args.as_slice()), Some(&["PATH=/usr/bin", "TERM=cykusz"]));
         }
     }
 }

@@ -4,14 +4,15 @@ use core::sync::atomic::AtomicU32;
 use core::sync::atomic::Ordering;
 
 use syscall_defs::OpenFlags;
+use syscall_defs::poll::PollEventFlags;
 
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::{Ip4, IpHeader};
 use crate::kernel::net::udp::{Udp, UdpService};
 use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
 use crate::kernel::sync::Spin;
-use crate::kernel::syscall::sys::PollTable;
 use crate::kernel::utils::buffer::BufferQueue;
 
 pub struct Socket {
@@ -94,8 +95,8 @@ impl INode for Socket {
         }
     }
 
-    fn poll(&self, listen: Option<&mut PollTable>) -> Result<bool> {
-        if self.error() {
+    fn poll(&self, listen: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags> {
+        if self.error() || !flags.contains(PollEventFlags::READ) {
             return Err(FsError::NotSupported);
         }
 
@@ -105,7 +106,11 @@ impl INode for Socket {
             p.listen(self.buffer.readers_queue());
         }
 
-        Ok(has_data)
+        Ok(if has_data {
+            PollEventFlags::READ
+        } else {
+            PollEventFlags::empty()
+        })
     }
 
     fn close(&self, _flags: OpenFlags) {

@@ -179,13 +179,8 @@ impl WaitQueue {
     }
 
     pub fn add_task_debug(&self, task: Arc<Task>) {
-        logln_disabled!("wq add task: {:p}", self as *const _);
-        let mut tasks = self.tasks.lock_irq_debug(2);
-
-        logln_disabled!("task adding");
-        logln_disabled!("has int {}", is_enabled());
+        let mut tasks = self.tasks.lock_irq();
         tasks.push(task);
-        logln_disabled!("task added");
     }
 
     pub fn remove_task(&self, task: Arc<Task>) {
@@ -244,18 +239,14 @@ impl WaitQueue {
     }
 
     pub fn notify_one_debug(&self) -> bool {
-        logln_disabled!("wq notify: {:p}", self as *const _);
-        let tasks = self.tasks.lock_irq_debug(1);
+        let tasks = self.tasks.lock_irq();
         let len = tasks.len();
 
         if len == 0 {
-            logln_disabled!("len == 0");
             return false;
         }
 
         let t = tasks.first().unwrap();
-
-        logln_disabled!("wake up {}", t.tid());
 
         t.wake_up();
 

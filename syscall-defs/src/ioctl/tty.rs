@@ -126,8 +126,7 @@ pub struct Termios {
     pub c_oflag: u32,
     pub c_cflag: u32,
     pub c_lflag: u32,
-    pub c_line: u32,
-    pub c_cc: [u32; 32],
+    pub c_cc: [u32; 11],
     pub ibaud: u32,
     pub obaud: u32,
 }
@@ -139,8 +138,7 @@ impl Termios {
             c_oflag: OPOST | ONLCR,
             c_cflag: CREAD,
             c_lflag: IEXTEN | ECHOKE | ECHOK | ECHOE | ECHO | ICANON | ISIG,
-            c_line: 0,
-            c_cc: [0; 32],
+            c_cc: [0; 11],
             ibaud: 0,
             obaud: 0,
         }

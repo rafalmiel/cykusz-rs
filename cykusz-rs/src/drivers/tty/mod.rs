@@ -7,10 +7,12 @@ use input::*;
 use syscall_defs::ioctl::tty;
 use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT};
 use syscall_defs::OpenFlags;
+use syscall_defs::poll::PollEventFlags;
 
 use crate::arch::output::{video, Color, ConsoleWriter};
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::kbd::keys::KeyCode;
 use crate::kernel::kbd::KeyListener;
@@ -18,8 +20,7 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::Spin;
-use crate::kernel::syscall::sys::PollTable;
+use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::task::Task;
 use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -77,6 +78,10 @@ impl State {
         }
     }
 
+    fn map_raw_sequence(&self, key_code: KeyCode) -> Option<&'static [u8]> {
+        return keymap::RAW_MODE_MAP[key_code as usize]
+    }
+
     fn map(&self, apply_caps: bool) -> Option<&'static [u16]> {
         let mut shift = self.lshift || self.rshift;
         let ctrl = self.lctrl || self.rctrl;
@@ -89,7 +94,7 @@ impl State {
 
         match (shift, ctrl, alt, altgr) {
             (false, false, false, false) => Some(&keymap::PLAIN_MAP),
-            (true, false, false, false) => Some(&keymap::SHIFT_MAP),
+            (true, false, _, false) => Some(&keymap::SHIFT_MAP),
             (false, true, false, false) => Some(&keymap::CTRL_MAP),
             (false, false, true, false) => Some(&keymap::ALT_MAP),
             (false, false, false, true) => Some(&keymap::ALTGR_MAP),
@@ -151,13 +156,8 @@ impl Tty {
         self.write_to_output(symbol, &termios);
         self.write_to_buffer(symbol, &termios);
     }
-}
 
-impl KeyListener for Tty {
-    fn on_new_key(&self, key: KeyCode, released: bool) {
-        //println!("new key begin");
-        let mut state = self.state.lock();
-
+    fn handle_key_state(key: KeyCode, released: bool, state: &mut SpinGuard<State>) -> bool {
         match key {
             KeyCode::KEY_CAPSLOCK if !released => {
                 state.caps = !state.caps;
@@ -180,6 +180,16 @@ impl KeyListener for Tty {
             KeyCode::KEY_RIGHTALT => {
                 state.altgr = !released;
             }
+            _ => {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    fn handle_canonical(&self, key: KeyCode, released: bool, state: &mut SpinGuard<State>) -> bool {
+        match key {
             KeyCode::KEY_BACKSPACE if !released => {
                 let n = self.buffer.lock_irq().remove_last_n(1);
                 if n > 0 {
@@ -228,25 +238,67 @@ impl KeyListener for Tty {
             KeyCode::KEY_DOWN if !released => {
                 self.output.lock_irq().scroll_down(1);
             }
-            _ if !released => {
-                if let Some(finalmap) = state.map(false).map_or(None, |map| {
-                    match state.caps {
-                        // 0xfb marker denotes letter than is
-                        // affected by caps lock
-                        true if (map[key as usize] >> 8) & 0xff == 0xfb => {
-                            // Return map after applying capslock to current shift state
-                            state.map(true)
-                        }
-                        _ => Some(map),
-                    }
-                }) {
-                    let sym = ((finalmap[key as usize] & 0xff) as u8) as char;
-
-                    self.write_symbol(sym as u8);
-                }
+            _ => {
+                return false;
             }
-            _ => {}
         };
+
+        return true;
+    }
+
+    fn output_sym(&self, key: KeyCode, state: SpinGuard<State>, canonical: bool) {
+        if !canonical {
+            if let Some(seq) = state.map_raw_sequence(key) {
+                let mut buf = self.buffer.lock_irq();
+                for v in seq {
+                    buf.put_char(*v);
+                }
+                buf.commit_write();
+                if let Some(_t) = &*self.ctrl_task.lock_irq() {
+                    self.wait_queue.notify_all();
+                }
+                return;
+            }
+        }
+
+        if let Some(finalmap) = state.map(false).map_or(None, |map| {
+            match state.caps {
+                // 0xfb marker denotes letter than is
+                // affected by caps lock
+                true if (map[key as usize] >> 8) & 0xff == 0xfb => {
+                    // Return map after applying capslock to current shift state
+                    state.map(true)
+                }
+                _ => Some(map),
+            }
+        }) {
+            let sym = ((finalmap[key as usize] & 0xff) as u8) as char;
+
+            if !canonical && state.alt {
+                self.write_symbol(0x1b);
+            }
+
+            self.write_symbol(sym as u8);
+        }
+    }
+}
+
+impl KeyListener for Tty {
+    fn on_new_key(&self, key: KeyCode, released: bool) {
+        let canon = self.termios.lock_irq().has_lflag(tty::ICANON);
+        let mut state = self.state.lock();
+
+        if Self::handle_key_state(key, released, &mut state) {
+            return;
+        }
+
+        if canon && self.handle_canonical(key, released, &mut state) {
+            return;
+        }
+
+        if !released  {
+            self.output_sym(key, state, canon);
+        }
     }
 }
 
@@ -339,7 +391,9 @@ impl TerminalDevice for Tty {
 
 impl INode for Tty {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
-        Ok(self.read(buf.as_mut_ptr(), buf.len())?)
+        let r = self.read(buf.as_mut_ptr(), buf.len())?;
+        logln!("tty read {} {:?}", r, buf);
+        Ok(r)
     }
 
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, FsError> {
@@ -350,14 +404,27 @@ impl INode for Tty {
         }
     }
 
-    fn poll(&self, ptable: Option<&mut PollTable>) -> Result<bool, FsError> {
+    fn poll(&self, ptable: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags, FsError> {
+        let mut res_flags = PollEventFlags::empty();
+        if flags.contains(PollEventFlags::WRITE) {
+            res_flags.insert(PollEventFlags::WRITE);
+        }
+
+        if !flags.contains(PollEventFlags::READ) {
+            return Ok(res_flags);
+        }
+
         let has_data = self.buffer.lock_irq().has_data();
 
         if let Some(p) = ptable {
             p.listen(&self.wait_queue);
         }
 
-        Ok(has_data)
+        if has_data {
+            res_flags.insert(PollEventFlags::READ);
+        }
+
+        Ok(res_flags)
     }
 
     fn open(&self, flags: OpenFlags) -> Result<(), FsError> {

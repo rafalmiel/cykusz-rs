@@ -12,4 +12,8 @@ impl Timespec {
             nsecs: 0,
         }
     }
+
+    pub fn to_nanoseconds(&self) -> usize {
+        self.secs as usize * 1000000000usize + self.nsecs as usize
+    }
 }

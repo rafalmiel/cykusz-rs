@@ -6,7 +6,7 @@
 
 cykusz-rs is a toy operating system written in Rust programming language.
 
-https://user-images.githubusercontent.com/3881998/121915370-0ec4d300-cd2b-11eb-9581-9981bc44ea40.mov
+https://user-images.githubusercontent.com/3881998/183302450-65193783-b10f-4ddd-8e3e-a702d0d928cf.mov
 
 ## Kernel
 

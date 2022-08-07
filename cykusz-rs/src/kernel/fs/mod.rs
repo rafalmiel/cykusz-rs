@@ -29,6 +29,7 @@ pub mod mount;
 pub mod path;
 pub mod pcache;
 pub mod pipe;
+pub mod poll;
 pub mod ramfs;
 pub mod vfs;
 
@@ -186,7 +187,6 @@ fn lookup_by_path_from(
     let len = path.components().count();
 
     for (idx, name) in path.components().enumerate() {
-        //println!("lookup component {}", name);
         match name {
             "." => {}
             ".." => loop {

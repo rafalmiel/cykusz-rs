@@ -4,14 +4,15 @@ use alloc::sync::Weak;
 use downcast_rs::DowncastSync;
 
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::poll::PollEventFlags;
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
 use crate::kernel::fs::pcache::CachedAccess;
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Metadata, Result};
-use crate::kernel::syscall::sys::PollTable;
 
 pub trait INode: Send + Sync + DowncastSync {
     fn id(&self) -> Result<usize> {
@@ -58,7 +59,7 @@ pub trait INode: Send + Sync + DowncastSync {
         Err(FsError::NotSupported)
     }
 
-    fn poll(&self, _poll_table: Option<&mut PollTable>) -> Result<bool> {
+    fn poll(&self, _poll_table: Option<&mut PollTable>, _flags: PollEventFlags) -> Result<PollEventFlags> {
         Err(FsError::NotSupported)
     }
 

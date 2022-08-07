@@ -3,6 +3,7 @@ use crate::arch::raw::gdt;
 use crate::arch::raw::segmentation as sgm;
 use crate::arch::raw::task::TaskStateSegment;
 use crate::kernel::mm::VirtAddr;
+use crate::kernel::sync::{IrqGuard, IrqLock};
 
 static mut INIT_GDT: [gdt::GdtEntry; 3] = [
     // Null
@@ -77,6 +78,7 @@ pub fn update_tss_rps0(new_rsp: usize) {
     }
 }
 
+#[inline(never)]
 fn init_tss(stack_top: VirtAddr, fs_base: u64) {
     unsafe {
         TSS.rsp[0] = stack_top.0 as u64;

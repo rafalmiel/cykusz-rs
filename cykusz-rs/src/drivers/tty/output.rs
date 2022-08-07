@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::cmp::max;
 
 use crate::arch::output::{video, Color, ColorCode, ScreenChar};
 use crate::kernel::utils::types::Align;
@@ -485,6 +486,12 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
             self.output.store_char(byte, &mut self.update);
         } else if byte == b'\r' {
             self.output.store_char(byte, &mut self.update);
+        } else if byte == 8 {
+            if self.output.cursor_x > 0 {
+                self.output.cursor_x -= 1;
+            }
+        } else {
+            logln!("unrecognised ctrl {}", byte);
         }
     }
 
@@ -497,7 +504,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
     ) {
         use core::cmp::min;
 
-        if ignore {
+        if ignore && false {
             return;
         }
 
@@ -559,6 +566,14 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                     }
                 }
             }
+            'd' => {
+                let mut iter = params.iter();
+
+                if let Some(&[y, ..]) = iter.next() {
+                    let y = if y == 0 { y } else { y - 1 };
+                    self.output.cursor_y = min(y as usize, self.output.size_x - 1);
+                }
+            }
             'G' => {
                 let mut iter = params.iter();
 
@@ -590,8 +605,21 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                                 dim = true;
                                 bright = false;
                             }
+                            7 => {
+                                let fg = self.output.color.fg();
+                                let bg = self.output.color.bg();
+
+                                self.output.color.set_fg(bg);
+                                self.output.color.set_bg(fg);
+                            }
                             m => match to_color(m) {
-                                ParsedColor::Background(c) => {
+                                ParsedColor::Background(mut c) => {
+                                    if dim {
+                                        c = c.dim();
+                                    } else if bright {
+                                        c = c.brighten();
+                                    }
+
                                     self.output.color.set_bg(c);
                                 }
                                 ParsedColor::Foreground(mut c) => {
@@ -618,7 +646,11 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
 
                     match x {
                         0 => {
-                            let end = buf_pos.align_up(self.output.size_x);
+                            let mut end = buf_pos.align_up(self.output.size_x);
+
+                            if end == buf_pos {
+                                end = (buf_pos + 1).align_up(self.output.size_x);
+                            }
 
                             self.output.buffer[buf_pos..end].fill(blank);
 
@@ -683,15 +715,8 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 self.output.cursor_x = self.output.saved_x;
                 self.output.cursor_y = self.output.saved_y;
             }
-            'r' => {
-                let mut iter = params.iter();
-                let y = iter.next().unwrap_or(&[1u16])[0] as usize;
-                let x = iter.next().unwrap_or(&[1u16])[0] as usize;
-
-                logln!("r command {} {}", x, y);
-            }
             a => {
-                logln!("Unhandled cmd {}", a);
+                panic!("Unhandled cmd {}", a);
             }
         }
     }

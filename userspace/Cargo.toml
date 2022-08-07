@@ -9,7 +9,7 @@ rlibc = "*"
 
 [dependencies.chrono]
 default-features = false
-version = "*"
+version = "=0.4.19"
 
 [dependencies.user_alloc]
 path = "../user-alloc"

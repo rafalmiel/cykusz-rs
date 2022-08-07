@@ -31,6 +31,8 @@ cp sysroot/sum.cpp mnt/
 cp sysroot/money.cpp mnt/
 cp sysroot/lest.hpp mnt/
 cp sysroot/ncurses.c mnt/
+cp sysroot/kbd.c mnt/
+cp sysroot/float.c mnt/
 cp sysroot/ncurses mnt/
 #cp sysroot/hello.cpp mnt/
 ##cp sysroot/cykusz/usr/bin/{readelf,objdump,nm,strings,size} mnt/bin/

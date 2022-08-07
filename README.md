@@ -48,6 +48,8 @@ https://user-images.githubusercontent.com/3881998/121915370-0ec4d300-cd2b-11eb-9
 - [x] binutils (<https://github.com/rafalmiel/binutils-gdb/tree/cykusz>)
 - [x] gcc (<https://github.com/rafalmiel/gcc/tree/cykusz>)
 - [x] nyancat (<https://github.com/rafalmiel/nyancat/tree/cykusz>)
+- [x] ncurses (<https://github.com/rafalmiel/ncurses/tree/cykusz>)
+- [x] nano (<https://github.com/rafalmiel/nano/tree/cykusz>)
 
 ## Building
 

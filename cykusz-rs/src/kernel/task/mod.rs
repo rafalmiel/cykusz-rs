@@ -487,7 +487,7 @@ impl Task {
         }
     }
 
-    pub fn await_io(&self) -> SignalResult<()> {
+    fn do_await_io(&self, timeout_ns: Option<usize>) -> SignalResult<()> {
         if self.locks() > 0 {
             logln!(
                 "await_io: sleeping while holding locks: {}, tid {}",
@@ -495,7 +495,7 @@ impl Task {
                 self.tid()
             );
         }
-        let res = crate::kernel::sched::sleep(None);
+        let res = crate::kernel::sched::sleep(timeout_ns);
 
         assert_eq!(
             self.state(),
@@ -505,6 +505,14 @@ impl Task {
         );
 
         res
+    }
+
+    pub fn await_io(&self) -> SignalResult<()> {
+        self.do_await_io(None)
+    }
+
+    pub fn await_io_timeout(&self, timeout_ns: Option<usize>) -> SignalResult<()> {
+        self.do_await_io(timeout_ns)
     }
 
     pub fn wake_up(&self) {

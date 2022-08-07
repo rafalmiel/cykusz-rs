@@ -3,6 +3,7 @@ use core::sync::atomic::{AtomicI64, Ordering};
 use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::raw::cpuio;
+use crate::kernel::sync::IrqGuard;
 
 fn read_naive_date() -> chrono::NaiveDateTime {
     unsafe {
@@ -41,7 +42,7 @@ pub fn init() {
 
     int::mask_int(8, false);
 
-    int::disable();
+    let _ = IrqGuard::new();
 
     unsafe {
         let mut sel = cpuio::UnsafePort::<u8>::new(0x70);
@@ -53,8 +54,6 @@ pub fn init() {
         sel.write(0x8B);
         cmd.write(prev | 0x10 | 0b110); //Enable update interrupt and human date format
     }
-
-    int::enable();
 }
 
 fn eoi() {

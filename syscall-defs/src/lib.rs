@@ -9,6 +9,7 @@ use core::convert::TryFrom;
 
 pub mod exec;
 pub mod ioctl;
+pub mod poll;
 pub mod prctl;
 pub mod resource;
 pub mod signal;

@@ -41,7 +41,7 @@ pub extern "C" fn _start() -> ! {
     /* fd 2 stderr*/
     if syscall::fcntl(2, FcntlCmd::GetFL) == Err(SyscallError::EBADFD) {
         syscall::open("/dev/tty", OpenFlags::WRONLY | OpenFlags::NOCTTY)
-            .expect("Failed to open /dev/stdout");
+            .expect("Failed to open /dev/stderr");
     }
 
     user_alloc::init();

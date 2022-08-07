@@ -151,7 +151,25 @@ impl<T> Spin<T> {
     }
 
     pub fn lock_irq_debug(&self, _id: usize) -> SpinGuard<T> {
-        self.lock_irq()
+        let int_enabled = crate::kernel::int::is_enabled();
+
+        crate::kernel::int::disable();
+
+        let notify = if self.notify {
+            //crate::kernel::sched::preempt_disable()
+            false
+        } else {
+            false
+        };
+
+        let lock = self.l.lock();
+
+        SpinGuard {
+            g: Some(lock),
+            irq: int_enabled,
+            notify,
+            debug: _id,
+        }
     }
 }
 

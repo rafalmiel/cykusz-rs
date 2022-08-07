@@ -343,7 +343,7 @@ impl Queues {
         assert_ne!(task.tid(), self.idle_task.tid());
 
         task.set_state(TaskState::Runnable);
-        task.set_sleep_until(0);
+        //task.set_sleep_until(0);
 
         self.runnable.push_back(task);
     }

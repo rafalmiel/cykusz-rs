@@ -40,6 +40,8 @@ impl KbdState {
             _ => {
                 let released = state.f;
 
+                logln!("got scancode: {}", data);
+
                 let key = scancode::get(data as usize, state.e);
 
                 state.e = false;

@@ -39,7 +39,7 @@ pub fn init() {
         panic!("[ ERROR ] HPET Not found");
     }
 
-    println!("[ OK ] PIT Disabled");
+    println!("[ OK ] PIT Disabled {}", crate::arch::int::is_enabled());
 
     rtc::init();
 

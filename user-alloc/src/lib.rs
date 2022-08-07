@@ -43,7 +43,7 @@ impl Heap {
                 panic!("mmap failed {:?}", e);
             }
             unsafe {
-                self.heap.init(self.heap_start, 4096);
+                self.heap.init(self.heap_start as *mut u8, 4096);
             }
             self.heap_end = self.heap_start + 4096;
         }
@@ -51,7 +51,7 @@ impl Heap {
 
     fn print_debug(&self) {
         println!(
-            "heap {:p} {:#x} {:#x} top: {:#x}",
+            "heap {:p} {:#x} {:#x} top: {:p}",
             self as *const _,
             self.heap_start,
             self.heap_end,

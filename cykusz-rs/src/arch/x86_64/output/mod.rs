@@ -70,6 +70,18 @@ impl ColorCode {
     pub fn set_bg(&mut self, c: Color) {
         self.0.set_bits(4..=7, c as u8);
     }
+
+    pub fn fg(&self) -> Color {
+        unsafe {
+            core::mem::transmute::<u8, Color>(self.0.get_bits(0..=3))
+        }
+    }
+
+    pub fn bg(&self) -> Color {
+        unsafe {
+            core::mem::transmute::<u8, Color>(self.0.get_bits(4..=7))
+        }
+    }
 }
 
 #[repr(C)]

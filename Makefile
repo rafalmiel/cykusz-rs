@@ -112,7 +112,7 @@ hello: $(cross_cpp) sysroot/test.c sysroot/test.cpp sysroot/hello.cpp sysroot/st
 	$(cross_cpp) sysroot/test.cpp -o $(cross_testcpp)
 	$(cross_c) sysroot/ttytest.c -o $(cross_ttytest)
 	$(cross_c) sysroot/fork.c -o $(cross_fork)
-	sysroot/build.sh nyancat
+	sysroot/build.sh cykusz_nyancat
 	$(cross_strip) $(cross_hello)
 
 # compile assembly files

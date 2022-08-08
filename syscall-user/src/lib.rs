@@ -11,6 +11,8 @@ use core::sync::atomic::AtomicU32;
 
 use syscall_defs::signal::SigAction;
 use syscall_defs::*;
+use syscall_defs::poll::FdSet;
+use syscall_defs::time::Timespec;
 
 #[macro_use]
 pub mod print;
@@ -290,8 +292,23 @@ pub fn connect(host: &[u8], port: u32, flags: syscall_defs::ConnectionFlags) -> 
     }
 }
 
-pub fn select(fds: &[u8]) -> SyscallResult {
-    unsafe { syscall2(SYS_SELECT, fds.as_ptr() as usize, fds.len()) }
+pub fn select(nfds: usize, readfds: Option<&mut FdSet>, writefds: Option<&mut FdSet>,
+              exceptfds: Option<&mut FdSet>, timeout: Option<&Timespec>) -> SyscallResult {
+
+    let mk_param = |p: &Option<&mut FdSet>| -> usize {
+        if let Some(f) = p {
+            *f as *const _ as usize
+        } else {
+            0
+        }
+    };
+
+    unsafe {
+        syscall6(SYS_SELECT, nfds, mk_param(&readfds), mk_param(&writefds),
+                 mk_param(&exceptfds),
+                 if let Some(t) = timeout { t as *const _ as usize } else { 0 },
+                 0)
+    }
 }
 
 pub fn getdents(fd: usize, buf: &mut [u8]) -> SyscallResult {

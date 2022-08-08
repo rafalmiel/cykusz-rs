@@ -1,4 +1,5 @@
 use syscall_defs::ConnectionFlags;
+use syscall_defs::poll::FdSet;
 
 fn send(fd: usize) -> bool {
     let mut buf = [0u8; 1300];
@@ -56,23 +57,32 @@ fn start(fd: usize) {
         SENT = 0;
     }
 
+    let mut read_fds: FdSet = FdSet::new();
+
+    read_fds.set(0);
+    read_fds.set(fd);
+
     loop {
-        if let Ok(ready) = syscall::select(&[0, fd as u8]) {
-            match ready {
-                0 => {
-                    if !send(fd) {
-                        break;
-                    }
-                }
-                _ if ready == fd => {
-                    if !recv(fd) {
-                        break;
-                    }
-                }
-                _ => {
-                    println!("Unexpected fd found");
+        if let Ok(count) = syscall::select(2, Some(&mut read_fds), None, None, None) {
+            if count == 0 {
+                break;
+            }
+
+            if read_fds.is_set(0) {
+                if !send(fd) {
+                    break;
                 }
             }
+
+            if read_fds.is_set(fd) {
+                if !recv(fd) {
+                    break;
+                }
+            }
+
+            read_fds.zero();
+            read_fds.set(0);
+            read_fds.set(fd);
         } else {
             println!("Select fault, closing");
             break;

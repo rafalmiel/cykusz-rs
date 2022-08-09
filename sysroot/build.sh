@@ -38,7 +38,7 @@ export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:$PATH
 function _prepare_mlibc {
 	if [ ! -d $MLIBC_SRC_DIR ]; then
 		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/mlibc.git $MLIBC_SRC_DIR
+		git clone -b cykusz https://github.com/rafalmiel/mlibc.git $MLIBC_SRC_DIR
 	fi
 }
 

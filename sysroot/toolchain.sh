@@ -17,7 +17,7 @@ echo "Building gcc..."
 $SPATH/build.sh gcc > $LOGDIR/gcc.log 2>&1
 
 echo "Building mlibc..."
-$SPATH/build.sh mlibc
+$SPATH/build.sh mlibc > $LOGDIF/mlibc.log 2>&1
 
 echo "Building libgcc..."
 $SPATH/build.sh libgcc > $LOGDIR/libgcc.log 2>&1
@@ -44,6 +44,6 @@ echo "Cross building ncurses..."
 $SPATH/build.sh cykusz_ncurses > $LOGDIR/cykusz_ncurses.log 2>&1
 
 echo "Cross building nano..."
-$SPATH/build.sh cykusz_nano > $LOGDIR/cykusz_nano.log 2>&1
+$SPATH/build.sh cykusz_nano
 
 echo "Success!"

@@ -41,7 +41,7 @@ echo "Cross building nyancat..."
 $SPATH/build.sh cykusz_nyancat > $LOGDIR/cykusz_nyancat.log 2>&1
 
 echo "Cross building ncurses..."
-$SPATH/build.sh cykusz_ncurses > $LOGDIR/cykusz_ncurses.log 2>&1
+$SPATH/build.sh cykusz_ncurses
 
 echo "Cross building nano..."
 $SPATH/build.sh cykusz_nano

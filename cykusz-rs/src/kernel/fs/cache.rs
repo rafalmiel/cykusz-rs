@@ -2,6 +2,7 @@ use alloc::sync::{Arc, Weak};
 use core::borrow::Borrow;
 use core::fmt::Debug;
 use core::hash::Hash;
+use core::num::NonZeroUsize;
 use core::ops::Deref;
 use core::ops::DerefMut;
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -342,7 +343,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     pub fn new(capacity: usize) -> Arc<Cache<K, T>> {
         Arc::new_cyclic(|me| Cache::<K, T> {
             data: Mutex::new(CacheData::<K, T> {
-                unused: LruCache::new(capacity),
+                unused: LruCache::new(NonZeroUsize::new(capacity).unwrap()),
                 used: hashbrown::HashMap::new(),
             }),
             sref: me.clone(),

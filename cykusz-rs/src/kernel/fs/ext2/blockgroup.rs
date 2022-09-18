@@ -1,5 +1,6 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
+use core::num::NonZeroUsize;
 use core::ops::Index;
 use core::ops::IndexMut;
 
@@ -243,7 +244,7 @@ impl BlockGroupDescriptors {
     pub fn new() -> BlockGroupDescriptors {
         BlockGroupDescriptors {
             d_desc: Mutex::new(GroupDescriptors::new()),
-            d_inodes: Mutex::new(lru::LruCache::new(256)),
+            d_inodes: Mutex::new(lru::LruCache::new(NonZeroUsize::new(256).unwrap())),
             fs: Once::new(),
         }
     }

@@ -115,9 +115,9 @@ pub const TOSTOP: u32 = 0x0100;
 pub const ECHOPRT: u32 = 0x0200;
 
 pub const ECHOCTL: u32 = 0o0001000;
-pub const FLUSHO : u32 = 0o0010000;
+pub const FLUSHO: u32 = 0o0010000;
 pub const IMAXBEL: u32 = 0o0020000;
-pub const ECHOKE : u32 = 0o0040000;
+pub const ECHOKE: u32 = 0o0040000;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

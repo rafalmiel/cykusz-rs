@@ -1,5 +1,5 @@
-use syscall_defs::ConnectionFlags;
 use syscall_defs::poll::FdSet;
+use syscall_defs::ConnectionFlags;
 
 fn send(fd: usize) -> bool {
     let mut buf = [0u8; 1300];

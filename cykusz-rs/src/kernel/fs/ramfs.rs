@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
-use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::poll::PollEventFlags;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::devnode::DevNode;
@@ -136,7 +136,11 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn poll(&self, ptable: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags> {
+    fn poll(
+        &self,
+        ptable: Option<&mut PollTable>,
+        flags: PollEventFlags,
+    ) -> Result<PollEventFlags> {
         let i = self.0.read();
 
         match &i.content {

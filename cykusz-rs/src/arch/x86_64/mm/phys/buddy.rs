@@ -15,14 +15,23 @@ pub struct BuddyAlloc {
     freecnt: [usize; BUDDY_COUNT],
 }
 
-pub static BSIZE: [usize; BUDDY_COUNT] = [0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000, 0x40000];
+pub static BSIZE: [usize; BUDDY_COUNT] =
+    [0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000, 0x40000];
 
 impl BuddyAlloc {
     pub const fn new() -> BuddyAlloc {
         BuddyAlloc {
             start: PhysAddr(0),
             end: PhysAddr(0),
-            buddies: [&mut [], &mut [], &mut [], &mut [], &mut [], &mut [], &mut []],
+            buddies: [
+                &mut [],
+                &mut [],
+                &mut [],
+                &mut [],
+                &mut [],
+                &mut [],
+                &mut [],
+            ],
             freecnt: [0usize; BUDDY_COUNT],
         }
     }

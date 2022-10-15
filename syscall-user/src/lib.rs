@@ -1,6 +1,5 @@
 #![feature(naked_functions)]
 #![feature(asm_const)]
-
 #![no_std]
 
 extern crate alloc;
@@ -9,10 +8,10 @@ use alloc::vec::Vec;
 use core::arch::asm;
 use core::sync::atomic::AtomicU32;
 
-use syscall_defs::signal::SigAction;
-use syscall_defs::*;
 use syscall_defs::poll::FdSet;
+use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
+use syscall_defs::*;
 
 #[macro_use]
 pub mod print;
@@ -292,9 +291,13 @@ pub fn connect(host: &[u8], port: u32, flags: syscall_defs::ConnectionFlags) -> 
     }
 }
 
-pub fn select(nfds: usize, readfds: Option<&mut FdSet>, writefds: Option<&mut FdSet>,
-              exceptfds: Option<&mut FdSet>, timeout: Option<&Timespec>) -> SyscallResult {
-
+pub fn select(
+    nfds: usize,
+    readfds: Option<&mut FdSet>,
+    writefds: Option<&mut FdSet>,
+    exceptfds: Option<&mut FdSet>,
+    timeout: Option<&Timespec>,
+) -> SyscallResult {
     let mk_param = |p: &Option<&mut FdSet>| -> usize {
         if let Some(f) = p {
             *f as *const _ as usize
@@ -304,10 +307,19 @@ pub fn select(nfds: usize, readfds: Option<&mut FdSet>, writefds: Option<&mut Fd
     };
 
     unsafe {
-        syscall6(SYS_SELECT, nfds, mk_param(&readfds), mk_param(&writefds),
-                 mk_param(&exceptfds),
-                 if let Some(t) = timeout { t as *const _ as usize } else { 0 },
-                 0)
+        syscall6(
+            SYS_SELECT,
+            nfds,
+            mk_param(&readfds),
+            mk_param(&writefds),
+            mk_param(&exceptfds),
+            if let Some(t) = timeout {
+                t as *const _ as usize
+            } else {
+                0
+            },
+            0,
+        )
     }
 }
 

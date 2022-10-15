@@ -126,7 +126,7 @@ pub static RAW_MODE_MAP: [Option<&'static [u8]>; 128] = {
         [KeyCode::KEY_ENTER, b"\x1bOM"],
         [KeyCode::KEY_KPENTER, b"\x1bOM"],
         [KeyCode::KEY_BACKSPACE, b"\x08"]
-        );
+    );
 
     arr
 };

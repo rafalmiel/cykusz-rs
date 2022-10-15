@@ -635,7 +635,11 @@ fn exec(cmd: &str) {
         }
 
         if !cmd.is_empty() {
-            start_process(args[0], Some(args.as_slice()), Some(&["PATH=/usr/bin", "TERM=cykusz"]));
+            start_process(
+                args[0],
+                Some(args.as_slice()),
+                Some(&["PATH=/usr/bin", "TERM=cykusz"]),
+            );
         }
     }
 }

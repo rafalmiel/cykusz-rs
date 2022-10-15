@@ -3,7 +3,7 @@ use core::ops::Deref;
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use linked_list_allocator::{align_up, Heap};
+use linked_list_allocator::Heap;
 use spin::Once;
 
 use crate::arch::mm::heap::{HEAP_END, HEAP_SIZE, HEAP_START};

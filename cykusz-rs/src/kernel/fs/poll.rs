@@ -1,7 +1,7 @@
-use alloc::vec::Vec;
-use intrusive_collections::UnsafeRef;
 use crate::kernel::sched::current_task;
 use crate::kernel::utils::wait_queue::WaitQueue;
+use alloc::vec::Vec;
+use intrusive_collections::UnsafeRef;
 
 pub struct PollTable {
     queues: Vec<UnsafeRef<WaitQueue>>,

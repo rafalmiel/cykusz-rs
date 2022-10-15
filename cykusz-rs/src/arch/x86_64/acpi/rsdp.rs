@@ -70,7 +70,7 @@ impl Header for Rsdp20 {
     }
 }
 
-fn find_hdr<T: Header>() -> Option<&'static impl Header> {
+fn find_hdr<T: Header + 'static>() -> Option<&'static impl Header> {
     let ebda_address = unsafe {
         PhysAddr((PhysAddr(0x40E as usize).to_mapped().read::<u16>()) as usize * 4).to_mapped()
     };

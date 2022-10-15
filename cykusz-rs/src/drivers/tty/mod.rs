@@ -5,9 +5,9 @@ use core::fmt::{Error, Formatter};
 
 use input::*;
 use syscall_defs::ioctl::tty;
+use syscall_defs::poll::PollEventFlags;
 use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT};
 use syscall_defs::OpenFlags;
-use syscall_defs::poll::PollEventFlags;
 
 use crate::arch::output::{video, Color, ConsoleWriter};
 use crate::kernel::device::Device;
@@ -79,7 +79,7 @@ impl State {
     }
 
     fn map_raw_sequence(&self, key_code: KeyCode) -> Option<&'static [u8]> {
-        return keymap::RAW_MODE_MAP[key_code as usize]
+        return keymap::RAW_MODE_MAP[key_code as usize];
     }
 
     fn map(&self, apply_caps: bool) -> Option<&'static [u16]> {
@@ -296,7 +296,7 @@ impl KeyListener for Tty {
             return;
         }
 
-        if !released  {
+        if !released {
             self.output_sym(key, state, canon);
         }
     }
@@ -404,7 +404,11 @@ impl INode for Tty {
         }
     }
 
-    fn poll(&self, ptable: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags, FsError> {
+    fn poll(
+        &self,
+        ptable: Option<&mut PollTable>,
+        flags: PollEventFlags,
+    ) -> Result<PollEventFlags, FsError> {
         let mut res_flags = PollEventFlags::empty();
         if flags.contains(PollEventFlags::WRITE) {
             res_flags.insert(PollEventFlags::WRITE);
@@ -507,9 +511,8 @@ impl INode for Tty {
                 Ok(0)
             }
             tty::TCSETS => {
-                let termios = unsafe {
-                    VirtAddr(arg).read_ref::<syscall_defs::ioctl::tty::Termios>()
-                };
+                let termios =
+                    unsafe { VirtAddr(arg).read_ref::<syscall_defs::ioctl::tty::Termios>() };
 
                 logln!("termios TCSETS 0x{:x}", termios.c_lflag);
                 logln!("{:?}", termios);
@@ -519,9 +522,8 @@ impl INode for Tty {
                 Ok(0)
             }
             tty::TCGETS => {
-                let termios = unsafe {
-                    VirtAddr(arg).read_mut::<syscall_defs::ioctl::tty::Termios>()
-                };
+                let termios =
+                    unsafe { VirtAddr(arg).read_mut::<syscall_defs::ioctl::tty::Termios>() };
 
                 logln!("termios TCGETS 0x{:x}", termios.c_lflag);
                 logln!("{:?}", termios);
@@ -529,7 +531,6 @@ impl INode for Tty {
                 *termios = *self.termios.lock_irq();
 
                 Ok(0)
-
             }
             _ => Err(FsError::NotSupported),
         }

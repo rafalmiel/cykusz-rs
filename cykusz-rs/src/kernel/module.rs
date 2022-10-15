@@ -66,7 +66,8 @@ macro_rules! platform_2_fini {
 
 unsafe fn run_range(start: VirtAddr, end: VirtAddr) {
     (start..end).step_by(8).for_each(|ptr| {
-        let f = ptr.read::<fn()>(); f();
+        let f = ptr.read::<fn()>();
+        f();
     });
 }
 

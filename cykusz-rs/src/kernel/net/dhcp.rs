@@ -297,7 +297,12 @@ impl<'a> Iterator for OptionsIter<'a> {
 
                     let ptr = unsafe { self.ptr.offset(2) };
 
-                    logln!("shift in place o: {}, len: {}, remaining len: {}", o, len, self.len);
+                    logln!(
+                        "shift in place o: {}, len: {}, remaining len: {}",
+                        o,
+                        len,
+                        self.len
+                    );
 
                     self.shift_inplace(2 + len as isize);
 

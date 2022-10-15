@@ -43,7 +43,7 @@ impl PciDeviceHandle for Ahci {
 static DEVICE: Once<Arc<Ahci>> = Once::new();
 
 fn device() -> &'static Arc<Ahci> {
-    unsafe {DEVICE.get_unchecked()}
+    unsafe { DEVICE.get_unchecked() }
 }
 
 fn init() {

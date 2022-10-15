@@ -240,7 +240,7 @@ impl Clone for FileTable {
         }
 
         FileTable {
-            files: RwMutex::new(files)
+            files: RwMutex::new(files),
         }
     }
 }

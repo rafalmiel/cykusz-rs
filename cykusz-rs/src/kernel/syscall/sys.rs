@@ -3,25 +3,22 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
-use intrusive_collections::UnsafeRef;
-
+use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
+use syscall_defs::time::Timespec;
 use syscall_defs::{
     ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
 };
 use syscall_defs::{OpenFlags, SyscallError};
-use syscall_defs::poll::{FdSet, PollEventFlags};
-use syscall_defs::time::Timespec;
 
 use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::path::Path;
-use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::fs::poll::PollTable;
+use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::{current_task, current_task_ref};
 use crate::kernel::signal::SignalEntry;
-use crate::kernel::utils::wait_queue::WaitQueue;
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
@@ -552,11 +549,18 @@ pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallRe
     }
 }
 
-pub fn sys_select(nfds: u64, readfds: u64, writefds: u64, _exceptfds: u64, timeout: u64, _sigmask: u64) -> SyscallResult {
-    let timeout = if timeout == 0 { None } else {
-        unsafe {
-            Some(VirtAddr(timeout as usize).read_ref::<Timespec>())
-        }
+pub fn sys_select(
+    nfds: u64,
+    readfds: u64,
+    writefds: u64,
+    _exceptfds: u64,
+    timeout: u64,
+    _sigmask: u64,
+) -> SyscallResult {
+    let timeout = if timeout == 0 {
+        None
+    } else {
+        unsafe { Some(VirtAddr(timeout as usize).read_ref::<Timespec>()) }
     };
 
     let mut input: [Option<(&mut FdSet, PollEventFlags)>; 3] = [None, None, None];
@@ -566,9 +570,7 @@ pub fn sys_select(nfds: u64, readfds: u64, writefds: u64, _exceptfds: u64, timeo
             return;
         }
 
-        let fdset = unsafe {
-            VirtAddr(addr as usize).read_mut::<FdSet>()
-        };
+        let fdset = unsafe { VirtAddr(addr as usize).read_mut::<FdSet>() };
 
         logln_disabled!("select fdset {} {:?}", idx, fdset.fds);
 
@@ -598,8 +600,12 @@ pub fn sys_select(nfds: u64, readfds: u64, writefds: u64, _exceptfds: u64, timeo
         }
     }
 
-    if let Some(fd) = &mut input[0] { fd.0.zero() }
-    if let Some(fd) = &mut input[1] { fd.0.zero() }
+    if let Some(fd) = &mut input[0] {
+        fd.0.zero()
+    }
+    if let Some(fd) = &mut input[1] {
+        fd.0.zero()
+    }
 
     let task = current_task_ref();
     let mut first = true;
@@ -615,16 +621,20 @@ pub fn sys_select(nfds: u64, readfds: u64, writefds: u64, _exceptfds: u64, timeo
                 if let Ok(f) = handle
                     .inode
                     .inode()
-                    .poll(if first { Some(&mut poll_table) } else { None }, *flags) {
-
+                    .poll(if first { Some(&mut poll_table) } else { None }, *flags)
+                {
                     if !f.is_empty() {
                         found += 1;
 
                         if f.contains(PollEventFlags::READ) {
-                            if let Some(fd2) = &mut input[0] { fd2.0.set(*fd); }
+                            if let Some(fd2) = &mut input[0] {
+                                fd2.0.set(*fd);
+                            }
                         }
                         if f.contains(PollEventFlags::WRITE) {
-                            if let Some(fd2) = &mut input[1] { fd2.0.set(*fd); }
+                            if let Some(fd2) = &mut input[1] {
+                                fd2.0.set(*fd);
+                            }
                         }
                     }
                 } else {
@@ -633,11 +643,12 @@ pub fn sys_select(nfds: u64, readfds: u64, writefds: u64, _exceptfds: u64, timeo
             }
         }
 
-        logln_disabled!("select await io timeout: {:?}", timeout.and_then(|t| Some(t.to_nanoseconds())));
+        logln_disabled!(
+            "select await io timeout: {:?}",
+            timeout.and_then(|t| Some(t.to_nanoseconds()))
+        );
         if found == 0 && !timed_out {
-            task.await_io_timeout(timeout.and_then(|t| {
-                Some(t.to_nanoseconds())
-            }))?;
+            task.await_io_timeout(timeout.and_then(|t| Some(t.to_nanoseconds())))?;
 
             timed_out = task.sleep_until() == 0;
             logln_disabled!("timedout: {}", timed_out);
@@ -650,7 +661,7 @@ pub fn sys_select(nfds: u64, readfds: u64, writefds: u64, _exceptfds: u64, timeo
 
     logln_disabled!("select found {}", found);
 
-    return Ok(found)
+    return Ok(found);
 }
 
 pub fn sys_mount(

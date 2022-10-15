@@ -202,7 +202,10 @@ impl LApic {
                     msr::IA32_X2APIC_LVT_TIMER,
                     32 | (if one_shot { 0 } else { 1 } << 17),
                 );
-                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * TIMER_MS as u64);
+                msr::wrmsr(
+                    msr::IA32_X2APIC_INIT_COUNT,
+                    self.ticks_in_1_ms as u64 * TIMER_MS as u64,
+                );
             }
         }
     }
@@ -212,7 +215,10 @@ impl LApic {
             self.reg_write(REG_TIMINIT, self.ticks_in_1_ms as u32 * TIMER_MS as u32);
         } else {
             unsafe {
-                msr::wrmsr(msr::IA32_X2APIC_INIT_COUNT, self.ticks_in_1_ms as u64 * TIMER_MS as u64);
+                msr::wrmsr(
+                    msr::IA32_X2APIC_INIT_COUNT,
+                    self.ticks_in_1_ms as u64 * TIMER_MS as u64,
+                );
             }
         }
     }

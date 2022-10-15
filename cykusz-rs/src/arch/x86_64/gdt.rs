@@ -3,7 +3,6 @@ use crate::arch::raw::gdt;
 use crate::arch::raw::segmentation as sgm;
 use crate::arch::raw::task::TaskStateSegment;
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::sync::{IrqGuard, IrqLock};
 
 static mut INIT_GDT: [gdt::GdtEntry; 3] = [
     // Null

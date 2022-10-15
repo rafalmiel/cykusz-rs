@@ -164,7 +164,10 @@ unsafe extern "C" fn pci_add_root_dev(
     pci.primary = -1;
     pci.secondary = 0;
 
-    ROOT_HANDLE.call_once(|| { let _ = &pci; AcpiHandle(pci.acpi_handle) });
+    ROOT_HANDLE.call_once(|| {
+        let _ = &pci;
+        AcpiHandle(pci.acpi_handle)
+    });
     ROOT_BRIDGE.call_once(|| Spin::new(pci));
 
     root_bridge().init();

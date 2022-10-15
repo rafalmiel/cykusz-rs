@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::cmp::max;
 
 use crate::arch::output::{video, Color, ColorCode, ScreenChar};
 use crate::kernel::utils::types::Align;

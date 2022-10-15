@@ -1,4 +1,3 @@
-
 bitflags! {
     pub struct PollEventFlags: usize {
         const READ          = 1 << 0;
@@ -14,9 +13,7 @@ pub struct FdSet {
 
 impl FdSet {
     pub fn new() -> FdSet {
-        FdSet {
-            fds: [0u8; 128],
-        }
+        FdSet { fds: [0u8; 128] }
     }
 
     pub fn zero(&mut self) {

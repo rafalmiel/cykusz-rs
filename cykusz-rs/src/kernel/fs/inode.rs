@@ -3,8 +3,8 @@ use alloc::sync::Weak;
 
 use downcast_rs::DowncastSync;
 
-use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::poll::PollEventFlags;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;
@@ -59,7 +59,11 @@ pub trait INode: Send + Sync + DowncastSync {
         Err(FsError::NotSupported)
     }
 
-    fn poll(&self, _poll_table: Option<&mut PollTable>, _flags: PollEventFlags) -> Result<PollEventFlags> {
+    fn poll(
+        &self,
+        _poll_table: Option<&mut PollTable>,
+        _flags: PollEventFlags,
+    ) -> Result<PollEventFlags> {
         Err(FsError::NotSupported)
     }
 

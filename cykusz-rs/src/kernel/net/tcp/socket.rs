@@ -1,7 +1,7 @@
 use alloc::sync::{Arc, Weak};
 
-use syscall_defs::OpenFlags;
 use syscall_defs::poll::PollEventFlags;
+use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
@@ -827,7 +827,11 @@ impl INode for Socket {
         }
     }
 
-    fn poll(&self, listen: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags> {
+    fn poll(
+        &self,
+        listen: Option<&mut PollTable>,
+        flags: PollEventFlags,
+    ) -> Result<PollEventFlags> {
         if !flags.contains(PollEventFlags::READ) {
             return Err(FsError::NotSupported);
         }

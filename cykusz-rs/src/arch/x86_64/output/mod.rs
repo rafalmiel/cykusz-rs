@@ -72,15 +72,11 @@ impl ColorCode {
     }
 
     pub fn fg(&self) -> Color {
-        unsafe {
-            core::mem::transmute::<u8, Color>(self.0.get_bits(0..=3))
-        }
+        unsafe { core::mem::transmute::<u8, Color>(self.0.get_bits(0..=3)) }
     }
 
     pub fn bg(&self) -> Color {
-        unsafe {
-            core::mem::transmute::<u8, Color>(self.0.get_bits(4..=7))
-        }
+        unsafe { core::mem::transmute::<u8, Color>(self.0.get_bits(4..=7)) }
     }
 }
 

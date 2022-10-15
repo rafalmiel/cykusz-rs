@@ -4,7 +4,6 @@
 #![feature(auto_traits)]
 #![feature(c_variadic)]
 #![feature(concat_idents)]
-#![feature(const_btree_new)]
 #![feature(const_mut_refs)]
 #![feature(lang_items)]
 #![feature(linkage)]

@@ -1,4 +1,3 @@
-use core::alloc::Layout;
 use core::panic::PanicInfo;
 
 #[cfg(not(test))]
@@ -19,8 +18,8 @@ pub extern "C" fn _Unwind_Resume() -> ! {
     loop {}
 }
 
-#[lang = "oom"]
-fn oom(layout: Layout) -> ! {
+#[alloc_error_handler]
+fn oom(layout: core::alloc::Layout) -> ! {
     println!("Out of memory! {:?}", layout);
     loop {}
 }

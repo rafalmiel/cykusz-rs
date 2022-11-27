@@ -143,7 +143,7 @@ impl PageItemStruct {
     pub fn drop_user_addr(&self, mapping: &UserAddr) {
         let mut umaps = self.user_dirty_mappings.lock();
 
-        umaps.remove(&mapping);
+        umaps.remove(mapping);
     }
 }
 

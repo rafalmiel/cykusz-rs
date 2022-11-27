@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(alloc_error_handler)]
 #![feature(lang_items)]
 #![feature(linkage)]
 
@@ -9,7 +10,6 @@ extern crate syscall_defs;
 extern crate syscall_user as syscall;
 extern crate user_alloc;
 
-use core::alloc::Layout;
 use core::panic::PanicInfo;
 
 use syscall_defs::{FcntlCmd, OpenFlags, SyscallError};
@@ -68,8 +68,8 @@ pub extern "C" fn _Unwind_Resume() -> ! {
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
 
-#[lang = "oom"]
-fn oom(layout: Layout) -> ! {
+#[alloc_error_handler]
+fn oom(layout: core::alloc::Layout) -> ! {
     println!("Out of memory! {:?}", layout);
     syscall::exit(1)
 }

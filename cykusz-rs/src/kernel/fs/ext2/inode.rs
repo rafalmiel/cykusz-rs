@@ -417,7 +417,7 @@ impl CachedAccess for LockedExt2INode {
             }
         }
 
-        self.update_cached_synced(offset, buf, true)
+        self.update_cached_synced(offset, buf, false)
     }
 }
 

@@ -46,11 +46,16 @@ impl Index<usize> for Offsets {
 pub struct INodeData {
     inode: Arc<LockedExt2INode>,
     offset: usize,
+    synced: bool,
 }
 
 impl INodeData {
     pub fn new(inode: Arc<LockedExt2INode>, offset: usize) -> INodeData {
-        INodeData { inode, offset }
+        INodeData { inode, offset, synced: false }
+    }
+
+    pub fn new_synced(inode: Arc<LockedExt2INode>, offset: usize, synced: bool) -> INodeData {
+        INodeData { inode, offset, synced }
     }
 
     fn fs(&self) -> Arc<Ext2Filesystem> {
@@ -484,6 +489,7 @@ impl INodeData {
             let block_offset = self.offset % block_size;
 
             if let Some(mut block) = if block_offset == 0 && file_size == self.offset {
+                assert!(allow_grow);
                 self.append_block(core::cmp::min(block_size, rem))
             } else {
                 if let Some(block) = self.read_block_at(block_num) {
@@ -498,7 +504,7 @@ impl INodeData {
                 block.slice_mut()[block_offset..block_offset + to_write]
                     .copy_from_slice(&data[data_offset..data_offset + to_write]);
 
-                fs.write_block(block.block(), block.slice());
+                fs.write_block_sync(block.block(), block.slice(), self.synced);
 
                 self.offset += to_write;
 

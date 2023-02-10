@@ -1,11 +1,12 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::ops::{Deref, DerefMut};
+use intrusive_collections::LinkedList;
 
 use syscall_defs::{FileType, OpenFlags};
 
 use crate::arch::mm::PAGE_SIZE;
-use crate::kernel::fs::cache::Cacheable;
+use crate::kernel::fs::cache::{Cacheable, CacheItemAdapter};
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
@@ -14,17 +15,18 @@ use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::pcache::{CachedAccess, PageItem, PageItemInt, RawAccess};
+use crate::kernel::fs::pcache::{CachedAccess, PageItem, PageItemAdapter, PageItemInt, RawAccess};
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
-use crate::kernel::sync::{RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
+use crate::kernel::sync::{Mutex, RwMutex, RwMutexReadGuard, RwMutexWriteGuard, Spin};
 use crate::kernel::utils::slice::ToBytes;
 
 pub struct LockedExt2INode {
     node: RwMutex<Ext2INode>,
     fs: Weak<Ext2Filesystem>,
     self_ref: Weak<LockedExt2INode>,
+    dirty_list: Mutex<LinkedList<PageItemAdapter>>,
 }
 
 impl LockedExt2INode {
@@ -41,6 +43,7 @@ impl LockedExt2INode {
                     node: RwMutex::new(Ext2INode::new(fs.clone(), id)),
                     fs,
                     self_ref: me.clone(),
+                    dirty_list: Mutex::new(LinkedList::<PageItemAdapter>::new(PageItemAdapter::new())),
                 }
             })))
         }
@@ -159,12 +162,12 @@ impl LockedExt2INode {
         self.self_ref.upgrade().unwrap()
     }
 
-    fn update_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+    fn update_at(&self, offset: usize, buf: &[u8], synced: bool) -> Result<usize> {
         if self.ftype()? != FileType::File && self.ftype()? != FileType::Symlink {
             return Err(FsError::NotFile);
         }
 
-        let mut writer = INodeData::new(self.self_ref(), offset);
+        let mut writer = INodeData::new_synced(self.self_ref(), offset, synced);
 
         Ok(writer.write(buf, false)?)
     }
@@ -291,6 +294,20 @@ impl Ext2INode {
         fs.group_descs().free_block_ptr(ptr);
     }
 
+    fn sync_s_ptr(&self, ptr: usize, fs: &Ext2Filesystem) {
+        let block = fs.make_slice_buf_from::<u32>(ptr);
+
+        for p in block.slice() {
+            if *p != 0 {
+                fs.sync_block(*p as usize);
+            } else {
+                continue;
+            }
+        }
+
+        fs.sync_block(ptr);
+    }
+
     fn free_d_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
         let mut block = fs.make_slice_buf_from::<u32>(ptr);
 
@@ -300,12 +317,26 @@ impl Ext2INode {
 
                 *p = 0;
             } else {
-                break;
+                continue;
             }
         }
         fs.write_block(ptr, block.slice().to_bytes());
 
         fs.group_descs().free_block_ptr(ptr);
+    }
+
+    fn sync_d_ptr(&self, ptr: usize, fs: &Ext2Filesystem) {
+        let block = fs.make_slice_buf_from::<u32>(ptr);
+
+        for p in block.slice() {
+            if *p != 0 {
+                self.sync_s_ptr(*p as usize, fs);
+            } else {
+                continue;
+            }
+        }
+
+        fs.sync_block(ptr);
     }
 
     fn free_t_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
@@ -317,12 +348,25 @@ impl Ext2INode {
 
                 *p = 0;
             } else {
-                break;
+                continue;
             }
         }
         fs.write_block(ptr, block.slice().to_bytes());
 
         fs.group_descs().free_block_ptr(ptr);
+    }
+
+    fn sync_t_ptr(&self, ptr: usize, fs: &Ext2Filesystem) {
+        let block = fs.make_slice_buf_from::<u32>(ptr);
+
+        for p in block.slice() {
+            if *p != 0 {
+                self.sync_d_ptr(*p as usize, fs);
+            } else {
+                continue;
+            }
+        }
+        fs.sync_block(ptr);
     }
 
     pub fn free_blocks(&mut self, fs: &Ext2Filesystem) {
@@ -364,6 +408,42 @@ impl Ext2INode {
 
         fs.group_descs().write_d_inode(self.id, self.d_inode());
     }
+
+    pub fn sync_blocks(&self, fs: &Ext2Filesystem) {
+        if self.ftype() == FileType::Symlink && self.d_inode.size_lower() <= 60 {
+            fs.group_descs().sync_d_inode(self.id);
+            return;
+        }
+
+        logln!("sync inode blocks {} {:?}", self.id, self.d_inode);
+
+        for i in 0usize..15 {
+            let ptr = self.d_inode.block_ptrs()[i] as usize;
+
+            if ptr == 0 {
+                continue;
+            }
+
+            if i < 12 {
+                fs.sync_block(ptr);
+            } else {
+                match i {
+                    12 => {
+                        self.sync_s_ptr(ptr, fs);
+                    }
+                    13 => {
+                        self.sync_d_ptr(ptr, fs);
+                    }
+                    14 => {
+                        self.sync_t_ptr(ptr, fs);
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+
+        fs.group_descs().sync_d_inode(self.id);
+    }
 }
 
 impl RawAccess for LockedExt2INode {
@@ -376,7 +456,7 @@ impl RawAccess for LockedExt2INode {
     }
 
     fn write_direct(&self, addr: usize, buf: &[u8]) -> Option<usize> {
-        if let Ok(written) = self.update_at(addr, buf) {
+        if let Ok(written) = self.update_at(addr, buf, true) {
             Some(written)
         } else {
             None
@@ -390,11 +470,16 @@ impl CachedAccess for LockedExt2INode {
     }
 
     fn notify_dirty(&self, page: &PageItem) {
+        page.link_to_list(&mut *self.dirty_list.lock());
         self.ext2_fs().dev().notify_dirty_inode(page);
     }
 
     fn notify_clean(&self, page: &PageItemInt) {
         self.ext2_fs().dev().notify_clean_inode(page);
+        if let Some(mut s) = self.dirty_list.try_lock() {
+            logln!("notify clean inode unlink");
+            page.unlink_from_list(&mut *s);
+        }
     }
 
     fn sync_page(&self, page: &PageItemInt) {
@@ -402,7 +487,7 @@ impl CachedAccess for LockedExt2INode {
             "sync inode page flags {:?}",
             get_flags(page.page().to_virt())
         );
-        if let Err(e) = self.update_at(page.offset() * PAGE_SIZE, page.data()) {
+        if let Err(e) = self.update_at(page.offset() * PAGE_SIZE, page.data(), true) {
             panic!("Page {:?} sync failed {:?}", page.cache_key(), e);
         }
     }
@@ -843,6 +928,22 @@ impl INode for LockedExt2INode {
         }
 
         Some(Arc::new(SysDirEntIter::new(parent, self.self_ref())))
+    }
+
+    fn sync(&self) -> Result<()> {
+        let mut pages = self.dirty_list.lock();
+
+        for page in pages.iter() {
+            logln!("syncing page to storage");
+            page.sync_to_storage(&page);
+            logln!("synced page to storage");
+        }
+
+        pages.clear();
+
+        self.read().sync_blocks(&self.ext2_fs());
+
+        return Ok(())
     }
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {

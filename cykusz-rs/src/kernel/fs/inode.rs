@@ -117,6 +117,10 @@ pub trait INode: Send + Sync + DowncastSync {
         return Err(FsError::NotSupported);
     }
 
+    fn sync(&self) -> Result<()> {
+        return Err(FsError::NotSupported);
+    }
+
     fn ref_update(&self, _new_ref: Weak<INodeItemInt>) {}
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {

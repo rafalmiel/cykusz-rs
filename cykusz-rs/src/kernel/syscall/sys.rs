@@ -1046,6 +1046,17 @@ pub fn sys_sync() -> SyscallResult {
     Ok(0)
 }
 
+pub fn sys_fsync(fd: u64) -> SyscallResult {
+    let file = current_task_ref()
+        .filetable()
+        .get_handle(fd as usize)
+        .ok_or(SyscallError::EBADFD)?;
+
+    file.inode.inode().sync()?;
+
+    Ok(0)
+}
+
 pub fn sys_poweroff() -> ! {
     crate::kernel::sched::close_all_tasks();
     println!("[ SHUTDOWN ] Closed all tasks");

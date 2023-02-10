@@ -186,6 +186,6 @@ impl BlockDev for Port {
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize> {
         let request = Arc::new(DmaRequest::from_bytes(sector, buf));
 
-        self.run_request(request.clone())
+        self.run_request(request)
     }
 }

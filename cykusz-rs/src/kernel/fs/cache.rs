@@ -10,7 +10,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use intrusive_collections::{LinkedList, LinkedListLink};
 use lru::LruCache;
 
-use crate::kernel::sync::{Mutex, Spin, SpinGuard};
+use crate::kernel::sync::{Mutex, MutexGuard, Spin, SpinGuard};
 
 pub trait DropHandler {
     fn handle_drop(&self, arc: Arc<Self>);
@@ -156,7 +156,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheItem<K, T> {
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> ArcWrap<CacheItem<K, T>> {
-    pub fn link_to_list(&self, mut list: SpinGuard<LinkedList<CacheItemAdapter<K, T>>>) {
+    pub fn link_to_list(&self, list: &mut LinkedList<CacheItemAdapter<K, T>>) {
         let _link_lock = self.link_lock.lock();
 
         if self.link.is_linked() {

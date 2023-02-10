@@ -56,6 +56,20 @@ impl INodeGroup {
     pub fn write(&self) -> MutexGuard<INodeVec> {
         self.inodes.lock()
     }
+
+    pub fn sync(&self) {
+        let mut l = self.inodes.lock();
+
+        if let Some(fs) = self.fs.upgrade() {
+            if l.dirty {
+                fs.write_block(l.src_block, l.vec.as_slice());
+            }
+
+            fs.sync_block(l.src_block);
+        }
+
+        l.dirty = false;
+    }
 }
 
 impl Drop for INodeGroup {
@@ -280,6 +294,14 @@ impl BlockGroupDescriptors {
         desc[bg_idx].inode_table() as usize + block_off
     }
 
+    pub fn try_get_d_inode(&self, id: usize) -> Option<Arc<INodeGroup>> {
+        let block = self.get_inode_block(id);
+
+        let mut inodes = self.d_inodes.lock();
+
+        inodes.get(&block).cloned()
+    }
+
     pub fn get_d_inode(&self, id: usize) -> Arc<INodeGroup> {
         let block = self.get_inode_block(id);
 
@@ -324,6 +346,14 @@ impl BlockGroupDescriptors {
         let vec = group.read();
 
         *d_inode = *vec.get(id, group.inode_size());
+    }
+
+    pub fn sync_d_inode(&self, id: usize) {
+        if let Some(ind) = self.try_get_d_inode(id) {
+            ind.sync();
+        } else {
+            self.fs().sync_block(self.get_inode_block(id));
+        }
     }
 
     pub fn debug(&self) {

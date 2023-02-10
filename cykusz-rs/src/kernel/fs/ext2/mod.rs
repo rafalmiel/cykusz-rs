@@ -8,7 +8,8 @@ use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
-use crate::kernel::fs::pcache::CachedBlockDev;
+use crate::kernel::fs::pcache::{CachedBlockDev, PageItemStruct};
+use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{Mutex, MutexGuard};
 use crate::kernel::utils::slice::ToBytesMut;
@@ -77,9 +78,19 @@ impl Ext2Filesystem {
             .read_cached(block * self.sectors_per_block() * 512, dest)
     }
 
+    pub fn sync_block(&self, block: usize) -> bool {
+        let res = self.dev.sync_offset(block * self.sectors_per_block() * 512);
+
+        res
+    }
+
     pub fn write_block(&self, block: usize, buf: &[u8]) -> Option<usize> {
         self.dev
-            .update_cached(block * self.sectors_per_block() * 512, buf)
+            .write_cached(block * self.sectors_per_block() * 512, buf)
+    }
+
+    pub fn write_block_sync(&self, block: usize, buf: &[u8], sync: bool) -> Option<usize> {
+        self.dev.update_cached_synced(block * self.sectors_per_block() * 512, buf, sync)
     }
 
     pub fn dir_lock(&self) -> MutexGuard<()> {
@@ -132,6 +143,8 @@ impl Ext2Filesystem {
         if let Some(ptr) = self.group_descs().alloc_block_ptr(hint) {
             let mut buf = self.make_buf();
             buf.set_block(ptr);
+
+            logln!("allocated new block {}", ptr);
 
             Some(buf)
         } else {

@@ -103,6 +103,7 @@ impl PageItemStruct {
     }
 
     pub fn notify_dirty(&self, page: &PageItem, mapping: Option<UserAddr>) {
+        logln!("block notify dirty page: {}", self.offset());
         if !page.is_dirty() {
             map_flags(page.page.to_virt(), PageFlags::WRITABLE);
 
@@ -121,6 +122,7 @@ impl PageItemStruct {
     }
 
     pub fn notify_clean(&self, page: &PageItemInt) {
+        logln!("block notify clean page: {}", self.offset());
         self.mark_dirty(false);
 
         {
@@ -175,6 +177,20 @@ pub trait CachedAccess: RawAccess {
     fn notify_clean(&self, _page: &PageItemInt);
 
     fn sync_page(&self, page: &PageItemInt);
+
+    fn try_get_mmap_page(&self, offset: usize) -> Option<PageItem> {
+        if current_task_ref().locks() > 0 {
+            logln!("get_mmap_page: locks > 0");
+        }
+
+        let page_cache = cache();
+
+        let dev = self.this();
+
+        let cache_offset = offset / PAGE_SIZE;
+
+        page_cache.get(PageItemStruct::make_key(&dev, cache_offset))
+    }
 
     fn get_mmap_page(&self, offset: usize) -> Option<PageItem> {
         if current_task_ref().locks() > 0 {
@@ -242,6 +258,15 @@ pub trait CachedAccess: RawAccess {
 
     fn update_cached(&self, offset: usize, buf: &[u8]) -> Option<usize> {
         self.update_cached_synced(offset, buf, false)
+    }
+
+    fn sync_offset(&self, offset: usize) -> bool {
+        if let Some(page) = self.try_get_mmap_page(offset) {
+            page.sync_to_storage(&page);
+            return true;
+        }
+
+        false
     }
 
     fn update_cached_synced(&self, mut offset: usize, buf: &[u8], sync: bool) -> Option<usize> {

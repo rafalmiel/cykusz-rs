@@ -8,6 +8,8 @@ extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
 
+use alloc::format;
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use chrono::{Datelike, Timelike};
@@ -191,6 +193,17 @@ fn exec(cmd: &str) {
             if let Err(e) = syscall::mkdir(p.trim()) {
                 println!("Failed to mkdir: {:?}", e);
             }
+
+            if let Some(f) = File::new(p.trim(), OpenFlags::DIRECTORY) {
+                f.sync();
+            }
+            let mut s = String::new();
+            s += p;
+            s += "/..";
+            if let Some(f) = File::new(s.as_str(), OpenFlags::DIRECTORY) {
+                f.sync();
+            }
+
         }
     } else if cmd.starts_with("host ") {
         let mut iter = cmd.split_whitespace();
@@ -412,6 +425,8 @@ fn exec(cmd: &str) {
                         break;
                     }
                 }
+
+                file.sync();
             }
         }
     } else if cmd.starts_with("create ") {

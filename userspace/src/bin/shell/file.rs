@@ -32,6 +32,16 @@ impl File {
             }
         }
     }
+
+    pub fn sync(&self) -> usize {
+        match syscall::fsync(self.fd) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("fsync failed: {:?}", e);
+                0
+            }
+        }
+    }
 }
 
 impl Drop for File {

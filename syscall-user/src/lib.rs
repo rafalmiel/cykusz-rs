@@ -535,6 +535,10 @@ pub fn dup2(fd: usize, new_fd: usize, flags: OpenFlags) -> SyscallResult {
     unsafe { syscall3(SYS_DUP2, fd, new_fd, flags.bits()) }
 }
 
+pub fn fsync(fd: usize) -> SyscallResult {
+    unsafe { syscall1(SYS_FSYNC, fd) }
+}
+
 pub fn poweroff() -> ! {
     unsafe {
         if let Err(e) = syscall0(SYS_POWEROFF) {

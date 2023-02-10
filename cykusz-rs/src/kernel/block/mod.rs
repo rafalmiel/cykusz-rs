@@ -138,6 +138,7 @@ impl BlockDevice {
     fn sync_cache(&self, cache: &mut MutexGuard<hashbrown::HashMap<PageCacheKey, PageItemWeak>>) {
         for (_, a) in cache.iter() {
             if let Some(up) = a.upgrade() {
+                logln!("sync page to storage (offset: {})", up.offset());
                 up.sync_to_storage(&up);
             }
         }
@@ -197,6 +198,7 @@ impl CachedAccess for BlockDevice {
     }
 
     fn notify_dirty(&self, page: &PageItem) {
+        logln!("notify dirty page: {}", page.offset());
         let mut dirty = self.dirty_pages.lock();
 
         dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
@@ -207,10 +209,15 @@ impl CachedAccess for BlockDevice {
     }
 
     fn notify_clean(&self, page: &PageItemInt) {
+        logln!("notify clean page: {}", page.offset());
         if !self.is_sync_all_active() {
             let mut dirty = self.dirty_pages.lock();
 
             dirty.remove(&page.cache_key());
+
+            if dirty.is_empty() && self.dirty_inode_pages.lock().is_empty() {
+                self.cleanup_timer.disable();
+            }
         }
     }
 
@@ -235,6 +242,7 @@ impl CachedAccess for BlockDevice {
 
 impl CachedBlockDev for BlockDevice {
     fn notify_dirty_inode(&self, page: &PageItem) {
+        logln!("notify dirty inode: {}", page.offset());
         let mut dirty = self.dirty_inode_pages.lock();
 
         dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
@@ -245,10 +253,15 @@ impl CachedBlockDev for BlockDevice {
     }
 
     fn notify_clean_inode(&self, page: &PageItemInt) {
+        logln!("notify clean inode: {}", page.offset());
         if !self.is_sync_all_active() {
             let mut dirty = self.dirty_inode_pages.lock();
 
             dirty.remove(&page.cache_key());
+
+            if dirty.is_empty() && self.dirty_pages.lock().is_empty() {
+                self.cleanup_timer.disable();
+            }
         }
     }
 

@@ -59,8 +59,6 @@ impl<T> Mutex<T> {
     }
 
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
-        let task = current_task();
-
         loop {
             if let Some(g) = self.mutex.try_lock() {
                 return Some(MutexGuard {

@@ -260,4 +260,7 @@ impl Superblock {
     pub fn sectors_per_block(&self) -> usize {
         self.block_size() / 512
     }
+    pub fn fs_id(&self) -> &[u8] {
+        &self.fs_id
+    }
 }

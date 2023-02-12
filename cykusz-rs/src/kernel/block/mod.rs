@@ -3,10 +3,13 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
+use spin::Once;
+use uuid::Uuid;
 
 use crate::kernel::device;
 use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::cache::{ArcWrap, Cacheable};
+use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{
     CachedAccess, CachedBlockDev, PageCacheKey, PageItem, PageItemInt, PageItemWeak, RawAccess,
@@ -20,6 +23,10 @@ mod mbr;
 pub trait BlockDev: Send + Sync {
     fn read(&self, sector: usize, dest: &mut [u8]) -> Option<usize>;
     fn write(&self, sector: usize, buf: &[u8]) -> Option<usize>;
+
+    fn init_uuid(&self) -> Option<Uuid> {
+        None
+    }
 }
 
 static BLK_DEVS: Mutex<BTreeMap<usize, Arc<BlockDevice>>> = Mutex::new(BTreeMap::new());
@@ -31,7 +38,11 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
 
     println!("[ BLOCK ] Registered block device {}", dev.name());
 
-    devs.insert(dev.id, dev);
+    devs.insert(dev.id, dev.clone());
+
+    drop(devs);
+
+    dev.init();
 
     Ok(())
 }
@@ -46,6 +57,20 @@ pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn CachedBlockDev>> {
     }
 }
 
+pub fn get_blkdev_by_uuid(uuid: Uuid) -> Option<Arc<dyn CachedBlockDev>> {
+    let devs = BLK_DEVS.lock();
+
+    for (_k, v) in devs.iter() {
+        if let Some(uid) = v.uuid() {
+            if uid == uuid {
+                return Some(v.clone());
+            }
+        }
+    }
+
+    None
+}
+
 pub struct BlockDevice {
     id: usize,
     name: String,
@@ -55,12 +80,14 @@ pub struct BlockDevice {
     dirty_pages: Mutex<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
     cleanup_timer: Arc<Timer>,
     sync_all_altive: AtomicBool,
+    uuid: Once<Option<Uuid>>,
 }
 
 pub struct PartitionBlockDev {
     offset: usize, // offset in sectors
     size: usize,   // capacity in sectors
     dev: Arc<dyn BlockDev>,
+    self_ref: Weak<PartitionBlockDev>,
 }
 
 impl BlockDev for PartitionBlockDev {
@@ -95,11 +122,18 @@ impl BlockDev for PartitionBlockDev {
             self.dev.write(self.offset + sector, buf)
         }
     }
+
+    fn init_uuid(&self) -> Option<Uuid> {
+        Ext2Filesystem::try_get_uuid(self.self_ref.upgrade().unwrap())
+    }
+
 }
 
 impl PartitionBlockDev {
-    pub fn new(offset: usize, size: usize, dev: Arc<dyn BlockDev>) -> PartitionBlockDev {
-        PartitionBlockDev { offset, size, dev }
+    pub fn new(offset: usize, size: usize, dev: Arc<dyn BlockDev>) -> Arc<PartitionBlockDev> {
+        Arc::new_cyclic(|me| {
+            PartitionBlockDev { offset, size, dev, self_ref: me.clone() }
+        })
     }
 }
 
@@ -126,13 +160,24 @@ impl BlockDevice {
         Arc::new_cyclic(|me| BlockDevice {
             id: alloc_id(),
             name,
-            dev: imp,
+            dev: imp.clone(),
             self_ref: me.clone(),
             dirty_inode_pages: Mutex::new(hashbrown::HashMap::new()),
             dirty_pages: Mutex::new(hashbrown::HashMap::new()),
             cleanup_timer: create_timer(TimerCallback::new(me.clone(), BlockDevice::sync_all)),
             sync_all_altive: AtomicBool::new(false),
+            uuid: Once::new(),
         })
+    }
+
+    fn init(&self) {
+        self.uuid.call_once(|| {
+            self.dev.init_uuid()
+        });
+    }
+
+    pub fn uuid(&self) -> Option<Uuid> {
+        *self.uuid.get().unwrap()
     }
 
     fn sync_cache(&self, cache: &mut MutexGuard<hashbrown::HashMap<PageCacheKey, PageItemWeak>>) {
@@ -320,7 +365,7 @@ pub fn init() {
 
                         let blkdev = BlockDevice::new(
                             dev.name() + "." + &(p + 1).to_string(),
-                            Arc::new(part_dev),
+                            part_dev,
                         );
 
                         if let Err(e) = register_blkdev(blkdev.clone()) {

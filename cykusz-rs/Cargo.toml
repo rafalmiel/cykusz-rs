@@ -21,6 +21,10 @@ lru = "*"
 vte = "*"
 linked_list_allocator = "*"
 
+[dependencies.uuid]
+default-features = false
+version = "*"
+
 [dependencies.chrono]
 default-features = false
 version = "*"

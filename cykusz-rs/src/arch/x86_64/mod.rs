@@ -45,6 +45,11 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
 
     println!("[ OK ] Phys Page Map Initialised");
 
+    for mo in mboot.command_line_tags() {
+        crate::kernel::params::init(mo.command_line());
+        break;
+    }
+
     acpi::init();
 
     dev::init();

@@ -10,6 +10,7 @@ pub mod mm;
 #[macro_use]
 pub mod module;
 pub mod net;
+pub mod params;
 #[macro_use]
 pub mod sched;
 pub mod session;

@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 use alloc::sync::Weak;
+use alloc::vec::Vec;
 
 use downcast_rs::DowncastSync;
 
@@ -53,6 +54,14 @@ pub trait INode: Send + Sync + DowncastSync {
 
     fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
         Err(FsError::NotSupported)
+    }
+
+    fn read_all(&self) -> Vec<u8> {
+        let meta = self.metadata().unwrap();
+        let mut data = Vec::<u8>::new();
+        data.resize(meta.size, 0);
+        self.read_at(0, data.as_mut_slice()).expect("fstab read failed");
+        data
     }
 
     fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {

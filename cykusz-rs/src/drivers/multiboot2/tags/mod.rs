@@ -1,6 +1,7 @@
 use crate::kernel::mm::PhysAddr;
 
 pub mod address;
+pub mod command_line;
 pub mod elf;
 pub mod memory;
 pub mod modules;

@@ -6,7 +6,7 @@ use intrusive_collections::LinkedList;
 use syscall_defs::{FileType, OpenFlags};
 
 use crate::arch::mm::PAGE_SIZE;
-use crate::kernel::fs::cache::{Cacheable, CacheItemAdapter};
+use crate::kernel::fs::cache::Cacheable;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
@@ -19,7 +19,7 @@ use crate::kernel::fs::pcache::{CachedAccess, PageItem, PageItemAdapter, PageIte
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
-use crate::kernel::sync::{Mutex, RwMutex, RwMutexReadGuard, RwMutexWriteGuard, Spin};
+use crate::kernel::sync::{Mutex, RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
 use crate::kernel::utils::slice::ToBytes;
 
 pub struct LockedExt2INode {

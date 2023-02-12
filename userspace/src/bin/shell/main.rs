@@ -8,7 +8,6 @@ extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
 
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 

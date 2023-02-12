@@ -82,4 +82,19 @@ impl Info {
             }
         })
     }
+
+    pub fn command_line_tags(
+        &self,
+    ) -> ::core::iter::FilterMap<
+        tags::TagIter,
+        fn(&tags::Tag) -> Option<&'static tags::command_line::CommandLine>,
+    > {
+        self.tags().filter_map(|t| {
+            if t.typ == 1 {
+                Some(unsafe { &*(t as *const tags::Tag as *const tags::command_line::CommandLine) })
+            } else {
+                None
+            }
+        })
+    }
 }

@@ -3,10 +3,11 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use spin::Once;
+use uuid::Uuid;
 
 use syscall_defs::{FileType, OpenFlags};
 
-use crate::kernel::block::get_blkdev_by_id;
+use crate::kernel::block::{get_blkdev_by_id, get_blkdev_by_uuid};
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::ext2::Ext2Filesystem;
@@ -103,6 +104,47 @@ pub fn init() {
 }
 
 pub fn mount_root() {
+    let uuid_str = crate::kernel::params::get("root").expect("missing root kernel cmd param");
+    let uuid = Uuid::parse_str(uuid_str.as_str()).expect("invalid root uuid param");
+
+    let root_dev = get_blkdev_by_uuid(uuid).expect("device with root uuid does not exists");
+    let root_fs = Ext2Filesystem::new(root_dev).expect("Invalid ext2 fs");
+
+    ROOT_MOUNT.call_once(|| root_fs.clone());
+    ROOT_DENTRY.call_once(|| root_fs.root_dentry());
+
+    if let Ok(fstab) = lookup_by_path(Path::new("/etc/fstab"), LookupMode::None) {
+        let data = fstab.inode().read_all();
+
+        if let Ok(content) = core::str::from_utf8(data.as_slice()) {
+            for line in content.split("\n") {
+                if let Some((uuid_str, path)) = line.split_once(' ') {
+                    let mount_entry =
+                        lookup_by_path(Path::new(path), LookupMode::None).expect("fstab path not found");
+
+                    let uuid = Uuid::parse_str(uuid_str).expect("invalid uuid fstab str");
+
+                    let dev = get_blkdev_by_uuid(uuid).expect("dev not found");
+
+                    let fs = Ext2Filesystem::new(dev).expect("not an ext2 filesystem");
+
+                    mount::mount(mount_entry, fs).expect("failed to mount");
+
+                    logln!("mounted uuid: {} at path: {}", uuid_str, path);
+                }
+            }
+        }
+    }
+
+    let dev_entry =
+        lookup_by_path(Path::new("/dev"), LookupMode::None).expect("/dev dir not found");
+
+    mount::mount(dev_entry, dev_listener().devfs.clone()).expect("/dev mount faiiled");
+
+    logln!("all mounted");
+}
+
+pub fn mount_root_old() {
     let dev_ent = dev_listener().root_dentry();
 
     let boot = dev_listener()

@@ -2,6 +2,8 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 
 use spin::Once;
+use uuid::Uuid;
+use crate::kernel::block::BlockDev;
 
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
@@ -45,6 +47,17 @@ impl Ext2Filesystem {
             None
         } else {
             Some(a)
+        }
+    }
+
+    pub fn try_get_uuid(dev: Arc<dyn BlockDev>) -> Option<Uuid> {
+        let mut sb = crate::kernel::fs::ext2::disk::superblock::Superblock::default();
+        dev.read(2, sb.as_bytes_mut());
+
+        if sb.ext_sig() == 0xef53 {
+            Uuid::from_slice(sb.fs_id()).ok()
+        } else {
+            None
         }
     }
 
@@ -142,8 +155,6 @@ impl Ext2Filesystem {
         if let Some(ptr) = self.group_descs().alloc_block_ptr(hint) {
             let mut buf = self.make_buf();
             buf.set_block(ptr);
-
-            logln!("allocated new block {}", ptr);
 
             Some(buf)
         } else {

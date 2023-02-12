@@ -9,6 +9,8 @@ mount /dev/loop0p1 mnt
 cp -f build/isofiles/boot/kernel.bin mnt/
 cp -f build/isofiles/boot/grub/grub.cfg mnt/grub/
 
+sed -i "s/{ROOT_UUID}/$(blkid -s UUID -o value /dev/loop0p2)/g" mnt/grub/grub.cfg
+
 umount mnt
 
 PROGS="test testcpp hello stack nyancat ttytest fork"
@@ -36,6 +38,12 @@ cp sysroot/float.c mnt/
 cp sysroot/ncurses mnt/
 #cp sysroot/hello.cpp mnt/
 ##cp sysroot/cykusz/usr/bin/{readelf,objdump,nm,strings,size} mnt/bin/
+
+mkdir -p mnt/etc
+mkdir -p mnt/home
+echo $(blkid -s UUID -o value /dev/loop0p1) /boot > mnt/etc/fstab
+echo $(blkid -s UUID -o value /dev/loop0p3) /home >> mnt/etc/fstab
+
 umount mnt
 
 losetup -D

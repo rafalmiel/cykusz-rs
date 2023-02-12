@@ -61,17 +61,13 @@ impl<T> Mutex<T> {
     pub fn try_lock(&self) -> Option<MutexGuard<T>> {
         let task = current_task();
 
-        self.wait_queue.add_task(task.clone());
-
         loop {
             if let Some(g) = self.mutex.try_lock() {
-                self.wait_queue.remove_task(task.clone());
                 return Some(MutexGuard {
                     g: Some(g),
                     m: &self,
                 });
             } else {
-                self.wait_queue.remove_task(task.clone());
                 return None;
             }
         }

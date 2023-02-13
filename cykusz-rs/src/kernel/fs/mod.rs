@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
@@ -103,6 +103,13 @@ pub fn init() {
     });
 }
 
+fn mount_by_path(path: &str, fs: Arc<dyn Filesystem>) {
+    let entry =
+        lookup_by_path(Path::new(path), LookupMode::None).expect((path.to_string() + "/dev dir not found").as_str());
+
+    mount::mount(entry, fs).expect((path.to_string() + " mount faiiled").as_str());
+}
+
 pub fn mount_root() {
     let uuid_str = crate::kernel::params::get("root").expect("missing root kernel cmd param");
     let uuid = Uuid::parse_str(uuid_str.as_str()).expect("invalid root uuid param");
@@ -119,16 +126,13 @@ pub fn mount_root() {
         if let Ok(content) = core::str::from_utf8(data.as_slice()) {
             for line in content.split("\n") {
                 if let Some((uuid_str, path)) = line.split_once(' ') {
-                    let mount_entry =
-                        lookup_by_path(Path::new(path), LookupMode::None).expect("fstab path not found");
-
-                    let uuid = Uuid::parse_str(uuid_str).expect("invalid uuid fstab str");
-
-                    let dev = get_blkdev_by_uuid(uuid).expect("dev not found");
-
-                    let fs = Ext2Filesystem::new(dev).expect("not an ext2 filesystem");
-
-                    mount::mount(mount_entry, fs).expect("failed to mount");
+                    mount_by_path(path,
+                                  Ext2Filesystem::new(
+                                      get_blkdev_by_uuid(
+                                          Uuid::parse_str(uuid_str).expect("invalid uuid")
+                                      ).expect("block dev not found")
+                                  ).expect("not ext2 filesystem")
+                    );
 
                     logln!("mounted uuid: {} at path: {}", uuid_str, path);
                 }
@@ -136,12 +140,7 @@ pub fn mount_root() {
         }
     }
 
-    let dev_entry =
-        lookup_by_path(Path::new("/dev"), LookupMode::None).expect("/dev dir not found");
-
-    mount::mount(dev_entry, dev_listener().devfs.clone()).expect("/dev mount faiiled");
-
-    logln!("all mounted");
+    mount_by_path("/dev", dev_listener().devfs.clone());
 }
 
 pub fn mount_root_old() {

@@ -125,21 +125,21 @@ pub fn rust_main(stack_top: VirtAddr) {
 fn init_task() {
     kernel::ipi::test_ipi();
 
-    kernel::net::init();
-
-    println!("[ OK ] Network Stack Initialized");
-
     kernel::module::init_all();
 
     println!("[ OK ] Modules Initialized");
 
     drivers::post_module_init();
 
+    kernel::net::init();
+
+    println!("[ OK ] Network Stack Initialized");
+
     kernel::block::init();
 
     kernel::fs::mount_root();
 
-    kernel::net::init();
+    kernel::tty::init();
 
     kernel::futex::init();
 

@@ -3,9 +3,11 @@ use crate::kernel::mm::PhysAddr;
 pub mod address;
 pub mod command_line;
 pub mod elf;
+pub mod framebuffer_info;
 pub mod memory;
 pub mod modules;
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct Tag {
     pub typ: u32,

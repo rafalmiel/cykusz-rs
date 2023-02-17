@@ -24,16 +24,17 @@ pub mod utils;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr) {
-    output::init();
+    let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
+
+    output::init(mboot.framebuffer_info_tag());
 
     gdt::early_init();
 
     println!("[ OK ] GDT Initialised");
 
     idt::init();
-    println!("[ OK ] IDT Initialised");
 
-    let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
+    println!("[ OK ] IDT Initialised");
 
     mm::init(&mboot);
 
@@ -45,9 +46,8 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
 
     println!("[ OK ] Phys Page Map Initialised");
 
-    for mo in mboot.command_line_tags() {
+    if let Some(mo) = mboot.command_line_tag() {
         crate::kernel::params::init(mo.command_line());
-        break;
     }
 
     acpi::init();

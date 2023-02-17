@@ -68,6 +68,18 @@ impl Info {
             .map(|t| unsafe { &*(t as *const tags::Tag as *const tags::elf::Elf) })
     }
 
+    pub fn command_line_tag(&self) -> Option<&'static tags::command_line::CommandLine> {
+        self.tags()
+            .find(|t| t.typ == 1)
+            .map(|t| unsafe { &*(t as *const tags::Tag as *const tags::command_line::CommandLine) })
+    }
+
+    pub fn framebuffer_info_tag(&self) -> Option<&'static tags::framebuffer_info::FramebufferInfo> {
+        self.tags()
+            .find(|t| t.typ == 8)
+            .map(|t| unsafe { &*(t as *const tags::Tag as *const tags::framebuffer_info::FramebufferInfo) })
+    }
+
     pub fn modules_tags(
         &self,
     ) -> ::core::iter::FilterMap<

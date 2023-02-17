@@ -552,7 +552,7 @@ fn tty() -> &'static Arc<Tty> {
     &TTY
 }
 
-fn init() {
+pub fn init() {
     crate::kernel::kbd::register_key_listener(tty().as_ref());
     if let Err(v) = crate::kernel::device::register_device(tty().clone()) {
         panic!("Failed to register Tty device: {:?}", v);
@@ -562,6 +562,5 @@ fn init() {
     }
     crate::arch::output::register_output_driver(tty().as_ref());
     video().clear();
+    video().set_cursor_visible(true);
 }
-
-module_init!(init);

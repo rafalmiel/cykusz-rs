@@ -1,6 +1,5 @@
 use crate::drivers::multiboot2::Tag;
 
-#[repr(packed)]
 pub struct CommandLine {
     pub tag: Tag,
     cmdline_byte: u8,

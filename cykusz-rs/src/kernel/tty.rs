@@ -157,3 +157,7 @@ impl Terminal {
         term.ctrl_term = self.ctrl_term.clone();
     }
 }
+
+pub fn init() {
+    crate::drivers::tty::init();
+}

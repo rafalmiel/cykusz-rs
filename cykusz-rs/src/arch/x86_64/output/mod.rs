@@ -1,6 +1,7 @@
 use core::fmt::Error;
 
 use bit_field::BitField;
+use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
 
 use crate::kernel::sync::{Spin, SpinGuard};
 
@@ -91,6 +92,18 @@ impl ScreenChar {
     pub fn new(char: u8, color: ColorCode) -> ScreenChar {
         ScreenChar { char, color }
     }
+
+    pub fn char(&self) -> u8 {
+        self.char
+    }
+
+    pub fn fg(&self) -> Color {
+        self.color.fg()
+    }
+
+    pub fn bg(&self) -> Color {
+        self.color.bg()
+    }
 }
 
 pub trait VideoDriver: Sync + Send {
@@ -141,9 +154,15 @@ pub fn register_output_driver(driver: &'static dyn ConsoleWriter) {
     *OUTPUT_WRITER.lock() = driver;
 }
 
-pub fn init() {
+pub fn init(fb_info: Option<&'static FramebufferInfo>) {
     crate::arch::dev::serial::init();
-    crate::drivers::video::vga::init();
+    if let Some(fb) = fb_info {
+        if fb.typ() == 2 {
+            crate::drivers::video::vga::init();
+        } else {
+            crate::drivers::video::fb::init(fb);
+        }
+    }
     let w = video();
     w.clear()
 }

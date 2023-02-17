@@ -55,8 +55,23 @@ impl<T> Spin<T> {
         }
     }
 
-    pub fn lock_debug(&self, _id: usize) -> SpinGuard<T> {
-        self.lock()
+    pub fn lock_debug(&self, id: usize) -> SpinGuard<T> {
+        let notify = if self.notify {
+            crate::kernel::sched::preempt_disable()
+        } else {
+            false
+        };
+
+        logln!("l: - {}", id);
+        let lock = self.l.lock();
+        logln!("l: + {}", id);
+
+        SpinGuard {
+            g: Some(lock),
+            irq: false,
+            notify,
+            debug: id,
+        }
     }
 
     pub fn try_lock(&self) -> Option<SpinGuard<T>> {

@@ -6,13 +6,13 @@ header_start:
     ; checksum
     dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start))
 
-;align 8
-;    dw 5
-;    dw 0
-;    dd 20
-;    dd 1920
-;    dd 1080
-;    dd 16
+align 8
+    dw 5
+    dw 0
+    dd 20
+    dd 640
+    dd 480
+    dd 32
 
 align 8
     ; required end tag

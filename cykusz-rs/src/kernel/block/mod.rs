@@ -183,7 +183,7 @@ impl BlockDevice {
     fn sync_cache(&self, cache: &mut MutexGuard<hashbrown::HashMap<PageCacheKey, PageItemWeak>>) {
         for (_, a) in cache.iter() {
             if let Some(up) = a.upgrade() {
-                logln!("sync page to storage (offset: {})", up.offset());
+                //logln!("sync page to storage (offset: {})", up.offset());
                 up.sync_to_storage(&up);
             }
         }
@@ -314,7 +314,7 @@ impl CachedBlockDev for BlockDevice {
         let _irq = IrqGuard::new();
         let _guard = SyncAllGuard::new(self);
 
-        //self.cleanup_timer.disable();
+        self.cleanup_timer.disable();
 
         {
             let mut inodes = self.dirty_inode_pages.lock();

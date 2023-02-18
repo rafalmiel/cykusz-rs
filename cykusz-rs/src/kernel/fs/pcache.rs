@@ -86,6 +86,15 @@ impl PageItemStruct {
         }
     }
 
+    pub fn flush_to_storage(&self, page: &PageItemInt) {
+        if self.is_dirty() {
+            if let Some(cache) = self.fs.upgrade() {
+                cache.write_direct_synced(self.offset() * PAGE_SIZE, self.data());
+                page.notify_clean(page);
+            }
+        }
+    }
+
     pub fn offset(&self) -> usize {
         self.offset
     }
@@ -262,7 +271,7 @@ pub trait CachedAccess: RawAccess {
 
     fn sync_offset(&self, offset: usize) -> bool {
         if let Some(page) = self.try_get_mmap_page(offset) {
-            page.sync_to_storage(&page);
+            page.flush_to_storage(&page);
             return true;
         }
 
@@ -303,6 +312,9 @@ pub trait CachedAccess: RawAccess {
 pub trait RawAccess: Send + Sync {
     fn read_direct(&self, addr: usize, dest: &mut [u8]) -> Option<usize>;
     fn write_direct(&self, addr: usize, buf: &[u8]) -> Option<usize>;
+    fn write_direct_synced(&self, addr: usize, buf: &[u8]) -> Option<usize> {
+        self.write_direct(addr, buf)
+    }
 }
 
 pub fn init() {

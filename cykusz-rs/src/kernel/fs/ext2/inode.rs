@@ -456,6 +456,14 @@ impl RawAccess for LockedExt2INode {
     }
 
     fn write_direct(&self, addr: usize, buf: &[u8]) -> Option<usize> {
+        if let Ok(written) = self.update_at(addr, buf, false) {
+            Some(written)
+        } else {
+            None
+        }
+    }
+
+    fn write_direct_synced(&self, addr: usize, buf: &[u8]) -> Option<usize> {
         if let Ok(written) = self.update_at(addr, buf, true) {
             Some(written)
         } else {
@@ -502,7 +510,7 @@ impl CachedAccess for LockedExt2INode {
             }
         }
 
-        self.update_cached_synced(offset, buf, false)
+        self.update_cached_synced(offset, buf, true)
     }
 }
 
@@ -935,7 +943,7 @@ impl INode for LockedExt2INode {
 
         for page in pages.iter() {
             logln!("syncing page to storage");
-            page.sync_to_storage(&page);
+            page.flush_to_storage(&page);
             logln!("synced page to storage");
         }
 

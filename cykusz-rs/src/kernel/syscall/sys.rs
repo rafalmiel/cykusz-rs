@@ -714,11 +714,16 @@ pub fn sys_time() -> SyscallResult {
     Ok(crate::kernel::time::unix_timestamp() as usize)
 }
 
+pub fn sys_ticksns() -> SyscallResult {
+    Ok(crate::kernel::timer::current_ns() as usize)
+}
+
 pub fn sys_exit(status: u64) -> ! {
     crate::kernel::sched::exit(status as isize)
 }
 
 pub fn sys_sleep(time_ns: u64) -> SyscallResult {
+    logln!("sys_sleep {}", time_ns);
     let t = current_task_ref();
     t.sleep(time_ns as usize)?;
     Ok(0)

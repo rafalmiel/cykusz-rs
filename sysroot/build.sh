@@ -14,6 +14,7 @@ NANO_SRC_DIR=$SRC_DIR/nano
 GMP_SRC_DIR=$SRC_DIR/gmp
 MPFR_SRC_DIR=$SRC_DIR/mpfr
 MPC_SRC_DIR=$SRC_DIR/mpc
+DOOM_SRC_DIR=$SRC_DIR/doomgeneric
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -70,6 +71,13 @@ function _prepare_nyancat {
 		mkdir -p $SRC_DIR
 		git clone --depth 1 -b cykusz https://github.com/rafalmiel/nyancat.git $NYANCAT_SRC_DIR
 	fi
+}
+
+function _prepare_doom {
+    if [ ! -d $DOOM_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/doomgeneric.git $DOOM_SRC_DIR
+    fi
 }
 
 function _prepare_ncurses {
@@ -234,6 +242,20 @@ function _cykusz_nyancat {
 	make clean
 
 	popd
+}
+
+function _cykusz_doom {
+    _prepare_doom
+
+    pushd .
+
+    cd $DOOM_SRC_DIR/doomgeneric
+    CYKUSZ_ROOT=$SYSROOT make -f Makefile.cykusz
+    cp fbdoom $BUILD_DIR
+    cp ../DOOM1.WAD $BUILD_DIR
+    make clean
+
+    popd
 }
 
 function _cykusz_ncurses {

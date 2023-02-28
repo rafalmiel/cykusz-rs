@@ -15,7 +15,7 @@ use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::pcache::{CachedAccess, PageItem, PageItemAdapter, PageItemInt, RawAccess};
+use crate::kernel::fs::pcache::{CachedAccess, PageCacheItemArc, PageCacheItemAdapter, PageCacheItem, RawAccess, MappedAccess};
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
@@ -26,7 +26,7 @@ pub struct LockedExt2INode {
     node: RwMutex<Ext2INode>,
     fs: Weak<Ext2Filesystem>,
     self_ref: Weak<LockedExt2INode>,
-    dirty_list: Mutex<LinkedList<PageItemAdapter>>,
+    dirty_list: Mutex<LinkedList<PageCacheItemAdapter>>,
 }
 
 impl LockedExt2INode {
@@ -43,7 +43,7 @@ impl LockedExt2INode {
                     node: RwMutex::new(Ext2INode::new(fs.clone(), id)),
                     fs,
                     self_ref: me.clone(),
-                    dirty_list: Mutex::new(LinkedList::<PageItemAdapter>::new(PageItemAdapter::new())),
+                    dirty_list: Mutex::new(LinkedList::<PageCacheItemAdapter>::new(PageCacheItemAdapter::new())),
                 }
             })))
         }
@@ -477,12 +477,12 @@ impl CachedAccess for LockedExt2INode {
         self.self_ref.clone()
     }
 
-    fn notify_dirty(&self, page: &PageItem) {
+    fn notify_dirty(&self, page: &PageCacheItemArc) {
         page.link_to_list(&mut *self.dirty_list.lock());
         self.ext2_fs().dev().notify_dirty_inode(page);
     }
 
-    fn notify_clean(&self, page: &PageItemInt) {
+    fn notify_clean(&self, page: &PageCacheItem) {
         self.ext2_fs().dev().notify_clean_inode(page);
         if let Some(mut s) = self.dirty_list.try_lock() {
             logln!("notify clean inode unlink");
@@ -490,7 +490,7 @@ impl CachedAccess for LockedExt2INode {
         }
     }
 
-    fn sync_page(&self, page: &PageItemInt) {
+    fn sync_page(&self, page: &PageCacheItem) {
         println!(
             "sync inode page flags {:?}",
             get_flags(page.page().to_virt())
@@ -955,6 +955,15 @@ impl INode for LockedExt2INode {
     }
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {
+        if self.ftype().unwrap() == FileType::File {
+            Some(self.self_ref())
+        } else {
+            None
+        }
+    }
+
+
+    fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
         if self.ftype().unwrap() == FileType::File {
             Some(self.self_ref())
         } else {

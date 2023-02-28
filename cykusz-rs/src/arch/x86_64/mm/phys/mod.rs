@@ -5,7 +5,7 @@ use spin::Once;
 
 use crate::drivers::multiboot2;
 use crate::kernel::fs::cache::{ArcWrap, WeakWrap};
-use crate::kernel::fs::pcache::{PageItem, PageItemWeak};
+use crate::kernel::fs::pcache::{PageCacheItemArc, PageCacheItemWeak};
 use crate::kernel::mm::{PhysAddr, PAGE_SIZE};
 use crate::kernel::sync::{Spin, SpinGuard};
 
@@ -24,7 +24,7 @@ mod iter;
 #[repr(C)]
 pub struct PhysPage {
     pt_lock: Spin<()>,
-    p_cache: PageItemWeak,
+    p_cache: PageCacheItemWeak,
     vm_use_count: u32,
 }
 
@@ -58,14 +58,14 @@ impl PhysPage {
         unsafe { &mut *(self as *const _ as *mut PhysPage) }
     }
 
-    pub fn link_page_cache(&self, page: &PageItem) {
+    pub fn link_page_cache(&self, page: &PageCacheItemArc) {
         let _lock = self.lock_pt();
 
         let this = self.this();
         this.p_cache = ArcWrap::downgrade(&page);
     }
 
-    pub fn page_item(&self) -> Option<PageItem> {
+    pub fn page_item(&self) -> Option<PageCacheItemArc> {
         let _lock = self.lock_pt();
 
         self.p_cache.upgrade()
@@ -102,7 +102,7 @@ impl Default for PhysPage {
     fn default() -> Self {
         PhysPage {
             pt_lock: Spin::new(()),
-            p_cache: PageItemWeak::empty(),
+            p_cache: PageCacheItemWeak::empty(),
             vm_use_count: 0,
         }
     }

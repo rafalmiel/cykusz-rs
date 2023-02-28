@@ -18,8 +18,8 @@ pub trait DropHandler {
     fn debug(&self) {}
 }
 
-pub struct ArcWrap<T: DropHandler>(Arc<T>);
-pub struct WeakWrap<T: DropHandler>(Weak<T>);
+pub struct ArcWrap<T: DropHandler + ?Sized>(Arc<T>);
+pub struct WeakWrap<T: DropHandler + ?Sized>(Weak<T>);
 
 impl<T: DropHandler> Clone for ArcWrap<T> {
     fn clone(&self) -> Self {
@@ -27,7 +27,7 @@ impl<T: DropHandler> Clone for ArcWrap<T> {
     }
 }
 
-impl<T: DropHandler> Deref for ArcWrap<T> {
+impl<T: DropHandler + ?Sized> Deref for ArcWrap<T> {
     type Target = Arc<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -77,7 +77,7 @@ impl<T: DropHandler> From<Arc<T>> for ArcWrap<T> {
     }
 }
 
-impl<T: DropHandler> Drop for ArcWrap<T> {
+impl<T: DropHandler + ?Sized> Drop for ArcWrap<T> {
     fn drop(&mut self) {
         let sc = Arc::strong_count(&self.0);
 

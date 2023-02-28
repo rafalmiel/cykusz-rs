@@ -13,14 +13,14 @@ use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
 
 pub type PageCacheKey = (usize, usize);
-type PageCache = Cache<PageCacheKey, PageItemStruct>;
+type PageCache = Cache<PageCacheKey, PageCacheItemStruct>;
 
-impl Cacheable<PageCacheKey> for PageItemStruct {
+impl Cacheable<PageCacheKey> for PageCacheItemStruct {
     fn cache_key(&self) -> (usize, usize) {
         (self.fs.as_ptr() as *const u8 as usize, self.offset)
     }
 
-    fn deallocate(&self, me: &PageItemInt) {
+    fn deallocate(&self, me: &PageCacheItem) {
         if let Some(cached) = self.fs.upgrade() {
             if self.is_dirty() {
                 cached.sync_page(me);
@@ -31,12 +31,33 @@ impl Cacheable<PageCacheKey> for PageItemStruct {
     }
 }
 
-pub type PageItemInt = CacheItem<PageCacheKey, PageItemStruct>;
-pub type PageItem = ArcWrap<PageItemInt>;
-pub type PageItemWeak = WeakWrap<PageItemInt>;
-pub type PageItemAdapter = CacheItemAdapter<PageCacheKey, PageItemStruct>;
+pub type PageCacheItem = CacheItem<PageCacheKey, PageCacheItemStruct>;
+pub type PageCacheItemArc = ArcWrap<PageCacheItem>;
+pub type PageCacheItemWeak = WeakWrap<PageCacheItem>;
+pub type PageCacheItemAdapter = CacheItemAdapter<PageCacheKey, PageCacheItemStruct>;
 
-pub struct PageItemStruct {
+pub struct PageDirectItemStruct {
+    page: PhysAddr,
+    offset: usize,
+}
+
+impl PageDirectItemStruct {
+    pub fn new(page: PhysAddr, offset: usize) -> PageDirectItemStruct {
+        PageDirectItemStruct {
+            page, offset
+        }
+    }
+
+    pub fn page(&self) -> PhysAddr {
+        self.page
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+}
+
+pub struct PageCacheItemStruct {
     fs: Weak<dyn CachedAccess>,
     offset: usize,
     is_dirty: AtomicBool,
@@ -44,14 +65,14 @@ pub struct PageItemStruct {
     user_dirty_mappings: Spin<hashbrown::HashSet<UserAddr>>,
 }
 
-unsafe impl Sync for PageItemStruct {}
+unsafe impl Sync for PageCacheItemStruct {}
 
-impl PageItemStruct {
+impl PageCacheItemStruct {
     pub fn make_key(a: &Weak<dyn CachedAccess>, offset: usize) -> PageCacheKey {
         (a.as_ptr() as *const u8 as usize, offset)
     }
 
-    pub fn new(fs: Weak<dyn CachedAccess>, offset: usize) -> PageItemStruct {
+    pub fn new(fs: Weak<dyn CachedAccess>, offset: usize) -> PageCacheItemStruct {
         let page = allocate_order(0).unwrap().address();
 
         map_to_flags(page.to_virt(), page, PageFlags::WRITABLE);
@@ -60,7 +81,7 @@ impl PageItemStruct {
             page.to_virt().as_bytes_mut(PAGE_SIZE).fill(0);
         }
 
-        PageItemStruct {
+        PageCacheItemStruct {
             fs,
             offset,
             page,
@@ -77,7 +98,7 @@ impl PageItemStruct {
         self.is_dirty.load(Ordering::SeqCst)
     }
 
-    pub fn sync_to_storage(&self, page: &PageItemInt) {
+    pub fn sync_to_storage(&self, page: &PageCacheItem) {
         if self.is_dirty() {
             if let Some(cache) = self.fs.upgrade() {
                 cache.write_direct(self.offset() * PAGE_SIZE, self.data());
@@ -86,7 +107,7 @@ impl PageItemStruct {
         }
     }
 
-    pub fn flush_to_storage(&self, page: &PageItemInt) {
+    pub fn flush_to_storage(&self, page: &PageCacheItem) {
         if self.is_dirty() {
             if let Some(cache) = self.fs.upgrade() {
                 cache.write_direct_synced(self.offset() * PAGE_SIZE, self.data());
@@ -111,7 +132,7 @@ impl PageItemStruct {
         unsafe { self.page.to_virt().as_bytes_mut(PAGE_SIZE) }
     }
 
-    pub fn notify_dirty(&self, page: &PageItem, mapping: Option<UserAddr>) {
+    pub fn notify_dirty(&self, page: &PageCacheItemArc, mapping: Option<UserAddr>) {
         logln!("block notify dirty page: {}", self.offset());
         if !page.is_dirty() {
             map_flags(page.page.to_virt(), PageFlags::WRITABLE);
@@ -130,7 +151,7 @@ impl PageItemStruct {
         }
     }
 
-    pub fn notify_clean(&self, page: &PageItemInt) {
+    pub fn notify_clean(&self, page: &PageCacheItem) {
         logln!("block notify clean page: {}", self.offset());
         self.mark_dirty(false);
 
@@ -158,7 +179,7 @@ impl PageItemStruct {
     }
 }
 
-impl PageItem {
+impl PageCacheItemArc {
     fn link_with_page(&self) {
         let page = self.page.to_phys_page().unwrap();
 
@@ -173,21 +194,24 @@ pub fn cache() -> &'static Arc<PageCache> {
 }
 
 pub trait CachedBlockDev: CachedAccess {
-    fn notify_dirty_inode(&self, _page: &PageItem);
-    fn notify_clean_inode(&self, _page: &PageItemInt);
+    fn notify_dirty_inode(&self, _page: &PageCacheItemArc);
+    fn notify_clean_inode(&self, _page: &PageCacheItem);
     fn sync_all(&self);
 }
 
-pub trait CachedAccess: RawAccess {
-    fn this(&self) -> Weak<dyn CachedAccess>;
+pub enum MMapPage {
+    Cached(PageCacheItemArc),
+    Direct(PageDirectItemStruct)
+}
 
-    fn notify_dirty(&self, _page: &PageItem);
+pub struct MMapPageStruct(pub MMapPage);
 
-    fn notify_clean(&self, _page: &PageItemInt);
+pub trait MappedAccess {
+    fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct>;
+}
 
-    fn sync_page(&self, page: &PageItemInt);
-
-    fn try_get_mmap_page(&self, offset: usize) -> Option<PageItem> {
+impl<T: ?Sized> MappedAccess for T where T: CachedAccess {
+    fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct> {
         if current_task_ref().locks() > 0 {
             logln!("get_mmap_page: locks > 0");
         }
@@ -198,24 +222,10 @@ pub trait CachedAccess: RawAccess {
 
         let cache_offset = offset / PAGE_SIZE;
 
-        page_cache.get(PageItemStruct::make_key(&dev, cache_offset))
-    }
-
-    fn get_mmap_page(&self, offset: usize) -> Option<PageItem> {
-        if current_task_ref().locks() > 0 {
-            logln!("get_mmap_page: locks > 0");
-        }
-
-        let page_cache = cache();
-
-        let dev = self.this();
-
-        let cache_offset = offset / PAGE_SIZE;
-
-        if let Some(page) = page_cache.get(PageItemStruct::make_key(&dev, cache_offset)) {
-            Some(page)
+        if let Some(page) = page_cache.get(PageCacheItemStruct::make_key(&dev, cache_offset)) {
+            Some(MMapPageStruct(MMapPage::Cached(page)))
         } else {
-            let new_page = PageItemStruct::new(dev.clone(), cache_offset);
+            let new_page = PageCacheItemStruct::new(dev.clone(), cache_offset);
 
             if let Some(read) = self.read_direct(offset.align(PAGE_SIZE), new_page.data_mut()) {
                 if read == 0 {
@@ -227,12 +237,37 @@ pub trait CachedAccess: RawAccess {
 
                     page.notify_clean(&page);
 
-                    Some(page)
+                    Some(MMapPageStruct(MMapPage::Cached(page)))
                 }
             } else {
                 None
             }
         }
+    }
+
+}
+
+pub trait CachedAccess: RawAccess {
+    fn this(&self) -> Weak<dyn CachedAccess>;
+
+    fn notify_dirty(&self, _page: &PageCacheItemArc);
+
+    fn notify_clean(&self, _page: &PageCacheItem);
+
+    fn sync_page(&self, page: &PageCacheItem);
+
+    fn try_get_mmap_page(&self, offset: usize) -> Option<PageCacheItemArc> {
+        if current_task_ref().locks() > 0 {
+            logln!("get_mmap_page: locks > 0");
+        }
+
+        let page_cache = cache();
+
+        let dev = self.this();
+
+        let cache_offset = offset / PAGE_SIZE;
+
+        page_cache.get(PageCacheItemStruct::make_key(&dev, cache_offset))
     }
 
     fn read_cached(&self, mut offset: usize, dest: &mut [u8]) -> Option<usize> {
@@ -242,7 +277,7 @@ pub trait CachedAccess: RawAccess {
             if current_task_ref().locks() > 0 {
                 logln!("read_cached: locks > 0");
             }
-            if let Some(page) = self.get_mmap_page(offset) {
+            if let Some(MMapPageStruct(MMapPage::Cached(page))) = self.get_mmap_page(offset) {
                 use core::cmp::min;
 
                 let page_offset = offset % PAGE_SIZE;
@@ -285,7 +320,7 @@ pub trait CachedAccess: RawAccess {
             if current_task_ref().locks() > 0 {
                 logln!("update_cached_synced: locks > 0");
             }
-            if let Some(page) = self.get_mmap_page(offset) {
+            if let Some(MMapPageStruct(MMapPage::Cached(page))) = self.get_mmap_page(offset) {
                 use core::cmp::min;
 
                 let page_offset = offset % PAGE_SIZE;

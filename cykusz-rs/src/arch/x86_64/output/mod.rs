@@ -118,6 +118,8 @@ pub trait VideoDriver: Sync + Send {
         (0, 0)
     }
     fn copy_txt_buffer(&self, _x: usize, _y: usize, _buf: &[ScreenChar]) {}
+
+    fn init_dev(&self) {}
 }
 
 pub struct DefaultOutputWriter {}

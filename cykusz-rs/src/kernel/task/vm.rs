@@ -10,7 +10,7 @@ use crate::drivers::elf::types::{BinType, ProgramFlags, ProgramType};
 use crate::drivers::elf::ElfHeader;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::path::Path;
-use crate::kernel::fs::pcache::PageItem;
+use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, PageCacheItemArc};
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{
@@ -61,7 +61,7 @@ struct MMapedFile {
     file: DirEntryItem,
     starting_offset: usize,
     len: usize,
-    active_mappings: hashbrown::HashMap<VirtAddr, PageItem>,
+    active_mappings: hashbrown::HashMap<VirtAddr, PageCacheItemArc>,
 }
 
 impl MMapedFile {
@@ -207,7 +207,7 @@ impl Mapping {
             if current_task_ref().locks() > 0 {
                 logln!("handle_pf_private_file: locks > 0");
             }
-            if let Some(p) = f.file.inode().as_cacheable().unwrap().get_mmap_page(offset) {
+            if let Some(MMapPageStruct(MMapPage::Cached(p))) = f.file.inode().as_mappable().unwrap().get_mmap_page(offset) {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
                 {
@@ -299,40 +299,46 @@ impl Mapping {
             if current_task_ref().locks() > 0 {
                 logln!("handle_pf_shared: locks > 0");
             }
-            if let Some(p) = f.file.inode().as_cacheable().unwrap().get_mmap_page(offset) {
-                let is_present = reason.contains(PageFaultReason::PRESENT);
-                let is_write = reason.contains(PageFaultReason::WRITE);
+            let is_present = reason.contains(PageFaultReason::PRESENT);
+            let is_write = reason.contains(PageFaultReason::WRITE);
 
-                if is_present && !is_write {
-                    // We want to read present page, this page fault should not happen so return false..
+            if is_present && !is_write {
+                // We want to read present page, this page fault should not happen so return false..
+                return false;
+            }
 
-                    return false;
-                }
+            let mut flags: PageFlags = PageFlags::from(self.prot) | PageFlags::USER;
 
-                let mut flags: PageFlags = PageFlags::from(self.prot) | PageFlags::USER;
+            let addr_aligned = addr.align_down(PAGE_SIZE);
 
-                let addr_aligned = addr.align_down(PAGE_SIZE);
+            match f.file.inode().as_mappable().unwrap().get_mmap_page(offset) {
+                Some(MMapPageStruct(MMapPage::Cached(p))) => {
+                    if !is_present {
+                        // Insert page to the list of active mappings if not present
+                        f.active_mappings.insert(addr_aligned, p.clone());
+                    }
 
-                if !is_present {
-                    // Insert page to the list of active mappings if not present
-                    f.active_mappings.insert(addr_aligned, p.clone());
-                }
+                    if is_write {
+                        // We want to write so make the page writable and send notify
+                        map_to_flags(addr_aligned, p.page(), flags);
 
-                if is_write {
-                    // We want to write so make the page writable and send notify
+                        p.notify_dirty(&p, Some(addr_aligned.into()));
+                    } else {
+                        // Page is not present and we are reading, so map it readable
+                        flags.remove(PageFlags::WRITABLE);
+
+                        map_to_flags(addr_aligned, p.page(), flags);
+                    }
+
+                    true
+                },
+                Some(MMapPageStruct(MMapPage::Direct(p))) => {
                     map_to_flags(addr_aligned, p.page(), flags);
-
-                    p.notify_dirty(&p, Some(addr_aligned.into()));
-                } else {
-                    // Page is not present and we are reading, so map it readable
-                    flags.remove(PageFlags::WRITABLE);
-
-                    map_to_flags(addr_aligned, p.page(), flags);
+                    true
+                },
+                _ => {
+                    false
                 }
-
-                true
-            } else {
-                false
             }
         } else {
             false
@@ -564,7 +570,7 @@ impl VMData {
             }
 
             // Check whether file supports mmaped access
-            if f.inode().as_cacheable().is_none() {
+            if f.inode().as_mappable().is_none() {
                 return None;
             }
         } else {
@@ -668,7 +674,7 @@ impl VMData {
     ) -> Option<(VirtAddr, VirtAddr, ElfHeader, Option<TlsVmInfo>)> {
         let mut base_addr = VirtAddr(0);
 
-        if let Some(elf_page) = exe.inode().as_cacheable().unwrap().get_mmap_page(0) {
+        if let Some(MMapPageStruct(MMapPage::Cached(elf_page))) = exe.inode().as_mappable().unwrap().get_mmap_page(0) {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
 
             let load_offset = VirtAddr(if hdr.e_type == BinType::Dyn {

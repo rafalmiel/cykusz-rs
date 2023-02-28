@@ -16,6 +16,7 @@ use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemInt, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::pcache::MappedAccess;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::fs::vfs::{FsError, Metadata};
@@ -247,6 +248,14 @@ impl INode for LockedRamINode {
             d.ioctl(cmd, arg)
         } else {
             Err(FsError::NotSupported)
+        }
+    }
+
+    fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
+        if let Content::DevNode(Some(d)) = &self.0.read().content {
+            d.device().inode().as_mappable()
+        } else {
+            None
         }
     }
 }

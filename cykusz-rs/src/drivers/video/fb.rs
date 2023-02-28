@@ -1,12 +1,17 @@
-use alloc::sync::Arc;
+use alloc::string::String;
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use bit_field::BitField;
 use spin::Once;
 use crate::arch::output::{Color, ColorCode, register_video_driver, ScreenChar, VideoDriver};
 use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
-use crate::kernel::mm::PhysAddr;
+use crate::kernel::device::Device;
+use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::pcache::{MappedAccess, MMapPage, MMapPageStruct, PageDirectItemStruct};
+use crate::kernel::mm::{MappedAddr, PAGE_SIZE, PhysAddr};
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::TimerObject;
+use crate::kernel::utils::types::Align;
 
 static FONT: &'static [u8] = &[
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -343,6 +348,10 @@ impl State {
         state
     }
 
+    fn buffer(&self) -> &[u32] {
+        &self.buffer
+    }
+
     fn new_line(&mut self) {
         self.column = 0;
         self.row += 1;
@@ -558,9 +567,60 @@ impl VideoDriver for Fb {
             }
         }
     }
+
+    fn init_dev(&self) {
+        init_dev();
+    }
+}
+
+pub struct FbDevice {
+    dev_id: usize,
+    self_ptr: Weak<FbDevice>
+}
+
+impl INode for FbDevice {
+    fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
+        if let Some(me) = self.self_ptr.upgrade() {
+            return Some(me);
+        }
+
+        None
+    }
+}
+
+impl Device for FbDevice {
+    fn id(&self) -> usize {
+        self.dev_id
+    }
+
+    fn name(&self) -> String {
+        String::from("fb")
+    }
+
+    fn inode(&self) -> Arc<dyn INode> {
+        self.self_ptr.upgrade().unwrap()
+    }
+}
+
+impl MappedAccess for FbDevice {
+    fn get_mmap_page(&self, mut offset: usize) -> Option<MMapPageStruct> {
+        offset = offset.align_down(PAGE_SIZE);
+        let addr: PhysAddr = MappedAddr(fb().state.lock().buffer().as_ptr() as usize).to_phys() + offset;
+
+        Some(MMapPageStruct(MMapPage::Direct(PageDirectItemStruct::new(addr, offset))))
+    }
 }
 
 static FB: Once<Fb> = Once::new();
+static FB_DEV: Once<Arc<FbDevice>> = Once::new();
+
+fn fb() -> &'static Fb {
+    FB.get().unwrap()
+}
+
+pub fn fb_dev() -> &'static Arc<FbDevice> {
+    FB_DEV.get().unwrap()
+}
 
 pub fn init(fb_info: &'static FramebufferInfo) {
     FB.call_once(|| {
@@ -568,4 +628,15 @@ pub fn init(fb_info: &'static FramebufferInfo) {
     });
 
     register_video_driver(FB.get().unwrap());
+}
+
+fn init_dev() {
+    FB_DEV.call_once(|| {
+        Arc::new_cyclic(|me| FbDevice {
+            dev_id: crate::kernel::device::alloc_id(),
+            self_ptr: me.clone(),
+        })
+    });
+
+    crate::kernel::device::register_device(fb_dev().clone()).expect("Failed to register fb device");
 }

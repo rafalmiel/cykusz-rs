@@ -12,7 +12,7 @@ use crate::kernel::fs::cache::{ArcWrap, Cacheable};
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{
-    CachedAccess, CachedBlockDev, PageCacheKey, PageItem, PageItemInt, PageItemWeak, RawAccess,
+    CachedAccess, CachedBlockDev, PageCacheKey, PageCacheItemArc, PageCacheItem, PageCacheItemWeak, RawAccess,
 };
 use crate::kernel::sync::{IrqGuard, Mutex, MutexGuard};
 use crate::kernel::timer::{create_timer, Timer, TimerCallback};
@@ -76,8 +76,8 @@ pub struct BlockDevice {
     name: String,
     dev: Arc<dyn BlockDev>,
     self_ref: Weak<BlockDevice>,
-    dirty_inode_pages: Mutex<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
-    dirty_pages: Mutex<hashbrown::HashMap<PageCacheKey, PageItemWeak>>,
+    dirty_inode_pages: Mutex<hashbrown::HashMap<PageCacheKey, PageCacheItemWeak>>,
+    dirty_pages: Mutex<hashbrown::HashMap<PageCacheKey, PageCacheItemWeak>>,
     cleanup_timer: Arc<Timer>,
     sync_all_altive: AtomicBool,
     uuid: Once<Option<Uuid>>,
@@ -180,7 +180,7 @@ impl BlockDevice {
         *self.uuid.get().unwrap()
     }
 
-    fn sync_cache(&self, cache: &mut MutexGuard<hashbrown::HashMap<PageCacheKey, PageItemWeak>>) {
+    fn sync_cache(&self, cache: &mut MutexGuard<hashbrown::HashMap<PageCacheKey, PageCacheItemWeak>>) {
         for (_, a) in cache.iter() {
             if let Some(up) = a.upgrade() {
                 //logln!("sync page to storage (offset: {})", up.offset());
@@ -242,7 +242,7 @@ impl CachedAccess for BlockDevice {
         self.self_ref.clone()
     }
 
-    fn notify_dirty(&self, page: &PageItem) {
+    fn notify_dirty(&self, page: &PageCacheItemArc) {
         logln!("notify dirty page: {}", page.offset());
         let mut dirty = self.dirty_pages.lock();
 
@@ -253,7 +253,7 @@ impl CachedAccess for BlockDevice {
         }
     }
 
-    fn notify_clean(&self, page: &PageItemInt) {
+    fn notify_clean(&self, page: &PageCacheItem) {
         logln!("notify clean page: {}", page.offset());
         if !self.is_sync_all_active() {
             let mut dirty = self.dirty_pages.lock();
@@ -266,7 +266,7 @@ impl CachedAccess for BlockDevice {
         }
     }
 
-    fn sync_page(&self, page: &PageItemInt) {
+    fn sync_page(&self, page: &PageCacheItem) {
         page.sync_to_storage(page);
 
         let key = page.cache_key();
@@ -286,7 +286,7 @@ impl CachedAccess for BlockDevice {
 }
 
 impl CachedBlockDev for BlockDevice {
-    fn notify_dirty_inode(&self, page: &PageItem) {
+    fn notify_dirty_inode(&self, page: &PageCacheItemArc) {
         logln!("notify dirty inode: {}", page.offset());
         let mut dirty = self.dirty_inode_pages.lock();
 
@@ -297,7 +297,7 @@ impl CachedBlockDev for BlockDevice {
         }
     }
 
-    fn notify_clean_inode(&self, page: &PageItemInt) {
+    fn notify_clean_inode(&self, page: &PageCacheItem) {
         logln!("notify clean inode: {}", page.offset());
         if !self.is_sync_all_active() {
             let mut dirty = self.dirty_inode_pages.lock();

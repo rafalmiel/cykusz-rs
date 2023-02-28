@@ -559,6 +559,37 @@ fn exec(cmd: &str) {
         if let Err(e) = syscall::munmap(addr, 0x1000) {
             println!("munmap failed: {:?}", e);
         }
+    } else if cmd == "mmap_fb" {
+        if let Ok(file) = syscall::open("/dev/fb", OpenFlags::RDWR) {
+            if let Ok(addr) = syscall::mmap(
+                None,
+                640*480*4,
+                MMapProt::PROT_READ | MMapProt::PROT_WRITE,
+                MMapFlags::MAP_SHARED,
+                Some(file),
+                0,
+            ) {
+                logln!("MMaped fb at addr: 0x{:x}", addr);
+
+                unsafe {
+                    let ptr = addr as *mut u32;
+
+                    for i in 0..(640*480) {
+                        ptr.offset(i).write(0xffffffff);
+                    }
+                }
+
+                if let Err(e) = syscall::munmap(addr, 640*480*4) {
+                    println!("fb unmap failed: {:?}", e);
+                }
+            } else {
+                println!("mmap faileld");
+            }
+            syscall::close(file).expect("Failed to close file");
+        } else {
+            println!("file open failed");
+        }
+
     } else if cmd == "maps" {
         if let Err(e) = syscall::maps() {
             println!("maps failed {:?}", e);

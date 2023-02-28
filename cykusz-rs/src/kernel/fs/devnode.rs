@@ -6,6 +6,7 @@ use syscall_defs::OpenFlags;
 use crate::kernel::device::Result as DevResult;
 use crate::kernel::device::{DevError, Device};
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::pcache::MappedAccess;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Result;
 
@@ -52,5 +53,9 @@ impl INode for DevNode {
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
         self.dev.inode().ioctl(cmd, arg)
+    }
+
+    fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
+        self.dev.inode().as_mappable()
     }
 }

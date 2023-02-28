@@ -563,4 +563,6 @@ pub fn init() {
     crate::arch::output::register_output_driver(tty().as_ref());
     video().clear();
     video().set_cursor_visible(true);
+
+    video().init_dev();
 }

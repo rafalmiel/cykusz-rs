@@ -80,6 +80,7 @@ pub const SYS_ACCESS: usize = 54;
 pub const SYS_KILL: usize = 55;
 pub const SYS_SYNC: usize = 56;
 pub const SYS_FSYNC: usize = 57;
+pub const SYS_TICKSNS: usize = 58;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

@@ -83,8 +83,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_KILL => sys::sys_kill(a, b),
         SYS_SYNC => sys::sys_sync(),
         SYS_FSYNC => sys::sys_fsync(a),
-
-
+        SYS_TICKSNS => sys::sys_ticksns(),
         _ => Err(SyscallError::ENOSYS),
     }
     .syscall_into()

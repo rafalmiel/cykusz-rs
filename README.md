@@ -50,6 +50,7 @@ https://user-images.githubusercontent.com/3881998/183302450-65193783-b10f-4ddd-8
 - [x] nyancat (<https://github.com/rafalmiel/nyancat/tree/cykusz>)
 - [x] ncurses (<https://github.com/rafalmiel/ncurses/tree/cykusz>)
 - [x] nano (<https://github.com/rafalmiel/nano/tree/cykusz>)
+- [x] doom (<https://github.com/rafalmiel/doomgeneric/tree/cykusz>)
 
 ## Building
 

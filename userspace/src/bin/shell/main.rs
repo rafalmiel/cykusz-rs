@@ -563,7 +563,7 @@ fn exec(cmd: &str) {
         if let Ok(file) = syscall::open("/dev/fb", OpenFlags::RDWR) {
             if let Ok(addr) = syscall::mmap(
                 None,
-                640*480*4,
+                640 * 480 * 4,
                 MMapProt::PROT_READ | MMapProt::PROT_WRITE,
                 MMapFlags::MAP_SHARED,
                 Some(file),
@@ -574,12 +574,12 @@ fn exec(cmd: &str) {
                 unsafe {
                     let ptr = addr as *mut u32;
 
-                    for i in 0..(640*480) {
+                    for i in 0..(640 * 480) {
                         ptr.offset(i).write(0xffffffff);
                     }
                 }
 
-                if let Err(e) = syscall::munmap(addr, 640*480*4) {
+                if let Err(e) = syscall::munmap(addr, 640 * 480 * 4) {
                     println!("fb unmap failed: {:?}", e);
                 }
             } else {
@@ -589,7 +589,18 @@ fn exec(cmd: &str) {
         } else {
             println!("file open failed");
         }
+    } else if cmd == "kbd_test" {
+        if let Some(f) = File::new("/dev/kbd", OpenFlags::RDONLY) {
+            let mut buf = [0u8; core::mem::size_of::<syscall_defs::events::Event>()];
 
+            while f.read(&mut buf) > 0 {
+                let evt = unsafe {
+                    &*(buf.as_ptr() as *const syscall_defs::events::Event)
+                };
+
+                println!("{:?}", evt);
+            }
+        }
     } else if cmd == "maps" {
         if let Err(e) = syscall::maps() {
             println!("maps failed {:?}", e);

@@ -55,6 +55,8 @@ impl PS {
 }
 
 fn init() {
+    handler::init();
+
     let ctrl = controller();
 
     use crate::arch::int;

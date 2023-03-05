@@ -31,7 +31,6 @@ cross_stack := sysroot/build/stack
 cross_nyancat := sysroot/build/nyancat
 cross_ttytest := sysroot/build/ttytest
 cross_fork := sysroot/build/fork
-cross_ttypoll := sysroot/build/ttypoll
 
 .PHONY: all clean run ata bochs iso toolchain fsck
 
@@ -106,14 +105,13 @@ fsck:
 
 $(cross_cpp): toolchain
 
-hello: $(cross_cpp) sysroot/test.c sysroot/test.cpp sysroot/hello.cpp sysroot/stack.c sysroot/ttypoll.c
+hello: $(cross_cpp) sysroot/test.c sysroot/test.cpp sysroot/hello.cpp sysroot/stack.c
 	$(cross_c) sysroot/test.c -o $(cross_test)
 	$(cross_c) sysroot/stack.c -o $(cross_stack)
 	$(cross_cpp) sysroot/hello.cpp -o $(cross_hello)
 	$(cross_cpp) sysroot/test.cpp -o $(cross_testcpp)
 	$(cross_c) sysroot/ttytest.c -o $(cross_ttytest)
 	$(cross_c) sysroot/fork.c -o $(cross_fork)
-	$(cross_cpp) sysroot/ttypoll.c -o $(cross_ttypoll)
 	sysroot/build.sh cykusz_nyancat
 	$(cross_strip) $(cross_hello)
 

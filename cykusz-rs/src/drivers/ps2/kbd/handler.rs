@@ -79,11 +79,12 @@ struct State {
     e: bool,
     f: bool,
     opened: bool,
+    pressed: bitmaps::Bitmap<256>,
 }
 
 impl State {
     fn new() -> State {
-        State { e: false, f: false, opened: false }
+        State { e: false, f: false, opened: false, pressed: bitmaps::Bitmap::new() }
     }
 }
 
@@ -116,15 +117,19 @@ impl KbdState {
 
                 let opened = state.opened;
 
+                let was_pressed = state.pressed.get(key as usize);
+                state.pressed.set(key as usize, !released);
+
                 drop(state);
 
                 crate::kernel::kbd::key_notify(key, released);
 
                 if opened {
+                    let repeat = !released && was_pressed;
                     let evt = Event {
                         typ: EventType::Key,
                         code: key as u16,
-                        val: if released { 1 } else { 0 },
+                        val: if released { 1 } else if repeat { 2 } else { 0 },
                     };
 
                     unsafe {
@@ -147,7 +152,7 @@ pub fn init() {
     KEYBOARD.call_once(|| {
         Arc::new_cyclic(|me| KbdState {
             state: Spin::new(State::new()),
-            buf: BufferQueue::new(core::mem::size_of::<Event>() * 16),
+            buf: BufferQueue::new(core::mem::size_of::<Event>() * 32),
             dev_id: crate::kernel::device::alloc_id(),
             self_ref: me.clone(),
         })

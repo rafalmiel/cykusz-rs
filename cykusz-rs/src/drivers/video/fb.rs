@@ -3,11 +3,13 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use bit_field::BitField;
 use spin::Once;
+use crate::arch::mm::VirtAddr;
 use crate::arch::output::{Color, ColorCode, register_video_driver, ScreenChar, VideoDriver};
-use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
+use crate::drivers::multiboot2::framebuffer_info::{FramebufferInfo, FramebufferType};
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{MappedAccess, MMapPage, MMapPageStruct, PageDirectItemStruct};
+use crate::kernel::fs::vfs::FsError;
 use crate::kernel::mm::{MappedAddr, PAGE_SIZE, PhysAddr};
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::TimerObject;
@@ -293,6 +295,8 @@ static FONT: &'static [u8] = &[
 struct State {
     width: usize,
     height: usize,
+    pitch: usize,
+    fb_type: FramebufferType,
     txt_width: usize,
     txt_height: usize,
     column: usize,
@@ -306,30 +310,54 @@ struct State {
     buffer: &'static mut [u32],
 }
 
-static COLORS: &'static [u32] = &[
-    0x0,
-    0x00_00_A8,
-    0x00_A8_00,
-    0x00_A8_A8,
-    0xa8_00_00,
-    0xA8_00_A8,
-    0xA8_A8_00,
-    0xD0_D0_D0,
-    0xA8_A8_A8,
-    0x00_00_FC,
-    0x00_FC_00,
-    0x00_FC_FC,
-    0xFC_00_00,
-    0xFC_00_FC,
-    0xFC_FC_00,
-    0xFC_FC_FC,
+struct FbColor {
+    red: u8,
+    green: u8,
+    blue: u8,
+}
+
+impl FbColor {
+    const fn from_u32(v: u32) -> FbColor {
+        FbColor {
+            red: (v >> 16) as u8,
+            green: (v >> 8) as u8,
+            blue: v as u8,
+        }
+    }
+
+    fn make_u32(&self, info: &FramebufferType) -> u32 {
+        (((self.blue as u64) & info.blue_mask()) << info.blue_field_pos() |
+            ((self.red as u64) & info.red_mask()) << info.red_field_pos() |
+            ((self.green as u64) & info.green_mask()) << info.green_field_pos()) as u32
+    }
+}
+
+static COLORS: &'static [FbColor] = &[
+    FbColor::from_u32(0x0),
+    FbColor::from_u32(0x00_00_A8),
+    FbColor::from_u32(0x00_A8_00),
+    FbColor::from_u32(0x00_A8_A8),
+    FbColor::from_u32(0xa8_00_00),
+    FbColor::from_u32(0xA8_00_A8),
+    FbColor::from_u32(0xA8_A8_00),
+    FbColor::from_u32(0xD0_D0_D0),
+    FbColor::from_u32(0xA8_A8_A8),
+    FbColor::from_u32(0x00_00_FC),
+    FbColor::from_u32(0x00_FC_00),
+    FbColor::from_u32(0x00_FC_FC),
+    FbColor::from_u32(0xFC_00_00),
+    FbColor::from_u32(0xFC_00_FC),
+    FbColor::from_u32(0xFC_FC_00),
+    FbColor::from_u32(0xFC_FC_FC),
 ];
 
 impl State {
-    fn new(width: u32, height: u32, buf: PhysAddr) -> State {
+    fn new(width: u32, height: u32, pitch: u32, fb_type: FramebufferType, buf: PhysAddr) -> State {
         let state = State {
             width: width as usize,
             height: height as usize,
+            pitch: pitch as usize / 4,
+            fb_type,
             txt_width: width as usize / 8,
             txt_height: height as usize / 16,
             column: 0,
@@ -341,7 +369,7 @@ impl State {
             cursor_timer: None,
             char_cache: Vec::<ScreenChar>::new(),
             buffer: unsafe {
-                buf.to_mapped().as_slice_mut::<u32>(width as usize * height as usize)
+                buf.to_mapped().as_slice_mut::<u32>(pitch as usize * height as usize)
             },
         };
 
@@ -360,8 +388,8 @@ impl State {
     fn scroll(&mut self) {
         if self.row > self.txt_height - 1 {
             {
-                self.buffer.copy_within(self.width * 16..self.width * self.height, 0);
-                self.buffer[self.width * 16 * (self.txt_height - 1)..self.width * self.height].fill(0);
+                self.buffer.copy_within(self.pitch * 16..self.pitch * self.height, 0);
+                self.buffer[self.pitch * 16 * (self.txt_height - 1)..self.pitch * self.height].fill(0);
             }
 
             self.row = self.txt_height - 1;
@@ -380,10 +408,10 @@ impl State {
 
         let data = &FONT[ch.char() as usize * 16..ch.char() as usize * 16 + 16];
 
-        let fg = COLORS[ch.fg() as usize];
-        let bg = COLORS[ch.bg() as usize];
+        let fg = COLORS[ch.fg() as usize].make_u32(&self.fb_type);
+        let bg = COLORS[ch.bg() as usize].make_u32(&self.fb_type);
 
-        let mut pos = (y * 16 * self.width) + x * 8;
+        let mut pos = (y * 16 * self.pitch) + x * 8;
 
         for d in data {
             for i in (0..8).rev() {
@@ -409,13 +437,15 @@ impl State {
             return;
         }
 
-        let mut pos = (y * 16 * self.width) + x * 8;
-        pos += 14 * self.width;
+        let lg_color = COLORS[Color::LightGreen as usize].make_u32(&self.fb_type);
+
+        let mut pos = (y * 16 * self.pitch) + x * 8;
+        pos += 14 * self.pitch;
 
         if show {
-            self.buffer[pos..pos + 8].fill(COLORS[Color::LightGreen as usize]);
-            pos += self.width;
-            self.buffer[pos..pos + 8].fill(COLORS[Color::LightGreen as usize]);
+            self.buffer[pos..pos + 8].fill(lg_color);
+            pos += self.pitch;
+            self.buffer[pos..pos + 8].fill(lg_color);
         } else {
             let pos = y * self.txt_width + x;
             if pos < self.char_cache.len() {
@@ -507,10 +537,12 @@ struct Fb {
 
 impl Fb {
     fn new(fb: &'static FramebufferInfo) -> Fb {
+        assert_eq!(fb.bpp(), 32, "Only 32bpp fb supported");
         Fb {
             width: fb.width(),
             height: fb.height(),
-            state: Spin::new(State::new(fb.width(), fb.height(), PhysAddr(fb.addr() as usize))),
+            state: Spin::new(State::new(fb.width(), fb.height(), fb.pitch(), *fb.framebuffer_type(),
+                                        PhysAddr(fb.addr() as usize))),
         }
     }
 
@@ -579,6 +611,26 @@ pub struct FbDevice {
 }
 
 impl INode for FbDevice {
+    fn ioctl(&self, cmd: usize, arg: usize) -> crate::kernel::fs::vfs::Result<usize> {
+        if cmd == syscall_defs::ioctl::fb::GFBINFO {
+            let info = unsafe {
+                VirtAddr(arg).read_mut::<syscall_defs::ioctl::fb::FbInfo>()
+            };
+
+            let fb = fb();
+            let state = fb.state.lock();
+
+            info.bpp = 32;
+            info.pitch = state.pitch as u64 * 4;
+            info.width = state.width as u64;
+            info.height = state.height as u64;
+
+            Ok(0)
+        } else {
+            Err(FsError::NotSupported)
+        }
+    }
+
     fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
         if let Some(me) = self.self_ptr.upgrade() {
             return Some(me);
@@ -623,6 +675,7 @@ pub fn fb_dev() -> &'static Arc<FbDevice> {
 }
 
 pub fn init(fb_info: &'static FramebufferInfo) {
+    logln!("{:?}", fb_info);
     FB.call_once(|| {
         Fb::new(fb_info)
     });

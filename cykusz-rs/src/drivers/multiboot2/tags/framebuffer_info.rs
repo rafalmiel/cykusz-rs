@@ -15,7 +15,7 @@ pub struct FramebufferInfo {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct FramebufferType {
     red_field_pos: u8,
     red_mask_size: u8,
@@ -23,6 +23,44 @@ pub struct FramebufferType {
     green_mask_size: u8,
     blue_field_pos: u8,
     blue_mask_size: u8,
+}
+
+impl FramebufferType {
+    pub fn red_field_pos(&self) -> u8 {
+        self.red_field_pos
+    }
+
+    pub fn red_mask_size(&self) -> u8 {
+        self.red_mask_size
+    }
+
+    pub fn green_field_pos(&self) -> u8 {
+        self.green_field_pos
+    }
+
+    pub fn green_mask_size(&self) -> u8 {
+        self.green_mask_size
+    }
+
+    pub fn blue_field_pos(&self) -> u8 {
+        self.blue_field_pos
+    }
+
+    pub fn blue_mask_size(&self) -> u8 {
+        self.blue_mask_size
+    }
+
+    pub fn blue_mask(&self) -> u64 {
+        (1u64 << self.blue_mask_size) - 1
+    }
+
+    pub fn red_mask(&self) -> u64 {
+        (1u64 << self.red_mask_size) - 1
+    }
+
+    pub fn green_mask(&self) -> u64 {
+        (1u64 << self.green_mask_size) - 1
+    }
 }
 
 impl FramebufferInfo {

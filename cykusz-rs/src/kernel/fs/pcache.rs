@@ -133,7 +133,7 @@ impl PageCacheItemStruct {
     }
 
     pub fn notify_dirty(&self, page: &PageCacheItemArc, mapping: Option<UserAddr>) {
-        logln!("block notify dirty page: {}", self.offset());
+        //logln!("block notify dirty page: {}", self.offset());
         if !page.is_dirty() {
             map_flags(page.page.to_virt(), PageFlags::WRITABLE);
 
@@ -152,7 +152,7 @@ impl PageCacheItemStruct {
     }
 
     pub fn notify_clean(&self, page: &PageCacheItem) {
-        logln!("block notify clean page: {}", self.offset());
+        //logln!("block notify clean page: {}", self.offset());
         self.mark_dirty(false);
 
         {

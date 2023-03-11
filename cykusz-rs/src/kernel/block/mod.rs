@@ -243,7 +243,7 @@ impl CachedAccess for BlockDevice {
     }
 
     fn notify_dirty(&self, page: &PageCacheItemArc) {
-        logln!("notify dirty page: {}", page.offset());
+        //logln!("notify dirty page: {}", page.offset());
         let mut dirty = self.dirty_pages.lock();
 
         dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
@@ -254,7 +254,7 @@ impl CachedAccess for BlockDevice {
     }
 
     fn notify_clean(&self, page: &PageCacheItem) {
-        logln!("notify clean page: {}", page.offset());
+        //logln!("notify clean page: {}", page.offset());
         if !self.is_sync_all_active() {
             let mut dirty = self.dirty_pages.lock();
 
@@ -287,7 +287,7 @@ impl CachedAccess for BlockDevice {
 
 impl CachedBlockDev for BlockDevice {
     fn notify_dirty_inode(&self, page: &PageCacheItemArc) {
-        logln!("notify dirty inode: {}", page.offset());
+        //logln!("notify dirty inode: {}", page.offset());
         let mut dirty = self.dirty_inode_pages.lock();
 
         dirty.insert(page.cache_key(), ArcWrap::downgrade(page));
@@ -298,7 +298,7 @@ impl CachedBlockDev for BlockDevice {
     }
 
     fn notify_clean_inode(&self, page: &PageCacheItem) {
-        logln!("notify clean inode: {}", page.offset());
+        //logln!("notify clean inode: {}", page.offset());
         if !self.is_sync_all_active() {
             let mut dirty = self.dirty_inode_pages.lock();
 

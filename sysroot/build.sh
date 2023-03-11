@@ -51,19 +51,18 @@ function _prepare_binutils {
 }
 
 function _prepare_gcc {
-	if [ ! -d $GCC_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/gcc.git $GCC_SRC_DIR
+    if [ ! -d $GCC_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/gcc.git $GCC_SRC_DIR
 
-		pushd .
+        pushd .
 
-		cd $GCC_SRC_DIR/mpfr
-		autoreconf
-		cd $GCC_SRC_DIR/isl
-		autoreconf
+        cd $GCC_SRC_DIR
+        ./contrib/download_prerequisites
+        git apply patch-01.patch
 
-		popd
-	fi
+        popd
+    fi
 }
 
 function _prepare_nyancat {
@@ -196,7 +195,7 @@ function _cykusz_binutils {
 
 	cd $BINUTILS_CYKUSZ_BUILD_DIR
 
-	$BINUTILS_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared --prefix=/usr
+	$BINUTILS_SRC_DIR/configure --disable-gdb --disable-gdbserver --host=$TRIPLE --with-build-sysroot=$SYSROOT --disable-werror --enable-shared --prefix=/usr
 
 	popd
 

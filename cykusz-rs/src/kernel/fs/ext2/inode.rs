@@ -485,7 +485,7 @@ impl CachedAccess for LockedExt2INode {
     fn notify_clean(&self, page: &PageCacheItem) {
         self.ext2_fs().dev().notify_clean_inode(page);
         if let Some(mut s) = self.dirty_list.try_lock() {
-            logln!("notify clean inode unlink");
+            //logln!("notify clean inode unlink");
             page.unlink_from_list(&mut *s);
         }
     }

@@ -116,7 +116,7 @@ function _sysroot {
 	mkdir -p $BUILD_DIR
 
 	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true -Dstatic=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true  $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 	meson install -C $MLIBC_BUILD_DIR
 }
 
@@ -159,7 +159,7 @@ function _mlibc {
 	mkdir -p $BUILD_DIR
 
 	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
 	ninja -C $MLIBC_BUILD_DIR
 	meson install -C $MLIBC_BUILD_DIR
@@ -213,6 +213,23 @@ function _cykusz_gcc {
 
 	cd $GCC_CYKUSZ_BUILD_DIR
 	$GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
+
+	popd
+
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
+	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
+}
+
+function _cykusz_gcc_debug {
+	_prepare_gcc
+
+	mkdir -p $GCC_CYKUSZ_BUILD_DIR
+
+	pushd .
+
+	cd $GCC_CYKUSZ_BUILD_DIR
+	$GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
+	CXXFLAGS="-O0" CFLAGS="-O0" $GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
 
 	popd
 

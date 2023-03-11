@@ -42,7 +42,7 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
         // Store syscall result in rax
         regs.rax = crate::arch::signal::arch_sys_sigreturn(sys_frame, regs) as u64
     } else {
-        logln_disabled!("syscall {:?}", sys_frame);
+        //logln!("syscall {:?} {:?}", regs, sys_frame);
 
         let res = crate::kernel::syscall::syscall_handler(
             regs.rax, regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9,

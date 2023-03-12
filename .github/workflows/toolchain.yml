@@ -22,7 +22,7 @@ jobs:
           submodules: true
       
       - name: Install Packages
-        run: apt-fast -y install nasm meson ninja-build bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo xorriso autotools-dev automake autoconf autoconf-archive gcc-12 g++-12
+        run: apt-fast -y install nasm meson ninja-build bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo xorriso autotools-dev automake autoconf autoconf-archive gettext pkgconf autopoint gcc-12 g++-12
 
       - name: Configure gcc
         run: |

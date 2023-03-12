@@ -43,7 +43,10 @@ $SPATH/build.sh cykusz_nyancat > $LOGDIR/cykusz_nyancat.log 2>&1
 echo "Cross building ncurses..."
 $SPATH/build.sh cykusz_ncurses
 
-tree $SPATH/cykusz
+#tree $SPATH/cykusz
+echo "======================NCURSES CONFIG START========================"
+cat $SPATH/cykusz/usr/bin/ncursesw6-config
+echo "======================NCURSES CONFIG END  ========================"
 
 echo "Cross building nano..."
 $SPATH/build.sh cykusz_nano

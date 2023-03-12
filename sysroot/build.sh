@@ -282,7 +282,7 @@ function _cykusz_ncurses {
 	pushd .
 
 	cd $NCURSES_CYKUSZ_BUILD_DIR
-	$NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --disable-stripping --with-debug --enable-widec
+	$NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --enable-widec
 
 	popd
 

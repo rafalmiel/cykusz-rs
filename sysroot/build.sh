@@ -302,7 +302,7 @@ function _cykusz_nano {
 
 	popd
 
-	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT LIBS="-lncursesw" -j4
 	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 

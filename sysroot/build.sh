@@ -297,16 +297,12 @@ function _cykusz_nano {
 
 	pushd .
 
-    echo "================= ENV START ====================="
-    env
-    echo "================= ENV END ======================="
-
 	cd $NANO_CYKUSZ_BUILD_DIR
 	$NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
 
 	popd
 
-	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT LIBS="-lncursesw" -j4
 	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 

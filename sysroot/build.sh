@@ -34,7 +34,7 @@ CROSS=$CYKUSZ_DIR/sysroot/cross
 
 TRIPLE=x86_64-cykusz
 
-export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:$PATH
+export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:/usr/bin
 
 function _prepare_mlibc {
 	if [ ! -d $MLIBC_SRC_DIR ]; then
@@ -296,6 +296,10 @@ function _cykusz_nano {
 	mkdir -p $NANO_CYKUSZ_BUILD_DIR
 
 	pushd .
+
+    echo "================= ENV START ====================="
+    env
+    echo "================= ENV END ======================="
 
 	cd $NANO_CYKUSZ_BUILD_DIR
 	$NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc

@@ -369,7 +369,7 @@ impl State {
             cursor_timer: None,
             char_cache: Vec::<ScreenChar>::new(),
             buffer: unsafe {
-                buf.to_mapped().as_slice_mut::<u32>(pitch as usize * height as usize)
+                buf.to_mapped().as_slice_mut::<u32>(pitch as usize / 4usize * height as usize)
             },
         };
 
@@ -424,7 +424,7 @@ impl State {
                 pos += 1;
             }
 
-            pos += self.width - 8;
+            pos += self.pitch - 8;
         }
     }
 

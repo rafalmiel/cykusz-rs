@@ -22,7 +22,6 @@ use syscall_defs::signal::{SigAction, SignalFlags, SignalHandler};
 pub mod file;
 pub mod nc;
 
-#[thread_local]
 pub static mut TEST: usize = 33;
 
 fn make_str(buf: &[u8]) -> &str {
@@ -648,6 +647,28 @@ fn exec(cmd: &str) {
                 "/usr/bin/gcc",
                 Some(&["/usr/bin/gcc", "/test.c", "-o", "/test"]),
                 Some(&["PATH=/usr/bin", "TERM=cykusz"]),
+            );
+        }
+    } else if cmd.starts_with("thread_test") {
+        let mut split = cmd.split_whitespace();
+
+        split.next();
+
+        let reps = if let Some(n) = split.next() {
+            if let Ok(rep) = n.parse::<usize>() {
+                rep
+            } else {
+                50
+            }
+        } else {
+            50
+        };
+
+        for _ in 0..reps {
+            start_process(
+                "/bin/hello",
+                None,
+                None
             );
         }
     } else if cmd == "pipe_test" {

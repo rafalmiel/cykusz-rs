@@ -79,7 +79,6 @@ impl FileHandle {
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
         let offset = self.offset.load(Ordering::SeqCst);
 
-        //logln2!("sys_write: {}, offset: {}, len: {}", self.fd, offset, buf.len());
         //println!("writing to inode handle");
         let wrote = self.write_at(buf, offset)?;
 
@@ -108,7 +107,6 @@ impl FileHandle {
     pub fn seek(&self, off: isize, whence: syscall_defs::SeekWhence) -> Result<usize> {
         let meta = self.inode.inode().metadata().ok().ok_or(FsError::IsPipe)?;
 
-        //logln2!("seek: fd: {} off: {} whence: {:?}", self.fd, off, whence);
 
         if meta.typ == FileType::File {
             match whence {

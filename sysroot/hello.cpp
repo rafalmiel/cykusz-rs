@@ -1,9 +1,11 @@
+#include <cykusz/syscall.h>
 #include <iostream>
 #include <vector>
 #include <signal.h>
 #include <unistd.h>
 #include <thread>
 #include <mutex>
+#include <cstring>
 
 class TestCtr {
 	public:
@@ -38,9 +40,13 @@ void print_thread() {
 
 void print_thread2(int v) {
 		//for (int i = 0;i < 10; ++i) {
-		if (true || v != 7) {
-			for (int i = 0; i < 1000; ++i) {
-				printf("%d", v);
+		pid_t tid = syscalln0(SYS_GETTID);
+		if (false && v != 7) {
+			for (int i = 0;; ++i) {
+				//printf("%d ", tid);
+				char buf[8];
+				sprintf(buf, "%d|", tid);
+				syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
 			}
 			//for (;;) {
 			//	//printf("%d", v);
@@ -51,10 +57,15 @@ void print_thread2(int v) {
 			//}
 		} else {
 			for (int i = 0; i < 1000; ++i) {
-				printf("%d", v);
+			//for (int i = 0; ; ++i) {
+				char buf[8];
+				sprintf(buf, "%d|", tid);
+				syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
 			}
 
-			printf("exec stack\n");
+            char buf[20];
+            sprintf(buf, "exec stack\n");
+            syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
 
 			char* args[] = {"/bin/stack", "-arg1", "-arg2", 0};
 			char* envs[] = {"PATH=/usr/bin:/bin", 0};
@@ -88,14 +99,14 @@ int main(int argc, char *argv[]) {
 	std::thread thr9{print_thread2, 9};
 
 	//for(int i = 0;i < 10; ++i) {
-	for (;;) {
+	//for (;;) {
 		//printf("%d", 0);
 		//std::unique_lock<std::mutex> lck{MUT};
 		//std::cout << "Hello, from main " << i << std::endl;
 		//write(1, "TT0. Hello printf main\n", 23);
 		//lock.unlock();
 	//	printf("Hello printf main\n");
-	}
+	//}
 
 	//std::cin >> input;
 	std::cout << "Hello, " << input << "!" << std::endl;
@@ -111,4 +122,11 @@ int main(int argc, char *argv[]) {
 
 	thr1.join();
 	thr2.join();
+	thr3.join();
+	thr4.join();
+	thr5.join();
+	thr6.join();
+	thr7.join();
+	thr8.join();
+	thr9.join();
 }

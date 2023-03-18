@@ -6,6 +6,7 @@ use downcast_rs::DowncastSync;
 use spin::Once;
 
 use syscall_defs::exec::ExeArgs;
+use crate::kernel;
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::mm::VirtAddr;
@@ -13,6 +14,7 @@ use crate::kernel::sched::round_robin::RRScheduler;
 use crate::kernel::sched::task_container::TaskContainer;
 use crate::kernel::session::sessions;
 use crate::kernel::signal::SignalResult;
+use crate::kernel::sync::IrqGuard;
 use crate::kernel::task::Task;
 
 #[macro_export]
@@ -50,6 +52,7 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn queue_task(&self, task: Arc<Task>);
     fn sleep(&self, until: Option<usize>) -> SignalResult<()>;
     fn wake(&self, task: Arc<Task>);
+    fn wake_as_next(&self, task: Arc<Task>);
     fn cont(&self, task: Arc<Task>);
     fn stop(&self);
     fn exit(&self, status: isize) -> !;
@@ -145,6 +148,10 @@ impl Scheduler {
         self.sched.wake(task);
     }
 
+    fn wake_as_next(&self, task: Arc<Task>) {
+        self.sched.wake_as_next(task);
+    }
+
     fn stop(&self) {
         self.sched.stop();
     }
@@ -179,10 +186,14 @@ impl Scheduler {
 
             current.exec(exe, args, envs);
         } else {
-            current
+            //let _ = IrqGuard::new();
+            if current
                 .process_leader()
                 .signals()
-                .setup_sig_exec(sigexec_exec, Arc::new(ExecParams { exe, args, envs }));
+                .setup_sig_exec(sigexec_exec, Arc::new(ExecParams { exe, args, envs })) {
+
+                current.process_leader().wake_up_as_next();
+            }
 
             self.exit_thread();
         }
@@ -202,6 +213,7 @@ impl Scheduler {
 
     pub fn exit(&self, status: isize) -> ! {
         let current = current_task_ref();
+
 
         logln_disabled!(
             "exit tid {} is pl: {}, sc: {}, wc: {}",
@@ -361,6 +373,10 @@ pub fn sleep(time_ns: Option<usize>) -> SignalResult<()> {
 
 pub fn wake(task: Arc<Task>) {
     scheduler().wake(task);
+}
+
+pub fn wake_as_next(task: Arc<Task>) {
+    scheduler().wake_as_next(task);
 }
 
 pub fn stop() {

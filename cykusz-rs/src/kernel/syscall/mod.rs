@@ -1,3 +1,5 @@
+use crate::kernel::sched::current_id;
+
 pub mod sys;
 
 pub fn init() {
@@ -11,7 +13,7 @@ pub fn init_ap() {
 fn conditional_enable_int(sys: usize) {
     use syscall_defs::*;
     match sys {
-        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT | SYS_EXIT | SYS_EXIT_THREAD => {
+        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT | SYS_EXIT | SYS_EXIT_THREAD | SYS_EXEC => {
             return;
         }
         _ => {

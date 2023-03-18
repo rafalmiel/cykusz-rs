@@ -12,9 +12,9 @@ use syscall_defs::signal::{SigAction, SignalFlags};
 use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sched::current_task_ref;
+use crate::kernel::sched::{current_id, current_task_ref};
 use crate::kernel::signal::default::Action;
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::Task;
 
 mod default;
@@ -30,7 +30,10 @@ pub enum SignalError {
 const IMMUTABLE_MASK: u64 = {
     let a = (1u64 << syscall_defs::signal::SIGSTOP)
         | (1u64 << syscall_defs::signal::SIGCONT)
-        | (1u64 << syscall_defs::signal::SIGKILL);
+        | (1u64 << syscall_defs::signal::SIGABRT)
+        | (1u64 << syscall_defs::signal::SIGKILL)
+        | (1u64 << KSIGKILLTHR)
+        | (1u64 << KSIGEXEC);
 
     a
 };
@@ -236,7 +239,7 @@ impl Signals {
     }
 
     pub fn has_pending(&self) -> bool {
-        (self.entries().pending() | self.thread_pending()) & !self.blocked_mask() > 0
+        ((self.entries().pending() | self.thread_pending()) & !self.blocked_mask()) > 0
     }
 
     pub fn blocked_mask(&self) -> u64 {
@@ -249,7 +252,7 @@ impl Signals {
 
     pub fn setup_sig_exec(&self, f: fn(SigExecParam), param: SigExecParam) -> bool {
         if !self.is_pending(KSIGEXEC as u64) {
-            *self.sig_exec.lock() = Some(SigExec { handler: f, param });
+            *self.sig_exec.lock_irq_debug(1) = Some(SigExec { handler: f, param });
 
             self.set_pending(KSIGEXEC as u64, true);
 
@@ -263,7 +266,10 @@ impl Signals {
         if self.is_pending(KSIGEXEC as u64) {
             self.clear_pending(KSIGEXEC as u64);
 
-            if let Some(SigExec { handler, param }) = self.sig_exec.lock().take() {
+            let exc = self.sig_exec.lock_irq_debug(2).take();
+
+            if let Some(SigExec { handler, param }) = exc {
+                let _ = IrqGuard::new();
                 (handler)(param);
             }
         }
@@ -294,6 +300,7 @@ impl Signals {
             drop(sigs);
 
             self.set_pending(signal as u64, this_thread);
+
 
             if self.is_blocked(signal) {
                 TriggerResult::Blocked
@@ -377,6 +384,7 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
         return None;
     }
 
+
     if signals.is_pending(syscall_defs::signal::SIGKILL as u64) {
         logln_disabled!(
             "sigkill: {} sc: {}, wc: {}",
@@ -389,11 +397,26 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
 
         crate::kernel::sched::exit(1);
     }
+    if signals.is_pending(syscall_defs::signal::SIGABRT as u64) {
+        logln_disabled!(
+            "sigkill: {} sc: {}, wc: {}",
+            task.tid(),
+            Arc::strong_count(task),
+            Arc::weak_count(task)
+        );
+
+        signals.clear_pending(syscall_defs::signal::SIGABRT as u64);
+
+        crate::kernel::sched::exit(1);
+    }
+
 
     signals.sig_exec();
 
+
     for s in 0..SIGNAL_COUNT {
         if !signals.is_blocked(s) && signals.is_pending(s as u64) {
+
             signals.clear_pending(s as u64);
 
             let entries = signals.entries();

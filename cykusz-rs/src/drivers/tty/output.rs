@@ -490,7 +490,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 self.output.cursor_x -= 1;
             }
         } else {
-            logln!("unrecognised ctrl {}", byte);
+            //logln!("unrecognised ctrl {}", byte);
         }
     }
 

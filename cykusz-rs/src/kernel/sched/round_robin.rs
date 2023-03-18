@@ -221,6 +221,26 @@ impl Queues {
         }
     }
 
+    fn wake_as_next(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
+        if task.state() == TaskState::AwaitingIo {
+            let mut cursor = if task.sleep_until() > 0 {
+                unsafe { self.deadline_awaiting.cursor_mut_from_ptr(task.as_ref()) }
+            } else {
+                unsafe { self.awaiting.cursor_mut_from_ptr(task.as_ref()) }
+            };
+
+            if let Some(task) = cursor.remove() {
+                self.push_runnable_front(task);
+            }
+        } else {
+            task.set_has_pending_io(true);
+            let mut cursor = unsafe { self.runnable.cursor_mut_from_ptr(task.as_ref()) };
+            if let Some(task) = cursor.remove() {
+                self.push_runnable_front(task);
+            }
+        }
+    }
+
     fn stop(&mut self, lock: SpinGuard<()>) {
         let task = get_current().clone();
 
@@ -310,6 +330,7 @@ impl Queues {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
 
+
         task.set_state(TaskState::AwaitingIo);
         task.set_sleep_until(0);
 
@@ -320,6 +341,7 @@ impl Queues {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
 
+
         task.set_state(TaskState::Stopped);
         task.set_sleep_until(0);
 
@@ -329,6 +351,7 @@ impl Queues {
     fn push_deadline_awaiting(&mut self, task: Arc<Task>, time_ns: usize) {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
+
 
         use crate::kernel::timer::current_ns;
 
@@ -346,6 +369,16 @@ impl Queues {
         //task.set_sleep_until(0);
 
         self.runnable.push_back(task);
+    }
+
+    fn push_runnable_front(&mut self, task: Arc<Task>) {
+        assert_eq!(task.sched.is_linked(), false);
+        assert_ne!(task.tid(), self.idle_task.tid());
+
+        task.set_state(TaskState::Runnable);
+        //task.set_sleep_until(0);
+
+        self.runnable.push_front(task);
     }
 }
 
@@ -401,6 +434,14 @@ impl SchedulerInterface for RRScheduler {
         let lock = lock.lock_irq();
 
         queue.wake(task, lock);
+    }
+
+    fn wake_as_next(&self, task: Arc<Task>) {
+        let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
+
+        let lock = lock.lock_irq();
+
+        queue.wake_as_next(task, lock);
     }
 
     fn cont(&self, task: Arc<Task>) {

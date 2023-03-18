@@ -588,7 +588,7 @@ impl VideoDriver for Fb {
             return;
         }
 
-        let mut state = self.state.lock();
+        let mut state = self.state.lock_irq();
 
         for b in buf {
             state.print_char(*b, x, y);

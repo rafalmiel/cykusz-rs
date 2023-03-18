@@ -1,6 +1,7 @@
 use core::ops::{Deref, DerefMut};
 
-use crate::kernel::sched::current_task;
+use crate::kernel::sched::{current_id, current_task};
+use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::spin_lock::{Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -35,7 +36,7 @@ impl<T> Mutex<T> {
                     m: &self,
                 };
             } else {
-                while let Err(_e) = WaitQueue::task_wait() {}
+                let _ = WaitQueue::task_wait();
             }
         }
     }
@@ -53,7 +54,7 @@ impl<T> Mutex<T> {
                     m: &self,
                 };
             } else {
-                while let Err(_e) = WaitQueue::task_wait() {}
+                let _ = WaitQueue::task_wait();
             }
         }
     }
@@ -89,7 +90,6 @@ impl<'a, T: ?Sized> DerefMut for MutexGuard<'a, T> {
 impl<'a, T: ?Sized> Drop for MutexGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
-
         self.m.wait_queue.notify_one();
     }
 }

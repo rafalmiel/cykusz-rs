@@ -1,6 +1,7 @@
 use core::ops::{Deref, DerefMut};
 
 use spin::{Mutex as M, MutexGuard as MG};
+use crate::kernel;
 
 use crate::kernel::int;
 use crate::kernel::sched::current_id;
@@ -38,12 +39,17 @@ impl<T> Spin<T> {
         }
     }
 
-    pub fn lock(&self) -> SpinGuard<T> {
-        let notify = if self.notify {
+    fn maybe_preempt_disable(&self) -> bool {
+        let notify = if self.notify && kernel::int::is_enabled() {
             crate::kernel::sched::preempt_disable()
         } else {
             false
         };
+        notify
+    }
+
+    pub fn lock(&self) -> SpinGuard<T> {
+        let notify = self.maybe_preempt_disable();
 
         let lock = self.l.lock();
 
@@ -56,11 +62,7 @@ impl<T> Spin<T> {
     }
 
     pub fn lock_debug(&self, id: usize) -> SpinGuard<T> {
-        let notify = if self.notify {
-            crate::kernel::sched::preempt_disable()
-        } else {
-            false
-        };
+        let notify = self.maybe_preempt_disable();
 
         logln!("l: - {}", id);
         let lock = self.l.lock();
@@ -75,11 +77,7 @@ impl<T> Spin<T> {
     }
 
     pub fn try_lock(&self) -> Option<SpinGuard<T>> {
-        let notify = if self.notify {
-            crate::kernel::sched::preempt_disable()
-        } else {
-            false
-        };
+        let notify = self.maybe_preempt_disable();
 
         let lock = match self.l.try_lock() {
             Some(l) => Some(l),
@@ -106,23 +104,11 @@ impl<T> Spin<T> {
 
     pub fn try_lock_irq(&self) -> Option<SpinGuard<T>> {
         let int_enabled = crate::kernel::int::is_enabled();
-
         crate::kernel::int::disable();
-
-        let notify = if self.notify {
-            //crate::kernel::sched::preempt_disable()
-            false
-        } else {
-            false
-        };
 
         let lock = match self.l.try_lock() {
             Some(l) => Some(l),
             None => {
-                if notify {
-                    crate::kernel::sched::preempt_enable();
-                }
-
                 if int_enabled {
                     crate::kernel::int::enable();
                 }
@@ -135,7 +121,7 @@ impl<T> Spin<T> {
             Some(SpinGuard {
                 g: Some(g),
                 irq: int_enabled,
-                notify,
+                notify: false,
                 debug: 0,
             })
         } else {
@@ -145,45 +131,29 @@ impl<T> Spin<T> {
 
     pub fn lock_irq(&self) -> SpinGuard<T> {
         let int_enabled = crate::kernel::int::is_enabled();
-
         crate::kernel::int::disable();
-
-        let notify = if self.notify {
-            //crate::kernel::sched::preempt_disable()
-            false
-        } else {
-            false
-        };
 
         let lock = self.l.lock();
 
         SpinGuard {
             g: Some(lock),
             irq: int_enabled,
-            notify,
+            notify: false,
             debug: 0,
         }
     }
 
-    pub fn lock_irq_debug(&self, _id: usize) -> SpinGuard<T> {
+    pub fn lock_irq_debug(&self, id: usize) -> SpinGuard<T> {
         let int_enabled = crate::kernel::int::is_enabled();
-
         crate::kernel::int::disable();
-
-        let notify = if self.notify {
-            //crate::kernel::sched::preempt_disable()
-            false
-        } else {
-            false
-        };
 
         let lock = self.l.lock();
 
         SpinGuard {
             g: Some(lock),
             irq: int_enabled,
-            notify,
-            debug: _id,
+            notify: false,
+            debug: id,
         }
     }
 }
@@ -217,7 +187,6 @@ impl<'a, T: ?Sized> Drop for SpinGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
         if self.debug > 0 {
-            logln!("U {} {}", self.debug, current_id());
         }
         if self.notify {
             crate::kernel::sched::preempt_enable();

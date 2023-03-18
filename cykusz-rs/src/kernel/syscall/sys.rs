@@ -10,6 +10,7 @@ use syscall_defs::{
     ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
 };
 use syscall_defs::{OpenFlags, SyscallError};
+use crate::kernel;
 
 use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::path::Path;
@@ -231,8 +232,8 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
     let offset = offset as usize;
 
     if let Some(res) = task.vm().mmap_vm(addr, len, prot, flags, file, offset) {
-        logln!("mmap at {} len: 0x{:X} | {:?}", res, len, flags);
-        task.vm().log_vm();
+        //logln!("mmap at {} len: 0x{:X} | {:?}", res, len, flags);
+        //task.vm().log_vm();
         Ok(res.0)
     } else {
         Err(SyscallError::EFAULT)
@@ -749,8 +750,6 @@ pub fn sys_exec(
     envs_len: u64,
 ) -> SyscallResult {
     let path = make_str(path, path_len);
-
-    logln!("sys_exec: {}", path);
 
     let prog = lookup_by_path(Path::new(path), LookupMode::None)?;
 

@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use crate::kernel::sched::current_task;
 
 use crate::kernel::task::Task;
 
@@ -16,7 +17,7 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
     Action::Handle(terminate),        // SIGQUIT
     Action::Handle(terminate),        // SIGILL
     Action::Ignore,                   // UNUSED
-    Action::Ignore,                   // UNUSED
+    Action::Handle(terminate),        // SIGABRT
     Action::Handle(terminate),        // SIGBUS
     Action::Handle(terminate),        // SIGFPE
     Action::Handle(terminate),        // SIGKILL

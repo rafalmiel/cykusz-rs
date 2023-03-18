@@ -3,6 +3,7 @@ use core::ops::{Deref, DerefMut};
 use spin::{
     RwLock as RW, RwLockReadGuard as RWR, RwLockUpgradableGuard as RWU, RwLockWriteGuard as RWW,
 };
+use crate::kernel;
 
 use crate::kernel::int;
 
@@ -97,8 +98,17 @@ impl<T> RwSpin<T> {
         }
     }
 
+    fn maybe_preempt_disable(&self) -> bool {
+        let notify = if self.notify && kernel::int::is_enabled() {
+            crate::kernel::sched::preempt_disable()
+        } else {
+            false
+        };
+        notify
+    }
+
     pub fn read(&self) -> RwSpinReadGuard<T> {
-        let notify = self.notify && crate::kernel::sched::preempt_disable();
+        let notify = self.maybe_preempt_disable();
 
         RwSpinReadGuard {
             g: Some(self.l.read()),
@@ -118,7 +128,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn read_upgradeable(&self) -> RwSpinUpgradeableGuard<T> {
-        let notify = self.notify && crate::kernel::sched::preempt_disable();
+        let notify = self.maybe_preempt_disable();
         RwSpinUpgradeableGuard {
             g: Some(self.l.upgradeable_read()),
             irq: false,
@@ -137,7 +147,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn try_read(&self) -> Option<RwSpinReadGuard<T>> {
-        let notify = self.notify && crate::kernel::sched::preempt_disable();
+        let notify = self.maybe_preempt_disable();
 
         let lock = match self.l.try_read() {
             Some(l) => Some(l),
@@ -186,7 +196,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn try_read_upgradeable(&self) -> Option<RwSpinUpgradeableGuard<T>> {
-        let notify = self.notify && crate::kernel::sched::preempt_disable();
+        let notify = self.maybe_preempt_disable();
 
         let lock = match self.l.try_upgradeable_read() {
             Some(l) => Some(l),
@@ -237,7 +247,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn write(&self) -> RwSpinWriteGuard<T> {
-        let notify = self.notify && crate::kernel::sched::preempt_disable();
+        let notify = self.maybe_preempt_disable();
 
         RwSpinWriteGuard {
             g: Some(self.l.write()),
@@ -257,7 +267,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn try_write(&self) -> Option<RwSpinWriteGuard<T>> {
-        let notify = self.notify && crate::kernel::sched::preempt_disable();
+        let notify = self.maybe_preempt_disable();
 
         let lock = match self.l.try_write() {
             Some(l) => Some(l),

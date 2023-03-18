@@ -475,13 +475,16 @@ impl Task {
         let mut count = 0;
 
         for c in self.children().iter().filter(|t| t.pid() == self.pid()) {
-            c.signal_thread(crate::kernel::signal::KSIGKILLTHR);
+            if c.signal_thread(crate::kernel::signal::KSIGKILLTHR) {
 
-            count += 1;
+                count += 1;
+
+            }
         }
 
         while count > 0 {
             while let Err(_e) = self.wait_thread(0) {}
+
 
             count -= 1;
         }
@@ -517,6 +520,10 @@ impl Task {
 
     pub fn wake_up(&self) {
         crate::kernel::sched::wake(self.me());
+    }
+
+    pub fn wake_up_as_next(&self) {
+        crate::kernel::sched::wake_as_next(self.me());
     }
 
     pub unsafe fn arch_task_mut(&self) -> &mut ArchTask {
@@ -631,7 +638,8 @@ impl Task {
     }
 
     pub fn wait_thread(&self, tid: usize) -> SignalResult<usize> {
-        self.zombies.wait_thread(self.pid(), tid)
+        let res = self.zombies.wait_thread(self.pid(), tid);
+        res
     }
 }
 

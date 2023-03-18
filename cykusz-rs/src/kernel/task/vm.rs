@@ -641,7 +641,7 @@ impl VMData {
             let is_private = map.flags.contains(MMapFlags::MAP_PRIVATE);
             let is_anonymous = map.flags.contains(MMapFlags::MAP_ANONYOMUS);
 
-            logln_disabled!(
+            logln!(
                 "page fault {} p {} a {} {:?} pid {}",
                 addr.align_down(PAGE_SIZE),
                 is_private,

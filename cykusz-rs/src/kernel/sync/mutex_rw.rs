@@ -47,7 +47,7 @@ impl<'a, T: ?Sized> RwMutexUpgradeableGuard<'a, T> {
                 Err(u) => {
                     self.g = Some(u);
 
-                    while let Err(_e) = WaitQueue::task_wait() {}
+                    let _ = WaitQueue::task_wait();
                 }
             }
         }
@@ -84,7 +84,7 @@ impl<T> RwMutex<T> {
                     m: &self,
                 };
             } else {
-                while let Err(_e) = WaitQueue::task_wait() {}
+                let _ = WaitQueue::task_wait();
             }
         }
     }
@@ -102,7 +102,7 @@ impl<T> RwMutex<T> {
                     m: &self,
                 };
             } else {
-                while let Err(_e) = WaitQueue::task_wait() {}
+                let _ = WaitQueue::task_wait();
             }
         }
     }
@@ -120,7 +120,7 @@ impl<T> RwMutex<T> {
                     m: &self,
                 };
             } else {
-                while let Err(_e) = WaitQueue::task_wait() {}
+                let _ = WaitQueue::task_wait();
             }
         }
     }
@@ -138,7 +138,7 @@ impl<T> RwMutex<T> {
                     m: &self,
                 };
             } else {
-                while let Err(_e) = WaitQueue::task_wait() {}
+                let _ = WaitQueue::task_wait();
             }
         }
     }
@@ -156,7 +156,7 @@ impl<T> RwMutex<T> {
                     m: &self,
                 };
             } else {
-                while let Err(_e) = WaitQueue::task_wait() {}
+                let _ = WaitQueue::task_wait();
             }
         }
     }
@@ -174,7 +174,7 @@ impl<T> RwMutex<T> {
                     m: &self,
                 };
             } else {
-                while let Err(_e) = WaitQueue::task_wait() {}
+                let _ = WaitQueue::task_wait();
             }
         }
     }

@@ -8,7 +8,7 @@ pub struct Params {
 impl Params {
     pub fn new() -> Params {
         Params {
-            map: hashbrown::HashMap::<String, String>::new()
+            map: hashbrown::HashMap::<String, String>::new(),
         }
     }
     pub fn get(&self, key: &str) -> Option<&String> {

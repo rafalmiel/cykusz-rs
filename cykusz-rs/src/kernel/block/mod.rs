@@ -12,7 +12,8 @@ use crate::kernel::fs::cache::{ArcWrap, Cacheable};
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{
-    CachedAccess, CachedBlockDev, PageCacheKey, PageCacheItemArc, PageCacheItem, PageCacheItemWeak, RawAccess,
+    CachedAccess, CachedBlockDev, PageCacheItem, PageCacheItemArc, PageCacheItemWeak, PageCacheKey,
+    RawAccess,
 };
 use crate::kernel::sync::{IrqGuard, Mutex, MutexGuard};
 use crate::kernel::timer::{create_timer, Timer, TimerCallback};
@@ -126,13 +127,15 @@ impl BlockDev for PartitionBlockDev {
     fn init_uuid(&self) -> Option<Uuid> {
         Ext2Filesystem::try_get_uuid(self.self_ref.upgrade().unwrap())
     }
-
 }
 
 impl PartitionBlockDev {
     pub fn new(offset: usize, size: usize, dev: Arc<dyn BlockDev>) -> Arc<PartitionBlockDev> {
-        Arc::new_cyclic(|me| {
-            PartitionBlockDev { offset, size, dev, self_ref: me.clone() }
+        Arc::new_cyclic(|me| PartitionBlockDev {
+            offset,
+            size,
+            dev,
+            self_ref: me.clone(),
         })
     }
 }
@@ -171,16 +174,17 @@ impl BlockDevice {
     }
 
     fn init(&self) {
-        self.uuid.call_once(|| {
-            self.dev.init_uuid()
-        });
+        self.uuid.call_once(|| self.dev.init_uuid());
     }
 
     pub fn uuid(&self) -> Option<Uuid> {
         *self.uuid.get().unwrap()
     }
 
-    fn sync_cache(&self, cache: &mut MutexGuard<hashbrown::HashMap<PageCacheKey, PageCacheItemWeak>>) {
+    fn sync_cache(
+        &self,
+        cache: &mut MutexGuard<hashbrown::HashMap<PageCacheKey, PageCacheItemWeak>>,
+    ) {
         for (_, a) in cache.iter() {
             if let Some(up) = a.upgrade() {
                 //logln!("sync page to storage (offset: {})", up.offset());
@@ -363,10 +367,8 @@ pub fn init() {
                             dev.clone(),
                         );
 
-                        let blkdev = BlockDevice::new(
-                            dev.name() + "." + &(p + 1).to_string(),
-                            part_dev,
-                        );
+                        let blkdev =
+                            BlockDevice::new(dev.name() + "." + &(p + 1).to_string(), part_dev);
 
                         if let Err(e) = register_blkdev(blkdev.clone()) {
                             panic!("Failed to register blkdev {} {:?}", blkdev.name(), e);

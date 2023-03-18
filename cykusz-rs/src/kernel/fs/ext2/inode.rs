@@ -15,7 +15,9 @@ use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
-use crate::kernel::fs::pcache::{CachedAccess, PageCacheItemArc, PageCacheItemAdapter, PageCacheItem, RawAccess, MappedAccess};
+use crate::kernel::fs::pcache::{
+    CachedAccess, MappedAccess, PageCacheItem, PageCacheItemAdapter, PageCacheItemArc, RawAccess,
+};
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
@@ -43,7 +45,9 @@ impl LockedExt2INode {
                     node: RwMutex::new(Ext2INode::new(fs.clone(), id)),
                     fs,
                     self_ref: me.clone(),
-                    dirty_list: Mutex::new(LinkedList::<PageCacheItemAdapter>::new(PageCacheItemAdapter::new())),
+                    dirty_list: Mutex::new(LinkedList::<PageCacheItemAdapter>::new(
+                        PageCacheItemAdapter::new(),
+                    )),
                 }
             })))
         }
@@ -951,7 +955,7 @@ impl INode for LockedExt2INode {
 
         self.read().sync_blocks(&self.ext2_fs());
 
-        return Ok(())
+        return Ok(());
     }
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {
@@ -961,7 +965,6 @@ impl INode for LockedExt2INode {
             None
         }
     }
-
 
     fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
         if self.ftype().unwrap() == FileType::File {

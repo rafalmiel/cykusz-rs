@@ -28,7 +28,10 @@ fn read_naive_date() -> chrono::NaiveDateTime {
         sel.write(0x9);
         let year = cmd.read() as i32;
 
-        chrono::NaiveDate::from_ymd_opt(year + 2000, mon, day).unwrap().and_hms_opt(hour, min, sec).unwrap()
+        chrono::NaiveDate::from_ymd_opt(year + 2000, mon, day)
+            .unwrap()
+            .and_hms_opt(hour, min, sec)
+            .unwrap()
     }
 }
 

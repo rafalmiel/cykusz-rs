@@ -1,5 +1,4 @@
 use alloc::sync::Arc;
-use crate::kernel::sched::current_task;
 
 use crate::kernel::task::Task;
 

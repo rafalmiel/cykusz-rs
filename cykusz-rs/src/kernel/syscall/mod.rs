@@ -1,5 +1,3 @@
-use crate::kernel::sched::current_id;
-
 pub mod sys;
 
 pub fn init() {
@@ -89,7 +87,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         a => {
             logln!("NO SYS????? {}", a);
             Err(SyscallError::ENOSYS)
-        },
+        }
     }
     .syscall_into()
 }

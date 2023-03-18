@@ -207,7 +207,9 @@ impl Mapping {
             if current_task_ref().locks() > 0 {
                 logln!("handle_pf_private_file: locks > 0");
             }
-            if let Some(MMapPageStruct(MMapPage::Cached(p))) = f.file.inode().as_mappable().unwrap().get_mmap_page(offset) {
+            if let Some(MMapPageStruct(MMapPage::Cached(p))) =
+                f.file.inode().as_mappable().unwrap().get_mmap_page(offset)
+            {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
                 {
@@ -331,14 +333,12 @@ impl Mapping {
                     }
 
                     true
-                },
+                }
                 Some(MMapPageStruct(MMapPage::Direct(p))) => {
                     map_to_flags(addr_aligned, p.page(), flags);
                     true
-                },
-                _ => {
-                    false
                 }
+                _ => false,
             }
         } else {
             false
@@ -641,7 +641,7 @@ impl VMData {
             let is_private = map.flags.contains(MMapFlags::MAP_PRIVATE);
             let is_anonymous = map.flags.contains(MMapFlags::MAP_ANONYOMUS);
 
-            logln!(
+            logln_disabled!(
                 "page fault {} p {} a {} {:?} pid {}",
                 addr.align_down(PAGE_SIZE),
                 is_private,
@@ -674,7 +674,9 @@ impl VMData {
     ) -> Option<(VirtAddr, VirtAddr, ElfHeader, Option<TlsVmInfo>)> {
         let mut base_addr = VirtAddr(0);
 
-        if let Some(MMapPageStruct(MMapPage::Cached(elf_page))) = exe.inode().as_mappable().unwrap().get_mmap_page(0) {
+        if let Some(MMapPageStruct(MMapPage::Cached(elf_page))) =
+            exe.inode().as_mappable().unwrap().get_mmap_page(0)
+        {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
 
             let load_offset = VirtAddr(if hdr.e_type == BinType::Dyn {

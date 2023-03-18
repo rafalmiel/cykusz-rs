@@ -1,4 +1,3 @@
-
 #[repr(u16)]
 #[derive(Debug)]
 pub enum EventType {

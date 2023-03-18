@@ -51,11 +51,19 @@ pub struct INodeData {
 
 impl INodeData {
     pub fn new(inode: Arc<LockedExt2INode>, offset: usize) -> INodeData {
-        INodeData { inode, offset, synced: false }
+        INodeData {
+            inode,
+            offset,
+            synced: false,
+        }
     }
 
     pub fn new_synced(inode: Arc<LockedExt2INode>, offset: usize, synced: bool) -> INodeData {
-        INodeData { inode, offset, synced }
+        INodeData {
+            inode,
+            offset,
+            synced,
+        }
     }
 
     fn fs(&self) -> Arc<Ext2Filesystem> {

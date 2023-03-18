@@ -84,8 +84,6 @@ impl FramebufferInfo {
     }
 
     pub fn framebuffer_type(&self) -> &'static FramebufferType {
-        unsafe {
-            &*(&self.color_info as *const u8 as *const FramebufferType)
-        }
+        unsafe { &*(&self.color_info as *const u8 as *const FramebufferType) }
     }
 }

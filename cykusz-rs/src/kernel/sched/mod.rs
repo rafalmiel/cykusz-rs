@@ -6,7 +6,6 @@ use downcast_rs::DowncastSync;
 use spin::Once;
 
 use syscall_defs::exec::ExeArgs;
-use crate::kernel;
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::mm::VirtAddr;
@@ -14,7 +13,7 @@ use crate::kernel::sched::round_robin::RRScheduler;
 use crate::kernel::sched::task_container::TaskContainer;
 use crate::kernel::session::sessions;
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::IrqGuard;
+
 use crate::kernel::task::Task;
 
 #[macro_export]
@@ -190,8 +189,8 @@ impl Scheduler {
             if current
                 .process_leader()
                 .signals()
-                .setup_sig_exec(sigexec_exec, Arc::new(ExecParams { exe, args, envs })) {
-
+                .setup_sig_exec(sigexec_exec, Arc::new(ExecParams { exe, args, envs }))
+            {
                 current.process_leader().wake_up_as_next();
             }
 
@@ -213,7 +212,6 @@ impl Scheduler {
 
     pub fn exit(&self, status: isize) -> ! {
         let current = current_task_ref();
-
 
         logln_disabled!(
             "exit tid {} is pl: {}, sc: {}, wc: {}",

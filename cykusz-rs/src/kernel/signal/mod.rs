@@ -12,7 +12,7 @@ use syscall_defs::signal::{SigAction, SignalFlags};
 use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sched::{current_id, current_task_ref};
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::signal::default::Action;
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::Task;
@@ -301,7 +301,6 @@ impl Signals {
 
             self.set_pending(signal as u64, this_thread);
 
-
             if self.is_blocked(signal) {
                 TriggerResult::Blocked
             } else {
@@ -384,7 +383,6 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
         return None;
     }
 
-
     if signals.is_pending(syscall_defs::signal::SIGKILL as u64) {
         logln_disabled!(
             "sigkill: {} sc: {}, wc: {}",
@@ -410,13 +408,10 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
         crate::kernel::sched::exit(1);
     }
 
-
     signals.sig_exec();
-
 
     for s in 0..SIGNAL_COUNT {
         if !signals.is_blocked(s) && signals.is_pending(s as u64) {
-
             signals.clear_pending(s as u64);
 
             let entries = signals.entries();

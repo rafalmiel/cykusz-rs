@@ -1,17 +1,17 @@
-use alloc::string::String;
-use alloc::sync::{Arc, Weak};
-use spin::Once;
 use crate::drivers::ps2::{controller, PS2Controller};
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::buffer::BufferQueue;
+use alloc::string::String;
+use alloc::sync::{Arc, Weak};
+use spin::Once;
 
-use syscall_defs::events::{Event, EventType};
-use syscall_defs::OpenFlags;
-use syscall_defs::poll::PollEventFlags;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
+use syscall_defs::events::{Event, EventType};
+use syscall_defs::poll::PollEventFlags;
+use syscall_defs::OpenFlags;
 
 use super::scancode;
 
@@ -45,7 +45,11 @@ impl INode for KbdState {
         }
     }
 
-    fn poll(&self, poll_table: Option<&mut PollTable>, flags: PollEventFlags) -> crate::kernel::fs::vfs::Result<PollEventFlags> {
+    fn poll(
+        &self,
+        poll_table: Option<&mut PollTable>,
+        flags: PollEventFlags,
+    ) -> crate::kernel::fs::vfs::Result<PollEventFlags> {
         if !flags.contains(PollEventFlags::READ) {
             return Err(FsError::NotSupported);
         }
@@ -84,7 +88,12 @@ struct State {
 
 impl State {
     fn new() -> State {
-        State { e: false, f: false, opened: false, pressed: bitmaps::Bitmap::new() }
+        State {
+            e: false,
+            f: false,
+            opened: false,
+            pressed: bitmaps::Bitmap::new(),
+        }
     }
 }
 
@@ -129,11 +138,20 @@ impl KbdState {
                     let evt = Event {
                         typ: EventType::Key,
                         code: key as u16,
-                        val: if released { 1 } else if repeat { 2 } else { 0 },
+                        val: if released {
+                            1
+                        } else if repeat {
+                            2
+                        } else {
+                            0
+                        },
                     };
 
                     unsafe {
-                        let bytes: &[u8] = core::slice::from_raw_parts(&evt as *const Event as *const u8, core::mem::size_of::<Event>());
+                        let bytes: &[u8] = core::slice::from_raw_parts(
+                            &evt as *const Event as *const u8,
+                            core::mem::size_of::<Event>(),
+                        );
                         self.buf.try_append_data(bytes);
                     }
                 }
@@ -143,9 +161,7 @@ impl KbdState {
 }
 
 fn keyboard() -> &'static Arc<KbdState> {
-    unsafe {
-        KEYBOARD.get_unchecked()
-    }
+    unsafe { KEYBOARD.get_unchecked() }
 }
 
 pub fn init() {

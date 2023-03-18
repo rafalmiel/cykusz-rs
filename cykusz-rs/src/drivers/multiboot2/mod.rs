@@ -75,9 +75,9 @@ impl Info {
     }
 
     pub fn framebuffer_info_tag(&self) -> Option<&'static tags::framebuffer_info::FramebufferInfo> {
-        self.tags()
-            .find(|t| t.typ == 8)
-            .map(|t| unsafe { &*(t as *const tags::Tag as *const tags::framebuffer_info::FramebufferInfo) })
+        self.tags().find(|t| t.typ == 8).map(|t| unsafe {
+            &*(t as *const tags::Tag as *const tags::framebuffer_info::FramebufferInfo)
+        })
     }
 
     pub fn modules_tags(

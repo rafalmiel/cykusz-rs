@@ -104,8 +104,8 @@ pub fn init() {
 }
 
 fn mount_by_path(path: &str, fs: Arc<dyn Filesystem>) {
-    let entry =
-        lookup_by_path(Path::new(path), LookupMode::None).expect((path.to_string() + "/dev dir not found").as_str());
+    let entry = lookup_by_path(Path::new(path), LookupMode::None)
+        .expect((path.to_string() + "/dev dir not found").as_str());
 
     mount::mount(entry, fs).expect((path.to_string() + " mount faiiled").as_str());
 }
@@ -126,12 +126,13 @@ pub fn mount_root() {
         if let Ok(content) = core::str::from_utf8(data.as_slice()) {
             for line in content.split("\n") {
                 if let Some((uuid_str, path)) = line.split_once(' ') {
-                    mount_by_path(path,
-                                  Ext2Filesystem::new(
-                                      get_blkdev_by_uuid(
-                                          Uuid::parse_str(uuid_str).expect("invalid uuid")
-                                      ).expect("block dev not found")
-                                  ).expect("not ext2 filesystem")
+                    mount_by_path(
+                        path,
+                        Ext2Filesystem::new(
+                            get_blkdev_by_uuid(Uuid::parse_str(uuid_str).expect("invalid uuid"))
+                                .expect("block dev not found"),
+                        )
+                        .expect("not ext2 filesystem"),
                     );
 
                     logln!("mounted uuid: {} at path: {}", uuid_str, path);

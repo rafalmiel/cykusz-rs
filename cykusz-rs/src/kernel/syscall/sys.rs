@@ -10,7 +10,6 @@ use syscall_defs::{
     ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
 };
 use syscall_defs::{OpenFlags, SyscallError};
-use crate::kernel;
 
 use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::path::Path;

@@ -60,7 +60,8 @@ pub trait INode: Send + Sync + DowncastSync {
         let meta = self.metadata().unwrap();
         let mut data = Vec::<u8>::new();
         data.resize(meta.size, 0);
-        self.read_at(0, data.as_mut_slice()).expect("fstab read failed");
+        self.read_at(0, data.as_mut_slice())
+            .expect("fstab read failed");
         data
     }
 

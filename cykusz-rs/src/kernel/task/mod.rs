@@ -476,15 +476,12 @@ impl Task {
 
         for c in self.children().iter().filter(|t| t.pid() == self.pid()) {
             if c.signal_thread(crate::kernel::signal::KSIGKILLTHR) {
-
                 count += 1;
-
             }
         }
 
         while count > 0 {
             while let Err(_e) = self.wait_thread(0) {}
-
 
             count -= 1;
         }

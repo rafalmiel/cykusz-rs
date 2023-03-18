@@ -43,9 +43,7 @@ pub struct PageDirectItemStruct {
 
 impl PageDirectItemStruct {
     pub fn new(page: PhysAddr, offset: usize) -> PageDirectItemStruct {
-        PageDirectItemStruct {
-            page, offset
-        }
+        PageDirectItemStruct { page, offset }
     }
 
     pub fn page(&self) -> PhysAddr {
@@ -201,7 +199,7 @@ pub trait CachedBlockDev: CachedAccess {
 
 pub enum MMapPage {
     Cached(PageCacheItemArc),
-    Direct(PageDirectItemStruct)
+    Direct(PageDirectItemStruct),
 }
 
 pub struct MMapPageStruct(pub MMapPage);
@@ -210,7 +208,10 @@ pub trait MappedAccess {
     fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct>;
 }
 
-impl<T: ?Sized> MappedAccess for T where T: CachedAccess {
+impl<T: ?Sized> MappedAccess for T
+where
+    T: CachedAccess,
+{
     fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct> {
         if current_task_ref().locks() > 0 {
             logln!("get_mmap_page: locks > 0");
@@ -244,7 +245,6 @@ impl<T: ?Sized> MappedAccess for T where T: CachedAccess {
             }
         }
     }
-
 }
 
 pub trait CachedAccess: RawAccess {

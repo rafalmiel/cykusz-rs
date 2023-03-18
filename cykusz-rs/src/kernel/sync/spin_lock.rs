@@ -1,10 +1,9 @@
 use core::ops::{Deref, DerefMut};
 
-use spin::{Mutex as M, MutexGuard as MG};
 use crate::kernel;
+use spin::{Mutex as M, MutexGuard as MG};
 
 use crate::kernel::int;
-use crate::kernel::sched::current_id;
 
 pub struct Spin<T: ?Sized> {
     notify: bool,
@@ -186,8 +185,7 @@ impl<'a, T: ?Sized> DerefMut for SpinGuard<'a, T> {
 impl<'a, T: ?Sized> Drop for SpinGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
-        if self.debug > 0 {
-        }
+        if self.debug > 0 {}
         if self.notify {
             crate::kernel::sched::preempt_enable();
         }

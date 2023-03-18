@@ -107,7 +107,6 @@ impl FileHandle {
     pub fn seek(&self, off: isize, whence: syscall_defs::SeekWhence) -> Result<usize> {
         let meta = self.inode.inode().metadata().ok().ok_or(FsError::IsPipe)?;
 
-
         if meta.typ == FileType::File {
             match whence {
                 syscall_defs::SeekWhence::SeekSet => {

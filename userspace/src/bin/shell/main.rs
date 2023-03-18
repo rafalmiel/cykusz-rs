@@ -201,7 +201,6 @@ fn exec(cmd: &str) {
             if let Some(f) = File::new(s.as_str(), OpenFlags::DIRECTORY) {
                 f.sync();
             }
-
         }
     } else if cmd.starts_with("host ") {
         let mut iter = cmd.split_whitespace();
@@ -593,9 +592,7 @@ fn exec(cmd: &str) {
             let mut buf = [0u8; core::mem::size_of::<syscall_defs::events::Event>()];
 
             while f.read(&mut buf) > 0 {
-                let evt = unsafe {
-                    &*(buf.as_ptr() as *const syscall_defs::events::Event)
-                };
+                let evt = unsafe { &*(buf.as_ptr() as *const syscall_defs::events::Event) };
 
                 println!("{:?}", evt);
             }
@@ -665,11 +662,7 @@ fn exec(cmd: &str) {
         };
 
         for _ in 0..reps {
-            start_process(
-                "/bin/hello",
-                None,
-                None
-            );
+            start_process("/bin/hello", None, None);
         }
     } else if cmd == "pipe_test" {
         let mut fds = [0u32; 2];

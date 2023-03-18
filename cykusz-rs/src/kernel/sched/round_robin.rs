@@ -330,7 +330,6 @@ impl Queues {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
 
-
         task.set_state(TaskState::AwaitingIo);
         task.set_sleep_until(0);
 
@@ -341,7 +340,6 @@ impl Queues {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
 
-
         task.set_state(TaskState::Stopped);
         task.set_sleep_until(0);
 
@@ -351,7 +349,6 @@ impl Queues {
     fn push_deadline_awaiting(&mut self, task: Arc<Task>, time_ns: usize) {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
-
 
         use crate::kernel::timer::current_ns;
 

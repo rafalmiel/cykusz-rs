@@ -63,14 +63,14 @@ void print_thread2(int v) {
 				syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
 			}
 
-            char buf[20];
-            sprintf(buf, "exec stack\n");
-            syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
+            //char buf[20];
+            //sprintf(buf, "exec stack\n");
+            //syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
 
-			char* args[] = {"/bin/stack", "-arg1", "-arg2", 0};
-			char* envs[] = {"PATH=/usr/bin:/bin", 0};
+			//char* args[] = {"/bin/stack", "-arg1", "-arg2", 0};
+			//char* envs[] = {"PATH=/usr/bin:/bin", 0};
 
-			execve("/bin/stack", args, envs);
+			//execve("/bin/stack", args, envs);
 		}
 }
 
@@ -88,15 +88,27 @@ int main(int argc, char *argv[]) {
 	std::string input{};
 	//std::cout << "Enter your name: ";
 
-	std::thread thr1{print_thread2, 1};
-	std::thread thr2{print_thread2, 2};
-	std::thread thr3{print_thread2, 3};
-	std::thread thr4{print_thread2, 4};
-	std::thread thr5{print_thread2, 5};
-	std::thread thr6{print_thread2, 6};
-	std::thread thr7{print_thread2, 7};
-	std::thread thr8{print_thread2, 8};
-	std::thread thr9{print_thread2, 9};
+    for (int i = 0; i < 1000; ++i) {
+        std::thread thr1{print_thread2, 1};
+        std::thread thr2{print_thread2, 2};
+        std::thread thr3{print_thread2, 3};
+        std::thread thr4{print_thread2, 4};
+        std::thread thr5{print_thread2, 5};
+        std::thread thr6{print_thread2, 6};
+        std::thread thr7{print_thread2, 7};
+        std::thread thr8{print_thread2, 8};
+        std::thread thr9{print_thread2, 9};
+
+        thr1.join();
+        thr2.join();
+        thr3.join();
+        thr4.join();
+        thr5.join();
+        thr6.join();
+        thr7.join();
+        thr8.join();
+        thr9.join();
+    }
 
 	//for(int i = 0;i < 10; ++i) {
 	//for (;;) {
@@ -117,16 +129,7 @@ int main(int argc, char *argv[]) {
 	}
 	std::cout << std::endl;
 
-	char* const args[3] = {"-arg1", "-arg2", nullptr};
-	char* const envs[1] = {nullptr};
+	//char* const args[3] = {"-arg1", "-arg2", nullptr};
+	//char* const envs[1] = {nullptr};
 
-	thr1.join();
-	thr2.join();
-	thr3.join();
-	thr4.join();
-	thr5.join();
-	thr6.join();
-	thr7.join();
-	thr8.join();
-	thr9.join();
 }

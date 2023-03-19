@@ -79,12 +79,12 @@ impl Partition<'_> {
         ((self.data[6].get_bits(6..8) as u16) << 8) | self.data[7] as u16
     }
 
-    pub fn relative_sector(&self) -> u32 {
-        unsafe { *(self.data.as_ptr().offset(8) as *const u32) }
+    pub fn relative_sector(&self) -> usize {
+        unsafe { *(self.data.as_ptr().offset(8) as *const u32) as usize }
     }
 
-    pub fn total_sectors(&self) -> u32 {
-        unsafe { *(self.data.as_ptr().offset(12) as *const u32) }
+    pub fn total_sectors(&self) -> usize {
+        unsafe { *(self.data.as_ptr().offset(12) as *const u32) as usize }
     }
 }
 

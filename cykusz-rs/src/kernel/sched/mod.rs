@@ -185,7 +185,6 @@ impl Scheduler {
 
             current.exec(exe, args, envs);
         } else {
-            //let _ = IrqGuard::new();
             if current
                 .process_leader()
                 .signals()

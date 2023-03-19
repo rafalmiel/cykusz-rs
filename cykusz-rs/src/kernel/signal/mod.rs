@@ -252,7 +252,7 @@ impl Signals {
 
     pub fn setup_sig_exec(&self, f: fn(SigExecParam), param: SigExecParam) -> bool {
         if !self.is_pending(KSIGEXEC as u64) {
-            *self.sig_exec.lock_irq_debug(1) = Some(SigExec { handler: f, param });
+            *self.sig_exec.lock() = Some(SigExec { handler: f, param });
 
             self.set_pending(KSIGEXEC as u64, true);
 
@@ -266,7 +266,7 @@ impl Signals {
         if self.is_pending(KSIGEXEC as u64) {
             self.clear_pending(KSIGEXEC as u64);
 
-            let exc = self.sig_exec.lock_irq_debug(2).take();
+            let exc = self.sig_exec.lock().take();
 
             if let Some(SigExec { handler, param }) = exc {
                 let _ = IrqGuard::new();

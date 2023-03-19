@@ -1,5 +1,6 @@
 use alloc::sync::Arc;
 
+use crate::{arch, kernel};
 use intrusive_collections::LinkedList;
 
 use crate::kernel::sched::SchedulerInterface;
@@ -282,8 +283,13 @@ impl Queues {
 
         self.dead.push_back(current.clone());
 
-        current.set_exit_status(status);
+        logln!(
+            "FREE MEM h:{} p:{}",
+            kernel::mm::heap::heap_mem(),
+            arch::mm::phys::used_mem()
+        );
 
+        current.set_exit_status(status);
         self.switch_to_sched(current, lock);
 
         unreachable!()

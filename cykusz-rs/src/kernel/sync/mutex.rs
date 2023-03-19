@@ -15,6 +15,12 @@ pub struct MutexGuard<'a, T: ?Sized + 'a> {
     m: &'a Mutex<T>,
 }
 
+impl<T: Default> Default for Mutex<T> {
+    fn default() -> Self {
+        Mutex::new(T::default())
+    }
+}
+
 impl<T> Mutex<T> {
     pub const fn new(user_data: T) -> Mutex<T> {
         Mutex {

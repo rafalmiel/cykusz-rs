@@ -54,6 +54,12 @@ impl<'a, T: ?Sized> RwMutexUpgradeableGuard<'a, T> {
     }
 }
 
+impl<T: Default> Default for RwMutex<T> {
+    fn default() -> Self {
+        RwMutex::new(T::default())
+    }
+}
+
 impl<T> RwMutex<T> {
     pub const fn new(user_data: T) -> RwMutex<T> {
         RwMutex::<T> {

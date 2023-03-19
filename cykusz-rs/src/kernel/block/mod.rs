@@ -37,13 +37,17 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
 
     register_device(dev.clone())?;
 
-    println!("[ BLOCK ] Registered block device {}", dev.name());
-
     devs.insert(dev.id, dev.clone());
 
     drop(devs);
 
     dev.init();
+
+    println!(
+        "[ BLOCK ] Registered block device {} uuid {:?}",
+        dev.name(),
+        dev.uuid()
+    );
 
     Ok(())
 }
@@ -131,6 +135,7 @@ impl BlockDev for PartitionBlockDev {
 
 impl PartitionBlockDev {
     pub fn new(offset: usize, size: usize, dev: Arc<dyn BlockDev>) -> Arc<PartitionBlockDev> {
+        logln!("new part at offset {} size: {}", offset, size);
         Arc::new_cyclic(|me| PartitionBlockDev {
             offset,
             size,
@@ -343,39 +348,63 @@ pub fn sync_all() {
     }
 }
 
-pub fn init() {
+fn process_dev(dev: Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offset: usize) {
     use crate::alloc::string::ToString;
 
     let mut mbr = mbr::Mbr::new();
+    dev.read(offset, mbr.bytes_mut());
 
+    if mbr.is_valid() {
+        for p in 0..4 {
+            if let Some(part) = mbr.partition(p) {
+                if part.system_id() != 0 {
+                    if part.system_id() != 5 {
+                        // not an extended partition
+                        let part_dev = PartitionBlockDev::new(
+                            offset + part.relative_sector(),
+                            part.total_sectors(),
+                            dev.clone(),
+                        );
+
+                        let blkdev =
+                            BlockDevice::new(dev.name() + "." + &count.to_string(), part_dev);
+
+                        if let Err(e) = register_blkdev(blkdev.clone()) {
+                            panic!("Failed to register blkdev {} {:?}", blkdev.name(), e);
+                        }
+
+                        *count += 1;
+                    } else {
+                        // extended partition
+                        process_dev(
+                            dev.clone(),
+                            count,
+                            ext_offset + part.relative_sector(),
+                            if ext_offset > 0 {
+                                ext_offset
+                            } else {
+                                offset + part.relative_sector()
+                            },
+                        );
+                    }
+                }
+            }
+        }
+    } else {
+        panic!("mbr invalid");
+    }
+}
+
+pub fn init() {
     let mut devs = Vec::<Arc<BlockDevice>>::new();
 
     for (_, dev) in BLK_DEVS.lock().iter() {
         devs.push(dev.clone());
     }
 
+    let mut count = 1usize;
+
     for dev in devs.iter() {
-        dev.read(0, mbr.bytes_mut());
-
-        if mbr.is_valid() {
-            for p in 0..4 {
-                if let Some(part) = mbr.partition(p) {
-                    if part.total_sectors() > 0 {
-                        let part_dev = PartitionBlockDev::new(
-                            part.relative_sector() as usize,
-                            part.total_sectors() as usize,
-                            dev.clone(),
-                        );
-
-                        let blkdev =
-                            BlockDevice::new(dev.name() + "." + &(p + 1).to_string(), part_dev);
-
-                        if let Err(e) = register_blkdev(blkdev.clone()) {
-                            panic!("Failed to register blkdev {} {:?}", blkdev.name(), e);
-                        }
-                    }
-                }
-            }
-        }
+        process_dev(dev.clone(), &mut count, 0, 0);
     }
 }

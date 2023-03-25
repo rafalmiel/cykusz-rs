@@ -109,6 +109,7 @@ impl HbaPortCmdReg {
 #[derive(Copy, Clone)]
 pub struct HbaPortTfdReg(pub u32);
 
+#[derive(Debug)]
 pub enum HbaPortTfdRegStatus {
     Err,
     Drq,
@@ -121,7 +122,7 @@ impl HbaPortTfdReg {
         self.0.get_bits(8..=15) as usize
     }
 
-    fn status(&self) -> HbaPortTfdRegStatus {
+    pub fn status(&self) -> HbaPortTfdRegStatus {
         match self.0.get_bits(0..=7) {
             0 => HbaPortTfdRegStatus::Err,
             3 => HbaPortTfdRegStatus::Drq,

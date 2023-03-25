@@ -40,6 +40,7 @@ impl PortData {
 
     fn handle_interrupt(&mut self) {
         let port = self.hba_port();
+
         port.set_is(port.is());
 
         let ci = port.ci();
@@ -132,12 +133,6 @@ impl Port {
     }
 
     fn run_request(&self, request: Arc<DmaRequest>) -> Option<usize> {
-        //let is_int = crate::kernel::int::is_enabled();
-
-        //if !is_int {
-        //    crate::kernel::int::enable();
-        //}
-
         let mut off = 0;
         // post request and wait for completion.....
         while off < request.count() {
@@ -159,10 +154,6 @@ impl Port {
             // TODO: Make some waits uninterruptible
             //println!("[ AHCI ] IO interrupted, retrying");
         }
-
-        //if !is_int {
-        //    crate::kernel::int::disable();
-        //}
 
         Some(request.count() * 512)
     }

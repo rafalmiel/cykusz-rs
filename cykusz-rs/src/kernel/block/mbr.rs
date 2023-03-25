@@ -17,9 +17,11 @@ impl Mbr {
     pub fn new() -> Mbr {
         let mem = allocate_align(512, 0x1000).unwrap();
 
-        Mbr {
+        let mbr = Mbr {
             data: VirtAddr(mem as usize),
-        }
+        };
+
+        mbr
     }
 
     pub fn bytes(&self) -> &[u8] {

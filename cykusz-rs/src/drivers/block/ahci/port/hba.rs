@@ -1,7 +1,9 @@
 use crate::arch::mm::virt::map_to_flags;
+
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::block::ata::request::DmaBuf;
 use crate::drivers::block::ata::AtaCommand;
+
 use crate::kernel::mm::allocate_order;
 use crate::kernel::mm::virt::PageFlags;
 
@@ -16,13 +18,13 @@ impl HbaPort {
     ) -> bool {
         let hdr = self.cmd_header_at(slot);
 
-        let mut flags = hdr.flags();
+        let mut flags = HbaCmdHeaderFlags::empty();
         if cmd == AtaCommand::AtaCommandWriteDmaExt || cmd == AtaCommand::AtaCommandWriteDma {
             flags.insert(HbaCmdHeaderFlags::W);
         } else {
             flags.remove(HbaCmdHeaderFlags::W);
         }
-        flags.insert(HbaCmdHeaderFlags::P | HbaCmdHeaderFlags::C);
+        flags.insert(HbaCmdHeaderFlags::C);
         flags.set_command_fis_length((core::mem::size_of::<FisRegH2D>() / 4) as u8);
 
         hdr.set_flags(flags);
@@ -51,7 +53,8 @@ impl HbaPort {
 
         fis.set_count(count as u16);
 
-        //todo: wait here
+        //arch::timer::busy_sleep(10000);
+        //println!("ci: {:x}", self.ci());
         self.set_ci(1 << slot); // issue cmd
 
         true

@@ -366,6 +366,8 @@ fn process_dev(dev: Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offs
                             dev.clone(),
                         );
 
+                        //println!("got normal {} {}", offset + part.relative_sector(), part.total_sectors());
+
                         let blkdev =
                             BlockDevice::new(dev.name() + "." + &count.to_string(), part_dev);
 
@@ -375,6 +377,7 @@ fn process_dev(dev: Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offs
 
                         *count += 1;
                     } else {
+                        //println!("got extended {}", p);
                         // extended partition
                         process_dev(
                             dev.clone(),
@@ -391,7 +394,7 @@ fn process_dev(dev: Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offs
             }
         }
     } else {
-        panic!("mbr invalid");
+        println!("[ WARN ] Mbr invalid for disk {}", dev.name());
     }
 }
 
@@ -402,9 +405,8 @@ pub fn init() {
         devs.push(dev.clone());
     }
 
-    let mut count = 1usize;
-
     for dev in devs.iter() {
+        let mut count = 1usize;
         process_dev(dev.clone(), &mut count, 0, 0);
     }
 }

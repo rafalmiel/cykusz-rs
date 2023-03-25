@@ -31,6 +31,7 @@ impl PciDeviceHandle for Ahci {
         match (pci_vendor_id, pci_dev_id) {
             (0x8086, 0x2922) => true,
             (0x8086, 0x2829) => true,
+            (0x8086, 0x1c03) => true,
             _ => false,
         }
     }

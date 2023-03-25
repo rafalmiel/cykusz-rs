@@ -1,7 +1,7 @@
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sync::Spin;
 
-const CAPACITY: usize = 4096 * 64;
+const CAPACITY: usize = 4096 * 128;
 
 #[repr(align(4096))]
 struct Mem {

@@ -96,7 +96,7 @@ unsafe extern "C" fn add_pci_dev(
     let bridge = &mut *(Context as *mut PciBridge);
     let mut parent: ACPI_HANDLE = null_mut();
 
-    if Object == root_handle() {
+    if Object == root_handle() || Object == bridge.acpi_handle {
         return AE_OK;
     }
 
@@ -111,6 +111,16 @@ unsafe extern "C" fn add_pci_dev(
         return AE_OK;
     }
 
+    assert_eq!(
+        AcpiGetDevices(
+            null_mut(),
+            Some(add_pci_dev),
+            &mut new_bridge as *mut _ as *mut ::core::ffi::c_void,
+            null_mut()
+        ),
+        AE_OK
+    );
+
     if new_bridge.init_irq_routing() {
         let (dev, fun) = new_bridge.init_dev_fun();
 
@@ -123,11 +133,6 @@ unsafe extern "C" fn add_pci_dev(
 
         bridge.add_child(dev, fun, new_bridge);
     }
-
-    assert_eq!(
-        AcpiGetDevices(null_mut(), Some(add_pci_dev), Object, null_mut()),
-        AE_OK
-    );
 
     return AE_OK;
 }

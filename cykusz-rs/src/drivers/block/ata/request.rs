@@ -58,6 +58,15 @@ impl DmaRequest {
                 data_size,
             });
 
+            unsafe {
+                dma.last_mut()
+                    .unwrap()
+                    .buf
+                    .to_mapped()
+                    .as_bytes_mut(512)
+                    .fill(0);
+            }
+
             size -= data_size;
         }
 
@@ -156,22 +165,9 @@ impl DmaRequest {
     }
 
     pub fn ata_command(&self) -> AtaCommand {
-        let lba48 = self.sector > 0x0FFF_FFFF;
         match self.command {
-            DmaCommand::Read => {
-                if lba48 {
-                    AtaCommand::AtaCommandReadDmaExt
-                } else {
-                    AtaCommand::AtaCommandReadDma
-                }
-            }
-            DmaCommand::Write => {
-                if lba48 {
-                    AtaCommand::AtaCommandWriteDmaExt
-                } else {
-                    AtaCommand::AtaCommandWriteDma
-                }
-            }
+            DmaCommand::Read => AtaCommand::AtaCommandReadDmaExt,
+            DmaCommand::Write => AtaCommand::AtaCommandWriteDmaExt,
         }
     }
 }

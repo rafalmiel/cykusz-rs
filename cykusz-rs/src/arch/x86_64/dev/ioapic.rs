@@ -1,3 +1,4 @@
+use bit_field::BitField;
 use core::ptr::read_volatile;
 use core::ptr::write_volatile;
 
@@ -169,9 +170,7 @@ impl IOApic {
         let mut l = RegRedTblL(self.read(reg_redtbl_low(src)));
         let h = RegRedTblH(self.read(reg_redtbl_high(src)));
 
-        if val {
-            l.0 |= 1 << 13; //active low
-        }
+        l.0.set_bit(13, !val);
 
         self.write(reg_redtbl_low(src), l.0);
         self.write(reg_redtbl_high(src), h.0);
@@ -181,9 +180,7 @@ impl IOApic {
         let mut l = RegRedTblL(self.read(reg_redtbl_low(src)));
         let h = RegRedTblH(self.read(reg_redtbl_high(src)));
 
-        if val {
-            l.0 |= 1 << 15; //level triggered
-        }
+        l.0.set_bit(15, val);
 
         self.write(reg_redtbl_low(src), l.0);
         self.write(reg_redtbl_high(src), h.0);

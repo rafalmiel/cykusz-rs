@@ -63,14 +63,14 @@ void print_thread2(int v) {
 				syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
 			}
 
-            //char buf[20];
-            //sprintf(buf, "exec stack\n");
-            //syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
+            char buf[20];
+            sprintf(buf, "exec stack\n");
+            syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
 
-			//char* args[] = {"/bin/stack", "-arg1", "-arg2", 0};
-			//char* envs[] = {"PATH=/usr/bin:/bin", 0};
+			char* args[] = {"/bin/stack", "-arg1", "-arg2", 0};
+			char* envs[] = {"PATH=/usr/bin:/bin", 0};
 
-			//execve("/bin/stack", args, envs);
+			execve("/bin/stack", args, envs);
 		}
 }
 
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
 	std::string input{};
 	//std::cout << "Enter your name: ";
 
-    for (int i = 0; i < 1000; ++i) {
+    //for (int i = 0; i < 1000; ++i) {
         std::thread thr1{print_thread2, 1};
         std::thread thr2{print_thread2, 2};
         std::thread thr3{print_thread2, 3};
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
         thr7.join();
         thr8.join();
         thr9.join();
-    }
+    //}
 
 	//for(int i = 0;i < 10; ++i) {
 	//for (;;) {

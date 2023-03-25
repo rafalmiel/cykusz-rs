@@ -17,7 +17,10 @@ pub fn init() {
             AE_OK
         );
         assert_eq!(AcpiLoadTables(), AE_OK);
-        assert_eq!(AcpiEnableSubsystem(0), AE_OK);
+        assert_eq!(
+            AcpiEnableSubsystem(ACPI_FULL_INITIALIZATION as UINT32),
+            AE_OK
+        );
         assert_eq!(
             AcpiInstallAddressSpaceHandler(
                 ACPI_ROOT_OBJECT,
@@ -29,7 +32,11 @@ pub fn init() {
             AE_OK
         );
 
-        assert_eq!(AcpiInitializeObjects(0), AE_OK);
+        assert_eq!(
+            AcpiInitializeObjects(ACPI_FULL_INITIALIZATION as UINT32),
+            AE_OK
+        );
+
         assert_eq!(AcpiEnable(), AE_OK);
     }
 

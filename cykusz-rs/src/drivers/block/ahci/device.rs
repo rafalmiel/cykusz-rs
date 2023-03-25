@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use bit_field::BitField;
 
 use crate::arch::idt::add_shared_irq_handler;
-use crate::arch::int::{set_active_high, set_irq_dest};
+use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
 use crate::drivers::block::ahci::port::Port;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::pci::PciHeader;
@@ -42,10 +42,11 @@ impl AhciDevice {
             crate::drivers::acpi::get_irq_mapping(data.bus as u32, data.dev as u32, pin as u32 - 1);
 
         if let Some(p) = int {
-            println!("[ AHCI ] Using interrupt: {}", p);
+            println!("[ AHCI ] Using interrupt: pin: {} int: {}", pin, p);
 
             set_irq_dest(p as u8, p as u8 + 32);
-            set_active_high(p as u8, true);
+            set_active_high(p as u8, false);
+            set_level_triggered(p as u8, false);
             add_shared_irq_handler(p as usize + 32, super::ahci_handler);
         }
     }
@@ -113,12 +114,20 @@ impl AhciDevice {
     pub fn handle_interrupt(&mut self) -> bool {
         let hba = self.hba();
 
-        if hba.is() != 0 {
-            hba.set_is(hba.is());
+        let is = hba.is();
 
-            if let Some(p) = &self.ports[0] {
-                p.handle_interrupt();
+        if is != 0 {
+            {
+                for p in 0..32 {
+                    if is.get_bit(p) {
+                        if let Some(p) = &self.ports[p] {
+                            p.handle_interrupt();
+                        }
+                    }
+                }
             }
+            let hba = self.hba();
+            hba.set_is(is);
         }
 
         return false;

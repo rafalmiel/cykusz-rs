@@ -31,7 +31,12 @@ fn read_naive_date() -> chrono::NaiveDateTime {
         chrono::NaiveDate::from_ymd_opt(year + 2000, mon, day)
             .unwrap()
             .and_hms_opt(hour, min, sec)
-            .unwrap()
+            .unwrap_or(
+                chrono::NaiveDate::from_ymd_opt(2023, 3, 23)
+                    .unwrap()
+                    .and_hms_opt(12, 0, 0)
+                    .unwrap(),
+            )
     }
 }
 

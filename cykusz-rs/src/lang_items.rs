@@ -9,7 +9,7 @@ extern "C" fn eh_personality() {}
 #[lang = "panic_impl"]
 pub fn panic_impl(_pi: &PanicInfo) -> ! {
     println!("PANIC: {:?} {:?}", _pi, unsafe { crate::CPU_ID });
-    crate::idle()
+    loop {}
 }
 
 #[allow(non_snake_case)]

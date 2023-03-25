@@ -131,7 +131,7 @@ fn init_task() {
 
     drivers::post_module_init();
 
-    kernel::net::init();
+    //kernel::net::init();
 
     println!("[ OK ] Network Stack Initialized");
 

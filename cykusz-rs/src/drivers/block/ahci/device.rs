@@ -5,6 +5,7 @@ use bit_field::BitField;
 
 use crate::arch::idt::add_shared_irq_handler;
 use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
+
 use crate::drivers::block::ahci::port::Port;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::pci::PciHeader;
@@ -46,7 +47,7 @@ impl AhciDevice {
 
             set_irq_dest(p as u8, p as u8 + 32);
             set_active_high(p as u8, false);
-            set_level_triggered(p as u8, false);
+            set_level_triggered(p as u8, true);
             add_shared_irq_handler(p as usize + 32, super::ahci_handler);
         }
     }

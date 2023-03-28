@@ -41,9 +41,8 @@ impl PortData {
     fn handle_interrupt(&mut self) {
         let port = self.hba_port();
 
-        port.set_is(port.is());
-
         let ci = port.ci();
+        drop(port);
 
         for (i, cmd) in self.cmds.iter_mut().enumerate() {
             if !ci.get_bit(i) {
@@ -60,6 +59,9 @@ impl PortData {
                 }
             }
         }
+
+        let port = self.hba_port();
+        port.set_is(port.is());
     }
 
     fn find_cmd_slot(&mut self) -> Option<usize> {

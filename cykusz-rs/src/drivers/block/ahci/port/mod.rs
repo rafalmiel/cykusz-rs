@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use bit_field::BitField;
 
-use crate::drivers::block::ahci::reg::HbaPort;
+use crate::drivers::block::ahci::reg::{HbaPort, HbaPortISReg};
 use crate::drivers::block::ata::request::DmaRequest;
 use crate::kernel::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
@@ -41,27 +41,39 @@ impl PortData {
     fn handle_interrupt(&mut self) {
         let port = self.hba_port();
 
-        let ci = port.ci();
+        let is = port.is();
+
+        let ci = port.ci() | port.sact();
         drop(port);
+
+        if !is.contains(HbaPortISReg::DHRS) {
+            let port = self.hba_port();
+            port.set_is(is);
+            return;
+        }
 
         for (i, cmd) in self.cmds.iter_mut().enumerate() {
             if !ci.get_bit(i) {
-                if let Some(cmd_inner) = cmd {
-                    let fin = cmd_inner.request().dec_incomplete() == 0;
-
-                    if fin {
-                        cmd_inner.request().wait_queue().notify_one();
-                    }
+                if let Some(request) = if let Some(cmd_inner) = cmd {
+                    Some(cmd_inner.request().clone())
+                } else {
+                    None
+                } {
+                    let fin = request.dec_incomplete() == 0;
 
                     *cmd = None;
 
                     self.free_cmds += 1;
+
+                    if fin {
+                        request.wait_queue().notify_one();
+                    }
                 }
             }
         }
 
         let port = self.hba_port();
-        port.set_is(port.is());
+        port.set_is(is);
     }
 
     fn find_cmd_slot(&mut self) -> Option<usize> {
@@ -75,36 +87,32 @@ impl PortData {
         let mut rem = request.count() - off;
 
         while rem > 0 {
-            let slot = {
-                if let Some(slot) = self.find_cmd_slot() {
-                    let port = self.hba_port();
+            if let Some(slot) = self.find_cmd_slot() {
+                self.cmds[slot] = Some(Cmd {
+                    req: request.clone(),
+                });
 
-                    let cnt = core::cmp::min(rem, 128);
+                self.free_cmds -= 1;
 
-                    port.run_command(
-                        request.ata_command(),
-                        request.sector() + off,
-                        cnt,
-                        request.dma_vec_from(off),
-                        slot,
-                    );
+                request.inc_incomplete();
 
-                    rem -= cnt;
-                    off += cnt;
+                let port = self.hba_port();
 
-                    slot
-                } else {
-                    return off;
-                }
-            };
+                let cnt = core::cmp::min(rem, 128);
 
-            self.cmds[slot] = Some(Cmd {
-                req: request.clone(),
-            });
+                port.run_command(
+                    request.ata_command(),
+                    request.sector() + off,
+                    cnt,
+                    request.dma_vec_from(off),
+                    slot,
+                );
 
-            self.free_cmds -= 1;
-
-            request.inc_incomplete();
+                rem -= cnt;
+                off += cnt;
+            } else {
+                return off;
+            }
         }
 
         off
@@ -169,7 +177,10 @@ impl BlockDev for Port {
 
         let res = self.run_request(request.clone());
 
-        if res.is_some() {
+        if let Some(r) = &res {
+            if *r / 512 != count {
+                println!("warn: read only {} bytes?", *r);
+            }
             request.copy_into(dest);
         }
 

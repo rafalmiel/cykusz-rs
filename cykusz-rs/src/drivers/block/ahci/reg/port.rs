@@ -109,26 +109,21 @@ impl HbaPortCmdReg {
 #[derive(Copy, Clone)]
 pub struct HbaPortTfdReg(pub u32);
 
-#[derive(Debug)]
-pub enum HbaPortTfdRegStatus {
-    Err,
-    Drq,
-    Bsy,
-    CmdSpec(u32),
+bitflags! {
+    pub struct HbaPortTfdRegStatus: u8 {
+        const BSY = 1 << 7;
+        const DRQ = 1 << 3;
+        const ERR = 1 << 0;
+    }
 }
 
 impl HbaPortTfdReg {
-    fn error(&self) -> usize {
+    pub fn error(&self) -> usize {
         self.0.get_bits(8..=15) as usize
     }
 
     pub fn status(&self) -> HbaPortTfdRegStatus {
-        match self.0.get_bits(0..=7) {
-            0 => HbaPortTfdRegStatus::Err,
-            3 => HbaPortTfdRegStatus::Drq,
-            7 => HbaPortTfdRegStatus::Bsy,
-            o => HbaPortTfdRegStatus::CmdSpec(o),
-        }
+        HbaPortTfdRegStatus::from_bits_truncate(self.0.get_bits(0..=7) as u8)
     }
 
     pub fn status_val(&self) -> u32 {
@@ -307,29 +302,31 @@ impl HbaPortSctlReg {
     }
 }
 
-#[repr(u32)]
-pub enum HbaPortSerrErr {
-    I = 0,  // Recovered Data Integrity Error
-    M = 1,  // Recovered Communications Error
-    T = 8,  // Transient Data Integrity Error
-    C = 9,  // Persistent Communication or Data Integrity Error
-    P = 10, // Protocol Error
-    E = 11, // Internal Error
+bitflags! {
+    pub struct HbaPortSerrErr: u16 {
+        const I = 1 << 0;  // Recovered Data Integrity Error
+        const M = 1 << 1;  // Recovered Communications Error
+        const T = 1 << 8;  // Transient Data Integrity Error
+        const C = 1 << 9;  // Persistent Communication or Data Integrity Error
+        const P = 1 << 10; // Protocol Error
+        const E = 1 << 11; // Internal Error
+    }
 }
 
-#[repr(u32)]
-pub enum HbaPortSerrDiag {
-    N = 0,  // PhyRdy Change
-    I = 1,  // Phy Internal Error
-    W = 2,  // Comm Wake
-    B = 3,  // 10B to 8B Decode Error
-    D = 4,  // Disparity Error
-    C = 5,  // CRC Error
-    H = 6,  // Handshake Error
-    S = 7,  // Link Sequence Error
-    T = 8,  // Transport state transition error
-    F = 9,  // Unknown FIS Type
-    X = 10, // Exchanged
+bitflags! {
+    pub struct HbaPortSerrDiag: u16 {
+        const N = 1 << 0;  // PhyRdy Change
+        const I = 1 << 1;  // Phy Internal Error
+        const W = 1 << 2;  // Comm Wake
+        const B = 1 << 3;  // 10B to 8B Decode Error
+        const D = 1 << 4;  // Disparity Error
+        const C = 1 << 5;  // CRC Error
+        const H = 1 << 6;  // Handshake Error
+        const S = 1 << 7;  // Link Sequence Error
+        const T = 1 << 8;  // Transport state transition error
+        const F = 1 << 9;  // Unknown FIS Type
+        const X = 1 << 10; // Exchanged
+    }
 }
 
 #[repr(transparent)]
@@ -338,40 +335,19 @@ pub struct HbaPortSerrReg(u32);
 
 impl HbaPortSerrReg {
     pub fn error(&self) -> HbaPortSerrErr {
-        match self.0.get_bits(0..=15) {
-            0 => HbaPortSerrErr::I,
-            1 => HbaPortSerrErr::M,
-            8 => HbaPortSerrErr::T,
-            9 => HbaPortSerrErr::C,
-            10 => HbaPortSerrErr::P,
-            11 => HbaPortSerrErr::E,
-            v => panic!("Invalid HbaPortSerrErr {}", v),
-        }
+        HbaPortSerrErr::from_bits_truncate(self.0.get_bits(0..=15) as u16)
     }
 
     pub fn set_error(&mut self, reg: HbaPortSerrErr) {
-        self.0.set_bits(0..=15, reg as u32);
+        self.0.set_bits(0..=15, reg.bits() as u32);
     }
 
     pub fn diagnostics(&self) -> HbaPortSerrDiag {
-        match self.0.get_bits(16..=31) {
-            0 => HbaPortSerrDiag::N,
-            1 => HbaPortSerrDiag::I,
-            2 => HbaPortSerrDiag::W,
-            3 => HbaPortSerrDiag::B,
-            4 => HbaPortSerrDiag::D,
-            5 => HbaPortSerrDiag::C,
-            6 => HbaPortSerrDiag::H,
-            7 => HbaPortSerrDiag::S,
-            8 => HbaPortSerrDiag::T,
-            9 => HbaPortSerrDiag::F,
-            10 => HbaPortSerrDiag::X,
-            v => panic!("Invalid HbaPortSerrDiag {}", v),
-        }
+        HbaPortSerrDiag::from_bits_truncate(self.0.get_bits(16..=31) as u16)
     }
 
     pub fn set_diagnostics(&mut self, reg: HbaPortSerrDiag) {
-        self.0.set_bits(16..=31, reg as u32);
+        self.0.set_bits(16..=31, reg.bits() as u32);
     }
 }
 
@@ -518,7 +494,7 @@ impl HbaPort {
 
     pub fn cmd_header_at(&self, idx: usize) -> &mut HbaCmdHeader {
         unsafe {
-            (self.clb().to_mapped() + core::mem::size_of::<HbaCmdHeader>() * idx)
+            (self.clb().to_virt() + core::mem::size_of::<HbaCmdHeader>() * idx)
                 .read_mut::<HbaCmdHeader>()
         }
     }

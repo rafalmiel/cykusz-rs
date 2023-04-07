@@ -35,11 +35,11 @@ pub struct FisRegH2D {
     lba5: VCell<u8>,
     featureh: VCell<u8>,
 
-    count: VCell<u16>,
+    count: [VCell<u8>; 2],
     icc: VCell<u8>,
     control: VCell<u8>,
 
-    _rsv1: [u8; 4],
+    _rsv1: [VCell<u8>; 4],
 }
 
 impl FisRegH2D {
@@ -48,12 +48,13 @@ impl FisRegH2D {
         self.set_flags(0);
         self.set_featurel(0);
         self.set_featureh(0);
-        self.set_lba(0);
-        self.set_device(0);
+        self.set_lba(0, 0);
         self.set_count(0);
         self.set_icc(0);
         self.set_control(0);
-        self._rsv1.fill(0);
+        for v in &mut self._rsv1 {
+            v.set(0);
+        }
     }
 
     pub fn fis_type(&self) -> FisType {
@@ -156,19 +157,21 @@ impl FisRegH2D {
     }
 
     pub fn count(&self) -> usize {
-        unsafe { self.count.get() as usize }
+        unsafe { self.count[0].get() as usize | (self.count[1].get() as usize) << 8 }
     }
 
     pub fn set_count(&mut self, d: u16) {
         unsafe {
-            self.count.set(d);
+            self.count[0].set(d as u8);
+            self.count[1].set((d >> 8) as u8);
         }
     }
 
-    pub fn set_lba(&mut self, addr: usize) {
+    pub fn set_lba(&mut self, addr: usize, device: u8) {
         self.set_lba0(addr as u8);
         self.set_lba1((addr >> 8) as u8);
         self.set_lba2((addr >> 16) as u8);
+        self.set_device(device);
         self.set_lba3((addr >> 24) as u8);
         self.set_lba4((addr >> 32) as u8);
         self.set_lba5((addr >> 40) as u8);

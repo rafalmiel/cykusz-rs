@@ -206,6 +206,9 @@ pub struct MMapPageStruct(pub MMapPage);
 
 pub trait MappedAccess {
     fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct>;
+    fn get_mmap_page_debug(&self, offset: usize) -> Option<MMapPageStruct> {
+        self.get_mmap_page(offset)
+    }
 }
 
 impl<T: ?Sized> MappedAccess for T
@@ -232,6 +235,44 @@ where
                 if read == 0 {
                     None
                 } else {
+                    let page = page_cache.make_item(new_page);
+
+                    page.link_with_page();
+
+                    page.notify_clean(&page);
+
+                    Some(MMapPageStruct(MMapPage::Cached(page)))
+                }
+            } else {
+                None
+            }
+        }
+    }
+
+    fn get_mmap_page_debug(&self, offset: usize) -> Option<MMapPageStruct> {
+        println!("get_mmap_page: {}", offset);
+        if current_task_ref().locks() > 0 {
+            logln!("get_mmap_page: locks > 0");
+        }
+
+        let page_cache = cache();
+
+        let dev = self.this();
+
+        let cache_offset = offset / PAGE_SIZE;
+
+        if let Some(page) = page_cache.get(PageCacheItemStruct::make_key(&dev, cache_offset)) {
+            println!("page found in cache");
+            Some(MMapPageStruct(MMapPage::Cached(page)))
+        } else {
+            let new_page = PageCacheItemStruct::new(dev.clone(), cache_offset);
+
+            println!("read direct");
+            if let Some(read) = self.read_direct(offset.align(PAGE_SIZE), new_page.data_mut()) {
+                if read == 0 {
+                    None
+                } else {
+                    println!("read {}", read);
                     let page = page_cache.make_item(new_page);
 
                     page.link_with_page();

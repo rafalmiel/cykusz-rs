@@ -23,5 +23,5 @@ pub fn exec() -> ! {
     let init =
         lookup_by_real_path(Path::new("/bin/init"), LookupMode::None).expect("Shell not found");
 
-    crate::kernel::sched::exec(init, None, None)
+    crate::kernel::sched::exec(init, None, None).unwrap()
 }

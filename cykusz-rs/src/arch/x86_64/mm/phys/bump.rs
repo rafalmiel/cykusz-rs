@@ -24,6 +24,7 @@ pub fn alloc(size: usize) -> VirtAddr {
     let ret = VirtAddr(unsafe { mem.mem.as_ptr().offset(mem.cur as isize) as usize });
 
     mem.cur += size;
+    //println!("alloc {} rem {}", size, CAPACITY - mem.cur);
 
     ret
 }

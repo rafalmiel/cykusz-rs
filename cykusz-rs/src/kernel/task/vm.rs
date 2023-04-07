@@ -675,9 +675,18 @@ impl VMData {
         let mut base_addr = VirtAddr(0);
 
         if let Some(MMapPageStruct(MMapPage::Cached(elf_page))) =
-            exe.inode().as_mappable().unwrap().get_mmap_page(0)
+            exe.inode().as_mappable()?.get_mmap_page(0)
         {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
+
+            if hdr.is_none()
+            /*|| exe.full_path().ends_with("cc1")*/
+            {
+                println!("failed elf {:?}", &elf_page.data()[..256]);
+                return None;
+            }
+
+            let hdr = hdr.unwrap();
 
             let load_offset = VirtAddr(if hdr.e_type == BinType::Dyn {
                 0x7500_0000_0000usize

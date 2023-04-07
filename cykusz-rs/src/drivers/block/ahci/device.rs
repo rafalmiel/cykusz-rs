@@ -56,8 +56,11 @@ impl AhciDevice {
         use crate::alloc::string::ToString;
 
         let mut hba = self.hba();
+        //println!("{:?}", hba.cap());
+        //println!("{:?}", hba.cap2());
+        //println!("{}", hba.cap().num_cmd_ports());
 
-        hba.set_ghc(hba.ghc() | HbaMemGhcReg::IE);
+        hba.set_ghc(hba.ghc() | HbaMemGhcReg::IE | HbaMemGhcReg::AE);
 
         let pi = hba.pi();
 
@@ -99,7 +102,7 @@ impl AhciDevice {
             map_to_flags(
                 self.hba,
                 PhysAddr(dhdr.base_address5() as usize),
-                PageFlags::NO_CACHE | PageFlags::WRT_THROUGH | PageFlags::WRITABLE,
+                PageFlags::NO_CACHE | PageFlags::WRITABLE,
             );
 
             self.start_hba();

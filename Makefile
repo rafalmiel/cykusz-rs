@@ -32,6 +32,8 @@ cross_nyancat := sysroot/build/nyancat
 cross_ttytest := sysroot/build/ttytest
 cross_fork := sysroot/build/fork
 
+usb_dev := /dev/sdb1
+
 .PHONY: all clean run ata bochs iso toolchain fsck
 
 all: $(kernel) $(rust_shell) $(rust_init)
@@ -46,7 +48,7 @@ purge: clean
 
 run: $(iso) $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -m 512 -smp cpus=1  -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
-	qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=1 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host --enable-kvm
+	qemu-system-x86_64 -serial stdio -no-reboot -m 5811 -smp cpus=4 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host --enable-kvm
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host
 
 run_ata: $(iso) $(disk)
@@ -89,6 +91,9 @@ $(vdi): $(disk)
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
 	ld -n --whole-archive --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
+
+usb: $(kernel)
+	sudo disk_scripts/install_usb.sh $(usb_dev)
 
 cargo:
 ifdef dev

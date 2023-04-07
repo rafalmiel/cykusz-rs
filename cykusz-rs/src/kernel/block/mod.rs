@@ -76,6 +76,18 @@ pub fn get_blkdev_by_uuid(uuid: Uuid) -> Option<Arc<dyn CachedBlockDev>> {
     None
 }
 
+pub fn get_blkdev_by_name(name: &str) -> Option<Arc<dyn CachedBlockDev>> {
+    let devs = BLK_DEVS.lock();
+
+    for (_k, v) in devs.iter() {
+        if name == v.name() {
+            return Some(v.clone());
+        }
+    }
+
+    None
+}
+
 pub struct BlockDevice {
     id: usize,
     name: String,

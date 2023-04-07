@@ -7,7 +7,7 @@ use intrusive_collections::{LinkedList, LinkedListLink};
 
 use syscall_defs::exec::ExeArgs;
 use syscall_defs::signal::SIGCHLD;
-use syscall_defs::OpenFlags;
+use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::arch::mm::VirtAddr;
 use crate::arch::task::Task as ArchTask;
@@ -182,7 +182,12 @@ impl Task {
         task
     }
 
-    pub fn exec(&self, exe: DirEntryItem, args: Option<ExeArgs>, envs: Option<ExeArgs>) -> ! {
+    pub fn exec(
+        &self,
+        exe: DirEntryItem,
+        args: Option<ExeArgs>,
+        envs: Option<ExeArgs>,
+    ) -> Result<!, SyscallError> {
         let vm = self.vm();
         vm.clear();
 
@@ -192,13 +197,13 @@ impl Task {
         self.filetable().close_on_exec();
 
         if let Some((base_addr, entry, elf_hdr, tls_vm)) = vm.load_bin(exe) {
-            vm.log_vm();
+            //vm.log_vm();
             unsafe {
                 self.arch_task_mut()
                     .exec(base_addr, entry, &elf_hdr, vm, tls_vm, args, envs)
             }
         } else {
-            panic!("Failed to exec task")
+            Err(SyscallError::EINVAL)
         }
     }
 

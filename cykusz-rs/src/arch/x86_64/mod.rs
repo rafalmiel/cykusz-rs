@@ -27,6 +27,19 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
     let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
 
     output::init(mboot.framebuffer_info_tag());
+    let fb_info = mboot.framebuffer_info_tag().unwrap();
+
+    println!(
+        "fb addr {:x} - {:x}",
+        fb_info.addr(),
+        fb_info.addr() + (fb_info.height() * fb_info.pitch()) as u64
+    );
+    println!(
+        "fb addr {} - {} x {}",
+        fb_info.width(),
+        fb_info.height(),
+        fb_info.pitch()
+    );
 
     gdt::early_init();
 

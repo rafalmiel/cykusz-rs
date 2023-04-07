@@ -3,6 +3,7 @@ use mmio::VCell;
 
 use crate::drivers::block::ahci::reg::FisRegH2D;
 use crate::kernel::mm::PhysAddr;
+use crate::kernel::utils::slice::ToBytesMut;
 
 bitflags! {
     pub struct HbaCmdHeaderFlags: u16 {
@@ -42,7 +43,7 @@ pub struct HbaCmdHeader {
 
     ctb: VCell<PhysAddr>,
 
-    _rsv1: [u32; 4],
+    _rsv1: [VCell<u32>; 4],
 }
 
 impl HbaCmdHeader {
@@ -102,25 +103,33 @@ impl HbaCmdTbl {
     pub fn prdt_entry_mut(&mut self, i: usize) -> &mut HbaPrdtEntry {
         unsafe { &mut *self.prdt_entry.as_mut_ptr().offset(i as isize) }
     }
+
+    pub fn reset(&mut self) {
+        self.cfis.fill(0);
+        self.acmd.fill(0);
+        self._rsv1.fill(0);
+    }
 }
 
 #[repr(C)]
 pub struct HbaPrdtEntry {
-    dba: VCell<PhysAddr>,
+    dba: VCell<u32>,
+    dbau: VCell<u32>,
 
-    _rsv1: u32,
+    _rsv1: VCell<u32>,
 
     flags: VCell<u32>,
 }
 
 impl HbaPrdtEntry {
     pub fn database_address(&self) -> PhysAddr {
-        unsafe { self.dba.get() }
+        PhysAddr(unsafe { self.dba.get() as usize | ((self.dbau.get() as usize) << 32) })
     }
 
     pub fn set_database_address(&mut self, addr: PhysAddr) {
         unsafe {
-            self.dba.set(addr);
+            self.dba.set(addr.0 as u32);
+            self.dbau.set((addr.0 >> 32) as u32);
         }
     }
 
@@ -140,5 +149,11 @@ impl HbaPrdtEntry {
 
     pub fn set_interrupt_on_completion(&mut self, i: bool) {
         unsafe { self.flags.set(*self.flags.get().set_bit(31, i)) }
+    }
+
+    pub fn reset(&mut self) {
+        self.set_database_address(PhysAddr(0));
+        self._rsv1.set(0);
+        self.flags.set(0);
     }
 }

@@ -14,6 +14,7 @@
 #![feature(thread_local)]
 #![feature(try_blocks)]
 #![feature(new_uninit)]
+#![feature(never_type)]
 #![feature(linked_list_cursors)]
 
 extern crate alloc;

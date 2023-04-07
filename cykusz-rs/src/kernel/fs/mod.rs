@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use syscall_defs::{FileType, OpenFlags};
 
-use crate::kernel::block::{get_blkdev_by_id, get_blkdev_by_uuid};
+use crate::kernel::block::{get_blkdev_by_id, get_blkdev_by_name, get_blkdev_by_uuid};
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::ext2::Ext2Filesystem;
@@ -105,16 +105,19 @@ pub fn init() {
 
 fn mount_by_path(path: &str, fs: Arc<dyn Filesystem>) {
     let entry = lookup_by_path(Path::new(path), LookupMode::None)
-        .expect((path.to_string() + "/dev dir not found").as_str());
+        .expect((path.to_string() + " dir not found").as_str());
 
     mount::mount(entry, fs).expect((path.to_string() + " mount faiiled").as_str());
 }
 
 pub fn mount_root() {
     let uuid_str = crate::kernel::params::get("root").expect("missing root kernel cmd param");
-    let uuid = Uuid::parse_str(uuid_str.as_str()).expect("invalid root uuid param");
+    let root_dev = if let Ok(uuid) = Uuid::parse_str(uuid_str.as_str()) {
+        get_blkdev_by_uuid(uuid).expect("device with root uuid does not exists")
+    } else {
+        get_blkdev_by_name(uuid_str).expect("device with root name {} does not exists")
+    };
 
-    let root_dev = get_blkdev_by_uuid(uuid).expect("device with root uuid does not exists");
     let root_fs = Ext2Filesystem::new(root_dev).expect("Invalid ext2 fs");
 
     ROOT_MOUNT.call_once(|| root_fs.clone());
@@ -126,16 +129,13 @@ pub fn mount_root() {
         if let Ok(content) = core::str::from_utf8(data.as_slice()) {
             for line in content.split("\n") {
                 if let Some((uuid_str, path)) = line.split_once(' ') {
-                    mount_by_path(
-                        path,
-                        Ext2Filesystem::new(
-                            get_blkdev_by_uuid(Uuid::parse_str(uuid_str).expect("invalid uuid"))
-                                .expect("block dev not found"),
-                        )
-                        .expect("not ext2 filesystem"),
-                    );
+                    if let Some(dev) =
+                        get_blkdev_by_uuid(Uuid::parse_str(uuid_str).expect("Invalid uuid"))
+                    {
+                        mount_by_path(path, Ext2Filesystem::new(dev).expect("not ext2 filesystem"));
 
-                    logln!("mounted uuid: {} at path: {}", uuid_str, path);
+                        logln!("mounted uuid: {} at path: {}", uuid_str, path);
+                    }
                 }
             }
         }

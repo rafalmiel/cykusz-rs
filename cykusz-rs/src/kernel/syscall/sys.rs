@@ -246,7 +246,7 @@ pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
 
     if task.vm().munmap_vm(addr, len as usize) {
         logln!("munmap at {} len: 0x{:X}", addr, len);
-        task.vm().log_vm();
+        //task.vm().log_vm();
         Ok(0)
     } else {
         Err(SyscallError::EFAULT)
@@ -770,7 +770,7 @@ pub fn sys_exec(
         None
     };
 
-    crate::kernel::sched::exec(prog, args, envs);
+    crate::kernel::sched::exec(prog, args, envs)?
 }
 
 pub fn sys_spawn_thread(entry: u64, stack: u64) -> SyscallResult {

@@ -6,6 +6,7 @@ use downcast_rs::DowncastSync;
 use spin::Once;
 
 use syscall_defs::exec::ExeArgs;
+use syscall_defs::SyscallError;
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::mm::VirtAddr;
@@ -177,13 +178,18 @@ impl Scheduler {
         forked
     }
 
-    pub fn exec(&self, exe: DirEntryItem, args: Option<ExeArgs>, envs: Option<ExeArgs>) -> ! {
+    pub fn exec(
+        &self,
+        exe: DirEntryItem,
+        args: Option<ExeArgs>,
+        envs: Option<ExeArgs>,
+    ) -> Result<!, SyscallError> {
         let current = self.sched.current_task();
 
         if current.is_process_leader() {
             current.terminate_threads();
 
-            current.exec(exe, args, envs);
+            current.exec(exe, args, envs)
         } else {
             if current
                 .process_leader()
@@ -278,7 +284,7 @@ fn sigexec_exec(param: Arc<dyn Any + Send + Sync>) {
 
         drop(param);
 
-        exec(exe, args, envs);
+        exec(exe, args, envs).unwrap();
     }
 }
 
@@ -388,7 +394,11 @@ pub fn fork() -> Arc<Task> {
     scheduler().fork()
 }
 
-pub fn exec(exe: DirEntryItem, args: Option<ExeArgs>, envs: Option<ExeArgs>) -> ! {
+pub fn exec(
+    exe: DirEntryItem,
+    args: Option<ExeArgs>,
+    envs: Option<ExeArgs>,
+) -> Result<!, SyscallError> {
     scheduler().exec(exe, args, envs)
 }
 

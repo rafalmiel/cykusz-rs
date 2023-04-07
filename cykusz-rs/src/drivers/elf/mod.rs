@@ -7,14 +7,14 @@ pub mod headers;
 pub mod types;
 
 impl ElfHeader {
-    pub unsafe fn load(exe: &[u8]) -> &ElfHeader {
+    pub unsafe fn load(exe: &[u8]) -> Option<&ElfHeader> {
         let hdr = &*(exe.as_ptr() as *const ElfHeader);
 
         if !hdr.is_valid() {
-            panic!("Invalid Elf Header");
+            return None;
         }
 
-        hdr
+        Some(hdr)
     }
 
     pub fn is_valid(&self) -> bool {

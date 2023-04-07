@@ -81,7 +81,7 @@ dependencies = [
  "mmio",
  "paste",
  "raw-cpuid",
- "spin 0.9.6",
+ "spin 0.9.8",
  "syscall-defs",
  "uuid",
  "vte",
@@ -196,9 +196,9 @@ checksum = "9f746c4065a8fa3fe23974dd82f15431cc8d40779821001404d10d2e79ca7d79"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.52"
+version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d0e1ae9e836cc3beddd63db0df682593d7e2d3d891ae8c9083d2113e1744224"
+checksum = "2b63bdb0cd06f1f4dedf69b254734f9b45af66e4a031e42a7480257d9898b435"
 dependencies = [
  "unicode-ident",
 ]
@@ -252,9 +252,9 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "spin"
-version = "0.9.6"
+version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5d6e0250b93c8427a177b849d144a96d5acc57006149479403d7861ab721e34"
+checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
 ]
@@ -294,7 +294,7 @@ version = "0.1.0"
 dependencies = [
  "linked_list_allocator",
  "rlibc",
- "spin 0.9.6",
+ "spin 0.9.8",
  "syscall-defs",
  "syscall-user",
 ]

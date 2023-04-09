@@ -87,11 +87,11 @@ pub fn init(mboot_info: &multiboot2::Info) {
 
     let mut bdy = BUDDY.lock();
 
-    //println!("init mem {} {}", mem_start, mem_end);
+    //logln!("init mem {} {}", mem_start, mem_end);
     bdy.init(mem_start, mem_end);
 
     for &(s, l) in ranges[..len].iter() {
-        //println!("add range {} {}", s, s + l);
+        //logln!("add range {} {}", s, s + l);
         bdy.add_range(s, s + l);
     }
 

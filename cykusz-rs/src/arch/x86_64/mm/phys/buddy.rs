@@ -13,6 +13,8 @@ pub struct BuddyAlloc {
     end: PhysAddr,
     buddies: [&'static mut [BMType]; BUDDY_COUNT],
     freecnt: [usize; BUDDY_COUNT],
+    ranges: [(PhysAddr, PhysAddr); 16],
+    num_ranges: usize,
 }
 
 pub static BSIZE: [usize; BUDDY_COUNT] =
@@ -33,6 +35,8 @@ impl BuddyAlloc {
                 &mut [],
             ],
             freecnt: [0usize; BUDDY_COUNT],
+            ranges: [(PhysAddr(0), PhysAddr(0)); 16],
+            num_ranges: 0,
         }
     }
 
@@ -75,6 +79,7 @@ impl BuddyAlloc {
 
     pub fn add_range(&mut self, start: PhysAddr, end: PhysAddr) {
         assert!(start >= self.start && end <= self.end);
+        assert!(self.num_ranges < self.ranges.len());
 
         let mut rem = (end - start).0;
 
@@ -84,11 +89,14 @@ impl BuddyAlloc {
             let ord = self.find_ord(cur, rem);
             let size = BSIZE[ord];
 
-            self.set_bit(cur, ord);
+            assert!(self.set_bit(cur, ord));
 
             cur += size;
             rem -= size;
         }
+
+        self.ranges[self.num_ranges] = (start, end);
+        self.num_ranges += 1;
     }
 
     fn find_free(&mut self, idx: usize) -> PhysAddr {
@@ -102,6 +110,8 @@ impl BuddyAlloc {
                     v >>= 1;
                     ib += 1;
                 }
+
+                assert!((*el).get_bit(ib));
 
                 (*el).set_bit(ib, false);
 
@@ -132,7 +142,7 @@ impl BuddyAlloc {
                         let si = BSIZE[ri];
 
                         if rem >= si {
-                            self.set_bit(res + (rem - si) + size, ri);
+                            assert!(self.set_bit(res + (rem - si) + size, ri));
 
                             rem -= si;
                         }
@@ -215,7 +225,19 @@ impl BuddyAlloc {
         }
     }
 
+    fn in_range(&self, addr: PhysAddr, order: usize) -> bool {
+        let end = addr + BSIZE[order];
+
+        self.ranges[..self.num_ranges]
+            .iter()
+            .find(|(s, e)| *s <= addr && *e > end)
+            .is_some()
+    }
+
     pub fn dealloc(&mut self, mut addr: PhysAddr, mut order: usize) {
+        if !self.in_range(addr, order) {
+            return;
+        }
         while order < BSIZE.len() {
             if order < BSIZE.len() - 1 {
                 let buddy = self.get_buddy(addr, order);

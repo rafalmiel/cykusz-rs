@@ -3,9 +3,6 @@ use alloc::sync::Arc;
 
 use bit_field::BitField;
 
-use crate::arch::idt::add_shared_irq_handler;
-use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
-
 use crate::drivers::block::ahci::port::Port;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::pci::PciHeader;
@@ -34,21 +31,19 @@ impl AhciDevice {
     }
 
     fn enable_interrupts(&mut self, pci_data: &PciHeader) {
-        pci_data.hdr().enable_bus_mastering();
-
-        let data = pci_data.hdr();
-        let pin = data.interrupt_pin();
-
-        let int =
-            crate::drivers::acpi::get_irq_mapping(data.bus as u32, data.dev as u32, pin as u32 - 1);
-
-        if let Some(p) = int {
-            println!("[ AHCI ] Using interrupt: pin: {} int: {}", pin, p);
-
-            set_irq_dest(p as u8, p as u8 + 32);
-            set_active_high(p as u8, false);
-            set_level_triggered(p as u8, true);
-            add_shared_irq_handler(p as usize + 32, super::ahci_handler);
+        let mut is_msi = true;
+        if let Some(int) = pci_data
+            .enable_msi_interrupt(super::ahci_handler)
+            .or_else(|| {
+                is_msi = false;
+                pci_data.enable_pci_interrupt(super::sh_ahci_handler)
+            })
+        {
+            logln!(
+                "[ AHCI ] Using {} interrupt: {}",
+                if is_msi { "MSI" } else { "PCI" },
+                int
+            );
         }
     }
 
@@ -107,6 +102,7 @@ impl AhciDevice {
 
             self.start_hba();
 
+            pci_data.hdr().enable_bus_mastering();
             self.enable_interrupts(pci_data);
 
             return true;
@@ -119,6 +115,7 @@ impl AhciDevice {
         let hba = self.hba();
 
         let is = hba.is();
+        hba.set_is(is);
 
         if is != 0 {
             {
@@ -130,8 +127,8 @@ impl AhciDevice {
                     }
                 }
             }
-            let hba = self.hba();
-            hba.set_is(is);
+            //let hba = self.hba();
+            //hba.set_is(is);
         }
 
         return false;

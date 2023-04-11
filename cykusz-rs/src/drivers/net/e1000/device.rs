@@ -1,7 +1,5 @@
 use alloc::vec::Vec;
 
-use crate::arch::idt::add_shared_irq_handler;
-use crate::arch::int::{set_active_high, set_irq_dest};
 use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
 use crate::drivers::pci::{PciData, PciHeader, PciHeader0};
@@ -56,7 +54,13 @@ pub struct E1000Data {
     pub tx_pkts: [Option<Packet<Eth>>; E1000_NUM_TX_DESCS],
 }
 
-fn e1000_handler() -> bool {
+fn e1000_handler() {
+    let dev = device();
+
+    dev.handle_irq();
+}
+
+fn sh_e1000_handler() -> bool {
     let dev = device();
 
     dev.handle_irq()
@@ -220,6 +224,10 @@ impl E1000Data {
         self.hdr.as_ref().expect("Invalid hdr").hdr()
     }
 
+    pub fn pci_hdr(&self) -> &PciHeader {
+        self.hdr.as_ref().expect("Invalid hdr")
+    }
+
     pub fn link_up(&self) {
         self.addr.flag(Regs::Ctrl, ECtl::SLU.bits(), true);
     }
@@ -285,18 +293,19 @@ impl E1000Data {
     }
 
     pub fn enable_interrupt(&mut self) {
-        let data = self.hdr();
-        let pin = data.interrupt_pin();
+        let pci_hdr = self.pci_hdr();
 
-        let int =
-            crate::drivers::acpi::get_irq_mapping(data.bus as u32, data.dev as u32, pin as u32 - 1);
+        let mut is_msi = true;
 
-        if let Some(p) = int {
-            println!("[ E1000 ] Using interrupt: {}", p);
-
-            set_irq_dest(p as u8, p as u8 + 32);
-            set_active_high(p as u8, true);
-            add_shared_irq_handler(p as usize + 32, e1000_handler);
+        if let Some(int) = pci_hdr.enable_msi_interrupt(e1000_handler).or_else(|| {
+            is_msi = false;
+            pci_hdr.enable_pci_interrupt(sh_e1000_handler)
+        }) {
+            logln!(
+                "[ E1000 ] Using {} interrupt: {}",
+                if is_msi { "MSI" } else { "PCI" },
+                int
+            );
 
             self.addr.write(Regs::IMask, IntFlags::default().bits());
             self.addr.read(Regs::ICause);

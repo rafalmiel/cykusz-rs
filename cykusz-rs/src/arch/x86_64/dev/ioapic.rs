@@ -189,6 +189,7 @@ impl IOApic {
     pub const fn new() -> IOApic {
         IOApic { ioapic_base: None }
     }
+
     pub fn init(&mut self, hdr: &'static MadtHeader) {
         if let Some(ref io) = hdr.ioapic_entries().nth(0) {
             self.ioapic_base = Some(io.ioapic_address());

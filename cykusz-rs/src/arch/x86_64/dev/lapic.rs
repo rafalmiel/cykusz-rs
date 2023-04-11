@@ -309,8 +309,10 @@ pub fn start_ap() {
 
             // Allocate stack for the new CPU
             trampoline.stack_ptr = unsafe {
-                crate::kernel::mm::heap::allocate_align(4096 * 16, 4096)
+                (crate::arch::mm::phys::allocate_order(4)
                     .unwrap()
+                    .address_mapped()
+                    .0 as *const u8)
                     .offset(4096 * 16)
             } as u64;
 

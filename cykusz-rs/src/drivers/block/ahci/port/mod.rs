@@ -42,6 +42,7 @@ impl PortData {
         let port = self.hba_port();
 
         let is = port.is();
+        port.set_is(is);
 
         let ci = port.ci() | port.sact();
         drop(port);
@@ -71,9 +72,8 @@ impl PortData {
                 }
             }
         }
-
-        let port = self.hba_port();
-        port.set_is(is);
+        //let port = self.hba_port();
+        //port.set_is(is);
     }
 
     fn find_cmd_slot(&mut self) -> Option<usize> {

@@ -14,7 +14,11 @@ struct Ahci {
     dev: Spin<AhciDevice>,
 }
 
-fn ahci_handler() -> bool {
+fn ahci_handler() {
+    device().dev.lock_irq().handle_interrupt();
+}
+
+fn sh_ahci_handler() -> bool {
     device().dev.lock_irq().handle_interrupt()
 }
 

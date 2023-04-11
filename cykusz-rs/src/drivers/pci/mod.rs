@@ -1,5 +1,8 @@
+use crate::arch::idt::{add_shared_irq_handler, InterruptFn, SharedInterruptFn};
+use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use bit_field::BitField;
 
 use crate::kernel::sync::Spin;
 
@@ -91,6 +94,44 @@ impl PciHeader {
                 panic!("Header not initialized");
             }
         }
+    }
+
+    fn try_hdr0(&self) -> Option<&PciHeader0> {
+        if let PciHeader::Type0(hdr) = self {
+            Some(hdr)
+        } else {
+            None
+        }
+    }
+
+    pub fn enable_msi_interrupt(&self, fun: InterruptFn) -> Option<usize> {
+        let msi = self.try_hdr0()?.msi()?;
+
+        let inum = crate::arch::idt::alloc_handler(fun)?;
+        crate::arch::int::mask_int(inum as u8, false);
+
+        msi.enable_interrupt(inum as u8, false, false, 0);
+        msi.set_enabled(true);
+
+        Some(inum)
+    }
+
+    pub fn enable_pci_interrupt(&self, fun: SharedInterruptFn) -> Option<usize> {
+        let data = self.hdr();
+
+        let pin = data.interrupt_pin();
+
+        let int =
+            crate::drivers::acpi::get_irq_mapping(data.bus as u32, data.dev as u32, pin as u32 - 1);
+
+        let p = int?;
+
+        set_irq_dest(p as u8, p as u8 + 32);
+        set_active_high(p as u8, false);
+        set_level_triggered(p as u8, true);
+        add_shared_irq_handler(p as usize + 32, fun);
+
+        Some(p as usize)
     }
 }
 
@@ -257,12 +298,166 @@ impl PciHeader0 {
         self.data.read(0x34, 8) as u8
     }
 
+    pub fn capabilities_iter(&self) -> CapabilityIter {
+        CapabilityIter::new(&self.data, self.capabilities_ptr())
+    }
+
+    pub fn msi(&self) -> Option<Msi<'_>> {
+        self.capabilities_iter()
+            .find(|cap| cap.id() == 0x5)
+            .and_then(|cap| Some(Msi::<'_>::new(cap.data, cap.offset)))
+    }
+
     pub fn min_grant(&self) -> u8 {
         self.data.read(0x3E, 8) as u8
     }
 
     pub fn max_latency(&self) -> u8 {
         self.data.read(0x3F, 8) as u8
+    }
+}
+
+pub struct CapabilityId<'a> {
+    data: &'a PciData,
+    offset: u32,
+}
+
+impl<'a> CapabilityId<'a> {
+    pub fn id(&self) -> u8 {
+        self.data.read(self.offset, 8) as u8
+    }
+
+    pub fn next(&self) -> u8 {
+        self.data.read(self.offset + 1, 8) as u8
+    }
+}
+
+pub struct CapabilityIter<'a> {
+    data: &'a PciData,
+    cur_ptr: u8,
+}
+
+impl<'a> CapabilityIter<'a> {
+    pub fn new(data: &'a PciData, init_ptr: u8) -> CapabilityIter<'a> {
+        CapabilityIter::<'a> {
+            data,
+            cur_ptr: init_ptr,
+        }
+    }
+}
+
+impl<'a> Iterator for CapabilityIter<'a> {
+    type Item = CapabilityId<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cur_ptr != 0 {
+            let ptr = self.cur_ptr;
+
+            let cap_id = CapabilityId::<'a> {
+                data: self.data,
+                offset: ptr as u32,
+            };
+
+            self.cur_ptr = cap_id.next();
+
+            return Some(cap_id);
+        }
+
+        None
+    }
+}
+
+pub struct Msi<'a> {
+    data: &'a PciData,
+    offset: u32,
+    is64: bool,
+}
+
+#[allow(unused)]
+impl<'a> Msi<'a> {
+    pub fn new(data: &'a PciData, offset: u32) -> Msi<'a> {
+        let mut msi = Msi::<'a> {
+            data,
+            offset,
+            is64: false,
+        };
+
+        msi.is64 = msi.control().get_bit(7);
+
+        msi
+    }
+
+    fn control(&self) -> u16 {
+        self.data.read(self.offset + 2, 16) as u16
+    }
+
+    fn set_control(&self, val: u16) {
+        self.data.write(self.offset + 2, val as u64, 16);
+    }
+
+    pub fn is64(&self) -> bool {
+        self.is64
+    }
+
+    pub fn multi_msg_capable(&self) -> u8 {
+        let v = self.control();
+        v.get_bits(1..=3) as u8
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.control().get_bit(0)
+    }
+
+    pub fn set_enabled(&self, enabled: bool) {
+        let mut v = self.control();
+        v.set_bit(0, enabled);
+
+        self.set_control(v);
+    }
+
+    pub fn address(&self) -> u64 {
+        let mut addr: u64 = self.data.read(self.offset + 4, 32) as u64;
+
+        if self.is64() {
+            addr.set_bits(32..64, self.data.read(self.offset + 8, 32) as u64);
+        }
+
+        addr
+    }
+
+    pub fn set_address(&self, addr: u64) {
+        self.data
+            .write(self.offset + 4, addr.get_bits(0..32) as u64, 32);
+        if self.is64() {
+            self.data
+                .write(self.offset + 8, addr.get_bits(32..64) as u64, 32);
+        }
+    }
+
+    fn data_offset(&self) -> u32 {
+        self.offset + if self.is64() { 0xC } else { 0x8 }
+    }
+
+    pub fn data(&self) -> u64 {
+        self.data.read(self.data_offset(), 16) as u64
+    }
+
+    pub fn set_data(&self, data: u16) {
+        self.data.write(self.data_offset(), data as u64, 16);
+    }
+
+    pub fn enable_interrupt(&self, vector: u8, level: bool, active_low: bool, target_proc: u8) {
+        let mut addr: u32 = 0;
+        addr.set_bits(20..32, 0xFEE);
+        addr.set_bits(12..20, target_proc as u32);
+
+        let mut data: u32 = 0;
+        data.set_bits(0..8, vector as u32);
+        data.set_bit(14, active_low);
+        data.set_bit(15, level);
+
+        self.set_address(addr as u64);
+        self.set_data(data as u16);
     }
 }
 

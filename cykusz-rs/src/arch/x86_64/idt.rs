@@ -69,6 +69,20 @@ impl Irqs {
         }
     }
 
+    fn alloc_int_handler(&self, f: InterruptFn) -> Option<usize> {
+        for i in 64..256 {
+            let mut irq = self.irqs[i].write_irq();
+
+            if let IrqHandler::Missing = *irq {
+                *irq = IrqHandler::Interrupt(f);
+
+                return Some(i);
+            }
+        }
+
+        None
+    }
+
     fn set_shared_int_handler(&self, idx: usize, f: SharedInterruptFn) {
         let mut irqs = self.irqs[idx].write_irq();
 
@@ -315,6 +329,10 @@ pub fn remove_handler(num: usize) -> bool {
 
 pub fn set_handler(num: usize, f: InterruptFn) {
     SHARED_IRQS.set_int_handler(num, f);
+}
+
+pub fn alloc_handler(f: InterruptFn) -> Option<usize> {
+    SHARED_IRQS.alloc_int_handler(f)
 }
 
 pub fn set_user_handler(num: usize, f: InterruptFn) {

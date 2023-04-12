@@ -633,7 +633,6 @@ impl MsixTable {
             (offset + 8).store_volatile(data.val() as u32);
             (offset + 12).store_volatile(0u32);
         }
-
     }
 
     pub fn alloc_interrupt(&self, num: usize, fun: InterruptFn) -> Option<usize> {

@@ -5,7 +5,8 @@ use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, MappedAccess, PageDirectItemStruct};
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::mm::{MappedAddr, PhysAddr, PAGE_SIZE};
+use crate::kernel::mm::virt::PageFlags;
+use crate::kernel::mm::{map_to_flags, virt, MappedAddr, PhysAddr, PAGE_SIZE};
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::TimerObject;
 use crate::kernel::utils::types::Align;
@@ -530,6 +531,26 @@ impl State {
         self.cursor_column = x;
         self.cursor_row = y;
     }
+
+    fn init_dev(&mut self) {
+        let buf_phys = MappedAddr(self.buffer.as_ptr() as usize).to_phys();
+
+        let total = self.pitch * 4 * self.height;
+
+        for off in (0..total).step_by(0x1000) {
+            map_to_flags(
+                buf_phys.to_virt() + off,
+                buf_phys + off,
+                virt::PageFlags::WRITABLE | virt::PageFlags::WRITE_COMBINE,
+            );
+        }
+
+        self.buffer = unsafe {
+            buf_phys
+                .to_virt()
+                .as_slice_mut::<u32>(self.pitch * self.height)
+        };
+    }
 }
 
 struct Fb {
@@ -608,6 +629,8 @@ impl VideoDriver for Fb {
 
     fn init_dev(&self) {
         init_dev();
+
+        self.state.lock().init_dev();
     }
 }
 
@@ -662,10 +685,12 @@ impl MappedAccess for FbDevice {
     fn get_mmap_page(&self, mut offset: usize) -> Option<MMapPageStruct> {
         offset = offset.align_down(PAGE_SIZE);
         let addr: PhysAddr =
-            MappedAddr(fb().state.lock().buffer().as_ptr() as usize).to_phys() + offset;
+            VirtAddr(fb().state.lock().buffer().as_ptr() as usize).to_phys() + offset;
 
         Some(MMapPageStruct(MMapPage::Direct(PageDirectItemStruct::new(
-            addr, offset,
+            addr,
+            offset,
+            PageFlags::WRITE_COMBINE,
         ))))
     }
 }

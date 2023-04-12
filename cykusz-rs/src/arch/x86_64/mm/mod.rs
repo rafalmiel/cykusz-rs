@@ -2,6 +2,7 @@ pub use crate::arch::raw::mm::{MappedAddr, PhysAddr, VirtAddr};
 use crate::drivers::multiboot2;
 
 pub mod heap;
+pub mod pat;
 pub mod phys;
 pub mod virt;
 

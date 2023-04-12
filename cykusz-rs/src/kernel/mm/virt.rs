@@ -8,6 +8,8 @@ bitflags! {
         const NO_EXECUTE    = 1 << 2;
         const WRT_THROUGH   = 1 << 3;
         const NO_CACHE      = 1 << 4;
+        const WRITE_COMBINE = 1 << 5;
+        const WRITE_PROTECT = 1 << 6;
     }
 }
 

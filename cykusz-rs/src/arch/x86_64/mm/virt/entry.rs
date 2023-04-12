@@ -14,6 +14,7 @@ bitflags! {
         const DIRTY         = 1 << 6;
         const HUGE_PAGE     = 1 << 7;
         const GLOBAL        = 1 << 8;
+        const HP_PAT        = 1 << 12;
         const NO_EXECUTE    = 1 << 63;
     }
 }
@@ -39,12 +40,8 @@ impl Entry {
         if flags.contains(virt::PageFlags::WRITABLE) {
             res.insert(Entry::WRITABLE);
         }
-        if flags.contains(virt::PageFlags::NO_CACHE) {
-            res.insert(Entry::NO_CACHE);
-        }
-        if flags.contains(virt::PageFlags::WRT_THROUGH) {
-            res.insert(Entry::WRT_THROUGH);
-        }
+
+        res.insert(crate::arch::mm::pat::from_kernel_flags(false, flags));
 
         return res;
     }

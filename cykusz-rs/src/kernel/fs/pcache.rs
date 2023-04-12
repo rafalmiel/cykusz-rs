@@ -39,11 +39,16 @@ pub type PageCacheItemAdapter = CacheItemAdapter<PageCacheKey, PageCacheItemStru
 pub struct PageDirectItemStruct {
     page: PhysAddr,
     offset: usize,
+    flags: PageFlags,
 }
 
 impl PageDirectItemStruct {
-    pub fn new(page: PhysAddr, offset: usize) -> PageDirectItemStruct {
-        PageDirectItemStruct { page, offset }
+    pub fn new(page: PhysAddr, offset: usize, flags: PageFlags) -> PageDirectItemStruct {
+        PageDirectItemStruct {
+            page,
+            offset,
+            flags,
+        }
     }
 
     pub fn page(&self) -> PhysAddr {
@@ -52,6 +57,10 @@ impl PageDirectItemStruct {
 
     pub fn offset(&self) -> usize {
         self.offset
+    }
+
+    pub fn flags(&self) -> PageFlags {
+        self.flags
     }
 }
 

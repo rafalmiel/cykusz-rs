@@ -98,7 +98,10 @@ impl PciDeviceHandle for E1000 {
     fn handles(&self, pci_vendor_id: u64, pci_dev_id: u64) -> bool {
         if pci_vendor_id == 0x8086 {
             return match pci_dev_id {
-                0x100E | 0x1502 => true,
+                0x100E | // qemu e1000
+                0x10d3 | // qemu e1000e
+                0x1502   // T-420
+                    => true,
                 _ => false,
             };
         }
@@ -133,6 +136,10 @@ impl PciDeviceHandle for E1000 {
 impl E1000 {
     fn handle_irq(&self) -> bool {
         self.data.lock_irq().handle_irq()
+    }
+
+    fn msi_handle_rq0(&self) {
+        self.data.lock_irq().handle_rq0()
     }
 }
 

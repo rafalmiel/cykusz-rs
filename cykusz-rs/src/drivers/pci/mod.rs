@@ -1,5 +1,8 @@
 use crate::arch::idt::{add_shared_irq_handler, InterruptFn, SharedInterruptFn};
 use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
+use crate::arch::mm::{PhysAddr, VirtAddr};
+use crate::kernel::mm::map_to_flags;
+use crate::kernel::mm::virt::PageFlags;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bit_field::BitField;
@@ -104,14 +107,28 @@ impl PciHeader {
         }
     }
 
+    pub fn msi(&self) -> Option<Msi<'_>> {
+        self.try_hdr0()?
+            .capabilities_iter()
+            .find(|cap| cap.id() == 0x5)
+            .and_then(|cap| Some(Msi::<'_>::new(cap.data, cap.offset)))
+    }
+
+    pub fn msix(&self) -> Option<Msix<'_>> {
+        self.try_hdr0()?
+            .capabilities_iter()
+            .find(|cap| cap.id() == 0x11)
+            .and_then(|cap| Some(Msix::<'_>::new(self, cap.offset)))
+    }
+
     pub fn enable_msi_interrupt(&self, fun: InterruptFn) -> Option<usize> {
-        let msi = self.try_hdr0()?.msi()?;
+        let msi = self.msi()?;
 
         let inum = crate::arch::idt::alloc_handler(fun)?;
         crate::arch::int::mask_int(inum as u8, false);
 
         msi.enable_interrupt(inum as u8, false, false, 0);
-        msi.set_enabled(true);
+        msi.enable(true);
 
         Some(inum)
     }
@@ -252,30 +269,100 @@ impl PciData {
     }
 }
 
+#[repr(transparent)]
+pub struct BarAddress(u64);
+
+impl BarAddress {
+    pub fn new(pci_data: &PciData, offset: u32) -> BarAddress {
+        let mut ba = BarAddress(pci_data.read(offset, 32));
+
+        if ba.is64() {
+            ba.0.set_bits(32..64, pci_data.read(offset + 4, 32));
+        }
+
+        ba
+    }
+
+    pub fn is64(&self) -> bool {
+        self.0.get_bits(1..=2) == 0x2
+    }
+
+    pub fn is_io(&self) -> bool {
+        self.0.get_bit(0)
+    }
+
+    pub fn is_prefetchable(&self) -> bool {
+        assert!(!self.is_io());
+        self.0.get_bit(3)
+    }
+
+    pub fn address(&self) -> PhysAddr {
+        assert!(!self.is_io());
+        let mut a = self.0;
+        a.set_bits(0..4, 0);
+        PhysAddr(a as usize)
+    }
+
+    pub fn address_map_virt(&self) -> VirtAddr {
+        self.address_map_virt_num(1)
+    }
+
+    pub fn address_map_virt_num(&self, num_pages: usize) -> VirtAddr {
+        let addr = self.address();
+
+        let mut flags = PageFlags::WRITABLE;
+        if self.is_prefetchable() {
+            flags.insert(PageFlags::WRT_THROUGH);
+        } else {
+            flags.insert(PageFlags::NO_CACHE);
+        }
+
+        for p in 0..num_pages {
+            let offset = 0x1000 * p;
+            map_to_flags(addr.to_virt() + offset, addr + offset, flags);
+        }
+
+        addr.to_virt()
+    }
+
+    pub fn io_address(&self) -> u16 {
+        assert!(self.is_io());
+        let mut a = self.0;
+        a.set_bits(0..2, 0);
+        a.try_into().unwrap()
+    }
+}
+
 #[allow(dead_code)]
 impl PciHeader0 {
-    pub fn base_address0(&self) -> u32 {
-        self.data.read(0x10, 32) as u32
+    pub fn base_address(&self, num: usize) -> BarAddress {
+        assert!(num <= 5);
+
+        BarAddress::new(&self.data, 0x10u32 + 4 * num as u32)
     }
 
-    pub fn base_address1(&self) -> u32 {
-        self.data.read(0x14, 32) as u32
+    pub fn base_address0(&self) -> BarAddress {
+        self.base_address(0)
     }
 
-    pub fn base_address2(&self) -> u32 {
-        self.data.read(0x18, 32) as u32
+    pub fn base_address1(&self) -> BarAddress {
+        self.base_address(1)
     }
 
-    pub fn base_address3(&self) -> u32 {
-        self.data.read(0x1C, 32) as u32
+    pub fn base_address2(&self) -> BarAddress {
+        self.base_address(2)
     }
 
-    pub fn base_address4(&self) -> u32 {
-        self.data.read(0x20, 32) as u32
+    pub fn base_address3(&self) -> BarAddress {
+        self.base_address(3)
     }
 
-    pub fn base_address5(&self) -> u32 {
-        self.data.read(0x24, 32) as u32
+    pub fn base_address4(&self) -> BarAddress {
+        self.base_address(4)
+    }
+
+    pub fn base_address5(&self) -> BarAddress {
+        self.base_address(5)
     }
 
     pub fn cardbus_cis_pointer(&self) -> u32 {
@@ -300,12 +387,6 @@ impl PciHeader0 {
 
     pub fn capabilities_iter(&self) -> CapabilityIter {
         CapabilityIter::new(&self.data, self.capabilities_ptr())
-    }
-
-    pub fn msi(&self) -> Option<Msi<'_>> {
-        self.capabilities_iter()
-            .find(|cap| cap.id() == 0x5)
-            .and_then(|cap| Some(Msi::<'_>::new(cap.data, cap.offset)))
     }
 
     pub fn min_grant(&self) -> u8 {
@@ -408,7 +489,7 @@ impl<'a> Msi<'a> {
         self.control().get_bit(0)
     }
 
-    pub fn set_enabled(&self, enabled: bool) {
+    pub fn enable(&self, enabled: bool) {
         let mut v = self.control();
         v.set_bit(0, enabled);
 
@@ -446,18 +527,123 @@ impl<'a> Msi<'a> {
         self.data.write(self.data_offset(), data as u64, 16);
     }
 
-    pub fn enable_interrupt(&self, vector: u8, level: bool, active_low: bool, target_proc: u8) {
-        let mut addr: u32 = 0;
-        addr.set_bits(20..32, 0xFEE);
-        addr.set_bits(12..20, target_proc as u32);
+    pub fn enable_interrupt(&self, vector: u8, level: bool, active_low: bool, target_proc: u32) {
+        let (addr, data) =
+            crate::arch::int::msi::get_addr_data(vector, level, active_low, target_proc);
 
-        let mut data: u32 = 0;
-        data.set_bits(0..8, vector as u32);
-        data.set_bit(14, active_low);
-        data.set_bit(15, level);
+        self.set_address(addr.val());
+        self.set_data(data.val());
+    }
+}
 
-        self.set_address(addr as u64);
-        self.set_data(data as u16);
+#[allow(unused)]
+pub struct Msix<'a> {
+    header: &'a PciHeader,
+    data: &'a PciData,
+    offset: u32,
+}
+
+#[allow(unused)]
+impl<'a> Msix<'a> {
+    pub fn new(header: &'a PciHeader, offset: u32) -> Msix<'a> {
+        Msix::<'a> {
+            header,
+            data: header.hdr(),
+            offset,
+        }
+    }
+
+    fn control(&self) -> u16 {
+        self.data.read(self.offset + 2, 16) as u16
+    }
+
+    fn set_control(&self, val: u16) {
+        self.data.write(self.offset + 2, val as u64, 16);
+    }
+
+    pub fn table_size(&self) -> usize {
+        let ctrl = self.control();
+        ctrl.get_bits(0..=10) as usize + 1
+    }
+
+    pub fn bir(&self) -> usize {
+        self.data.read(self.offset + 4, 32).get_bits(0..=2) as usize
+    }
+
+    pub fn table_offset(&self) -> usize {
+        *self.data.read(self.offset + 4, 32).set_bits(0..=2, 0) as usize
+    }
+
+    pub fn enable(&self, e: bool) {
+        let mut ctrl = self.control();
+        ctrl.set_bit(15, e);
+
+        self.set_control(ctrl);
+    }
+
+    fn table_bar(&self) -> BarAddress {
+        self.header.try_hdr0().unwrap().base_address(self.bir())
+    }
+
+    pub fn table_address(&self) -> PhysAddr {
+        let bar = self.table_bar();
+
+        return bar.address() + self.table_offset();
+    }
+
+    pub fn map_table_address(&self) -> VirtAddr {
+        let addr = self.table_bar().address_map_virt();
+
+        return addr + self.table_offset();
+    }
+
+    pub fn map_table(&self) -> MsixTable {
+        MsixTable::new(self.map_table_address())
+    }
+
+    pub fn table(&self) -> MsixTable {
+        MsixTable::new(self.table_address().to_virt())
+    }
+}
+
+pub struct MsixTable {
+    addr: VirtAddr,
+}
+
+impl MsixTable {
+    fn new(addr: VirtAddr) -> MsixTable {
+        MsixTable { addr }
+    }
+
+    pub fn enable_interrupt(
+        &self,
+        num: usize,
+        vector: u8,
+        level: bool,
+        active_low: bool,
+        target_proc: u32,
+    ) {
+        let (addr, data) =
+            crate::arch::int::msi::get_addr_data(vector, level, active_low, target_proc);
+
+        let offset = self.addr + 16 * num;
+
+        unsafe {
+            offset.store_volatile(addr.val() as u64);
+            (offset + 8).store_volatile(data.val() as u32);
+            (offset + 12).store_volatile(0u32);
+        }
+
+    }
+
+    pub fn alloc_interrupt(&self, num: usize, fun: InterruptFn) -> Option<usize> {
+        let inum = crate::arch::idt::alloc_handler(fun)?;
+
+        self.enable_interrupt(num, inum as u8, false, false, 0);
+
+        crate::arch::int::mask_int(inum as u8, false);
+
+        Some(inum)
     }
 }
 

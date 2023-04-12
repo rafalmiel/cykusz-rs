@@ -8,6 +8,8 @@ pub enum Regs {
     FCAL = 0x0028,
     FCAH = 0x02C,
     FCT = 0x0030,
+    Eiac = 0x00dc,
+    IVar = 0x00E4,
     FCTTV = 0x0170,
     ICause = 0x00C0,
     ICauseSet = 0x00C8,
@@ -131,6 +133,11 @@ bitflags! {
         const TXD_LOW       = (1 << 15);    // Transmit Descriptor Low Threshold hit
         const SRPD          = (1 << 16);    // Small Receive Packet Detected
         const ACK           = (1 << 17);    // Receive ACK Frame Detected
+        const RQ0           = (1 << 20);    // Receive Queue 0 Interrupt
+        const RQ1           = (1 << 21);    // Receive Queue 1 Interrupt
+        const TQ0           = (1 << 22);    // Transmit Queue 0 Interrupt
+        const TQ1           = (1 << 23);    // Transmit Queue 1 Interrupt
+        const OTHER         = (1 << 24);    // Other Reason Interrupt
         const ECCER         = (1 << 22);    // ECC Error
     }
 }
@@ -159,19 +166,23 @@ impl Default for TCtl {
 
 impl Default for IntFlags {
     fn default() -> Self {
-        IntFlags::TXDW
-            | IntFlags::TXQE
-            | IntFlags::LSC
-            | IntFlags::RXDMT0
-            | IntFlags::DSW
-            | IntFlags::RXO
-            | IntFlags::RXT0
-            | IntFlags::MDAC
-            | IntFlags::PHYINT
-            | IntFlags::LSECPN
-            | IntFlags::TXD_LOW
-            | IntFlags::SRPD
-            | IntFlags::ACK
-            | IntFlags::ECCER
+        IntFlags::RXT0 | IntFlags::RQ0 | IntFlags::RQ1 | IntFlags::TQ0 | IntFlags::TQ1 | IntFlags::OTHER
     }
+    //fn default() -> Self {
+    //    IntFlags::TXDW
+    //        | IntFlags::TXQE
+    //        | IntFlags::LSC
+    //        | IntFlags::RXDMT0
+    //        | IntFlags::DSW
+    //        | IntFlags::RXO
+    //        | IntFlags::RXT0
+    //        | IntFlags::MDAC
+    //        | IntFlags::PHYINT
+    //        | IntFlags::LSECPN
+    //        | IntFlags::TXD_LOW
+    //        | IntFlags::SRPD
+    //        | IntFlags::ACK
+    //        | IntFlags::RQ0
+    //        | IntFlags::ECCER
+    //}
 }

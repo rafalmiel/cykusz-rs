@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use bit_field::BitField;
 
 use crate::drivers::net::e1000::addr::Addr;
 use crate::drivers::net::e1000::regs::Regs;
@@ -60,6 +61,12 @@ fn e1000_handler() {
     dev.handle_irq();
 }
 
+fn e1000_handler_rq0() {
+    let dev = device();
+
+    dev.msi_handle_rq0();
+}
+
 fn sh_e1000_handler() -> bool {
     let dev = device();
 
@@ -71,9 +78,8 @@ impl E1000Data {
         self.hdr = Some(*hdr);
 
         let bar0 = self.dev_hdr().base_address0();
-        let bar1 = self.dev_hdr().base_address1();
 
-        self.addr.init(bar0, bar1);
+        self.addr.init(bar0);
 
         let ring_buf = allocate_order(0).unwrap().address_mapped().0 as *mut u8;
         unsafe {
@@ -83,14 +89,20 @@ impl E1000Data {
     }
 
     pub fn handle_irq(&mut self) -> bool {
-        //self.addr.write(Regs::IMask, 0x1);
         let c = self.addr.read(Regs::ICause);
+        logln!("handle irq {:x}", c);
 
         if c & 0x80 == 0x80 {
             self.handle_receive();
         }
 
         c != 0
+    }
+
+    pub fn handle_rq0(&mut self) {
+        let c = self.addr.read(Regs::ICause);
+        self.addr.write(Regs::ICause, c);
+        self.handle_receive();
     }
 
     pub fn handle_receive(&mut self) {
@@ -275,7 +287,7 @@ impl E1000Data {
                 self.mac[i as usize * 2 + 1] = (t >> 8) as u8;
             }
         } else {
-            let base = PhysAddr(self.addr.base() as usize).to_mapped() + 0x5400;
+            let base = self.addr.addr_base() + 0x5400;
 
             unsafe {
                 if base.read_volatile::<u32>() != 0 {
@@ -292,24 +304,48 @@ impl E1000Data {
         );
     }
 
+    fn msix_assign_num(&self, num: usize, table_idx: usize) {
+        let mut ivar = self.addr.read(Regs::IVar);
+
+        assert!(num <= 4);
+
+        let offset = num * 4;
+
+        ivar.set_bits(offset..=offset+2, table_idx as u32);
+        ivar.set_bit(offset + 3, true);
+
+        self.addr.write(Regs::IVar, ivar);
+    }
+
     pub fn enable_interrupt(&mut self) {
         let pci_hdr = self.pci_hdr();
 
-        let mut is_msi = true;
+        if let Some(msix) = pci_hdr.msix() {
+            let table = msix.map_table();
 
-        if let Some(int) = pci_hdr.enable_msi_interrupt(e1000_handler).or_else(|| {
-            is_msi = false;
-            pci_hdr.enable_pci_interrupt(sh_e1000_handler)
-        }) {
-            logln!(
-                "[ E1000 ] Using {} interrupt: {}",
-                if is_msi { "MSI" } else { "PCI" },
-                int
-            );
+            if let Some(irq) = table.alloc_interrupt(0, e1000_handler_rq0) {
+                self.msix_assign_num(0, 0);
 
-            self.addr.write(Regs::IMask, IntFlags::default().bits());
-            self.addr.read(Regs::ICause);
+                logln!("[ e1000 ] Using MSI-X rq-0 interrupt {}", irq);
+            }
+            msix.enable(true);
+        } else {
+            let mut is_msi = true;
+
+            if let Some(int) = pci_hdr.enable_msi_interrupt(e1000_handler).or_else(|| {
+                is_msi = false;
+                pci_hdr.enable_pci_interrupt(sh_e1000_handler)
+            }) {
+                logln!(
+                    "[ E1000 ] Using {} interrupt: {}",
+                    if is_msi { "MSI" } else { "PCI" },
+                    int
+                );
+            }
         }
+
+        self.addr.write(Regs::IMask, IntFlags::default().bits());
+        self.addr.read(Regs::ICause);
     }
 
     pub fn init_rx(&mut self) {

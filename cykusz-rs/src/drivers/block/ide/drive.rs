@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 
 use crate::drivers::block::ata::request::DmaRequest;
 use crate::drivers::block::ide::channel::IdeChannel;
-use crate::drivers::pci::{PciHeader, ProgInterface};
+use crate::drivers::pci::{BarAddress, PciHeader, ProgInterface};
 use crate::kernel::block::{register_blkdev, BlockDev, BlockDevice};
 use crate::kernel::utils::types::CeilDiv;
 
@@ -67,37 +67,25 @@ impl IdeDevice {
         }
 
         if let PciHeader::Type0(pci) = pci_data {
-            let bmid_1 = pci.base_address4() & 0xFFFF_FFFC;
+            let bmid_1 = pci.base_address4().io_address();
             let bmid_2 = bmid_1 + 8;
 
+            let get_or_default = |bar: &BarAddress, def: u16| -> u16 {
+                if bar.is_io() && bar.io_address() != 0 {
+                    bar.io_address()
+                } else {
+                    def
+                }
+            };
+
             let (io1, io2) = {
-                (
-                    if pci.base_address0() != 0 {
-                        pci.base_address0() & 0xFFFF_FFFC
-                    } else {
-                        0x1F0
-                    },
-                    if pci.base_address1() != 0 {
-                        pci.base_address1() & 0xFFFF_FFFC
-                    } else {
-                        0x3F6
-                    },
-                )
+                let (addr0, addr1) = (pci.base_address0(), pci.base_address1());
+                (get_or_default(&addr0, 0x1F0), get_or_default(&addr1, 0x3F6))
             };
 
             let (io3, io4) = {
-                (
-                    if pci.base_address2() != 0 {
-                        pci.base_address2() & 0xFFFF_FFFC
-                    } else {
-                        0x170
-                    },
-                    if pci.base_address3() != 0 {
-                        pci.base_address3() & 0xFFFF_FFFC
-                    } else {
-                        0x376
-                    },
-                )
+                let (addr2, addr3) = (pci.base_address2(), pci.base_address3());
+                (get_or_default(&addr2, 0x170), get_or_default(&addr3, 0x376))
             };
 
             let c1 = IdeChannel::new(io1 as u16, io2 as u16, bmid_1 as u16, 14);

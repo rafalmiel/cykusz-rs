@@ -1,6 +1,7 @@
 use core::arch::asm;
 
 mod apic;
+pub mod msi;
 mod pic;
 
 pub trait InterruptController: Send + Sync {

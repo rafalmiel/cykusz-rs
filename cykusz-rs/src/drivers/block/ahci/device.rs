@@ -7,9 +7,7 @@ use crate::drivers::block::ahci::port::Port;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::pci::PciHeader;
 use crate::kernel::block::{register_blkdev, BlockDevice};
-use crate::kernel::mm::map_to_flags;
-use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::PhysAddr;
+
 use crate::kernel::mm::VirtAddr;
 
 pub struct AhciDevice {
@@ -92,13 +90,7 @@ impl AhciDevice {
 
     pub fn start(&mut self, pci_data: &PciHeader) -> bool {
         if let PciHeader::Type0(dhdr) = pci_data {
-            self.hba = PhysAddr(dhdr.base_address5() as usize).to_virt();
-
-            map_to_flags(
-                self.hba,
-                PhysAddr(dhdr.base_address5() as usize),
-                PageFlags::NO_CACHE | PageFlags::WRITABLE,
-            );
+            self.hba = dhdr.base_address5().address_map_virt();
 
             self.start_hba();
 

@@ -42,6 +42,11 @@ impl AhciDevice {
                 if is_msi { "MSI" } else { "PCI" },
                 int
             );
+            println!(
+                "[ AHCI ] Using {} interrupt: {}",
+                if is_msi { "MSI" } else { "PCI" },
+                int
+            );
         }
     }
 

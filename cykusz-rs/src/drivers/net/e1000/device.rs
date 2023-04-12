@@ -90,7 +90,6 @@ impl E1000Data {
 
     pub fn handle_irq(&mut self) -> bool {
         let c = self.addr.read(Regs::ICause);
-        logln!("handle irq {:x}", c);
 
         if c & 0x80 == 0x80 {
             self.handle_receive();
@@ -311,7 +310,7 @@ impl E1000Data {
 
         let offset = num * 4;
 
-        ivar.set_bits(offset..=offset+2, table_idx as u32);
+        ivar.set_bits(offset..=offset + 2, table_idx as u32);
         ivar.set_bit(offset + 3, true);
 
         self.addr.write(Regs::IVar, ivar);
@@ -327,6 +326,7 @@ impl E1000Data {
                 self.msix_assign_num(0, 0);
 
                 logln!("[ e1000 ] Using MSI-X rq-0 interrupt {}", irq);
+                println!("[ e1000 ] Using MSI-X rq-0 interrupt {}", irq);
             }
             msix.enable(true);
         } else {
@@ -337,6 +337,11 @@ impl E1000Data {
                 pci_hdr.enable_pci_interrupt(sh_e1000_handler)
             }) {
                 logln!(
+                    "[ E1000 ] Using {} interrupt: {}",
+                    if is_msi { "MSI" } else { "PCI" },
+                    int
+                );
+                println!(
                     "[ E1000 ] Using {} interrupt: {}",
                     if is_msi { "MSI" } else { "PCI" },
                     int

@@ -166,7 +166,12 @@ impl Default for TCtl {
 
 impl Default for IntFlags {
     fn default() -> Self {
-        IntFlags::RXT0 | IntFlags::RQ0 | IntFlags::RQ1 | IntFlags::TQ0 | IntFlags::TQ1 | IntFlags::OTHER
+        IntFlags::RXT0
+            | IntFlags::RQ0
+            | IntFlags::RQ1
+            | IntFlags::TQ0
+            | IntFlags::TQ1
+            | IntFlags::OTHER
     }
     //fn default() -> Self {
     //    IntFlags::TXDW

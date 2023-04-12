@@ -1,5 +1,6 @@
 use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
+
 use core::ops::Range;
 
 use syscall_defs::{MMapFlags, MMapProt};
@@ -207,9 +208,10 @@ impl Mapping {
             if current_task_ref().locks() > 0 {
                 logln!("handle_pf_private_file: locks > 0");
             }
-            if let Some(MMapPageStruct(MMapPage::Cached(p))) =
-                f.file.inode().as_mappable().unwrap().get_mmap_page(offset)
-            {
+
+            let mappable = f.file.inode().as_mappable().unwrap();
+
+            if let Some(MMapPageStruct(MMapPage::Cached(p))) = mappable.get_mmap_page(offset) {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
                 {
@@ -283,7 +285,7 @@ impl Mapping {
                 } else {
                     logln_disabled!("mmap cow: update flags");
                     if !update_flags(addr_aligned, PageFlags::USER | self.prot.into()) {
-                        panic!("Update flags failed");
+                        panic!("update flags failed");
                     }
                 };
 
@@ -313,7 +315,9 @@ impl Mapping {
 
             let addr_aligned = addr.align_down(PAGE_SIZE);
 
-            match f.file.inode().as_mappable().unwrap().get_mmap_page(offset) {
+            let mappable = f.file.inode().as_mappable().unwrap();
+
+            match mappable.get_mmap_page(offset) {
                 Some(MMapPageStruct(MMapPage::Cached(p))) => {
                     if !is_present {
                         // Insert page to the list of active mappings if not present
@@ -335,7 +339,7 @@ impl Mapping {
                     true
                 }
                 Some(MMapPageStruct(MMapPage::Direct(p))) => {
-                    map_to_flags(addr_aligned, p.page(), flags);
+                    map_to_flags(addr_aligned, p.page(), flags | p.flags());
                     true
                 }
                 _ => false,

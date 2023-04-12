@@ -100,6 +100,8 @@ impl PciDeviceHandle for E1000 {
             return match pci_dev_id {
                 0x100E | // qemu e1000
                 0x10d3 | // qemu e1000e
+                0x100f | // vbox e1000
+                0x1004 | // vbox e1000
                 0x1502   // T-420
                     => true,
                 _ => false,

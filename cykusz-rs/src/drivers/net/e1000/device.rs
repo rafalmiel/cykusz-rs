@@ -129,7 +129,7 @@ impl E1000Data {
     }
 
     pub fn receive_finished(&mut self, id: usize) {
-        let mut desc = &mut self.rx_ring[id];
+        let desc = &mut self.rx_ring[id];
 
         if desc.status & 0x1 == 0x1 {
             desc.status = 0;

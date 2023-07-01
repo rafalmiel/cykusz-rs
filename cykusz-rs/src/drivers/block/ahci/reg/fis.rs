@@ -767,7 +767,7 @@ impl FisDmaSetup {
     }
 
     pub fn buf_id(&self) -> u64 {
-        (self.dma_buf_id_high.get() << 32) as u64 | self.dma_buf_id_low.get() as u64
+        ((self.dma_buf_id_high.get() as u64) << 32) as u64 | self.dma_buf_id_low.get() as u64
     }
 
     pub fn set_buf_id(&mut self, id: u64) {

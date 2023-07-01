@@ -69,8 +69,6 @@ impl AhciDevice {
                 let port = hba.port_mut(i);
                 if port.probe(i) {
                     let addr = VirtAddr(port as *const _ as usize);
-                    drop(port);
-                    drop(hba);
 
                     let port_dev = Arc::new(Port::new(addr));
 

@@ -71,4 +71,8 @@ pub fn init(mboot: &multiboot2::Info) {
     virt::init(&mboot);
 
     println!("[ OK ] Virtual Memory Initialised");
+
+    pat::init();
+
+    println!("[ OK ] PAT Initialised");
 }

@@ -246,8 +246,6 @@ impl Mapping {
                 } else if reason.contains(PageFaultReason::PRESENT)
                     && reason.contains(PageFaultReason::WRITE)
                 {
-                    drop(f);
-
                     logln_disabled!("map: handle cow priv file");
 
                     return if self.handle_cow(addr_aligned, true, PAGE_SIZE) {

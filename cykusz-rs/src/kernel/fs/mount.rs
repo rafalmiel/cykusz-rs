@@ -115,8 +115,6 @@ impl Mounts {
 
             ent.fs.umount();
 
-            drop(ent);
-
             mounts.remove(&key);
 
             Ok(())

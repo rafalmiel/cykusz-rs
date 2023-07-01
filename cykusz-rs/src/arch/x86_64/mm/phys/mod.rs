@@ -1,4 +1,5 @@
 use ::alloc::vec::Vec;
+use core::cell::UnsafeCell;
 use core::sync::atomic::Ordering;
 
 use spin::Once;
@@ -21,12 +22,18 @@ mod buddy;
 mod bump;
 mod iter;
 
-#[repr(C)]
-pub struct PhysPage {
-    pt_lock: Spin<()>,
+struct PhysPageData {
     p_cache: PageCacheItemWeak,
     vm_use_count: u32,
 }
+
+#[repr(C)]
+pub struct PhysPage {
+    pt_lock: Spin<()>,
+    data: UnsafeCell<PhysPageData>,
+}
+
+unsafe impl Sync for PhysPage {}
 
 impl PhysPage {
     fn base_addr() -> PhysAddr {
@@ -46,55 +53,61 @@ impl PhysPage {
     }
 
     pub fn unlink_page_cache(&self) {
-        unsafe {
-            let _lock = self.lock_pt();
+        let _lock = self.lock_pt();
 
-            let this = &mut *(self as *const _ as *mut PhysPage);
-            this.p_cache = WeakWrap::empty();
+        unsafe {
+            self.this().p_cache = WeakWrap::empty();
         }
     }
 
-    fn this(&self) -> &mut PhysPage {
-        unsafe { &mut *(self as *const _ as *mut PhysPage) }
+    unsafe fn this(&self) -> &mut PhysPageData {
+        self.data.get().as_mut().unwrap()
     }
 
     pub fn link_page_cache(&self, page: &PageCacheItemArc) {
         let _lock = self.lock_pt();
 
-        let this = self.this();
-        this.p_cache = ArcWrap::downgrade(&page);
+        unsafe {
+            self.this().p_cache = ArcWrap::downgrade(&page);
+        }
     }
 
     pub fn page_item(&self) -> Option<PageCacheItemArc> {
         let _lock = self.lock_pt();
 
-        self.p_cache.upgrade()
+        unsafe {
+            self.this().p_cache.upgrade()
+        }
     }
 
     pub fn inc_vm_use_count(&self) {
         let _lock = self.lock_pt();
 
-        let this = self.this();
-
-        this.vm_use_count += 1;
+        unsafe {
+            self.this().vm_use_count += 1;
+        }
     }
 
     pub fn dec_vm_use_count(&self) -> usize {
         let _lock = self.lock_pt();
 
-        let this = self.this();
+        unsafe {
+            let this = self.this();
 
-        if this.vm_use_count > 0 {
-            this.vm_use_count -= 1;
+            if this.vm_use_count > 0 {
+                this.vm_use_count -= 1;
+            }
+
+            this.vm_use_count as usize
         }
-
-        this.vm_use_count as usize
     }
 
     pub fn vm_use_count(&self) -> usize {
         let _lock = self.lock_pt();
 
-        self.vm_use_count as usize
+        unsafe {
+            self.this().vm_use_count as usize
+        }
     }
 }
 
@@ -102,8 +115,10 @@ impl Default for PhysPage {
     fn default() -> Self {
         PhysPage {
             pt_lock: Spin::new(()),
-            p_cache: PageCacheItemWeak::empty(),
-            vm_use_count: 0,
+            data: UnsafeCell::new(PhysPageData{
+                p_cache: PageCacheItemWeak::empty(),
+                vm_use_count: 0,
+            })
         }
     }
 }

@@ -257,7 +257,6 @@ impl INodeData {
             let sync = if last == i {
                 if ptrs[o] != 0 {
                     logln!("!!!INode corrupted, ptrs: {:?}", ptrs);
-                    drop(ptrs);
                     logln!("INode {} corrupted: {:?}", inode_id, inode);
                     logln!(
                         "block_num: {}, offsets: {:?}, i: {}, o: {}",

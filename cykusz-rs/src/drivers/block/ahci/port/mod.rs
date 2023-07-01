@@ -45,7 +45,6 @@ impl PortData {
         port.set_is(is);
 
         let ci = port.ci() | port.sact();
-        drop(port);
 
         if !is.contains(HbaPortISReg::DHRS) {
             let port = self.hba_port();

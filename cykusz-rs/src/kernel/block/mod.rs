@@ -3,6 +3,7 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
+use hashbrown::HashSet;
 use spin::Once;
 use uuid::Uuid;
 
@@ -15,6 +16,7 @@ use crate::kernel::fs::pcache::{
     CachedAccess, CachedBlockDev, PageCacheItem, PageCacheItemArc, PageCacheItemWeak, PageCacheKey,
     RawAccess,
 };
+use crate::kernel::params::params;
 use crate::kernel::sync::{IrqGuard, Mutex, MutexGuard};
 use crate::kernel::timer::{create_timer, Timer, TimerCallback};
 use crate::kernel::utils::types::CeilDiv;
@@ -413,7 +415,21 @@ fn process_dev(dev: Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offs
 pub fn init() {
     let mut devs = Vec::<Arc<BlockDevice>>::new();
 
+    let disks = params().get("disks").and_then(|d| {
+
+        Some(HashSet::<String>::from_iter(d.split(",").map(|e| {
+            logln!("add {}", e);
+            String::from(e)
+        })))
+    });
+
     for (_, dev) in BLK_DEVS.lock().iter() {
+        logln!("dev name {}", dev.name());
+        if let Some(disks) = &disks {
+            if !disks.contains(&dev.name()) {
+                continue;
+            }
+        }
         devs.push(dev.clone());
     }
 

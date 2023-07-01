@@ -7,6 +7,7 @@ use hashbrown::HashSet;
 use spin::Once;
 use uuid::Uuid;
 
+use crate::kernel::block::mbr::Partition;
 use crate::kernel::device;
 use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::cache::{ArcWrap, Cacheable};
@@ -362,73 +363,100 @@ pub fn sync_all() {
     }
 }
 
-fn process_dev(dev: Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offset: usize) {
+fn register_partition(dev: &Arc<BlockDevice>, count: usize, offset: usize, part: &Partition) {
     use crate::alloc::string::ToString;
 
+    let part_dev = PartitionBlockDev::new(
+        offset + part.relative_sector(),
+        part.total_sectors(),
+        dev.clone(),
+    );
+
+    let blkdev =
+        BlockDevice::new(dev.name() + "." + &count.to_string(), part_dev);
+
+    if let Err(e) = register_blkdev(blkdev.clone()) {
+        panic!("Failed to register blkdev {} {:?}", blkdev.name(), e);
+    }
+}
+
+fn process_partition(dev: &Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offset: usize, part: &Partition) {
+    if part.system_id() == 0 {
+        return;
+    }
+
+    if part.system_id() != 5 {
+        // not an extended partition
+        register_partition(dev, *count, offset, &part);
+
+        *count += 1;
+    } else {
+        // extended partition
+        process_dev(
+            dev.clone(),
+            count,
+            ext_offset + part.relative_sector(),
+            if ext_offset > 0 {
+                ext_offset
+            } else {
+                offset + part.relative_sector()
+            },
+        );
+    }
+}
+
+fn process_dev(dev: Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offset: usize) {
     let mut mbr = mbr::Mbr::new();
     dev.read(offset, mbr.bytes_mut());
 
-    if mbr.is_valid() {
-        for p in 0..4 {
-            if let Some(part) = mbr.partition(p) {
-                if part.system_id() != 0 {
-                    if part.system_id() != 5 {
-                        // not an extended partition
-                        let part_dev = PartitionBlockDev::new(
-                            offset + part.relative_sector(),
-                            part.total_sectors(),
-                            dev.clone(),
-                        );
-
-                        //println!("got normal {} {}", offset + part.relative_sector(), part.total_sectors());
-
-                        let blkdev =
-                            BlockDevice::new(dev.name() + "." + &count.to_string(), part_dev);
-
-                        if let Err(e) = register_blkdev(blkdev.clone()) {
-                            panic!("Failed to register blkdev {} {:?}", blkdev.name(), e);
-                        }
-
-                        *count += 1;
-                    } else {
-                        //println!("got extended {}", p);
-                        // extended partition
-                        process_dev(
-                            dev.clone(),
-                            count,
-                            ext_offset + part.relative_sector(),
-                            if ext_offset > 0 {
-                                ext_offset
-                            } else {
-                                offset + part.relative_sector()
-                            },
-                        );
-                    }
-                }
-            }
-        }
-    } else {
+    if !mbr.is_valid() {
         println!("[ WARN ] Mbr invalid for disk {}", dev.name());
+        return;
+    }
+
+    for p in 0..4 {
+        if let Some(part) = mbr.partition(p) {
+            process_partition(&dev, count, offset, ext_offset, &part);
+        }
+    }
+}
+
+fn disks_to_scan() -> Option<HashSet<String>> {
+    params().get("disks").and_then(|d| {
+        Some(HashSet::<String>::from_iter(d.split(",").map(|e| {
+            String::from(e)
+        })))
+    })
+}
+
+struct DisksToScan {
+    disks: Option<HashSet<String>>,
+}
+
+impl DisksToScan {
+    fn new() -> DisksToScan {
+        DisksToScan {
+            disks: disks_to_scan(),
+        }
+    }
+
+    fn is_enabled(&self, name: &String) -> bool {
+        if let Some(disks) = &self.disks {
+            return disks.contains(name);
+        }
+
+        return true;
     }
 }
 
 pub fn init() {
     let mut devs = Vec::<Arc<BlockDevice>>::new();
 
-    let disks = params().get("disks").and_then(|d| {
-
-        Some(HashSet::<String>::from_iter(d.split(",").map(|e| {
-            logln!("add {}", e);
-            String::from(e)
-        })))
-    });
+    let disks = DisksToScan::new();
 
     for (_, dev) in BLK_DEVS.lock().iter() {
-        logln!("dev name {}", dev.name());
-        if let Some(disks) = &disks {
-            if !disks.contains(&dev.name()) {
-                continue;
-            }
+        if !disks.is_enabled(&dev.name()) {
+            continue;
         }
         devs.push(dev.clone());
     }

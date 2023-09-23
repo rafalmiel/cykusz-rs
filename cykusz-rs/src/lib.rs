@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(internal_features)]
 #![feature(alloc_error_handler)]
 #![feature(array_methods)]
 #![feature(asm_const)]

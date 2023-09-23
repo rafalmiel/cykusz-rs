@@ -9,7 +9,7 @@ assembly_source_files := $(wildcard cykusz-rs/src/arch/$(arch)/asm/*.asm)
 assembly_object_files := $(patsubst cykusz-rs/src/arch/$(arch)/asm/%.asm, \
 		build/arch/$(arch)/asm/%.o, $(assembly_source_files))
 
-target ?= $(arch)-unknown-none-gnu
+target ?= $(arch)-cykusz_os
 ifdef dev
 rust_os := target/$(target)/debug/libcykusz_rs.a
 rust_shell := target/$(target)/debug/shell
@@ -97,9 +97,9 @@ usb: $(kernel)
 
 cargo:
 ifdef dev
-	RUST_TARGET_PATH=`pwd` xargo build --workspace --target $(target) --verbose
+	cargo build --workspace --verbose
 else
-	RUST_TARGET_PATH=`pwd` xargo build --workspace --release --target $(target) --verbose
+	cargo build --workspace --release --verbose
 endif
 
 toolchain: $(cross_cpp)

@@ -51,6 +51,7 @@ bitflags! {
 #[repr(u64)]
 #[derive(Debug)]
 pub enum SigProcMask {
+    None = 0,
     Block = 1,
     Unblock = 2,
     Set = 3,
@@ -96,6 +97,7 @@ impl From<SignalHandler> for u64 {
 impl From<u64> for SigProcMask {
     fn from(v: u64) -> Self {
         match v {
+            0 => SigProcMask::None,
             1 => SigProcMask::Block,
             2 => SigProcMask::Unblock,
             3 => SigProcMask::Set,

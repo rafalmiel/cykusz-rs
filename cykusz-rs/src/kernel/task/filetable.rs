@@ -14,7 +14,7 @@ pub struct FileHandle {
     pub fd: usize,
     pub inode: DirEntryItem,
     pub offset: AtomicUsize,
-    pub flags: OpenFlags,
+    pub flags: AtomicUsize,
     pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
     //#[allow(unused)]
     //fs: Option<Arc<dyn Filesystem>>,
@@ -26,7 +26,7 @@ impl FileHandle {
             fd,
             inode: inode.clone(),
             offset: AtomicUsize::new(0),
-            flags,
+            flags: AtomicUsize::from(flags.bits()),
             dir_iter: Mutex::new((None, None)),
             //fs: if let Some(fs) = inode.inode().fs() {
             //    fs.upgrade()
@@ -37,7 +37,7 @@ impl FileHandle {
     }
 
     pub fn duplicate(&self, flags: OpenFlags) -> Result<Arc<FileHandle>> {
-        let flags = self.flags | flags;
+        let flags = self.flags() | flags;
 
         let new = Arc::new(FileHandle::new(self.fd, self.inode.clone(), flags));
 
@@ -134,10 +134,6 @@ impl FileHandle {
         }
     }
 
-    pub fn flags(&self) -> OpenFlags {
-        self.flags
-    }
-
     fn get_dir_iter(&self) -> (Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>) {
         let mut lock = self.dir_iter.lock();
 
@@ -159,6 +155,14 @@ impl FileHandle {
         lock.1 = None;
 
         ret
+    }
+
+    pub fn flags(&self) -> OpenFlags {
+        OpenFlags::from_bits_truncate(self.flags.load(Ordering::SeqCst))
+    }
+
+    pub fn add_flags(&self, flags: OpenFlags) {
+        self.flags.store(self.flags().bits() | flags.bits(), Ordering::SeqCst);
     }
 
     pub fn get_dents(&self, mut buf: &mut [u8]) -> Result<usize> {
@@ -231,7 +235,7 @@ impl Clone for FileTable {
 
         for f in &files {
             if let Some(f) = f {
-                f.inode.inode().open(f.flags).expect("Open failed");
+                f.inode.inode().open(f.flags()).expect("Open failed");
             }
         }
 
@@ -272,7 +276,7 @@ impl FileTable {
                 fd,
                 inode: inode.clone(),
                 offset: AtomicUsize::new(0),
-                flags,
+                flags: AtomicUsize::new(flags.bits()),
                 dir_iter: Mutex::new((None, None)),
                 //fs: if let Some(fs) = inode.inode().fs() {
                 //    fs.upgrade()
@@ -315,7 +319,7 @@ impl FileTable {
         let mut files = self.files.write();
 
         if let Some(f) = &files[fd] {
-            f.inode.inode().close(f.flags);
+            f.inode.inode().close(f.flags());
             files[fd] = None;
             return true;
         }
@@ -328,8 +332,8 @@ impl FileTable {
 
         for f in files.iter_mut() {
             if let Some(h) = f {
-                if h.flags.contains(OpenFlags::CLOEXEC) {
-                    h.inode.inode().close(h.flags);
+                if h.flags().contains(OpenFlags::CLOEXEC) {
+                    h.inode.inode().close(h.flags());
 
                     *f = None;
                 }
@@ -342,7 +346,7 @@ impl FileTable {
 
         for f in files.iter_mut() {
             if let Some(file) = f {
-                file.inode.inode().close(file.flags);
+                file.inode.inode().close(file.flags());
 
                 *f = None;
             }
@@ -361,12 +365,12 @@ impl FileTable {
         None
     }
 
-    pub fn duplicate(&self, fd: usize, flags: OpenFlags) -> SyscallResult {
+    pub fn duplicate(&self, fd: usize, flags: OpenFlags, min: usize) -> SyscallResult {
         let handle = self.get_handle(fd).ok_or(SyscallError::EINVAL)?;
 
         let mut files = self.files.write();
 
-        if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
+        if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.0 >= min && e.1.is_none()) {
             *f = Some(handle.duplicate(flags)?);
 
             Ok(idx)
@@ -399,7 +403,7 @@ impl FileTable {
                 Ok(handle) => {
                     let old = files[at].take().unwrap();
 
-                    old.inode.inode().close(old.flags);
+                    old.inode.inode().close(old.flags());
 
                     files[at] = Some(handle);
 

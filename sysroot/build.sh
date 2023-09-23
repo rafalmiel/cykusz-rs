@@ -11,6 +11,7 @@ MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
 NCURSES_SRC_DIR=$SRC_DIR/ncurses
 NANO_SRC_DIR=$SRC_DIR/nano
+BASH_SRC_DIR=$SRC_DIR/bash
 GMP_SRC_DIR=$SRC_DIR/gmp
 MPFR_SRC_DIR=$SRC_DIR/mpfr
 MPC_SRC_DIR=$SRC_DIR/mpc
@@ -22,6 +23,7 @@ BINUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-binutils-gdb
 GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
 NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
 NANO_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-nano
+BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
@@ -304,6 +306,20 @@ function _cykusz_nano {
 
 	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT LIBS="-lncursesw" -j4
 	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+}
+
+function _cykusz_bash {
+	mkdir -p $BASH_CYKUSZ_BUILD_DIR
+
+	pushd .
+
+	cd $BASH_CYKUSZ_BUILD_DIR
+	CFLAGS="-O0 -g" $BASH_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --without-bash-malloc
+
+	popd
+
+	make -C $BASH_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT
+	make -C $BASH_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
 function _cross {

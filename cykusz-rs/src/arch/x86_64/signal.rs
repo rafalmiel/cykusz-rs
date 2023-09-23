@@ -65,7 +65,7 @@ pub fn arch_int_check_signals(frame: &mut InterruptFrame, regs: &mut RegsFrame) 
 
             let signal_frame = SignalFrame::from_interrupt(frame, regs, old_mask);
 
-            signals.set_mask(syscall_defs::signal::SigProcMask::Block, 1u64 << sig, None);
+            signals.set_mask(syscall_defs::signal::SigProcMask::Block, Some(1u64 << sig), None);
 
             let mut writer = StackHelper::new(&mut frame.sp);
 
@@ -98,7 +98,7 @@ pub extern "C" fn arch_sys_check_signals(
 
             let res: SyscallResult = syscall_defs::SyscallFrom::syscall_from(syscall_result);
 
-            signals.set_mask(syscall_defs::signal::SigProcMask::Block, 1u64 << sig, None);
+            signals.set_mask(syscall_defs::signal::SigProcMask::Block, Some(1u64 << sig), None);
 
             let restart = res == Err(SyscallError::EINTR)
                 && entry
@@ -139,7 +139,7 @@ pub fn arch_sys_sigreturn(sys_frame: &mut SyscallFrame, user_regs: &mut RegsFram
 
     current_task_ref().signals().set_mask(
         syscall_defs::signal::SigProcMask::Set,
-        signal_frame.sigmask,
+        Some(signal_frame.sigmask),
         None,
     );
 

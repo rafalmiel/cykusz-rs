@@ -83,6 +83,9 @@ pub const SYS_SYNC: usize = 56;
 pub const SYS_FSYNC: usize = 57;
 pub const SYS_TICKSNS: usize = 58;
 
+pub const SYS_GETPPID: usize = 59;
+pub const SYS_GETPGID: usize = 60;
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]
 pub enum SyscallError {
@@ -250,15 +253,44 @@ bitflags! {
 }
 
 #[repr(i64)]
+#[derive(Debug)]
 pub enum FcntlCmd {
-    GetFL = 1,
+    DupFD = 1,
+    DupFDCloexec = 2,
+    GetFD = 3,
+    SetFD = 4,
+    GetFL = 5,
+    SetFL = 6,
     Inval = -1,
+}
+
+bitflags! {
+    pub struct FcntlSetFDFlags: u64 {
+        const FD_CLOEXEC = 1;
+    }
+}
+
+impl From<FcntlSetFDFlags> for OpenFlags {
+    fn from(value: FcntlSetFDFlags) -> Self {
+        let mut flags = OpenFlags::empty();
+
+        if value.contains(FcntlSetFDFlags::FD_CLOEXEC) {
+            flags.insert(OpenFlags::CLOEXEC);
+        }
+
+        flags
+    }
 }
 
 impl From<u64> for FcntlCmd {
     fn from(v: u64) -> Self {
         match v {
-            1 => FcntlCmd::GetFL,
+            1 => FcntlCmd::DupFD,
+            2 => FcntlCmd::DupFDCloexec,
+            3 => FcntlCmd::GetFD,
+            4 => FcntlCmd::SetFD,
+            5 => FcntlCmd::GetFL,
+            6 => FcntlCmd::SetFL,
             _ => FcntlCmd::Inval,
         }
     }

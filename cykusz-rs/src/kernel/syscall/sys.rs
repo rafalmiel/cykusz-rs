@@ -6,9 +6,7 @@ use alloc::vec::Vec;
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
-use syscall_defs::{
-    ConnectionFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
-};
+use syscall_defs::{ConnectionFlags, FcntlCmd, FcntlSetFDFlags, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntry;
@@ -93,7 +91,7 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task_ref();
     return if let Some(f) = task.get_handle(fd) {
-        if f.flags.intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
+        if f.flags().intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
             Ok(f.write(make_buf(buf, len))?)
         } else {
             Err(SyscallError::EACCES)
@@ -111,7 +109,7 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     logln!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
 
     return if let Some(f) = task.get_handle(fd) {
-        if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
+        if f.flags().intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
             Ok(f.read(make_buf_mut(buf, len))?)
         } else {
             logln!("eaccess");
@@ -129,7 +127,7 @@ pub fn sys_pread(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
     let task = current_task_ref();
 
     return if let Some(f) = task.get_handle(fd) {
-        if f.flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
+        if f.flags().intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
             Ok(f.read_at(make_buf_mut(buf, len), offset as usize)?)
         } else {
             Err(SyscallError::EACCES)
@@ -144,7 +142,7 @@ pub fn sys_pwrite(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
 
     let task = current_task_ref();
     return if let Some(f) = task.get_handle(fd) {
-        if f.flags.intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
+        if f.flags().intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
             Ok(f.write_at(make_buf(buf, len), offset as usize)?)
         } else {
             Err(SyscallError::EACCES)
@@ -181,10 +179,30 @@ pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) ->
     Ok(0)
 }
 
-pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
+pub fn sys_fcntl(fd: u64, cmd: u64, flags: u64) -> SyscallResult {
     let cmd = FcntlCmd::from(cmd);
 
+    logln!("SYS_FCNTL {} {:?} {}", fd, cmd, flags);
+
     match cmd {
+        FcntlCmd::GetFD => {
+            let task = current_task_ref();
+
+            if let Some(handle) = task.get_handle(fd as usize) {
+                Ok(if handle.flags().contains(OpenFlags::CLOEXEC) { FcntlSetFDFlags::FD_CLOEXEC.bits() as usize } else { 0 })
+            } else {
+                Err(SyscallError::EBADFD)
+            }
+        }
+        FcntlCmd::SetFD => {
+            let task = current_task_ref();
+
+            if let Some(handle) = task.get_handle(fd as usize) {
+                handle.add_flags(FcntlSetFDFlags::from_bits_truncate(flags).into());
+            }
+
+            Ok(0)
+        }
         FcntlCmd::GetFL => {
             let task = current_task_ref();
 
@@ -193,6 +211,25 @@ pub fn sys_fcntl(fd: u64, cmd: u64) -> SyscallResult {
             } else {
                 Err(SyscallError::EBADFD)
             }
+        }
+        FcntlCmd::SetFL => {
+            let task = current_task_ref();
+
+            if let Some(handle) = task.get_handle(fd as usize) {
+                handle.add_flags(OpenFlags::from_bits_truncate(flags as usize));
+            }
+
+            Ok(0)
+        }
+        FcntlCmd::DupFD => {
+            let task = current_task_ref();
+
+            task.filetable().duplicate(fd as usize, OpenFlags::empty(), flags as usize)
+        }
+        FcntlCmd::DupFDCloexec => {
+            let task = current_task_ref();
+
+            task.filetable().duplicate(fd as usize, OpenFlags::CLOEXEC, flags as usize)
         }
         FcntlCmd::Inval => Err(SyscallError::EINVAL),
     }
@@ -232,7 +269,7 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
 
     if let Some(res) = task.vm().mmap_vm(addr, len, prot, flags, file, offset) {
         //logln!("mmap at {} len: 0x{:X} | {:?}", res, len, flags);
-        //task.vm().log_vm();
+        task.vm().log_vm();
         Ok(res.0)
     } else {
         Err(SyscallError::EFAULT)
@@ -295,6 +332,7 @@ pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
         if pwd.len() > len as usize {
             Err(SyscallError::EIO)
         } else {
+            logln!("getcwd {}", pwd);
             buf[..pwd.len()].copy_from_slice(pwd.as_bytes());
             Ok(pwd.len())
         }
@@ -792,6 +830,18 @@ pub fn sys_getpid() -> SyscallResult {
     Ok(current_task_ref().pid())
 }
 
+pub fn sys_getppid() -> SyscallResult {
+    if let Some(p) = &current_task_ref().get_parent() {
+        Ok(p.pid())
+    } else {
+        Ok(0)
+    }
+}
+
+pub fn sys_getpgid(_pid: u64) -> SyscallResult {
+    Ok(current_task_ref().gid())
+}
+
 pub fn sys_gettid() -> SyscallResult {
     Ok(current_task_ref().tid())
 }
@@ -866,8 +916,13 @@ pub fn sys_sigaction(sig: u64, sigact: u64, sigreturn: u64, old: u64) -> Syscall
 }
 
 pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {
+    logln!("sigprocmask: {} {} {}", how, set, old_set);
     let how = syscall_defs::signal::SigProcMask::from(how);
-    let set = unsafe { VirtAddr(set as usize).read::<u64>() };
+    let set = if set > 0 {
+        Some(unsafe { VirtAddr(set as usize).read::<u64>() })
+    } else {
+        None
+    };
     let old_set = if old_set > 0 {
         Some(unsafe { VirtAddr(old_set as usize).read_mut::<u64>() })
     } else {
@@ -963,7 +1018,7 @@ pub fn sys_dup(fd: u64, flags: u64) -> SyscallResult {
     let flags =
         OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)? & OpenFlags::CLOEXEC;
 
-    task.filetable().duplicate(fd as usize, flags)
+    task.filetable().duplicate(fd as usize, flags, 0)
 }
 
 pub fn sys_dup2(fd: u64, new_fd: u64, flags: u64) -> SyscallResult {

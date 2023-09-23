@@ -197,7 +197,7 @@ impl Task {
         self.filetable().close_on_exec();
 
         if let Some((base_addr, entry, elf_hdr, tls_vm)) = vm.load_bin(exe) {
-            //vm.log_vm();
+            vm.log_vm();
             unsafe {
                 self.arch_task_mut()
                     .exec(base_addr, entry, &elf_hdr, vm, tls_vm, args, envs)

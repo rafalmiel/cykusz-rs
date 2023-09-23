@@ -483,6 +483,7 @@ impl INode for Tty {
                 let task = current_task_ref();
 
                 if !task.terminal().is_connected(tty().clone()) {
+                    logln!("is not connected");
                     return Err(FsError::NoTty);
                 }
 
@@ -496,6 +497,7 @@ impl INode for Tty {
                     }
                 }
 
+                logln!("is not auth");
                 Err(FsError::NoTty)
             }
             tty::TIOCSWINSZ => Err(FsError::NotSupported),

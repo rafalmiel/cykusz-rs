@@ -351,12 +351,18 @@ impl Signals {
     pub fn set_mask(
         &self,
         how: syscall_defs::signal::SigProcMask,
-        set: u64,
+        set: Option<u64>,
         old_set: Option<&mut u64>,
     ) {
         if let Some(old) = old_set {
             *old = self.blocked_mask.load(Ordering::SeqCst);
         }
+
+        if set.is_none() {
+            return;
+        }
+
+        let set = set.unwrap();
 
         let set = set & !IMMUTABLE_MASK;
 
@@ -370,6 +376,7 @@ impl Signals {
             syscall_defs::signal::SigProcMask::Set => {
                 self.blocked_mask.store(set, Ordering::SeqCst);
             }
+            _ => {}
         }
     }
 }

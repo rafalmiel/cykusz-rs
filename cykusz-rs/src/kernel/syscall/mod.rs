@@ -1,3 +1,5 @@
+use syscall_defs::SyscallResult;
+
 pub mod sys;
 
 pub fn init() {
@@ -11,7 +13,7 @@ pub fn init_ap() {
 fn conditional_enable_int(sys: usize) {
     use syscall_defs::*;
     match sys {
-        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT | SYS_EXIT | SYS_EXIT_THREAD | SYS_EXEC => {
+        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT | SYS_KILL | SYS_EXIT | SYS_EXIT_THREAD | SYS_EXEC => {
             return;
         }
         _ => {
@@ -21,11 +23,11 @@ fn conditional_enable_int(sys: usize) {
 }
 
 #[allow(unused_variables)]
-pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> isize {
+pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> SyscallResult {
     conditional_enable_int(num as usize);
 
     use syscall_defs::*;
-    match num as usize {
+    let res = match num as usize {
         SYS_READ => sys::sys_read(a, b, c),
         SYS_WRITE => sys::sys_write(a, b, c),
         SYS_OPEN => sys::sys_open(a, b, c, d),
@@ -36,7 +38,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_GETDENTS => sys::sys_getdents(a, b, c),
         SYS_GETADDRINFO => sys::sys_getaddrinfo(a, b, c, d),
         SYS_EXIT => sys::sys_exit(a),
-        SYS_SLEEP => sys::sys_sleep(a),
+        SYS_SLEEP => sys::sys_sleep(a).maybe_into_erestartnohand(),
         SYS_POWEROFF => sys::sys_poweroff(),
         SYS_REBOOT => sys::sys_reboot(),
         SYS_BIND => sys::sys_bind(a, b),
@@ -52,14 +54,14 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_RENAME => sys::sys_rename(a, b, c, d),
         SYS_FORK => sys::sys_fork(),
         SYS_EXEC => sys::sys_exec(a, b, c, d, e, f),
-        SYS_FCNTL => sys::sys_fcntl(a, b),
+        SYS_FCNTL => sys::sys_fcntl(a, b, c),
         SYS_MMAP => sys::sys_mmap(a, b, c, d, e, f),
         SYS_MUNMAP => sys::sys_munmap(a, b),
         SYS_MAPS => sys::sys_maps(),
         SYS_SEEK => sys::sys_seek(a, b, c),
         SYS_PREAD => sys::sys_pread(a, b, c, d),
         SYS_PWRITE => sys::sys_pwrite(a, b, c, d),
-        SYS_WAITPID => sys::sys_waitpid(a, b, c),
+        SYS_WAITPID => sys::sys_waitpid(a, b, c).maybe_into_erestartsys(),
         SYS_IOCTL => sys::sys_ioctl(a, b, c),
         SYS_SIGACTION => sys::sys_sigaction(a, b, c, d),
         SYS_SIGPROCMASK => sys::sys_sigprocmask(a, b, c),
@@ -84,10 +86,13 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_SYNC => sys::sys_sync(),
         SYS_FSYNC => sys::sys_fsync(a),
         SYS_TICKSNS => sys::sys_ticksns(),
+        SYS_GETPPID => sys::sys_getppid(),
+        SYS_GETPGID => sys::sys_getpgid(a),
         a => {
             logln!("NO SYS????? {}", a);
             Err(SyscallError::ENOSYS)
         }
-    }
-    .syscall_into()
+    };
+
+    res
 }

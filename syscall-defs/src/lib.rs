@@ -16,6 +16,7 @@ pub mod resource;
 pub mod signal;
 pub mod stat;
 pub mod time;
+pub mod waitpid;
 
 pub const SYS_READ: usize = 0;
 pub const SYS_WRITE: usize = 1;
@@ -82,6 +83,9 @@ pub const SYS_KILL: usize = 55;
 pub const SYS_SYNC: usize = 56;
 pub const SYS_FSYNC: usize = 57;
 pub const SYS_TICKSNS: usize = 58;
+
+pub const SYS_GETPPID: usize = 59;
+pub const SYS_GETPGID: usize = 60;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]
@@ -171,6 +175,11 @@ pub enum SyscallError {
     EBADFD = 1081,
     ENOMEDIUM = 1082,
     ENOTBLK = 1083,
+    ERESTART = 1106,
+
+    ERESTARTSYS = 2000,
+    ERESTARTNOHAND = 2001,
+    ERESTARTNOINTR = 2002,
 
     UnknownError = 0xffff,
 }
@@ -250,15 +259,44 @@ bitflags! {
 }
 
 #[repr(i64)]
+#[derive(Debug)]
 pub enum FcntlCmd {
-    GetFL = 1,
+    DupFD = 1,
+    DupFDCloexec = 2,
+    GetFD = 3,
+    SetFD = 4,
+    GetFL = 5,
+    SetFL = 6,
     Inval = -1,
+}
+
+bitflags! {
+    pub struct FcntlSetFDFlags: u64 {
+        const FD_CLOEXEC = 1;
+    }
+}
+
+impl From<FcntlSetFDFlags> for OpenFlags {
+    fn from(value: FcntlSetFDFlags) -> Self {
+        let mut flags = OpenFlags::empty();
+
+        if value.contains(FcntlSetFDFlags::FD_CLOEXEC) {
+            flags.insert(OpenFlags::CLOEXEC);
+        }
+
+        flags
+    }
 }
 
 impl From<u64> for FcntlCmd {
     fn from(v: u64) -> Self {
         match v {
-            1 => FcntlCmd::GetFL,
+            1 => FcntlCmd::DupFD,
+            2 => FcntlCmd::DupFDCloexec,
+            3 => FcntlCmd::GetFD,
+            4 => FcntlCmd::SetFD,
+            5 => FcntlCmd::GetFL,
+            6 => FcntlCmd::SetFL,
             _ => FcntlCmd::Inval,
         }
     }
@@ -283,7 +321,7 @@ impl Default for FileType {
 pub struct SysDirEntry {
     pub ino: usize,
     pub off: usize,
-    pub reclen: usize,
+    pub reclen: u16,
     pub typ: FileType,
     pub name: [u8; 0],
 }
@@ -307,6 +345,47 @@ bitflags! {
 }
 
 pub type SyscallResult = Result<usize, SyscallError>;
+
+pub trait SyscallRestartable {
+    fn maybe_into_erestartsys(&self) -> SyscallResult;
+    fn maybe_into_erestartnohand(&self) -> SyscallResult;
+    fn maybe_into_erestartnointr(&self) -> SyscallResult;
+
+    fn is_restart(&self, has_handler: bool, restart_flag: bool) -> bool;
+}
+
+impl SyscallRestartable for SyscallResult {
+    fn maybe_into_erestartsys(&self) -> SyscallResult {
+        if let Err(SyscallError::EINTR) = self {
+            Err(SyscallError::ERESTARTSYS)
+        } else {
+            *self
+        }
+    }
+    fn maybe_into_erestartnohand(&self) -> SyscallResult {
+        if let Err(SyscallError::EINTR) = self {
+            Err(SyscallError::ERESTARTNOHAND)
+        } else {
+            *self
+        }
+    }
+    fn maybe_into_erestartnointr(&self) -> SyscallResult {
+        if let Err(SyscallError::EINTR) = self {
+            Err(SyscallError::ERESTARTNOINTR)
+        } else {
+            *self
+        }
+    }
+
+    fn is_restart(&self, has_handler: bool, restart_flag: bool) -> bool {
+        match self {
+            Err(SyscallError::ERESTARTNOINTR) => true,
+            Err(SyscallError::ERESTARTSYS) => !has_handler || (has_handler && restart_flag),
+            Err(SyscallError::ERESTARTNOHAND) => !has_handler,
+            _ => false,
+        }
+    }
+}
 
 pub trait SyscallFrom<T> {
     fn syscall_from(e: T) -> Self;
@@ -332,6 +411,9 @@ impl SyscallInto<isize> for SyscallResult {
     fn syscall_into(self) -> isize {
         match self {
             Ok(v) => v as isize,
+            Err(SyscallError::ERESTARTNOHAND)
+            | Err(SyscallError::ERESTARTNOINTR)
+            | Err(SyscallError::ERESTARTSYS) => -(SyscallError::EINTR as isize),
             Err(v) => -(v as isize),
         }
     }

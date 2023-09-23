@@ -30,6 +30,16 @@ impl IrqGuard {
 
         g
     }
+
+    pub fn maybe_new(irq: bool) -> IrqGuard {
+        let g = IrqGuard { had_int: irq };
+
+        if g.had_int {
+            crate::kernel::int::disable();
+        }
+
+        g
+    }
 }
 
 impl<T> IrqLock<T> {

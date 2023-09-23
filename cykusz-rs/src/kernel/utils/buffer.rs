@@ -4,7 +4,7 @@ use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task;
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 pub struct BufferQueue {
     buffer: Spin<Buffer>,
@@ -22,7 +22,8 @@ pub struct Buffer {
     data: Vec<u8>,
     r: usize,
     w: usize,
-    full: bool, // r == w may indicate both empty and full buffer, full boolean disambiguate that
+    full: bool,
+    // r == w may indicate both empty and full buffer, full boolean disambiguate that
     has_writers: bool,
     has_readers: bool,
 }
@@ -91,10 +92,13 @@ impl BufferQueue {
             return Ok(0);
         }
 
-        let mut buffer = self.writer_queue.wait_lock_for(&self.buffer, |lck| {
-            let _ = &lck;
-            !lck.has_readres() || lck.available_size() >= data.len()
-        })?;
+        let mut buffer = self
+            .writer_queue
+            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| {
+                let _ = &lck;
+                !lck.has_readres() || lck.available_size() >= data.len()
+            })?
+            .unwrap();
 
         if !buffer.has_readres() {
             return Err(FsError::Pipe);
@@ -122,7 +126,8 @@ impl BufferQueue {
     pub fn read_data(&self, buf: &mut [u8]) -> SignalResult<usize> {
         let mut buffer = self
             .reader_queue
-            .wait_lock_for(&self.buffer, |lck| lck.has_data())?;
+            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| lck.has_data())?
+            .unwrap();
 
         let read = buffer.read_data(buf);
 

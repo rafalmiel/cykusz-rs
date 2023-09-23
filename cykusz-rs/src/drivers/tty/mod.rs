@@ -6,7 +6,7 @@ use core::fmt::{Error, Formatter};
 use input::*;
 use syscall_defs::ioctl::tty;
 use syscall_defs::poll::PollEventFlags;
-use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT};
+use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT, SIGTSTP};
 use syscall_defs::OpenFlags;
 
 use crate::arch::output::{video, Color, ConsoleWriter};
@@ -22,8 +22,9 @@ use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::task::Task;
+
 use crate::kernel::tty::TerminalDevice;
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 use self::output::OutputBuffer;
 
@@ -126,7 +127,10 @@ impl Tty {
     fn read(&self, buf: *mut u8, len: usize) -> SignalResult<usize> {
         let mut buffer = self
             .wait_queue
-            .wait_lock_irq_for(&self.buffer, |lck| lck.has_data())?;
+            .wait_lock_for(WaitQueueFlags::IRQ_DISABLE, &self.buffer, |lck| {
+                lck.has_data()
+            })?
+            .unwrap();
 
         Ok(buffer.read(buf, len))
     }
@@ -180,6 +184,9 @@ impl Tty {
             KeyCode::KEY_RIGHTALT => {
                 state.altgr = !released;
             }
+            KeyCode::KEY_LEFTMETA | KeyCode::KEY_RIGHTMETA => {
+                return true;
+            }
             _ => {
                 return false;
             }
@@ -205,21 +212,6 @@ impl Tty {
                     self.output.lock_irq().remove_last_n(n);
                 }
             }
-            KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.fg_group.lock_irq().as_ref() {
-                    t.signal(SIGINT);
-                }
-            }
-            KeyCode::KEY_D if (state.lctrl || state.rctrl) && !released => {
-                self.buffer.lock_irq().trigger_eof();
-
-                self.wait_queue.notify_one();
-            }
-            KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.fg_group.lock_irq().as_ref() {
-                    t.signal(SIGQUIT);
-                }
-            }
             KeyCode::KEY_PAGEDOWN if !released => {
                 self.output.lock_irq().scroll_down(20);
             }
@@ -237,6 +229,35 @@ impl Tty {
             }
             KeyCode::KEY_DOWN if !released => {
                 self.output.lock_irq().scroll_down(1);
+            }
+            _ => {
+                return false;
+            }
+        };
+
+        return true;
+    }
+    fn handle_sig(&self, key: KeyCode, released: bool, state: &mut SpinGuard<State>) -> bool {
+        match key {
+            KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
+                if let Some(t) = self.fg_group.lock_irq().as_ref() {
+                    t.signal(SIGINT);
+                }
+            }
+            KeyCode::KEY_Z if (state.lctrl || state.rctrl) && !released => {
+                if let Some(t) = self.fg_group.lock_irq().clone() {
+                    t.signal(SIGTSTP);
+                }
+            }
+            KeyCode::KEY_D if (state.lctrl || state.rctrl) && !released => {
+                self.buffer.lock_irq().trigger_eof();
+
+                self.wait_queue.notify_one();
+            }
+            KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
+                if let Some(t) = self.fg_group.lock_irq().as_ref() {
+                    t.signal(SIGQUIT);
+                }
             }
             _ => {
                 return false;
@@ -286,6 +307,7 @@ impl Tty {
 impl KeyListener for Tty {
     fn on_new_key(&self, key: KeyCode, released: bool) {
         let canon = self.termios.lock_irq().has_lflag(tty::ICANON);
+        let sig = self.termios.lock_irq().has_lflag(tty::ISIG);
         let mut state = self.state.lock();
 
         if Self::handle_key_state(key, released, &mut state) {
@@ -293,6 +315,10 @@ impl KeyListener for Tty {
         }
 
         if canon && self.handle_canonical(key, released, &mut state) {
+            return;
+        }
+
+        if sig && self.handle_sig(key, released, &mut state) {
             return;
         }
 
@@ -391,9 +417,17 @@ impl TerminalDevice for Tty {
 
 impl INode for Tty {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
-        let r = self.read(buf.as_mut_ptr(), buf.len())?;
-        logln!("tty read {} {:?}", r, buf);
-        Ok(r)
+        logln2!("try tty read");
+        let r = self.read(buf.as_mut_ptr(), buf.len());
+        logln2!("tty read {:?} {:?}", r, buf);
+
+        match r {
+            Ok(s) => Ok(s),
+            Err(e) => {
+                logln2!("tty signal error");
+                Err(e.into())
+            }
+        }
     }
 
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, FsError> {
@@ -452,7 +486,7 @@ impl INode for Tty {
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize, FsError> {
-        logln!("TTY ioctl 0x{:x}", cmd);
+        logln2!("TTY ioctl 0x{:x}", cmd);
         match cmd {
             tty::TIOCSCTTY => {
                 let current = current_task_ref();
@@ -462,6 +496,7 @@ impl INode for Tty {
                 }
 
                 if current_task_ref().terminal().connect(tty().clone()) {
+                    println!("TERMINAL ATTACHED TO TASK {}", current.tid());
                     Ok(0)
                 } else {
                     Err(FsError::EntryExists)
@@ -477,28 +512,50 @@ impl INode for Tty {
                     Err(FsError::EntryNotFound)
                 }
             }
+            tty::TIOCGPGRP => {
+                let task = current_task_ref();
+
+                if !task.terminal().is_connected(tty().clone()) {
+                    logln2!("get is not connected");
+                    return Err(FsError::NoPermission);
+                }
+
+                let gid = unsafe { VirtAddr(arg).read_mut::<u32>() };
+
+                if let Some(fg) = &*tty().fg_group.lock() {
+                    *gid = fg.id() as u32;
+                }
+
+                return Ok(0);
+            }
             tty::TIOCSPGRP => {
-                let gid = arg;
+                let gid = unsafe { VirtAddr(arg).read::<u32>() };
 
                 let task = current_task_ref();
 
                 if !task.terminal().is_connected(tty().clone()) {
-                    return Err(FsError::NoTty);
+                    logln2!("set is not connected");
+                    return Err(FsError::NoPermission);
                 }
 
                 if let Some(ctrl) = self.ctrl_task.lock_irq().as_ref() {
                     if ctrl.sid() == task.sid() {
-                        if let Some(group) = sessions().get_group(task.sid(), gid) {
+                        if let Some(group) = sessions().get_group(task.sid(), gid as usize) {
                             self.set_fg_group(group);
 
                             return Ok(0);
+                        } else {
+                            logln2!("group {} not found", gid);
                         }
+                    } else {
+                        logln2!("diff sid {} {}", ctrl.sid(), task.sid());
                     }
                 }
 
-                Err(FsError::NoTty)
+                logln2!("set is not auth");
+                Err(FsError::NoPermission)
             }
-            tty::TIOCSWINSZ => Err(FsError::NotSupported),
+            tty::TIOCSWINSZ => Err(FsError::NoTty),
             tty::TIOCGWINSZ => {
                 let winsize =
                     unsafe { VirtAddr(arg).read_mut::<syscall_defs::ioctl::tty::WinSize>() };
@@ -532,7 +589,7 @@ impl INode for Tty {
 
                 Ok(0)
             }
-            _ => Err(FsError::NotSupported),
+            _ => Err(FsError::NoTty),
         }
     }
 }

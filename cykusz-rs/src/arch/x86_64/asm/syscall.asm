@@ -8,7 +8,6 @@ extern fast_syscall_handler
 extern restore_user_fs
 
 global asm_update_kern_fs_base
-extern arch_sys_check_signals
 
 %include "cykusz-rs/src/arch/x86_64/asm/regs.inc"
 

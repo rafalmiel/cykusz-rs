@@ -4,6 +4,7 @@ use crate::kernel;
 use spin::{Mutex as M, MutexGuard as MG};
 
 use crate::kernel::int;
+use crate::kernel::sync::IrqGuard;
 
 pub struct Spin<T: ?Sized> {
     notify: bool,
@@ -179,6 +180,16 @@ impl<'a, T: ?Sized> Deref for SpinGuard<'a, T> {
 impl<'a, T: ?Sized> DerefMut for SpinGuard<'a, T> {
     fn deref_mut(&mut self) -> &mut T {
         self.g.as_mut().unwrap()
+    }
+}
+
+impl<'a, T: ?Sized> SpinGuard<'a, T> {
+    pub fn to_irq_guard(mut self) -> IrqGuard {
+        let g = IrqGuard::maybe_new(self.irq);
+
+        self.irq = false;
+
+        g
     }
 }
 

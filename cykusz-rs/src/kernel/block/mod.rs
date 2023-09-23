@@ -372,15 +372,20 @@ fn register_partition(dev: &Arc<BlockDevice>, count: usize, offset: usize, part:
         dev.clone(),
     );
 
-    let blkdev =
-        BlockDevice::new(dev.name() + "." + &count.to_string(), part_dev);
+    let blkdev = BlockDevice::new(dev.name() + "." + &count.to_string(), part_dev);
 
     if let Err(e) = register_blkdev(blkdev.clone()) {
         panic!("Failed to register blkdev {} {:?}", blkdev.name(), e);
     }
 }
 
-fn process_partition(dev: &Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offset: usize, part: &Partition) {
+fn process_partition(
+    dev: &Arc<BlockDevice>,
+    count: &mut usize,
+    offset: usize,
+    ext_offset: usize,
+    part: &Partition,
+) {
     if part.system_id() == 0 {
         return;
     }
@@ -423,9 +428,9 @@ fn process_dev(dev: Arc<BlockDevice>, count: &mut usize, offset: usize, ext_offs
 
 fn disks_to_scan() -> Option<HashSet<String>> {
     params().get("disks").and_then(|d| {
-        Some(HashSet::<String>::from_iter(d.split(",").map(|e| {
-            String::from(e)
-        })))
+        Some(HashSet::<String>::from_iter(
+            d.split(",").map(|e| String::from(e)),
+        ))
     })
 }
 

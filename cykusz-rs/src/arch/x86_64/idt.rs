@@ -512,7 +512,6 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
     if virt.is_user() {
         // page fault originated in userspace
         // let the task try handle it
-
         let task = current_task();
 
         //println!("user pagefault {:#x} {} {:?} pid: {}", frame.ip, virt, reason, task.tid());
@@ -526,11 +525,6 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
                 frame.ip,
                 err
             );
-            if VirtAddr(frame.ip as usize).is_user() {
-                task.signal(syscall_defs::signal::SIGSEGV);
-
-                return;
-            }
         }
     //println!("user pagefault failed");
     } else if reason.contains(PageFaultReason::PRESENT | PageFaultReason::WRITE) {
@@ -546,6 +540,13 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
                 }
             }
         }
+    }
+
+    if VirtAddr(frame.ip as usize).is_user() {
+        let task = current_task();
+        task.signal(syscall_defs::signal::SIGSEGV);
+
+        return;
     }
 
     println!(

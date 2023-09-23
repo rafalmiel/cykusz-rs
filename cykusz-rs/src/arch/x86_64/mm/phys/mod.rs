@@ -75,9 +75,7 @@ impl PhysPage {
     pub fn page_item(&self) -> Option<PageCacheItemArc> {
         let _lock = self.lock_pt();
 
-        unsafe {
-            self.this().p_cache.upgrade()
-        }
+        unsafe { self.this().p_cache.upgrade() }
     }
 
     pub fn inc_vm_use_count(&self) {
@@ -105,9 +103,7 @@ impl PhysPage {
     pub fn vm_use_count(&self) -> usize {
         let _lock = self.lock_pt();
 
-        unsafe {
-            self.this().vm_use_count as usize
-        }
+        unsafe { self.this().vm_use_count as usize }
     }
 }
 
@@ -115,10 +111,10 @@ impl Default for PhysPage {
     fn default() -> Self {
         PhysPage {
             pt_lock: Spin::new(()),
-            data: UnsafeCell::new(PhysPageData{
+            data: UnsafeCell::new(PhysPageData {
                 p_cache: PageCacheItemWeak::empty(),
                 vm_use_count: 0,
-            })
+            }),
         }
     }
 }

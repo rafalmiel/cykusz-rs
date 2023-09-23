@@ -123,9 +123,10 @@ pub static RAW_MODE_MAP: [Option<&'static [u8]>; 128] = {
         [KeyCode::KEY_DOWN, b"\x1bOB"],
         [KeyCode::KEY_RIGHT, b"\x1bOC"],
         [KeyCode::KEY_LEFT, b"\x1bOD"],
-        [KeyCode::KEY_ENTER, b"\x1bOM"],
-        [KeyCode::KEY_KPENTER, b"\x1bOM"],
-        [KeyCode::KEY_BACKSPACE, b"\x08"]
+        [KeyCode::KEY_ENTER, b"\x0d"],
+        [KeyCode::KEY_KPENTER, b"\x0d"],
+        [KeyCode::KEY_BACKSPACE, b"\x08"],
+        [KeyCode::KEY_DELETE, b"\x1b[3~"]
     );
 
     arr

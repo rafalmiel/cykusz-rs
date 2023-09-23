@@ -56,8 +56,8 @@ void print_thread2(int v) {
 			//	//write(1, "TT2. Hello printf two\n", 22);
 			//}
 		} else {
-			for (int i = 0; i < 1000; ++i) {
-			//for (int i = 0; ; ++i) {
+			//for (int i = 0; i < 1000; ++i) {
+			for (int i = 0; ; ++i) {
 				char buf[8];
 				sprintf(buf, "%d|", tid);
 				syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
@@ -79,11 +79,11 @@ int main(int argc, char *argv[]) {
 	//	std::cout << "hello arg: " << argv[i] << std::endl;
 	//}
 	
-	struct sigaction sact{};
-	sact.sa_handler = int_handler;
-	sact.sa_flags = SA_RESTART;
+	//struct sigaction sact{};
+	//sact.sa_handler = int_handler;
+	//sact.sa_flags = SA_RESTART;
 
-	sigaction(SIGINT, &sact, nullptr);
+	//sigaction(SIGINT, &sact, nullptr);
 
 	std::string input{};
 	//std::cout << "Enter your name: ";

@@ -18,6 +18,7 @@ use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry, SyscallError};
 
 use crate::file::File;
 use syscall_defs::signal::{SigAction, SignalFlags, SignalHandler};
+use syscall_defs::waitpid::WaitPidFlags;
 
 pub mod file;
 pub mod nc;
@@ -48,7 +49,7 @@ fn ls(path: &str) {
                     let namebytes = unsafe {
                         core::slice::from_raw_parts(
                             dentry.name.as_ptr(),
-                            dentry.reclen - struct_len,
+                            dentry.reclen as usize - struct_len,
                         )
                     };
                     if let Ok(name) = core::str::from_utf8(namebytes) {
@@ -93,7 +94,7 @@ fn base_10_bytes(mut n: u64, buf: &mut [u8]) -> &[u8] {
 }
 
 fn get_tty_fd() -> usize {
-    syscall::open("/dev/tty", OpenFlags::RDWR).expect("Failed to get tty fd")
+    syscall::open("/dev/tty", OpenFlags::RDWR | OpenFlags::NOCTTY).expect("Failed to get tty fd")
 }
 
 struct Tty {
@@ -120,8 +121,12 @@ impl Tty {
     }
 
     fn set_fg(&self, gid: usize) {
-        syscall::ioctl(self.fd, syscall_defs::ioctl::tty::TIOCSPGRP, gid)
-            .expect("Failed to set fg terminal group");
+        syscall::ioctl(
+            self.fd,
+            syscall_defs::ioctl::tty::TIOCSPGRP,
+            core::ptr::addr_of!(gid) as usize,
+        )
+        .expect("Failed to set fg terminal group");
     }
 }
 
@@ -159,10 +164,15 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
 
             let mut status = 0u32;
 
-            while let Err(SyscallError::EINTR) = syscall::waitpid(id, &mut status) {}
+            while let Err(SyscallError::EINTR) =
+                syscall::waitpid(id as isize, &mut status, WaitPidFlags::empty())
+            {}
 
             if status != 0x200 {
-                println!("shell: process exit with status: {:#x}", status);
+                println!(
+                    "shell: process exit with status: {:?}",
+                    syscall_defs::waitpid::Status::from(status)
+                );
             }
 
             tty.set_fg(syscall::getpid().expect("Failed to get pid"));
@@ -643,7 +653,7 @@ fn exec(cmd: &str) {
             start_process(
                 "/usr/bin/gcc",
                 Some(&["/usr/bin/gcc", "/test.c", "-o", "/test"]),
-                Some(&["PATH=/usr/bin", "TERM=cykusz"]),
+                Some(&["PATH=/bin:/usr/bin", "TERM=cykusz"]),
             );
         }
     } else if cmd.starts_with("thread_test") {
@@ -676,7 +686,8 @@ fn exec(cmd: &str) {
                     syscall::close(fds[1] as usize).expect("close failed");
 
                     let mut status = 0u32;
-                    syscall::waitpid(id, &mut status).expect("waitpid failed");
+                    syscall::waitpid(id as isize, &mut status, WaitPidFlags::empty())
+                        .expect("waitpid failed");
                 } else {
                     syscall::close(fds[1] as usize).expect("close failed");
 
@@ -708,7 +719,7 @@ fn exec(cmd: &str) {
             start_process(
                 args[0],
                 Some(args.as_slice()),
-                Some(&["PATH=/usr/bin", "TERM=cykusz"]),
+                Some(&["PATH=/bin:/usr/bin", "TERM=cykusz"]),
             );
         }
     }
@@ -742,10 +753,18 @@ fn signal_test() {
 #[allow(dead_code)]
 fn sigchld_handler(_sig: usize) {
     let mut status = 0u32;
-    let pid = syscall::waitpid(0, &mut status);
+    let pid = syscall::waitpid(
+        -1,
+        &mut status,
+        WaitPidFlags::EXITED | WaitPidFlags::STOPPED | WaitPidFlags::CONTINUED,
+    );
 
     if let Ok(pid) = pid {
-        println!("child died: {}, status: {:#x}", pid, status);
+        println!(
+            "child died: {}, status: {:?}",
+            pid,
+            syscall_defs::waitpid::Status::from(status)
+        );
     }
 }
 
@@ -758,6 +777,17 @@ pub fn main() {
 
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGINT,
+        Some(&SigAction::new(
+            SignalHandler::Handle(sigint_handler),
+            0,
+            SignalFlags::RESTART,
+        )),
+        None,
+    ) {
+        println!("Failed to install signal handler: {:?}", e);
+    }
+    if let Err(e) = syscall::sigaction(
+        syscall_defs::signal::SIGTSTP,
         Some(&SigAction::new(
             SignalHandler::Handle(sigint_handler),
             0,

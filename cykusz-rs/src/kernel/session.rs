@@ -255,6 +255,7 @@ impl Sessions {
         if process.is_group_leader() {
             return Err(SyscallError::EPERM);
         }
+        logln3!("setsid {}", process.pid());
 
         let process = process.process_leader();
 
@@ -267,6 +268,8 @@ impl Sessions {
 
     pub fn set_pgid(&self, pid: usize, gid: usize) -> SyscallResult {
         let caller = current_task().process_leader();
+
+        logln3!("set_pgid {} {}", pid, gid);
 
         let process = if pid == 0 || pid == caller.pid() {
             caller.clone()

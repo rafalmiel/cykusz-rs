@@ -13,13 +13,14 @@ use syscall_defs::SyscallError;
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
-use crate::kernel::signal::default::Action;
+
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::Task;
 
 mod default;
 
 pub const KSIGKILLTHR: usize = 32;
+pub const KSIGSTOPTHR: usize = 33;
 pub const KSIGEXEC: usize = 63;
 
 #[derive(Debug, PartialEq)]
@@ -28,18 +29,30 @@ pub enum SignalError {
 }
 
 const IMMUTABLE_MASK: u64 = {
-    let a = (1u64 << syscall_defs::signal::SIGSTOP)
-        | (1u64 << syscall_defs::signal::SIGCONT)
-        | (1u64 << syscall_defs::signal::SIGABRT)
-        | (1u64 << syscall_defs::signal::SIGKILL)
-        | (1u64 << KSIGKILLTHR)
-        | (1u64 << KSIGEXEC);
+    let a = (1u64 << syscall_defs::signal::SIGSTOP - 1)
+        | (1u64 << syscall_defs::signal::SIGABRT - 1)
+        | (1u64 << syscall_defs::signal::SIGKILL - 1)
+        | (1u64 << KSIGKILLTHR - 1)
+        | (1u64 << KSIGSTOPTHR - 1)
+        | (1u64 << KSIGEXEC - 1);
+
+    a
+};
+
+const UNBLOCKABLE_MASK: u64 = {
+    let a = (1u64 << syscall_defs::signal::SIGSTOP - 1)
+        | (1u64 << syscall_defs::signal::SIGCONT - 1)
+        | (1u64 << syscall_defs::signal::SIGABRT - 1)
+        | (1u64 << syscall_defs::signal::SIGKILL - 1)
+        | (1u64 << KSIGKILLTHR - 1)
+        | (1u64 << KSIGSTOPTHR - 1)
+        | (1u64 << KSIGEXEC - 1);
 
     a
 };
 
 fn can_override(sig: usize) -> bool {
-    IMMUTABLE_MASK.get_bit(sig) == false
+    IMMUTABLE_MASK.get_bit(sig - 1) == false
 }
 
 pub type SignalResult<T> = core::result::Result<T, SignalError>;
@@ -115,7 +128,7 @@ impl SignalEntry {
     }
 }
 
-const SIGNAL_COUNT: usize = 33;
+const SIGNAL_COUNT: usize = 34;
 
 #[derive(Copy, Clone)]
 pub struct Entries {
@@ -156,14 +169,17 @@ impl Entries {
     }
 
     pub fn is_pending(&self, sig: u64) -> bool {
+        let sig = sig - 1;
         self.pending_mask.get_bit(sig as usize)
     }
 
     pub fn clear_pending(&mut self, sig: u64) {
+        let sig = sig - 1;
         self.pending_mask.set_bit(sig as usize, false);
     }
 
     pub fn set_pending(&mut self, sig: u64) {
+        let sig = sig - 1;
         self.pending_mask.set_bit(sig as usize, true);
     }
 }
@@ -196,11 +212,11 @@ impl Clone for Signals {
     }
 }
 
+#[derive(Debug)]
 pub enum TriggerResult {
-    Ignored,
     Blocked,
     Triggered,
-    Execute(fn(Arc<Task>)),
+    Execute(fn(usize, Arc<Task>)),
 }
 
 impl Signals {
@@ -217,24 +233,32 @@ impl Signals {
     }
 
     pub fn is_pending(&self, sig: u64) -> bool {
+        logln2!(
+            "is blocked: {} {}",
+            sig,
+            self.pending().get_bit(sig as usize - 1)
+        );
+        let sig = sig - 1;
         self.pending().get_bit(sig as usize)
     }
 
     pub fn clear_pending(&self, sig: u64) {
+        let sig = sig - 1;
         if self.thread_pending().get_bit(sig as usize) {
             self.thread_pending_mask
                 .fetch_and(!(1u64 << sig), Ordering::SeqCst);
         } else {
-            self.entries().clear_pending(sig);
+            self.entries().clear_pending(sig + 1);
         }
     }
 
     pub fn set_pending(&self, sig: u64, thread_scope: bool) {
+        let sig = sig - 1;
         if thread_scope {
             self.thread_pending_mask
                 .fetch_or(1u64 << sig, Ordering::SeqCst);
         } else {
-            self.entries().set_pending(sig);
+            self.entries().set_pending(sig + 1);
         }
     }
 
@@ -247,6 +271,12 @@ impl Signals {
     }
 
     pub fn is_blocked(&self, signal: usize) -> bool {
+        logln2!(
+            "is blocked: {} {}",
+            signal,
+            self.blocked_mask().get_bit(signal - 1)
+        );
+        let signal = signal - 1;
         self.blocked_mask().get_bit(signal)
     }
 
@@ -280,23 +310,7 @@ impl Signals {
 
         let sigs = self.entries();
 
-        let handler = sigs[signal].handler();
-
-        if match handler {
-            SignalHandler::Ignore => false,
-            SignalHandler::Default => {
-                let action = default::action(signal);
-
-                match action {
-                    Action::Ignore => false,
-                    Action::Handle(_) => true,
-                    Action::Exec(f) => {
-                        return TriggerResult::Execute(f);
-                    }
-                }
-            }
-            SignalHandler::Handle(_) => true,
-        } {
+        let set_pending = |sigs: SpinGuard<Entries>, trigger_result: TriggerResult| {
             drop(sigs);
 
             self.set_pending(signal as u64, this_thread);
@@ -304,10 +318,14 @@ impl Signals {
             if self.is_blocked(signal) {
                 TriggerResult::Blocked
             } else {
-                TriggerResult::Triggered
+                trigger_result
             }
+        };
+
+        if signal == syscall_defs::signal::SIGCONT || signal == syscall_defs::signal::SIGKILL {
+            set_pending(sigs, TriggerResult::Execute(default::cont))
         } else {
-            TriggerResult::Ignored
+            set_pending(sigs, TriggerResult::Triggered)
         }
     }
 
@@ -351,36 +369,65 @@ impl Signals {
     pub fn set_mask(
         &self,
         how: syscall_defs::signal::SigProcMask,
-        set: u64,
+        set: Option<u64>,
         old_set: Option<&mut u64>,
     ) {
         if let Some(old) = old_set {
             *old = self.blocked_mask.load(Ordering::SeqCst);
         }
 
-        let set = set & !IMMUTABLE_MASK;
+        if set.is_none() {
+            return;
+        }
+
+        let set = set.unwrap();
+
+        let set = set & !UNBLOCKABLE_MASK;
 
         match how {
             syscall_defs::signal::SigProcMask::Block => {
                 self.blocked_mask.fetch_or(set, Ordering::SeqCst);
+                logln2!(
+                    "sigblock {:b} {:b}",
+                    set,
+                    self.blocked_mask.load(Ordering::SeqCst)
+                );
             }
             syscall_defs::signal::SigProcMask::Unblock => {
                 self.blocked_mask.fetch_and(!set, Ordering::SeqCst);
+                logln2!(
+                    "sigunblock {:b} {:b}",
+                    set,
+                    self.blocked_mask.load(Ordering::SeqCst)
+                );
             }
             syscall_defs::signal::SigProcMask::Set => {
                 self.blocked_mask.store(set, Ordering::SeqCst);
+                logln2!(
+                    "sigset {:b} {:b}",
+                    set,
+                    self.blocked_mask.load(Ordering::SeqCst)
+                );
             }
+            _ => {}
         }
     }
 }
 
-pub fn do_signals() -> Option<(usize, SignalEntry)> {
+pub enum DoSignalsResult {
+    None,
+    Entry((usize, SignalEntry)),
+    Default,
+    Ignore,
+}
+
+pub fn do_signals(_from_syscall: bool, _syscall: usize) -> DoSignalsResult {
     let task = current_task_ref();
 
     let signals = task.signals();
 
     if !signals.has_pending() {
-        return None;
+        return DoSignalsResult::None;
     }
 
     if signals.is_pending(syscall_defs::signal::SIGKILL as u64) {
@@ -393,7 +440,9 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
 
         signals.clear_pending(syscall_defs::signal::SIGKILL as u64);
 
-        crate::kernel::sched::exit(1);
+        crate::kernel::sched::exit(syscall_defs::waitpid::Status::Signaled(
+            syscall_defs::signal::SIGKILL as u64,
+        ));
     }
     if signals.is_pending(syscall_defs::signal::SIGABRT as u64) {
         logln_disabled!(
@@ -405,12 +454,14 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
 
         signals.clear_pending(syscall_defs::signal::SIGABRT as u64);
 
-        crate::kernel::sched::exit(1);
+        crate::kernel::sched::exit(syscall_defs::waitpid::Status::Signaled(
+            syscall_defs::signal::SIGABRT as u64,
+        ));
     }
 
     signals.sig_exec();
 
-    for s in 0..SIGNAL_COUNT {
+    for s in 1..SIGNAL_COUNT {
         if !signals.is_blocked(s) && signals.is_pending(s as u64) {
             signals.clear_pending(s as u64);
 
@@ -418,20 +469,17 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
 
             let entry = entries[s];
 
-            match entry.handler() {
+            return match entry.handler() {
                 SignalHandler::Default => {
                     drop(entries);
                     default::handle_default(s);
+                    DoSignalsResult::Default
                 }
-                SignalHandler::Handle(_) => {
-                    return Some((s, entry));
-                }
-                SignalHandler::Ignore => {
-                    unreachable!()
-                }
-            }
+                SignalHandler::Handle(_) => DoSignalsResult::Entry((s, entry)),
+                SignalHandler::Ignore => DoSignalsResult::Ignore,
+            };
         }
     }
 
-    None
+    DoSignalsResult::None
 }

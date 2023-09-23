@@ -5,7 +5,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Once;
 
 use crate::kernel::sync::Spin;
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 use crate::kernel::utils::PerCpu;
 
 type IpiFn = fn(usize, *const ());
@@ -55,9 +55,12 @@ impl IpiCommand {
     }
 
     fn wait_complete(&self) {
-        while let Err(_e) = self.wq.wait_for(|| self.completed() == 1) {
-            println!("[ IPI ] IPI wait complete interrupted, retrying...");
-        }
+        self.wq
+            .wait_for(
+                WaitQueueFlags::NON_INTERRUPTIBLE | WaitQueueFlags::IRQ_DISABLE,
+                || self.completed() == 1,
+            )
+            .expect("not interruptble wait interrupted");
     }
 }
 
@@ -131,8 +134,11 @@ fn ipi_thread() {
     loop {
         let mut list = ipi
             .wq
-            .wait_lock_for(&ipi.ipis, |l| !l.is_empty())
-            .expect("ipi_thread should not be signalled");
+            .wait_lock_for(WaitQueueFlags::NON_INTERRUPTIBLE, &ipi.ipis, |l| {
+                !l.is_empty()
+            })
+            .expect("ipi_thread should not be signalled")
+            .unwrap();
 
         while let Some(cmd) = list.pop_front() {
             cmd.execute();

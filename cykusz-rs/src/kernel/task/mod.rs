@@ -1,31 +1,31 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicIsize, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use intrusive_collections::{LinkedList, LinkedListLink};
 
 use syscall_defs::exec::ExeArgs;
 use syscall_defs::signal::SIGCHLD;
-use syscall_defs::{OpenFlags, SyscallError};
+use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
 
 use crate::arch::mm::VirtAddr;
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
-use crate::kernel::sched::new_task_tid;
-use crate::kernel::signal::{SignalResult, Signals};
+use crate::kernel::sched::{new_task_tid, SleepFlags};
+use crate::kernel::signal::{SignalResult, Signals, KSIGSTOPTHR};
 use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
+use crate::kernel::task::children_events::WaitPidEvents;
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
-use crate::kernel::task::zombie::Zombies;
 use crate::kernel::tty::Terminal;
 
+pub mod children_events;
 pub mod cwd;
 pub mod filetable;
 pub mod vm;
-pub mod zombie;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
@@ -51,6 +51,7 @@ impl From<usize> for TaskState {
 
 intrusive_adapter!(pub TaskAdapter = Arc<Task> : Task { sibling: LinkedListLink });
 intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLink });
+intrusive_adapter!(pub WaitPidTaskAdapter = Arc<Task> : Task { waitpid: LinkedListLink });
 
 #[derive(Default)]
 pub struct Task {
@@ -64,6 +65,7 @@ pub struct Task {
     children: Spin<intrusive_collections::LinkedList<TaskAdapter>>,
     sibling: intrusive_collections::LinkedListLink,
     pub sched: intrusive_collections::LinkedListLink,
+    pub waitpid: intrusive_collections::LinkedListLink,
     state: AtomicUsize,
     locks: AtomicUsize,
     pending_io: AtomicBool,
@@ -75,8 +77,8 @@ pub struct Task {
     sref: Weak<Task>,
     signals: Signals,
     terminal: Terminal,
-    zombies: Zombies,
-    exit_status: AtomicIsize,
+    children_events: WaitPidEvents,
+    waitpid_status: AtomicU64,
 }
 
 unsafe impl Sync for Task {}
@@ -104,8 +106,6 @@ impl Task {
         if let Some(e) = root_dentry() {
             def.set_cwd(e.clone());
         }
-
-        def.set_state(TaskState::Runnable);
 
         def
     }
@@ -166,7 +166,6 @@ impl Task {
         if let Some(e) = self.get_dent() {
             task.set_cwd(e);
         }
-        task.set_state(TaskState::Runnable);
         task.set_locks(self.locks());
 
         let task = Self::make_ptr(task);
@@ -179,6 +178,8 @@ impl Task {
             task.terminal().connect(term);
         }
 
+        logln2!("new fork task {}", task.pid());
+
         task
     }
 
@@ -188,6 +189,7 @@ impl Task {
         args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> Result<!, SyscallError> {
+        logln2!("exec task {}", self.pid());
         let vm = self.vm();
         vm.clear();
 
@@ -197,7 +199,7 @@ impl Task {
         self.filetable().close_on_exec();
 
         if let Some((base_addr, entry, elf_hdr, tls_vm)) = vm.load_bin(exe) {
-            //vm.log_vm();
+            vm.log_vm();
             unsafe {
                 self.arch_task_mut()
                     .exec(base_addr, entry, &elf_hdr, vm, tls_vm, args, envs)
@@ -297,13 +299,13 @@ impl Task {
 
         let mut children = self.children.lock_irq();
 
-        let mut cursor = children.cursor_mut();
+        let mut cursor = children.front_mut();
 
         while let Some(child) = cursor.get() {
             if child.is_process_leader() {
-                parent.add_child(child.me());
+                let task = cursor.remove().unwrap();
 
-                cursor.remove();
+                parent.add_child(task);
             } else {
                 cursor.move_next();
             }
@@ -362,12 +364,12 @@ impl Task {
         }
     }
 
-    pub fn exit_status(&self) -> isize {
-        self.exit_status.load(Ordering::SeqCst)
+    pub fn waitpid_status(&self) -> syscall_defs::waitpid::Status {
+        self.waitpid_status.load(Ordering::SeqCst).into()
     }
 
-    pub fn set_exit_status(&self, status: isize) {
-        self.exit_status.store(status, Ordering::SeqCst);
+    pub fn set_waitpid_status(&self, status: syscall_defs::waitpid::Status) {
+        self.waitpid_status.store(status.into(), Ordering::SeqCst);
     }
 
     pub fn set_state(&self, state: TaskState) {
@@ -474,25 +476,104 @@ impl Task {
         self.pending_io.store(has, Ordering::SeqCst);
     }
 
-    pub fn terminate_threads(&self) {
+    pub fn stop_threads(&self) {
         assert!(self.is_process_leader());
 
         let mut count = 0;
 
-        for c in self.children().iter().filter(|t| t.pid() == self.pid()) {
-            if c.signal_thread(crate::kernel::signal::KSIGKILLTHR) {
-                count += 1;
-            }
+        for c in self
+            .children()
+            .iter()
+            .filter(|t| t.pid() == self.pid() && t.state() != TaskState::Stopped)
+        {
+            c.signal_thread(KSIGSTOPTHR);
+            count += 1;
         }
 
         while count > 0 {
-            while let Err(_e) = self.wait_thread(0) {}
-
-            count -= 1;
+            match self.wait_thread(0, syscall_defs::waitpid::WaitPidFlags::STOPPED, true) {
+                Ok(Err(SyscallError::ECHILD)) => {
+                    break;
+                }
+                Ok(Ok(_tid)) => {
+                    count -= 1;
+                }
+                Err(_) => {
+                    continue;
+                }
+                Ok(Err(e)) => {
+                    panic!("Unexpected error from wait_thread: {:?}", e);
+                }
+            }
         }
     }
 
-    fn do_await_io(&self, timeout_ns: Option<usize>) -> SignalResult<()> {
+    pub fn cont_threads(&self) {
+        assert!(self.is_process_leader());
+
+        let mut count = 0;
+
+        for c in self
+            .children()
+            .iter()
+            .filter(|t| t.pid() == self.pid() && t.state() == TaskState::Stopped)
+        {
+            crate::kernel::sched::cont_thread(c.me());
+            count += 1;
+        }
+
+        while count > 0 {
+            match self.wait_thread(
+                0,
+                syscall_defs::waitpid::WaitPidFlags::EXITED
+                    | syscall_defs::waitpid::WaitPidFlags::CONTINUED,
+                true,
+            ) {
+                Ok(Err(SyscallError::ECHILD)) => {
+                    break;
+                }
+                Ok(Ok(_tid)) => {
+                    count -= 1;
+                }
+                Err(_) => {
+                    continue;
+                }
+                Ok(Err(e)) => {
+                    panic!("Unexpected error from wait_thread: {:?}", e);
+                }
+            }
+        }
+    }
+
+    pub fn terminate_threads(&self) {
+        assert!(self.is_process_leader());
+
+        for c in self
+            .children()
+            .iter()
+            .filter(|t| t.pid() == self.pid() && t.state() != TaskState::Unused)
+        {
+            assert!(!c.is_process_leader());
+            c.signal_thread(crate::kernel::signal::KSIGKILLTHR);
+        }
+
+        loop {
+            match self.wait_thread(0, syscall_defs::waitpid::WaitPidFlags::EXITED, true) {
+                Ok(Err(SyscallError::ECHILD)) => {
+                    break;
+                }
+                Ok(Ok(_tid)) => {}
+                Err(_) => {
+                    continue;
+                }
+                Ok(Err(e)) => {
+                    panic!("Unexpected error from wait_thread: {:?}", e);
+                }
+            }
+        }
+    }
+
+    fn do_await_io(&self, timeout_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
         if self.locks() > 0 {
             logln!(
                 "await_io: sleeping while holding locks: {}, tid {}",
@@ -500,7 +581,7 @@ impl Task {
                 self.tid()
             );
         }
-        let res = crate::kernel::sched::sleep(timeout_ns);
+        let res = crate::kernel::sched::sleep(timeout_ns, flags);
 
         assert_eq!(
             self.state(),
@@ -512,12 +593,16 @@ impl Task {
         res
     }
 
-    pub fn await_io(&self) -> SignalResult<()> {
-        self.do_await_io(None)
+    pub fn await_io(&self, flags: SleepFlags) -> SignalResult<()> {
+        self.do_await_io(None, flags)
     }
 
-    pub fn await_io_timeout(&self, timeout_ns: Option<usize>) -> SignalResult<()> {
-        self.do_await_io(timeout_ns)
+    pub fn await_io_timeout(
+        &self,
+        timeout_ns: Option<usize>,
+        flags: SleepFlags,
+    ) -> SignalResult<()> {
+        self.do_await_io(timeout_ns, flags)
     }
 
     pub fn wake_up(&self) {
@@ -537,7 +622,7 @@ impl Task {
     }
 
     pub fn sleep(&self, time_ns: usize) -> SignalResult<()> {
-        crate::kernel::sched::sleep(Some(time_ns))
+        crate::kernel::sched::sleep(Some(time_ns), SleepFlags::empty())
     }
 
     pub fn sleep_until(&self) -> usize {
@@ -567,13 +652,11 @@ impl Task {
             TriggerResult::Triggered => {
                 self.wake_up();
 
-                return true;
-            }
-            TriggerResult::Ignored => {
-                return false;
+                true
             }
             TriggerResult::Execute(f) => {
-                f(self.me());
+                logln2!("SIG TRIGGER EXECUTE {}", sig);
+                f(sig, self.me());
 
                 true
             }
@@ -606,6 +689,7 @@ impl Task {
     }
 
     pub fn signal(&self, sig: usize) -> bool {
+        logln2!("signal {} sig: {}", self.pid(), sig);
         self.do_signal(sig, false)
     }
 
@@ -617,7 +701,7 @@ impl Task {
         &self.terminal
     }
 
-    pub fn make_zombie(&self) {
+    pub fn make_zombie(&self, status: syscall_defs::waitpid::Status) {
         self.terminal().disconnect(None);
 
         unsafe {
@@ -625,9 +709,18 @@ impl Task {
         }
 
         if let Some(parent) = self.get_parent() {
-            parent.remove_child(self);
+            self.set_waitpid_status(status);
+            parent.children_events.add_zombie(self.me());
 
-            parent.zombies.add_zombie(self.me());
+            if self.is_process_leader() {
+                parent.signal(SIGCHLD);
+            }
+        }
+    }
+    pub fn notify_continued(&self) {
+        if let Some(parent) = self.get_parent() {
+            self.set_waitpid_status(syscall_defs::waitpid::Status::Continued);
+            parent.children_events.add_continued(self.me());
 
             if self.is_process_leader() {
                 parent.signal(SIGCHLD);
@@ -635,18 +728,39 @@ impl Task {
         }
     }
 
-    pub fn wait_pid(&self, pid: usize, status: &mut u32) -> SignalResult<usize> {
-        self.zombies.wait_pid(pid, status)
+    pub fn notify_stopped(&self, sig: usize) {
+        if let Some(parent) = self.get_parent() {
+            self.set_waitpid_status(syscall_defs::waitpid::Status::Stopped(sig as u64));
+            parent.children_events.add_stopped(self.me());
+
+            if self.is_process_leader() {
+                parent.signal(SIGCHLD);
+            }
+        }
     }
 
-    pub fn wait_thread(&self, tid: usize) -> SignalResult<usize> {
-        let res = self.zombies.wait_thread(self.pid(), tid);
-        res
+    pub fn wait_pid(
+        &self,
+        pid: isize,
+        status: &mut syscall_defs::waitpid::Status,
+        flags: syscall_defs::waitpid::WaitPidFlags,
+    ) -> SignalResult<SyscallResult> {
+        self.children_events.wait_pid(self, pid, status, flags)
+    }
+
+    pub fn wait_thread(
+        &self,
+        tid: usize,
+        flags: syscall_defs::waitpid::WaitPidFlags,
+        no_intr: bool,
+    ) -> SignalResult<SyscallResult> {
+        self.children_events
+            .wait_thread(self, self.pid(), tid, flags, no_intr)
     }
 }
 
 impl Drop for Task {
     fn drop(&mut self) {
-        logln_disabled!("drop task {}", self.tid());
+        logln!("drop task {}", self.tid());
     }
 }

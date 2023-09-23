@@ -11,7 +11,7 @@ rlibc = "*"
 default-features = false
 version = "*"
 
-[dependencies.user_alloc]
+[dependencies.user-alloc]
 path = "../user-alloc"
 [dependencies.syscall-defs]
 path = "../syscall-defs"

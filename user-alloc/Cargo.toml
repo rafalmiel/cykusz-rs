@@ -1,5 +1,5 @@
 [package]
-name = "user_alloc"
+name = "user-alloc"
 version = "0.1.0"
 authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
 edition = "2021"

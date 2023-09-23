@@ -40,9 +40,6 @@ jobs:
 
       - name: Install `rust-src` Rustup Component
         run: rustup component add rust-src
-      
-      - name: Install Xargo
-        run: cargo install xargo
 
       # Runs a single command using the runners shell
       - name: Build OS

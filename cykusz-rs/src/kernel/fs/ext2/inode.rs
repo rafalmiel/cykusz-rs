@@ -534,6 +534,7 @@ impl INode for LockedExt2INode {
         let inode = self.read_debug(28);
 
         stat.st_ino = inode.id as u64;
+        //stat.st_dev = self.device().unwrap().id() as u64;
         stat.st_nlink = inode.d_inode.hl_count() as u32;
         stat.st_blksize = self.ext2_fs().superblock().block_size() as u64;
         stat.st_blocks = inode.d_inode.sector_count() as u64;

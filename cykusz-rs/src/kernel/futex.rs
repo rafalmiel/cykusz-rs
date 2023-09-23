@@ -7,7 +7,7 @@ use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::mm::{PhysAddr, VirtAddr};
 use crate::kernel::sync::Mutex;
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 pub struct Futex {
     wq: WaitQueue,
@@ -57,7 +57,7 @@ impl FutexContainer {
             if atom.load(Ordering::SeqCst) == expected {
                 let futex = self.get_alloc(phys);
 
-                let res = futex.wq.wait();
+                let res = futex.wq.wait(WaitQueueFlags::empty());
 
                 if futex.wq.is_empty() {
                     self.fut.lock().remove(&phys);

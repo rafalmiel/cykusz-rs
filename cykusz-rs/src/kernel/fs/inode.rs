@@ -124,7 +124,7 @@ pub trait INode: Send + Sync + DowncastSync {
     }
 
     fn ioctl(&self, _cmd: usize, _arg: usize) -> Result<usize> {
-        return Err(FsError::NotSupported);
+        return Err(FsError::NoTty);
     }
 
     fn sync(&self) -> Result<()> {

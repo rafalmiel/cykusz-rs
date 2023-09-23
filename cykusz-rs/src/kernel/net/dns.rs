@@ -10,7 +10,7 @@ use crate::kernel::net::{
 };
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Dns {}
@@ -264,7 +264,10 @@ impl DnsService {
     fn await_result(&self) -> SignalResult<Ip4> {
         let res = self
             .wait_queue
-            .wait_lock_for(&self.ip_result, |lck| lck.is_some())?;
+            .wait_lock_for(WaitQueueFlags::empty(), &self.ip_result, |lck| {
+                lck.is_some()
+            })?
+            .unwrap();
 
         Ok(res.unwrap())
     }

@@ -8,7 +8,7 @@ use crate::kernel::block::BlockDev;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::CeilDiv;
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 mod hba;
 
@@ -145,24 +145,26 @@ impl Port {
         let mut off = 0;
         // post request and wait for completion.....
         while off < request.count() {
-            let data = self
+            let mut data = self
                 .cmd_wq
-                .wait_lock_irq_for(&self.data, |d| d.free_cmds > 0);
+                .wait_lock_for(
+                    WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::NON_INTERRUPTIBLE,
+                    &self.data,
+                    |d| d.free_cmds > 0,
+                )
+                .unwrap()
+                .unwrap();
 
-            match data {
-                Ok(mut l) => {
-                    off = l.run_request(request.clone(), off);
-                }
-                Err(_e) => {
-                    return Some(off * 512);
-                }
-            }
+            off = data.run_request(request.clone(), off);
         }
 
-        while let Err(_e) = request.wait_queue().wait_for_irq(|| request.is_complete()) {
-            // TODO: Make some waits uninterruptible
-            //println!("[ AHCI ] IO interrupted, retrying");
-        }
+        request
+            .wait_queue()
+            .wait_for(
+                WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::NON_INTERRUPTIBLE,
+                || request.is_complete(),
+            )
+            .unwrap();
 
         Some(request.count() * 512)
     }

@@ -66,9 +66,13 @@ impl<T: RsdtPtrType> Rsdt<T> {
         assert!(i < self.entries_count());
 
         unsafe {
-            PhysAddr((self.raw_entries().offset(i as isize)).read_unaligned().as_usize())
-                .to_mapped()
-                .read_ref::<AcpiStdHeader>()
+            PhysAddr(
+                (self.raw_entries().offset(i as isize))
+                    .read_unaligned()
+                    .as_usize(),
+            )
+            .to_mapped()
+            .read_ref::<AcpiStdHeader>()
         }
     }
 

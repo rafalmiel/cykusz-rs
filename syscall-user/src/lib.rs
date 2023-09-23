@@ -416,8 +416,15 @@ pub fn exec(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) -> SyscallR
     }
 }
 
-pub fn waitpid(pid: usize, status: &mut u32) -> SyscallResult {
-    unsafe { syscall3(SYS_WAITPID, pid as usize, status as *const u32 as usize, 0) }
+pub fn waitpid(pid: isize, status: &mut u32, flags: waitpid::WaitPidFlags) -> SyscallResult {
+    unsafe {
+        syscall3(
+            SYS_WAITPID,
+            pid as usize,
+            status as *const u32 as usize,
+            flags.bits(),
+        )
+    }
 }
 
 pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {

@@ -1,8 +1,8 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use crate::kernel::sched::current_task;
-use crate::kernel::signal::SignalResult;
+use crate::kernel::sched::{current_task, SleepFlags};
+use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::Task;
 
@@ -15,15 +15,28 @@ pub struct WaitQueueGuard<'a> {
     task: &'a Arc<Task>,
 }
 
+bitflags! {
+    pub struct WaitQueueFlags: u64 {
+        const IRQ_DISABLE = (1u64 << 0);
+        const NON_INTERRUPTIBLE = (1u64 << 1);
+        const NO_HANG = (1u64 << 2);
+    }
+}
+
+impl From<WaitQueueFlags> for SleepFlags {
+    fn from(value: WaitQueueFlags) -> Self {
+        let mut flags = SleepFlags::empty();
+        if value.contains(WaitQueueFlags::NON_INTERRUPTIBLE) {
+            flags.insert(SleepFlags::NON_INTERRUPTIBLE);
+        }
+
+        flags
+    }
+}
+
 impl<'a> WaitQueueGuard<'a> {
     pub fn new(wq: &'a WaitQueue, task: &'a Arc<Task>) -> WaitQueueGuard<'a> {
         wq.add_task(task.clone());
-
-        WaitQueueGuard::<'a> { wq, task }
-    }
-
-    pub fn new_debug(wq: &'a WaitQueue, task: &'a Arc<Task>) -> WaitQueueGuard<'a> {
-        wq.add_task_debug(task.clone());
 
         WaitQueueGuard::<'a> { wq, task }
     }
@@ -65,58 +78,38 @@ impl WaitQueue {
 
         core::mem::drop(lock);
 
-        task.await_io()
+        task.await_io(SleepFlags::empty())
     }
 
     pub fn task_wait() -> SignalResult<()> {
         let task = current_task();
 
-        task.await_io()
+        task.await_io(SleepFlags::empty())
     }
 
-    pub fn wait(&self) -> SignalResult<()> {
-        let task = current_task();
-
-        let _guard = WaitQueueGuard::new(self, &task);
-
-        task.await_io()
-    }
-
-    pub fn wait_lock_irq_for<'a, T, F: FnMut(&mut SpinGuard<T>) -> bool>(
-        &self,
-        mtx: &'a Spin<T>,
-        mut cond: F,
-    ) -> SignalResult<SpinGuard<'a, T>> {
-        let mut lock = mtx.lock_irq();
-
-        if cond(&mut lock) {
-            return Ok(lock);
-        }
+    pub fn wait(&self, flags: WaitQueueFlags) -> SignalResult<()> {
+        let _irq = IrqGuard::maybe_new(flags.contains(WaitQueueFlags::IRQ_DISABLE));
 
         let task = current_task();
 
         let _guard = WaitQueueGuard::new(self, &task);
 
-        while !cond(&mut lock) {
-            core::mem::drop(lock);
-
-            task.await_io()?;
-
-            lock = mtx.lock_irq();
-        }
-
-        Ok(lock)
+        Self::do_await_io(flags, &task)
     }
 
     pub fn wait_lock_for<'a, T, F: FnMut(&mut SpinGuard<T>) -> bool>(
         &self,
+        flags: WaitQueueFlags,
         mtx: &'a Spin<T>,
         mut cond: F,
-    ) -> SignalResult<SpinGuard<'a, T>> {
-        let mut lock = mtx.lock();
+    ) -> SignalResult<Option<SpinGuard<'a, T>>> {
+        let irq = flags.contains(WaitQueueFlags::IRQ_DISABLE);
+        let mut lock = if irq { mtx.lock_irq() } else { mtx.lock() };
 
         if cond(&mut lock) {
-            return Ok(lock);
+            return Ok(Some(lock));
+        } else if flags.contains(WaitQueueFlags::NO_HANG) {
+            return Ok(None);
         }
 
         let task = current_task();
@@ -124,62 +117,56 @@ impl WaitQueue {
         let _guard = WaitQueueGuard::new(self, &task);
 
         while !cond(&mut lock) {
-            core::mem::drop(lock);
+            drop(lock);
 
-            task.await_io()?;
+            Self::do_await_io(flags, &task)?;
 
-            lock = mtx.lock();
+            lock = if irq { mtx.lock_irq() } else { mtx.lock() };
         }
 
-        Ok(lock)
+        Ok(Some(lock))
     }
 
-    pub fn wait_for_irq<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
-        let _irq = IrqGuard::new();
+    pub fn wait_for<F: FnMut() -> bool>(
+        &self,
+        flags: WaitQueueFlags,
+        mut cond: F,
+    ) -> SignalResult<Option<()>> {
+        let _irq = IrqGuard::maybe_new(flags.contains(WaitQueueFlags::IRQ_DISABLE));
+
+        if !cond() && flags.contains(WaitQueueFlags::NO_HANG) {
+            return Ok(None);
+        }
 
         let task = current_task();
 
         let _guard = WaitQueueGuard::new(self, &task);
 
         while !cond() {
-            task.await_io()?;
+            Self::do_await_io(flags, &task)?;
         }
 
-        Ok(())
+        Ok(Some(()))
     }
 
-    pub fn wait_for<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
-        let task = current_task();
+    fn do_await_io(flags: WaitQueueFlags, task: &Arc<Task>) -> SignalResult<()> {
+        let res = task.await_io(flags.into());
 
-        let _guard = WaitQueueGuard::new(self, &task);
-
-        while !cond() {
-            task.await_io()?;
-        }
-
-        Ok(())
-    }
-
-    pub fn wait_for_debug<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
-        let task = current_task();
-
-        let _guard = WaitQueueGuard::new_debug(self, &task);
-
-        while !cond() {
-            task.await_io()?;
-        }
-
-        Ok(())
+        return match res {
+            Ok(()) => Ok(()),
+            res @ Err(SignalError::Interrupted) => {
+                if flags.contains(WaitQueueFlags::NON_INTERRUPTIBLE) {
+                    Ok(())
+                } else {
+                    res
+                }
+            }
+        };
     }
 
     pub fn add_task(&self, task: Arc<Task>) {
         let mut tasks = self.tasks.lock_irq();
 
-        tasks.push(task);
-    }
-
-    pub fn add_task_debug(&self, task: Arc<Task>) {
-        let mut tasks = self.tasks.lock_irq();
         tasks.push(task);
     }
 
@@ -238,21 +225,6 @@ impl WaitQueue {
         return res;
     }
 
-    pub fn notify_one_debug(&self) -> bool {
-        let tasks = self.tasks.lock_irq();
-        let len = tasks.len();
-
-        if len == 0 {
-            return false;
-        }
-
-        let t = tasks.first().unwrap();
-
-        t.wake_up();
-
-        return true;
-    }
-
     pub fn notify_all(&self) -> bool {
         let tasks = self.tasks.lock_irq();
         let len = tasks.len();
@@ -266,28 +238,6 @@ impl WaitQueue {
         for i in 0..len {
             let t = tasks[i].clone();
 
-            t.wake_up();
-
-            res = true;
-        }
-
-        res
-    }
-
-    pub fn notify_all_debug(&self) -> bool {
-        let tasks = self.tasks.lock_irq();
-        let len = tasks.len();
-
-        if len == 0 {
-            return false;
-        }
-
-        let mut res = false;
-
-        for i in 0..len {
-            let t = tasks[i].clone();
-
-            println!("wake up {}", t.tid());
             t.wake_up();
 
             res = true;

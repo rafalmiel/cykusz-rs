@@ -30,6 +30,12 @@ macro_rules! activate_task {
     };
 }
 
+bitflags! {
+    pub struct SleepFlags: u64 {
+        const NON_INTERRUPTIBLE = 1;
+    }
+}
+
 mod round_robin;
 mod task_container;
 
@@ -50,12 +56,12 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
         self.current_task().tid() as isize
     }
     fn queue_task(&self, task: Arc<Task>);
-    fn sleep(&self, until: Option<usize>) -> SignalResult<()>;
+    fn sleep(&self, until: Option<usize>, flags: SleepFlags) -> SignalResult<()>;
     fn wake(&self, task: Arc<Task>);
     fn wake_as_next(&self, task: Arc<Task>);
     fn cont(&self, task: Arc<Task>);
-    fn stop(&self);
-    fn exit(&self, status: isize) -> !;
+    fn stop(&self, sig: usize);
+    fn exit(&self, status: syscall_defs::waitpid::Status) -> !;
     fn exit_thread(&self) -> !;
 }
 
@@ -140,8 +146,8 @@ impl Scheduler {
         }
     }
 
-    fn sleep(&self, time_ns: Option<usize>) -> SignalResult<()> {
-        self.sched.sleep(time_ns)
+    fn sleep(&self, time_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
+        self.sched.sleep(time_ns, flags)
     }
 
     fn wake(&self, task: Arc<Task>) {
@@ -152,12 +158,37 @@ impl Scheduler {
         self.sched.wake_as_next(task);
     }
 
-    fn stop(&self) {
-        self.sched.stop();
+    fn stop(&self, sig: usize) {
+        let current = current_task_ref();
+
+        if current.is_process_leader() {
+            current.stop_threads();
+
+            self.sched.stop(sig);
+        } else {
+            if let Some(parent) = current.get_parent() {
+                parent.signal_thread(sig);
+            }
+        }
+    }
+
+    fn stop_thread(&self) {
+        self.sched.stop(syscall_defs::signal::SIGSTOP);
     }
 
     fn cont(&self, task: Arc<Task>) {
-        self.sched.cont(task);
+        if task.is_process_leader() {
+            task.cont_threads();
+            task.notify_continued();
+            self.sched.cont(task.clone());
+        } else if let Some(parent) = task.get_parent() {
+            cont(parent);
+        }
+    }
+
+    fn cont_thread(&self, thread: Arc<Task>) {
+        thread.notify_continued();
+        self.sched.cont(thread.clone());
     }
 
     fn close_all_tasks(&self) {
@@ -215,10 +246,10 @@ impl Scheduler {
         thread
     }
 
-    pub fn exit(&self, status: isize) -> ! {
+    pub fn exit(&self, status: syscall_defs::waitpid::Status) -> ! {
         let current = current_task_ref();
 
-        logln_disabled!(
+        logln2!(
             "exit tid {} is pl: {}, sc: {}, wc: {}",
             current.tid(),
             current.is_process_leader(),
@@ -243,9 +274,15 @@ impl Scheduler {
 
             self.sched.exit(status)
         } else {
-            current
-                .process_leader()
-                .signal_thread(syscall_defs::signal::SIGKILL);
+            if !status.is_signaled() {
+                current
+                    .process_leader()
+                    .signal(syscall_defs::signal::SIGKILL);
+            } else {
+                current
+                    .process_leader()
+                    .signal(status.which_signal() as usize);
+            }
 
             self.exit_thread();
         }
@@ -257,7 +294,7 @@ impl Scheduler {
         if task.is_process_leader() {
             logln_disabled!("[ WARN ] exit thread of a process leader");
 
-            self.exit(0);
+            self.exit(syscall_defs::waitpid::Status::Exited(0));
         } else {
             self.tasks.remove_task(task.tid());
 
@@ -349,7 +386,7 @@ pub fn current_id() -> isize {
     scheduler().current_id()
 }
 
-pub fn exit(status: isize) -> ! {
+pub fn exit(status: syscall_defs::waitpid::Status) -> ! {
     scheduler().exit(status)
 }
 
@@ -370,8 +407,8 @@ pub fn create_user_task(exe: DirEntryItem) -> Arc<Task> {
     scheduler().create_user_task(exe)
 }
 
-pub fn sleep(time_ns: Option<usize>) -> SignalResult<()> {
-    scheduler().sleep(time_ns)
+pub fn sleep(time_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
+    scheduler().sleep(time_ns, flags)
 }
 
 pub fn wake(task: Arc<Task>) {
@@ -382,12 +419,20 @@ pub fn wake_as_next(task: Arc<Task>) {
     scheduler().wake_as_next(task);
 }
 
-pub fn stop() {
-    scheduler().stop();
+pub fn stop(sig: usize) {
+    scheduler().stop(sig);
+}
+
+pub fn stop_thread() {
+    scheduler().stop_thread();
 }
 
 pub fn cont(task: Arc<Task>) {
     scheduler().cont(task);
+}
+
+pub fn cont_thread(thread: Arc<Task>) {
+    scheduler().cont_thread(thread);
 }
 
 pub fn fork() -> Arc<Task> {

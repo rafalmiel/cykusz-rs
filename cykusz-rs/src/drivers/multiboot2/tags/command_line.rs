@@ -13,7 +13,8 @@ impl CommandLine {
             str::from_utf8(slice::from_raw_parts(
                 &self.cmdline_byte as *const u8,
                 strlen,
-            )).unwrap()
+            ))
+            .unwrap()
         }
     }
 }

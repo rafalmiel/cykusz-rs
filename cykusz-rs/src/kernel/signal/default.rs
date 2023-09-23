@@ -5,8 +5,7 @@ use crate::kernel::task::Task;
 #[derive(Copy, Clone, PartialEq)]
 pub enum Action {
     Ignore,
-    Handle(fn()),
-    Exec(fn(Arc<Task>)),
+    Handle(fn(usize)),
 }
 
 static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
@@ -28,7 +27,7 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
     Action::Handle(terminate),        // SIGTERM
     Action::Ignore,                   // UNUSED
     Action::Ignore,                   // SIGCHLD
-    Action::Exec(cont),               // SIGCONT
+    Action::Ignore,                   // SIGCONT
     Action::Handle(stop),             // SIGSTOP
     Action::Handle(stop),             // SIGTSTP
     Action::Ignore,                   // UNUSED
@@ -43,21 +42,27 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
     Action::Ignore,                   // UNUSED
     Action::Ignore,                   // UNUSED
     Action::Handle(terminate_thread), // UNUSED
+    Action::Handle(stop_thread),      // UNUSED
 ];
 
-fn terminate() {
-    crate::kernel::sched::exit(1);
+fn terminate(sig: usize) {
+    crate::kernel::sched::exit(sig.into());
 }
 
-fn terminate_thread() {
+fn terminate_thread(_sig: usize) {
     crate::kernel::sched::exit_thread()
 }
 
-fn stop() {
-    crate::kernel::sched::stop();
+fn stop_thread(_sig: usize) {
+    crate::kernel::sched::stop_thread();
 }
 
-fn cont(task: Arc<Task>) {
+fn stop(sig: usize) {
+    crate::kernel::sched::stop(sig);
+}
+
+pub fn cont(_sig: usize, task: Arc<Task>) {
+    logln2!("CONT {}", task.tid());
     crate::kernel::sched::cont(task);
 }
 
@@ -73,6 +78,6 @@ pub(in crate::kernel::signal) fn handle_default(sig: usize) {
     let action = DEFAULT_ACTIONS[sig];
 
     if let Action::Handle(f) = action {
-        (f)();
+        (f)(sig);
     }
 }

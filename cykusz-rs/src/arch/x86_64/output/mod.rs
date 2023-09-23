@@ -233,3 +233,27 @@ macro_rules! log {
         $crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
     });
 }
+#[macro_export]
+macro_rules! logln2 {
+    ($fmt:expr) => (log2!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log2!(concat!($fmt, "\n"), $($arg)*));
+}
+
+#[macro_export]
+macro_rules! log2 {
+    ($($arg:tt)*) => {{
+        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+    }};
+}
+#[macro_export]
+macro_rules! logln3 {
+    ($fmt:expr) => (log3!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log3!(concat!($fmt, "\n"), $($arg)*));
+}
+
+#[macro_export]
+macro_rules! log3 {
+    ($($arg:tt)*) => {{
+        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+    }};
+}

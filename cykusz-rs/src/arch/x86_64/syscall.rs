@@ -1,6 +1,7 @@
-use syscall_defs::{SyscallError, SyscallResult};
+use syscall_defs::{SyscallError, SyscallInto, SyscallResult};
 
 use crate::arch::idt::RegsFrame;
+use crate::arch::signal::arch_sys_check_signals;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::IrqGuard;
@@ -40,9 +41,16 @@ pub struct SyscallFrame {
 pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut RegsFrame) {
     if regs.rax == syscall_defs::SYS_SIGRETURN as u64 {
         // Store syscall result in rax
-        regs.rax = crate::arch::signal::arch_sys_sigreturn(sys_frame, regs) as u64
+        let (res, was_restart) = crate::arch::signal::arch_sys_sigreturn(sys_frame, regs);
+
+        if !was_restart {
+            arch_sys_check_signals(res, sys_frame, regs);
+        } else {
+            regs.rax = res.syscall_into() as u64;
+        }
     } else {
         //logln!("syscall {:?} {:?}", regs, sys_frame);
+        logln!("syscall {}, ret: 0x{:x}", regs.rax, sys_frame.rip);
 
         let res = crate::kernel::syscall::syscall_handler(
             regs.rax, regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9,
@@ -51,9 +59,6 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
         logln_disabled!("done syscall {} = {}", regs.rax, res);
 
         crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs);
-
-        // Store syscall result in rax
-        regs.rax = res as u64
     }
 }
 

@@ -81,12 +81,10 @@ impl Iterator for ElfSectionIter {
         if self.remaining == 0 {
             None
         } else {
-            let section = unsafe {
-                self.current.read_unaligned()
-            };
+            let section = unsafe { self.current.read_unaligned() };
 
-            self.current = (self.current as *const _ as u64 + self.entry_size as u64)
-                as *const ElfSection;
+            self.current =
+                (self.current as *const _ as u64 + self.entry_size as u64) as *const ElfSection;
 
             self.remaining -= 1;
 

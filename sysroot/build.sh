@@ -11,6 +11,7 @@ MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
 NCURSES_SRC_DIR=$SRC_DIR/ncurses
 NANO_SRC_DIR=$SRC_DIR/nano
+BASH_SRC_DIR=$SRC_DIR/bash
 GMP_SRC_DIR=$SRC_DIR/gmp
 MPFR_SRC_DIR=$SRC_DIR/mpfr
 MPC_SRC_DIR=$SRC_DIR/mpc
@@ -22,12 +23,12 @@ BINUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-binutils-gdb
 GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
 NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
 NANO_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-nano
+BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
 MPFR_BUILD_DIR=$BUILD_DIR/mpfr
 MPC_BUILD_DIR=$BUILD_DIR/mpc
-
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
 CROSS=$CYKUSZ_DIR/sysroot/cross
@@ -37,17 +38,17 @@ TRIPLE=x86_64-cykusz
 export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:$PATH
 
 function _prepare_mlibc {
-	if [ ! -d $MLIBC_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/mlibc.git $MLIBC_SRC_DIR
-	fi
+    if [ ! -d $MLIBC_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/mlibc.git $MLIBC_SRC_DIR
+    fi
 }
 
 function _prepare_binutils {
-	if [ ! -d $BINUTILS_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/binutils-gdb.git $BINUTILS_SRC_DIR
-	fi
+    if [ ! -d $BINUTILS_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/binutils-gdb.git $BINUTILS_SRC_DIR
+    fi
 }
 
 function _prepare_gcc {
@@ -66,10 +67,10 @@ function _prepare_gcc {
 }
 
 function _prepare_nyancat {
-	if [ ! -d $NYANCAT_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/nyancat.git $NYANCAT_SRC_DIR
-	fi
+    if [ ! -d $NYANCAT_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/nyancat.git $NYANCAT_SRC_DIR
+    fi
 }
 
 function _prepare_doom {
@@ -80,16 +81,23 @@ function _prepare_doom {
 }
 
 function _prepare_ncurses {
-	if [ ! -d $NCURSES_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/ncurses.git $NCURSES_SRC_DIR
-	fi
+    if [ ! -d $NCURSES_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/ncurses.git $NCURSES_SRC_DIR
+    fi
+}
+
+function _prepare_bash {
+    if [ ! -d $BASH_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/bash.git $BASH_SRC_DIR
+    fi
 }
 
 function _prepare_nano {
-	if [ ! -d $NANO_SRC_DIR ]; then
-		mkdir -p $SRC_DIR
-		git clone --depth 1 -b cykusz https://github.com/rafalmiel/nano.git $NANO_SRC_DIR
+    if [ ! -d $NANO_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/nano.git $NANO_SRC_DIR
 
         pushd .
         cd $NANO_SRC_DIR
@@ -97,167 +105,169 @@ function _prepare_nano {
         rm config.sub
         mv config.sub.cykusz config.sub
         popd
-	fi
+    fi
 }
 
 function _prepare {
-	_prepare_mlibc
-	_prepare_binutils
-	_prepare_gcc
-	_prepare_nyancat
-	_prepare_ncurses
-	_prepare_nano
+    _prepare_mlibc
+    _prepare_binutils
+    _prepare_gcc
+    _prepare_nyancat
+    _prepare_ncurses
+    _prepare_bash
+    _prepare_nano
+    _prepare_doom
 }
 
 function _sysroot {
-	_prepare_mlibc
+    _prepare_mlibc
 
-	mkdir -p $BUILD_DIR
+    mkdir -p $BUILD_DIR
 
-	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true  $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
-	meson install -C $MLIBC_BUILD_DIR
+    rm -rf $MLIBC_BUILD_DIR
+    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    meson install -C $MLIBC_BUILD_DIR
 }
 
 function _binutils {
-	_prepare_binutils
+    _prepare_binutils
 
-	mkdir -p $BINUTILS_BUILD_DIR
+    mkdir -p $BINUTILS_BUILD_DIR
 
-	pushd .
+    pushd .
 
-	cd $BINUTILS_BUILD_DIR
-	$BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared
+    cd $BINUTILS_BUILD_DIR
+    $BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared
 
-	popd
+    popd
 
-	make -C $BINUTILS_BUILD_DIR -j4
-	make -C $BINUTILS_BUILD_DIR install
+    make -C $BINUTILS_BUILD_DIR -j4
+    make -C $BINUTILS_BUILD_DIR install
 
 }
 
 function _gcc {
-	_prepare_gcc
+    _prepare_gcc
 
-	mkdir -p $GCC_BUILD_DIR
+    mkdir -p $GCC_BUILD_DIR
 
-	pushd .
+    pushd .
 
-	cd $GCC_BUILD_DIR
-	$GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared
+    cd $GCC_BUILD_DIR
+    $GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared
 
-	popd
+    popd
 
-	make -C $GCC_BUILD_DIR -j4 all-gcc
-	make -C $GCC_BUILD_DIR install-gcc
+    make -C $GCC_BUILD_DIR -j4 all-gcc
+    make -C $GCC_BUILD_DIR install-gcc
 }
 
 function _mlibc {
-	_prepare_mlibc
+    _prepare_mlibc
 
-	mkdir -p $BUILD_DIR
+    mkdir -p $BUILD_DIR
 
-	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    rm -rf $MLIBC_BUILD_DIR
+    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
-	ninja -C $MLIBC_BUILD_DIR
-	meson install -C $MLIBC_BUILD_DIR
+    ninja -C $MLIBC_BUILD_DIR
+    meson install -C $MLIBC_BUILD_DIR
 }
 
 function _mlibc_static {
-	_prepare_mlibc
+    _prepare_mlibc
 
-	mkdir -p $BUILD_DIR
+    mkdir -p $BUILD_DIR
 
-	rm -rf $MLIBC_BUILD_DIR
-	meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    rm -rf $MLIBC_BUILD_DIR
+    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
-	ninja -C $MLIBC_BUILD_DIR
-	meson install -C $MLIBC_BUILD_DIR
+    ninja -C $MLIBC_BUILD_DIR
+    meson install -C $MLIBC_BUILD_DIR
 }
 
 function _libgcc {
-	make -C $GCC_BUILD_DIR -j4 all-target-libgcc
-	make -C $GCC_BUILD_DIR install-target-libgcc
+    make -C $GCC_BUILD_DIR -j4 all-target-libgcc
+    make -C $GCC_BUILD_DIR install-target-libgcc
 }
 
 function _libstd {
-	make -C $GCC_BUILD_DIR -j4 all-target-libstdc++-v3
-	make -C $GCC_BUILD_DIR install-target-libstdc++-v3
+    make -C $GCC_BUILD_DIR -j4 all-target-libstdc++-v3
+    make -C $GCC_BUILD_DIR install-target-libstdc++-v3
 }
 
 function _cykusz_binutils {
-	_prepare_binutils
+    _prepare_binutils
 
-	mkdir -p $BINUTILS_CYKUSZ_BUILD_DIR
+    mkdir -p $BINUTILS_CYKUSZ_BUILD_DIR
 
-	pushd .
+    pushd .
 
-	cd $BINUTILS_CYKUSZ_BUILD_DIR
+    cd $BINUTILS_CYKUSZ_BUILD_DIR
 
-	$BINUTILS_SRC_DIR/configure --disable-gdb --disable-gdbserver --host=$TRIPLE --with-build-sysroot=$SYSROOT --disable-werror --enable-shared --prefix=/usr
+    $BINUTILS_SRC_DIR/configure --disable-gdb --disable-gdbserver --host=$TRIPLE --with-build-sysroot=$SYSROOT --disable-werror --enable-shared --prefix=/usr
 
-	popd
+    popd
 
-	make -C $BINUTILS_CYKUSZ_BUILD_DIR -j4
-	make -C $BINUTILS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+    make -C $BINUTILS_CYKUSZ_BUILD_DIR -j4
+    make -C $BINUTILS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
 function _cykusz_gcc {
-	_prepare_gcc
+    _prepare_gcc
 
-	mkdir -p $GCC_CYKUSZ_BUILD_DIR
+    mkdir -p $GCC_CYKUSZ_BUILD_DIR
 
-	pushd .
+    pushd .
 
-	cd $GCC_CYKUSZ_BUILD_DIR
-	$GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
+    cd $GCC_CYKUSZ_BUILD_DIR
+    $GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
 
-	popd
+    popd
 
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
+    make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
+    make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
 }
 
 function _cykusz_gcc_debug {
-	_prepare_gcc
+    _prepare_gcc
 
-	mkdir -p $GCC_CYKUSZ_BUILD_DIR
+    mkdir -p $GCC_CYKUSZ_BUILD_DIR
 
-	pushd .
+    pushd .
 
-	cd $GCC_CYKUSZ_BUILD_DIR
-	$GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
-	CXXFLAGS="-O0" CFLAGS="-O0" $GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
+    cd $GCC_CYKUSZ_BUILD_DIR
+    $GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
+    CXXFLAGS="-O0" CFLAGS="-O0" $GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
 
-	popd
+    popd
 
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
+    make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-gcc
+    make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-gcc
 }
 
 function _cykusz_libgcc {
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libgcc
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libgcc
+    make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libgcc
+    make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libgcc
 }
 
 function _cykusz_libstd {
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libstdc++-v3
-	make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libstdc++-v3
+    make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4 all-target-libstdc++-v3
+    make -C $GCC_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install-target-libstdc++-v3
 }
 
 function _cykusz_nyancat {
-	_prepare_nyancat
+    _prepare_nyancat
 
-	pushd .
+    pushd .
 
-	cd $NYANCAT_SRC_DIR/src
-	make clean
-	CC=$TRIPLE-gcc make
-	cp nyancat $BUILD_DIR
-	make clean
+    cd $NYANCAT_SRC_DIR/src
+    make clean
+    CC=$TRIPLE-gcc make
+    cp nyancat $BUILD_DIR
+    make clean
 
-	popd
+    popd
 }
 
 function _cykusz_doom {
@@ -277,79 +287,97 @@ function _cykusz_doom {
 function _cykusz_ncurses {
     _prepare_ncurses
 
-	mkdir -p $NCURSES_CYKUSZ_BUILD_DIR
+    mkdir -p $NCURSES_CYKUSZ_BUILD_DIR
 
-	pushd .
+    pushd .
 
-	cd $NCURSES_CYKUSZ_BUILD_DIR
-	$NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --disable-stripping --with-debug --enable-widec
+    cd $NCURSES_CYKUSZ_BUILD_DIR
+    $NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --disable-stripping --with-debug --enable-widec
 
-	popd
+    popd
 
-	make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
-	make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+    make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+    make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
 function _cykusz_nano {
     _prepare_nano
 
-	mkdir -p $NANO_CYKUSZ_BUILD_DIR
+    mkdir -p $NANO_CYKUSZ_BUILD_DIR
 
-	pushd .
+    pushd .
 
-	cd $NANO_CYKUSZ_BUILD_DIR
-	$NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
+    cd $NANO_CYKUSZ_BUILD_DIR
+    CFLAGS="-O0 -g" $NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
 
-	popd
+    popd
 
-	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT LIBS="-lncursesw" -j4
-	make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+    make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT LIBS="-lncursesw" -j4
+    make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+}
+
+function _cykusz_bash {
+    _prepare_bash
+
+    mkdir -p $BASH_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $BASH_CYKUSZ_BUILD_DIR
+    CFLAGS="-O0 -g" $BASH_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --without-bash-malloc
+
+    popd
+
+    make -C $BASH_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT
+    make -C $BASH_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
 function _cross {
-	_sysroot
-	_binutils
-	_gcc
-	_mlibc
-	_libgcc
-	_libstd
+    _sysroot
+    _binutils
+    _gcc
+    _mlibc
+    _libgcc
+    _libstd
 }
 
 function _cykusz {
-	_cykusz_binutils
-	_cykusz_gcc
-	_cykusz_libgcc
-	_cykusz_libstd
-	_cykusz_nyancat
-	_cykusz_ncurses
-	_cykusz_nano
+    _cykusz_binutils
+    _cykusz_gcc
+    _cykusz_libgcc
+    _cykusz_libstd
+    _cykusz_nyancat
+    _cykusz_ncurses
+    _cykusz_bash
+    _cykusz_nano
+    _cykusz_doom
 }
 
 function _build {
-	_cross
-	_cykusz
+    _cross
+    _cykusz
 }
 
 function _all {
-	_prepare	
-	_build
+    _prepare
+    _build
 }
 
 function _clean {
-	rm -rf $BUILD_DIR
-	rm -rf $CROSS
-	rm -rf $SYSROOT	
+    rm -rf $BUILD_DIR
+    rm -rf $CROSS
+    rm -rf $SYSROOT
 }
 
 function _check_build {
-	if [ ! -f $CROSS/bin/$TRIPLE-gcc ]; then
-		_all
-	fi
+    if [ ! -f $CROSS/bin/$TRIPLE-gcc ]; then
+        _all
+    fi
 }
 
 if [ -z "$1" ]; then
-	echo "Usage: $0 (clean/prepare/binutils/gcc/mlibc/cykusz_nyancat/cykusz_ncurses/cykusz_nano/check_build/build/all)"
+    echo "Usage: $0 (clean/prepare/binutils/gcc/mlibc/cykusz_nyancat/cykusz_ncurses/cykusz_bash/cykusz_nano/check_build/build/all)"
 else
-	cd $SPATH
-	_$1
+    cd $SPATH
+    _$1
 fi

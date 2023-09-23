@@ -12,7 +12,7 @@ use crate::drivers::block::ide::ata_handler;
 use crate::kernel::mm::{allocate_order, PhysAddr};
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::busy_sleep;
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 mod regs;
 
@@ -303,24 +303,26 @@ impl IdeChannel {
         let mut offset = 0;
 
         while offset < request.count() {
-            let data = self
+            let mut data = self
                 .cmd_wq
-                .wait_lock_irq_for(&self.data, |l| l.active_cmd.is_none());
+                .wait_lock_for(
+                    WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::NON_INTERRUPTIBLE,
+                    &self.data,
+                    |l| l.active_cmd.is_none(),
+                )
+                .unwrap()
+                .unwrap();
 
-            match data {
-                Ok(mut l) => {
-                    offset = l.run_request(request.clone(), offset, slave);
-                }
-                Err(_e) => {
-                    return Some(offset * 512);
-                }
-            }
+            offset = data.run_request(request.clone(), offset, slave);
         }
 
-        while let Err(_e) = request.wait_queue().wait_for(|| request.is_complete()) {
-            // TODO: Make some waits uninterruptible
-            //println!("[ IDE ] IO interrupted, retrying");
-        }
+        request
+            .wait_queue()
+            .wait_for(
+                WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::NON_INTERRUPTIBLE,
+                || request.is_complete(),
+            )
+            .unwrap();
 
         Some(request.count() * 512)
     }

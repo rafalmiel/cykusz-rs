@@ -6,7 +6,7 @@ use intrusive_collections::{LinkedList, LinkedListLink};
 
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::{Spin, SpinGuard};
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 pub trait TimerObject: Send + Sync {
     fn call(&self);
@@ -113,8 +113,11 @@ fn check_timers() {
     let time = current_ns();
 
     let mut timers = TIMERS_WQ
-        .wait_lock_for(&TIMERS, |lck| !lck.is_empty())
-        .expect("Timers thread should not be signalled");
+        .wait_lock_for(WaitQueueFlags::NON_INTERRUPTIBLE, &TIMERS, |lck| {
+            !lck.is_empty()
+        })
+        .expect("Timers thread should not be signalled")
+        .unwrap();
 
     let mut tmp_list = LinkedList::<TimerAdapter>::new(TimerAdapter::new());
 

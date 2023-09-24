@@ -68,7 +68,6 @@ git submodule update --init --recursive
 
 rustup override set nightly
 rustup component add rust-src
-cargo install xargo
 make
 
 ./create_disk.sh

@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(internal_features)]
 #![feature(alloc_error_handler)]
 #![feature(lang_items)]
 #![feature(linkage)]

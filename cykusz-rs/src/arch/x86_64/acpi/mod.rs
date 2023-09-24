@@ -63,26 +63,6 @@ impl Acpi {
         }
     }
 
-    pub fn get_ecdt_entry(&self) -> Option<&'static acpica::acpi_table_ecdt> {
-        match self.hdr {
-            Header::RSDT(ref r) => r.unwrap().find_ecdt_entry(),
-            Header::XSDT(ref r) => r.unwrap().find_ecdt_entry(),
-            _ => {
-                panic!("ACPI Not Initialised");
-            }
-        }
-    }
-
-    pub fn get_fadt_entry(&self) -> Option<&'static acpica::acpi_table_fadt> {
-        match self.hdr {
-            Header::RSDT(ref r) => r.unwrap().find_fadt_entry(),
-            Header::XSDT(ref r) => r.unwrap().find_fadt_entry(),
-            _ => {
-                panic!("ACPI Not Initialised");
-            }
-        }
-    }
-
     pub fn get_mcfg_entry(&self) -> Option<&'static acpica::acpi_table_mcfg> {
         match self.hdr {
             Header::RSDT(ref r) => r.unwrap().find_mcfg_entry(),

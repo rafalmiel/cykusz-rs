@@ -82,11 +82,11 @@ impl Partition<'_> {
     }
 
     pub fn relative_sector(&self) -> usize {
-        unsafe { *(self.data.as_ptr().offset(8) as *const u32) as usize }
+        unsafe { (self.data.as_ptr().offset(8) as *const u32).read_unaligned() as usize }
     }
 
     pub fn total_sectors(&self) -> usize {
-        unsafe { *(self.data.as_ptr().offset(12) as *const u32) as usize }
+        unsafe { (self.data.as_ptr().offset(12) as *const u32).read_unaligned() as usize }
     }
 }
 

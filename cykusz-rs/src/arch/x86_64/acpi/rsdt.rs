@@ -55,7 +55,7 @@ impl AcpiStdHeader {
 
 impl<T: RsdtPtrType> Rsdt<T> {
     pub fn entries_count(&'static self) -> usize {
-        (self.hdr.length as usize - size_of::<Self>()) / 4
+        (self.hdr.length as usize - size_of::<Self>()) / core::mem::size_of::<T>()
     }
 
     fn raw_entries(&'static self) -> *const T {
@@ -66,7 +66,7 @@ impl<T: RsdtPtrType> Rsdt<T> {
         assert!(i < self.entries_count());
 
         unsafe {
-            PhysAddr((self.raw_entries().offset(i as isize)).read().as_usize())
+            PhysAddr((self.raw_entries().offset(i as isize)).read_unaligned().as_usize())
                 .to_mapped()
                 .read_ref::<AcpiStdHeader>()
         }

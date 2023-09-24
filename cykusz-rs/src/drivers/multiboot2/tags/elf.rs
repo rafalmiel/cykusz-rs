@@ -25,7 +25,7 @@ pub struct ElfSection {
 }
 
 pub struct ElfSectionIter {
-    current: &'static ElfSection,
+    current: *const ElfSection,
     remaining: u32,
     entry_size: u32,
 }
@@ -56,12 +56,10 @@ bitflags!(
 
 impl Elf {
     pub fn sections(&'static self) -> ElfSectionIter {
-        unsafe {
-            ElfSectionIter {
-                current: &*(self.first_entry.as_ptr() as *const ElfSection),
-                remaining: self.num - 1,
-                entry_size: self.entsize,
-            }
+        ElfSectionIter {
+            current: self.first_entry.as_ptr() as *const ElfSection,
+            remaining: self.num - 1,
+            entry_size: self.entsize,
         }
     }
 }
@@ -77,17 +75,18 @@ impl ElfSection {
 }
 
 impl Iterator for ElfSectionIter {
-    type Item = &'static ElfSection;
+    type Item = ElfSection;
 
-    fn next(&mut self) -> Option<&'static ElfSection> {
+    fn next(&mut self) -> Option<ElfSection> {
         if self.remaining == 0 {
             None
         } else {
-            let section = self.current;
-
-            self.current = unsafe {
-                &*((self.current as *const _ as u64 + self.entry_size as u64) as *const ElfSection)
+            let section = unsafe {
+                self.current.read_unaligned()
             };
+
+            self.current = (self.current as *const _ as u64 + self.entry_size as u64)
+                as *const ElfSection;
 
             self.remaining -= 1;
 

@@ -195,7 +195,7 @@ impl OptionsBuilder {
 
     fn set_magic_cookie(self) -> OptionsBuilder {
         unsafe {
-            (self.ptr as *mut u32).write(NetU32::new(0x63825363).net_value());
+            (self.ptr as *mut u32).write_unaligned(NetU32::new(0x63825363).net_value());
         }
 
         self.shift(4)

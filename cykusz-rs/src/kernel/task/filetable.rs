@@ -205,10 +205,9 @@ impl FileHandle {
                     buf.as_mut_ptr()
                         .copy_from(&sysd as *const _ as *const u8, struct_len);
 
-                    let sysd_ref = &mut *(buf.as_mut_ptr() as *mut SysDirEntry);
-                    sysd_ref
-                        .name
-                        .as_mut_ptr()
+                    let sysd_ref = buf.as_mut_ptr() as *mut SysDirEntry;
+                    let name = core::ptr::addr_of_mut!((*sysd_ref).name);
+                    name.as_mut().unwrap().as_mut_ptr()
                         .copy_from(d.name().as_ptr(), d.name().len());
                 }
 

@@ -477,6 +477,25 @@ impl INode for Tty {
                     Err(FsError::EntryNotFound)
                 }
             }
+            tty::TIOCGPGRP => {
+                let task = current_task_ref();
+
+                if !task.terminal().is_connected(tty().clone()) {
+                    logln!("is not connected");
+                    return Err(FsError::NoTty);
+                }
+
+                let gid = unsafe {
+                    VirtAddr(arg).read_mut::<u32>()
+                };
+
+                if let Some(fg) = &*tty().fg_group.lock() {
+                    *gid = fg.id() as u32;
+                }
+
+                return Ok(0);
+
+            }
             tty::TIOCSPGRP => {
                 let gid = arg;
 

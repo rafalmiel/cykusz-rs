@@ -48,7 +48,7 @@ fn ls(path: &str) {
                     let namebytes = unsafe {
                         core::slice::from_raw_parts(
                             dentry.name.as_ptr(),
-                            dentry.reclen - struct_len,
+                            dentry.reclen as usize - struct_len,
                         )
                     };
                     if let Ok(name) = core::str::from_utf8(namebytes) {

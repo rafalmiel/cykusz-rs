@@ -196,10 +196,10 @@ impl FileHandle {
                     name: [],
                 };
 
-                sysd.reclen = struct_len + d.name().len();
-                sysd.off = offset + sysd.reclen;
+                sysd.reclen = (struct_len + d.name().len()) as u16;
+                sysd.off = offset + sysd.reclen as usize;
 
-                if buf.len() < sysd.reclen {
+                if buf.len() < sysd.reclen as usize {
                     self.dir_iter.lock().1 = Some(d.clone());
 
                     break offset;
@@ -213,11 +213,12 @@ impl FileHandle {
                     let name = core::ptr::addr_of_mut!((*sysd_ref).name);
                     name.as_mut().unwrap().as_mut_ptr()
                         .copy_from(d.name().as_ptr(), d.name().len());
+                    name.as_mut().unwrap().as_mut_ptr().offset(d.name().len() as isize).write(0);
                 }
 
-                offset += sysd.reclen;
+                offset += sysd.reclen as usize;
                 self.offset.fetch_add(1, Ordering::SeqCst);
-                buf = &mut buf[sysd.reclen..];
+                buf = &mut buf[sysd.reclen.into()..];
             } else {
                 break offset;
             }

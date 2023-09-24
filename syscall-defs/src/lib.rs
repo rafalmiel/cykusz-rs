@@ -315,7 +315,7 @@ impl Default for FileType {
 pub struct SysDirEntry {
     pub ino: usize,
     pub off: usize,
-    pub reclen: usize,
+    pub reclen: u16,
     pub typ: FileType,
     pub name: [u8; 0],
 }

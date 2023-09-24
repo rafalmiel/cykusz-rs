@@ -326,7 +326,8 @@ pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
 }
 
 pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
-    let buf = make_buf_mut(buf, len);
+    logln!("getcwd len: {}", len);
+    let buf = make_buf_mut(buf, if len > 0 { len } else { 255 });
 
     if let Some(pwd) = current_task_ref().get_pwd() {
         if pwd.len() > len as usize {
@@ -1051,7 +1052,7 @@ pub fn sys_stat(path: u64, path_len: u64, stat: u64) -> SyscallResult {
 
     *stat = inode.inode().stat()?;
 
-    //logln!("stat {}, {:?}", str, stat);
+    logln!("stat {}, {:?}", _str, stat);
 
     Ok(0)
 }
@@ -1066,7 +1067,7 @@ pub fn sys_fstat(fd: u64, stat: u64) -> SyscallResult {
 
     *stat = file.inode.inode().stat()?;
 
-    //logln!("fstat {}, {:?}", fd, stat);
+    logln!("fstat {}, {:?}", fd, stat);
 
     Ok(0)
 }

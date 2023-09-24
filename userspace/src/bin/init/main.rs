@@ -12,7 +12,7 @@ fn spawn_shell() {
             if let Err(e) = syscall::setsid() {
                 println!("[ init ] setsid failed {:?}", e);
             }
-            if let Err(e) = syscall::exec("/bin/shell", None, None) {
+            if let Err(e) = syscall::exec("/usr/bin/bash", None, None) {
                 panic!("Failed to spawn shell {:?}", e);
             }
 

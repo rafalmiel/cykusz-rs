@@ -218,7 +218,7 @@ impl Scheduler {
     pub fn exit(&self, status: isize) -> ! {
         let current = current_task_ref();
 
-        logln_disabled!(
+        logln2!(
             "exit tid {} is pl: {}, sc: {}, wc: {}",
             current.tid(),
             current.is_process_leader(),

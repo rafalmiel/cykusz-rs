@@ -205,21 +205,6 @@ impl Tty {
                     self.output.lock_irq().remove_last_n(n);
                 }
             }
-            KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.fg_group.lock_irq().as_ref() {
-                    t.signal(SIGINT);
-                }
-            }
-            KeyCode::KEY_D if (state.lctrl || state.rctrl) && !released => {
-                self.buffer.lock_irq().trigger_eof();
-
-                self.wait_queue.notify_one();
-            }
-            KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
-                if let Some(t) = self.fg_group.lock_irq().as_ref() {
-                    t.signal(SIGQUIT);
-                }
-            }
             KeyCode::KEY_PAGEDOWN if !released => {
                 self.output.lock_irq().scroll_down(20);
             }
@@ -237,6 +222,30 @@ impl Tty {
             }
             KeyCode::KEY_DOWN if !released => {
                 self.output.lock_irq().scroll_down(1);
+            }
+            _ => {
+                return false;
+            }
+        };
+
+        return true;
+    }
+    fn handle_sig(&self, key: KeyCode, released: bool, state: &mut SpinGuard<State>) -> bool {
+        match key {
+            KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
+                if let Some(t) = self.fg_group.lock_irq().as_ref() {
+                    t.signal(SIGINT);
+                }
+            }
+            KeyCode::KEY_D if (state.lctrl || state.rctrl) && !released => {
+                self.buffer.lock_irq().trigger_eof();
+
+                self.wait_queue.notify_one();
+            }
+            KeyCode::KEY_BACKSLASH if (state.lctrl || state.rctrl) && !released => {
+                if let Some(t) = self.fg_group.lock_irq().as_ref() {
+                    t.signal(SIGQUIT);
+                }
             }
             _ => {
                 return false;
@@ -286,6 +295,7 @@ impl Tty {
 impl KeyListener for Tty {
     fn on_new_key(&self, key: KeyCode, released: bool) {
         let canon = self.termios.lock_irq().has_lflag(tty::ICANON);
+        let sig = self.termios.lock_irq().has_lflag(tty::ISIG);
         let mut state = self.state.lock();
 
         if Self::handle_key_state(key, released, &mut state) {
@@ -293,6 +303,10 @@ impl KeyListener for Tty {
         }
 
         if canon && self.handle_canonical(key, released, &mut state) {
+            return;
+        }
+
+        if sig && self.handle_sig(key, released, &mut state) {
             return;
         }
 
@@ -391,9 +405,17 @@ impl TerminalDevice for Tty {
 
 impl INode for Tty {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
-        let r = self.read(buf.as_mut_ptr(), buf.len())?;
-        logln!("tty read {} {:?}", r, buf);
-        Ok(r)
+        let r = self.read(buf.as_mut_ptr(), buf.len());
+        logln2!("tty read {:?} {:?}", r, buf);
+
+        match r {
+            Ok(s) => {
+                Ok(s)
+            },
+            Err(e) => {
+                Err(e.into())
+            }
+        }
     }
 
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, FsError> {
@@ -452,7 +474,7 @@ impl INode for Tty {
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize, FsError> {
-        logln!("TTY ioctl 0x{:x}", cmd);
+        logln2!("TTY ioctl 0x{:x}", cmd);
         match cmd {
             tty::TIOCSCTTY => {
                 let current = current_task_ref();
@@ -462,6 +484,7 @@ impl INode for Tty {
                 }
 
                 if current_task_ref().terminal().connect(tty().clone()) {
+                    println!("TERMINAL ATTACHED TO TASK {}", current.tid());
                     Ok(0)
                 } else {
                     Err(FsError::EntryExists)
@@ -481,8 +504,8 @@ impl INode for Tty {
                 let task = current_task_ref();
 
                 if !task.terminal().is_connected(tty().clone()) {
-                    logln!("is not connected");
-                    return Err(FsError::NoTty);
+                    logln2!("get is not connected");
+                    return Err(FsError::NoPermission);
                 }
 
                 let gid = unsafe {
@@ -497,29 +520,35 @@ impl INode for Tty {
 
             }
             tty::TIOCSPGRP => {
-                let gid = arg;
+                let gid = unsafe {
+                    VirtAddr(arg).read::<u32>()
+                };
 
                 let task = current_task_ref();
 
                 if !task.terminal().is_connected(tty().clone()) {
-                    logln!("is not connected");
-                    return Err(FsError::NoTty);
+                    logln2!("set is not connected");
+                    return Err(FsError::NoPermission);
                 }
 
                 if let Some(ctrl) = self.ctrl_task.lock_irq().as_ref() {
                     if ctrl.sid() == task.sid() {
-                        if let Some(group) = sessions().get_group(task.sid(), gid) {
+                        if let Some(group) = sessions().get_group(task.sid(), gid as usize) {
                             self.set_fg_group(group);
 
                             return Ok(0);
+                        } else {
+                            logln2!("group {} not found", gid);
                         }
+                    } else {
+                        logln2!("diff sid {} {}", ctrl.sid(), task.sid());
                     }
                 }
 
-                logln!("is not auth");
-                Err(FsError::NoTty)
+                logln2!("set is not auth");
+                Err(FsError::NoPermission)
             }
-            tty::TIOCSWINSZ => Err(FsError::NotSupported),
+            tty::TIOCSWINSZ => Err(FsError::NoTty),
             tty::TIOCGWINSZ => {
                 let winsize =
                     unsafe { VirtAddr(arg).read_mut::<syscall_defs::ioctl::tty::WinSize>() };
@@ -553,7 +582,7 @@ impl INode for Tty {
 
                 Ok(0)
             }
-            _ => Err(FsError::NotSupported),
+            _ => Err(FsError::NoTty),
         }
     }
 }

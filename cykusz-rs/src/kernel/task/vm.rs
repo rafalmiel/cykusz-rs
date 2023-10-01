@@ -813,7 +813,7 @@ impl VMData {
     fn log_vm(&self) {
         for e in self.maps.iter() {
             if let Some(f) = &e.mmaped_file {
-                logln!(
+                logln2!(
                     "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
                     e.start,
                     e.end,
@@ -824,7 +824,7 @@ impl VMData {
                     f.len,
                 );
             } else {
-                logln!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
+                logln2!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
             }
         }
     }

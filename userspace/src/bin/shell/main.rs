@@ -93,7 +93,7 @@ fn base_10_bytes(mut n: u64, buf: &mut [u8]) -> &[u8] {
 }
 
 fn get_tty_fd() -> usize {
-    syscall::open("/dev/tty", OpenFlags::RDWR).expect("Failed to get tty fd")
+    syscall::open("/dev/tty", OpenFlags::RDWR | OpenFlags::NOCTTY).expect("Failed to get tty fd")
 }
 
 struct Tty {
@@ -120,7 +120,7 @@ impl Tty {
     }
 
     fn set_fg(&self, gid: usize) {
-        syscall::ioctl(self.fd, syscall_defs::ioctl::tty::TIOCSPGRP, gid)
+        syscall::ioctl(self.fd, syscall_defs::ioctl::tty::TIOCSPGRP, core::ptr::addr_of!(gid) as usize)
             .expect("Failed to set fg terminal group");
     }
 }

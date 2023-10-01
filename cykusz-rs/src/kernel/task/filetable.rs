@@ -51,6 +51,8 @@ impl FileHandle {
 
         let read = self.read_at(buf, offset)?;
 
+        logln2!("read into buf {:?}", buf);
+
         self.offset.fetch_add(read, Ordering::SeqCst);
 
         Ok(read)

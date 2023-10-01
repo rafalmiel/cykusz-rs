@@ -48,6 +48,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
     }
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
+        logln3!("sys_open: {} {:?}", path, flags);
         let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
 
         let task = current_task_ref();
@@ -64,7 +65,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
 
         let res = Ok(task.open_file(inode, flags)?);
 
-        logln!("sys_open: {} flags: {:?} = {}", path, flags, res.unwrap());
+        logln2!("sys_open: {} flags: {:?} = {}", path, flags, res.unwrap());
 
         //logln!("opened fd: {}", res.unwrap());
 
@@ -106,17 +107,17 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    logln!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
+    logln2!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
 
     return if let Some(f) = task.get_handle(fd) {
         if f.flags().intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
             Ok(f.read(make_buf_mut(buf, len))?)
         } else {
-            logln!("eaccess");
+            logln2!("eaccess");
             Err(SyscallError::EACCES)
         }
     } else {
-        logln!("ebadfd");
+        logln2!("ebadfd");
         Err(SyscallError::EBADFD)
     };
 }
@@ -592,7 +593,7 @@ pub fn sys_select(
     nfds: u64,
     readfds: u64,
     writefds: u64,
-    _exceptfds: u64,
+    exceptfds: u64,
     timeout: u64,
     _sigmask: u64,
 ) -> SyscallResult {
@@ -602,7 +603,9 @@ pub fn sys_select(
         unsafe { Some(VirtAddr(timeout as usize).read_ref::<Timespec>()) }
     };
 
-    let mut input: [Option<(&mut FdSet, PollEventFlags)>; 3] = [None, None, None];
+    logln2!("sys_select nfds: {}", nfds);
+
+    let mut input: [Option<(FdSet, PollEventFlags)>; 3] = [None, None, None];
 
     let mut initfds = |idx: usize, addr: usize, flags: PollEventFlags| {
         if addr == 0 {
@@ -611,13 +614,23 @@ pub fn sys_select(
 
         let fdset = unsafe { VirtAddr(addr as usize).read_mut::<FdSet>() };
 
-        logln_disabled!("select fdset {} {:?}", idx, fdset.fds);
+        logln2!("select fdset {} {} {:?}", addr, idx, fdset.fds);
 
-        input[idx] = Some((fdset, flags));
+        input[idx] = Some((*fdset, flags));
+    };
+
+    let outputfds = |inp: &mut Option<(FdSet, PollEventFlags)>, addr: usize| {
+        if addr == 0 || inp.is_none() {
+            return;
+        }
+
+        let fdset = unsafe { VirtAddr(addr as usize).read_mut::<FdSet>() };
+        *fdset = inp.unwrap().0;
     };
 
     initfds(0, readfds as usize, PollEventFlags::READ);
     initfds(1, writefds as usize, PollEventFlags::WRITE);
+    initfds(2, exceptfds as usize, PollEventFlags::empty());
 
     let mut to_poll = Vec::<(usize, PollEventFlags)>::new();
 
@@ -645,6 +658,9 @@ pub fn sys_select(
     if let Some(fd) = &mut input[1] {
         fd.0.zero()
     }
+    if let Some(fd) = &mut input[2] {
+        fd.0.zero()
+    }
 
     let task = current_task_ref();
     let mut first = true;
@@ -655,7 +671,7 @@ pub fn sys_select(
 
     'search: loop {
         for (fd, flags) in &to_poll {
-            logln_disabled!("select: checking fd {}", fd);
+            logln2!("select: checking fd {}", fd);
             if let Some(handle) = task.get_handle(*fd) {
                 if let Ok(f) = handle
                     .inode
@@ -682,15 +698,15 @@ pub fn sys_select(
             }
         }
 
-        logln_disabled!(
+        logln2!(
             "select await io timeout: {:?}",
             timeout.and_then(|t| Some(t.to_nanoseconds()))
         );
         if found == 0 && !timed_out {
             task.await_io_timeout(timeout.and_then(|t| Some(t.to_nanoseconds())))?;
 
-            timed_out = task.sleep_until() == 0;
-            logln_disabled!("timedout: {}", timed_out);
+            timed_out = task.sleep_until() == 0 && timeout.is_some();
+            logln2!("timedout: {}", timed_out);
         } else {
             break 'search;
         }
@@ -698,7 +714,11 @@ pub fn sys_select(
         first = false;
     }
 
-    logln_disabled!("select found {}", found);
+    outputfds(&mut input[0], readfds as usize);
+    outputfds(&mut input[1], writefds as usize);
+    outputfds(&mut input[2], exceptfds as usize);
+
+    logln2!("select found {}", found);
 
     return Ok(found);
 }
@@ -819,12 +839,14 @@ pub fn sys_spawn_thread(entry: u64, stack: u64) -> SyscallResult {
     Ok(thread.tid())
 }
 
-pub fn sys_waitpid(pid: u64, status: u64, _flags: u64) -> SyscallResult {
+pub fn sys_waitpid(pid: u64, status: u64, flags: u64) -> SyscallResult {
     let current = current_task_ref();
 
     let status = unsafe { VirtAddr(status as usize).read_mut::<u32>() };
 
-    Ok(current.wait_pid(pid as usize, status)?)
+    logln2!("SYS WAITPID {} {:x}", pid, flags);
+
+    current.wait_pid(pid as isize, status, flags)?
 }
 
 pub fn sys_getpid() -> SyscallResult {

@@ -90,6 +90,8 @@ impl Terminal {
     pub fn connect(&self, terminal: Arc<dyn TerminalDevice>) -> bool {
         let task = self.task().expect("terminal: Task not set");
 
+        logln3!("tty connect: pid: {}", task.tid());
+
         let mut term = self.ctrl_term.lock();
 
         if let Some(our) = term.as_ref() {

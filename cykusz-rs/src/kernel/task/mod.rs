@@ -7,7 +7,7 @@ use intrusive_collections::{LinkedList, LinkedListLink};
 
 use syscall_defs::exec::ExeArgs;
 use syscall_defs::signal::SIGCHLD;
-use syscall_defs::{OpenFlags, SyscallError};
+use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
 
 use crate::arch::mm::VirtAddr;
 use crate::arch::task::Task as ArchTask;
@@ -179,6 +179,8 @@ impl Task {
             task.terminal().connect(term);
         }
 
+        logln2!("new fork task {}", task.pid());
+
         task
     }
 
@@ -188,6 +190,7 @@ impl Task {
         args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> Result<!, SyscallError> {
+        logln2!("exec task {}", self.pid());
         let vm = self.vm();
         vm.clear();
 
@@ -635,11 +638,12 @@ impl Task {
         }
     }
 
-    pub fn wait_pid(&self, pid: usize, status: &mut u32) -> SignalResult<usize> {
-        self.zombies.wait_pid(pid, status)
+    pub fn wait_pid(&self, pid: isize, status: &mut u32, flags: u64) -> SignalResult<SyscallResult> {
+        self.zombies.wait_pid(pid, status, flags)
     }
 
     pub fn wait_thread(&self, tid: usize) -> SignalResult<usize> {
+        logln2!("wait thread {}", tid);
         let res = self.zombies.wait_thread(self.pid(), tid);
         res
     }

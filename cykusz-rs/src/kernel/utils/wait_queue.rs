@@ -133,6 +133,34 @@ impl WaitQueue {
 
         Ok(lock)
     }
+    pub fn wait_lock_for_no_hang<'a, T, F: FnMut(&mut SpinGuard<T>) -> bool>(
+        &self,
+        nohang: bool,
+        mtx: &'a Spin<T>,
+        mut cond: F,
+    ) -> SignalResult<Option<SpinGuard<'a, T>>> {
+        let mut lock = mtx.lock();
+
+        if cond(&mut lock) {
+            return Ok(Some(lock));
+        } else if nohang {
+            return Ok(None);
+        }
+
+        let task = current_task();
+
+        let _guard = WaitQueueGuard::new(self, &task);
+
+        while !cond(&mut lock) {
+            core::mem::drop(lock);
+
+            task.await_io()?;
+
+            lock = mtx.lock();
+        }
+
+        Ok(Some(lock))
+    }
 
     pub fn wait_for_irq<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
         let _irq = IrqGuard::new();

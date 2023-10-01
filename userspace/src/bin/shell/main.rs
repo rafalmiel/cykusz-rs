@@ -162,7 +162,7 @@ fn start_process(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) {
             while let Err(SyscallError::EINTR) = syscall::waitpid(id, &mut status) {}
 
             if status != 0x200 {
-                println!("shell: process exit with status: {:#x}", status);
+                println!("shell: process exit with status: {:?}", syscall_defs::waitpid::Status::from(status));
             }
 
             tty.set_fg(syscall::getpid().expect("Failed to get pid"));
@@ -745,7 +745,7 @@ fn sigchld_handler(_sig: usize) {
     let pid = syscall::waitpid(0, &mut status);
 
     if let Ok(pid) = pid {
-        println!("child died: {}, status: {:#x}", pid, status);
+        println!("child died: {}, status: {:?}", pid, syscall_defs::waitpid::Status::from(status));
     }
 }
 

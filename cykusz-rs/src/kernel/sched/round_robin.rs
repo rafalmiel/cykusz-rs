@@ -266,7 +266,7 @@ impl Queues {
         }
     }
 
-    fn exit(&mut self, status: isize, lock: SpinGuard<()>) -> ! {
+    fn exit(&mut self, status: syscall_defs::waitpid::Status, lock: SpinGuard<()>) -> ! {
         let current = get_current();
 
         logln_disabled!(
@@ -463,7 +463,7 @@ impl SchedulerInterface for RRScheduler {
         queue.stop(lock);
     }
 
-    fn exit(&self, status: isize) -> ! {
+    fn exit(&self, status: syscall_defs::waitpid::Status) -> ! {
         let (lock, queue) = self.queues.this_cpu_mut();
 
         let lock = lock.lock_irq();

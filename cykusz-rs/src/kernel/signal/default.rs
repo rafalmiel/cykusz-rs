@@ -5,8 +5,8 @@ use crate::kernel::task::Task;
 #[derive(Copy, Clone, PartialEq)]
 pub enum Action {
     Ignore,
-    Handle(fn()),
-    Exec(fn(Arc<Task>)),
+    Handle(fn(usize)),
+    Exec(fn(usize, Arc<Task>)),
 }
 
 static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
@@ -45,19 +45,19 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
     Action::Handle(terminate_thread), // UNUSED
 ];
 
-fn terminate() {
-    crate::kernel::sched::exit(1);
+fn terminate(sig: usize) {
+    crate::kernel::sched::exit(sig.into());
 }
 
-fn terminate_thread() {
+fn terminate_thread(_sig: usize) {
     crate::kernel::sched::exit_thread()
 }
 
-fn stop() {
+fn stop(sig: usize) {
     crate::kernel::sched::stop();
 }
 
-fn cont(task: Arc<Task>) {
+fn cont(sig: usize, task: Arc<Task>) {
     crate::kernel::sched::cont(task);
 }
 
@@ -73,6 +73,6 @@ pub(in crate::kernel::signal) fn handle_default(sig: usize) {
     let action = DEFAULT_ACTIONS[sig];
 
     if let Action::Handle(f) = action {
-        (f)();
+        (f)(sig);
     }
 }

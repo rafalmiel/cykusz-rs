@@ -242,7 +242,7 @@ macro_rules! logln2 {
 #[macro_export]
 macro_rules! log2 {
     ($($arg:tt)*) => ({
-        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        $crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
     });
 }
 #[macro_export]

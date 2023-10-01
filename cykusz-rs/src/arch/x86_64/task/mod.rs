@@ -81,7 +81,7 @@ impl Context {
 }
 
 fn task_finished() {
-    crate::kernel::sched::exit(0);
+    crate::kernel::sched::exit(syscall_defs::waitpid::Status::Exited(0));
 }
 
 fn prepare_p4<'a>() -> &'a mut P4Table {

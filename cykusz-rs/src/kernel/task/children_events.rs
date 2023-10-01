@@ -11,28 +11,28 @@ use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 #[derive(Default)]
-pub struct Zombies {
-    list: Spin<LinkedList<SchedTaskAdapter>>,
-    wq: WaitQueue,
+pub struct ChildrenEvents {
+    zombies: Spin<LinkedList<SchedTaskAdapter>>,
+    zombies_wq: WaitQueue,
 }
 
-impl Zombies {
+impl ChildrenEvents {
     pub fn add_zombie(&self, zombie: Arc<Task>) {
         assert_eq!(zombie.sched.is_linked(), false);
         assert_eq!(zombie.state(), TaskState::Unused);
 
-        let mut list = self.list.lock();
+        let mut list = self.zombies.lock();
 
         logln2!("add zombie pid {}", zombie.pid());
 
         list.push_back(zombie);
 
-        self.wq.notify_one();
+        self.zombies_wq.notify_one();
     }
 
-    fn wait_on(&self, nohang: bool, cond: impl Fn(&Task) -> bool) -> SignalResult<Option<(usize, isize)>> {
-        let mut res = (0, 0);
-        let result = self.wq.wait_lock_for_no_hang(nohang, &self.list, |l| {
+    fn wait_on(&self, nohang: bool, cond: impl Fn(&Task) -> bool) -> SignalResult<Option<(usize, syscall_defs::waitpid::Status)>> {
+        let mut res = (0, syscall_defs::waitpid::Status::Invalid(0));
+        let result = self.zombies_wq.wait_lock_for_no_hang(nohang, &self.zombies, |l| {
             let mut cur = l.front_mut();
 
             while let Some(t) = cur.get() {
@@ -68,9 +68,9 @@ impl Zombies {
             })
     }
 
-    pub fn wait_pid(&self, pid: isize, status: &mut u32, flags: u64) -> SignalResult<SyscallResult> {
+    pub fn wait_pid(&self, pid: isize, status: &mut syscall_defs::waitpid::Status, flags: u64) -> SignalResult<SyscallResult> {
         logln2!("wait on {}", pid);
-        let ret = self.wait_on(flags.get_bit(1), |t| {
+        let ret = self.wait_on(flags.get_bit(0), |t| {
             logln2!("got wait on task {} {} {}", t.is_process_leader(), t.gid(), t.pid());
             if !t.is_process_leader() {
                 false
@@ -99,8 +99,7 @@ impl Zombies {
 
         return match ret {
             Ok(Some((tid, st))) => {
-                *status = 0x200; //WIFEXITED
-                *status |= st as u32 & 0xff;
+                *status = st;
 
                 Ok(Ok(tid))
             },

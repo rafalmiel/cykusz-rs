@@ -778,7 +778,7 @@ pub fn sys_ticksns() -> SyscallResult {
 }
 
 pub fn sys_exit(status: u64) -> ! {
-    crate::kernel::sched::exit(status as isize)
+    crate::kernel::sched::exit(syscall_defs::waitpid::Status::Exited(status));
 }
 
 pub fn sys_sleep(time_ns: u64) -> SyscallResult {
@@ -846,7 +846,13 @@ pub fn sys_waitpid(pid: u64, status: u64, flags: u64) -> SyscallResult {
 
     logln2!("SYS WAITPID {} {:x}", pid, flags);
 
-    current.wait_pid(pid as isize, status, flags)?
+    let mut st = syscall_defs::waitpid::Status::Invalid(0);
+
+    let res = current.wait_pid(pid as isize, &mut st, flags)?;
+
+    *status = st.into();
+
+    res
 }
 
 pub fn sys_getpid() -> SyscallResult {

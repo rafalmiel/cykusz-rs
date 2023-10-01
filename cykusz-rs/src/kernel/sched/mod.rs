@@ -55,7 +55,7 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn wake_as_next(&self, task: Arc<Task>);
     fn cont(&self, task: Arc<Task>);
     fn stop(&self);
-    fn exit(&self, status: isize) -> !;
+    fn exit(&self, status: syscall_defs::waitpid::Status) -> !;
     fn exit_thread(&self) -> !;
 }
 
@@ -215,7 +215,7 @@ impl Scheduler {
         thread
     }
 
-    pub fn exit(&self, status: isize) -> ! {
+    pub fn exit(&self, status: syscall_defs::waitpid::Status) -> ! {
         let current = current_task_ref();
 
         logln2!(
@@ -257,7 +257,7 @@ impl Scheduler {
         if task.is_process_leader() {
             logln_disabled!("[ WARN ] exit thread of a process leader");
 
-            self.exit(0);
+            self.exit(syscall_defs::waitpid::Status::Exited(0));
         } else {
             self.tasks.remove_task(task.tid());
 
@@ -349,7 +349,7 @@ pub fn current_id() -> isize {
     scheduler().current_id()
 }
 
-pub fn exit(status: isize) -> ! {
+pub fn exit(status: syscall_defs::waitpid::Status) -> ! {
     scheduler().exit(status)
 }
 

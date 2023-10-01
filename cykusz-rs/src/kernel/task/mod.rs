@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicIsize, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, AtomicUsize, Ordering};
 
 use intrusive_collections::{LinkedList, LinkedListLink};
 
@@ -19,13 +19,13 @@ use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
-use crate::kernel::task::zombie::Zombies;
+use crate::kernel::task::children_events::ChildrenEvents;
 use crate::kernel::tty::Terminal;
 
 pub mod cwd;
 pub mod filetable;
 pub mod vm;
-pub mod zombie;
+pub mod children_events;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
@@ -75,8 +75,8 @@ pub struct Task {
     sref: Weak<Task>,
     signals: Signals,
     terminal: Terminal,
-    zombies: Zombies,
-    exit_status: AtomicIsize,
+    children_events: ChildrenEvents,
+    exit_status: AtomicU64,
 }
 
 unsafe impl Sync for Task {}
@@ -365,12 +365,12 @@ impl Task {
         }
     }
 
-    pub fn exit_status(&self) -> isize {
-        self.exit_status.load(Ordering::SeqCst)
+    pub fn exit_status(&self) -> syscall_defs::waitpid::Status {
+        self.exit_status.load(Ordering::SeqCst).into()
     }
 
-    pub fn set_exit_status(&self, status: isize) {
-        self.exit_status.store(status, Ordering::SeqCst);
+    pub fn set_exit_status(&self, status: syscall_defs::waitpid::Status) {
+        self.exit_status.store(status.into(), Ordering::SeqCst);
     }
 
     pub fn set_state(&self, state: TaskState) {
@@ -576,7 +576,7 @@ impl Task {
                 return false;
             }
             TriggerResult::Execute(f) => {
-                f(self.me());
+                f(sig, self.me());
 
                 true
             }
@@ -630,7 +630,7 @@ impl Task {
         if let Some(parent) = self.get_parent() {
             parent.remove_child(self);
 
-            parent.zombies.add_zombie(self.me());
+            parent.children_events.add_zombie(self.me());
 
             if self.is_process_leader() {
                 parent.signal(SIGCHLD);
@@ -638,13 +638,13 @@ impl Task {
         }
     }
 
-    pub fn wait_pid(&self, pid: isize, status: &mut u32, flags: u64) -> SignalResult<SyscallResult> {
-        self.zombies.wait_pid(pid, status, flags)
+    pub fn wait_pid(&self, pid: isize, status: &mut syscall_defs::waitpid::Status, flags: u64) -> SignalResult<SyscallResult> {
+        self.children_events.wait_pid(pid, status, flags)
     }
 
     pub fn wait_thread(&self, tid: usize) -> SignalResult<usize> {
         logln2!("wait thread {}", tid);
-        let res = self.zombies.wait_thread(self.pid(), tid);
+        let res = self.children_events.wait_thread(self.pid(), tid);
         res
     }
 }

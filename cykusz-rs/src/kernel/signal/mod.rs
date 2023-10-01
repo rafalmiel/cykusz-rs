@@ -200,7 +200,7 @@ pub enum TriggerResult {
     Ignored,
     Blocked,
     Triggered,
-    Execute(fn(Arc<Task>)),
+    Execute(fn(usize, Arc<Task>)),
 }
 
 impl Signals {
@@ -400,7 +400,7 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
 
         signals.clear_pending(syscall_defs::signal::SIGKILL as u64);
 
-        crate::kernel::sched::exit(1);
+        crate::kernel::sched::exit(syscall_defs::waitpid::Status::Signaled(syscall_defs::signal::SIGKILL as u64));
     }
     if signals.is_pending(syscall_defs::signal::SIGABRT as u64) {
         logln_disabled!(
@@ -412,7 +412,7 @@ pub fn do_signals() -> Option<(usize, SignalEntry)> {
 
         signals.clear_pending(syscall_defs::signal::SIGABRT as u64);
 
-        crate::kernel::sched::exit(1);
+        crate::kernel::sched::exit(syscall_defs::waitpid::Status::Signaled(syscall_defs::signal::SIGABRT as u64));
     }
 
     signals.sig_exec();

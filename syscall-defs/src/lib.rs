@@ -16,6 +16,7 @@ pub mod resource;
 pub mod signal;
 pub mod stat;
 pub mod time;
+pub mod waitpid;
 
 pub const SYS_READ: usize = 0;
 pub const SYS_WRITE: usize = 1;

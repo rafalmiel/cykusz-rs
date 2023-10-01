@@ -35,7 +35,7 @@ pub fn main() {
 
     loop {
         if let Ok(r) = syscall::waitpid(0, &mut status) {
-            println!("[ init ]: child terminated: {}, status: {:#x}", r, status);
+            println!("[ init ]: child terminated: {}, status: {:?}", r, syscall_defs::waitpid::Status::from(status));
 
             if r == shell_pid {
                 shell_pid = spawn_shell();

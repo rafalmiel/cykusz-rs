@@ -9,7 +9,7 @@ extern "C" fn eh_personality() {}
 #[lang = "panic_impl"]
 pub fn panic_impl(pi: &PanicInfo) -> ! {
     println!("PANIC: {:?}", pi);
-    logln!("PANIC: {:?}", pi);
+    logln2!("PANIC: {:?}", pi);
     loop {}
 }
 

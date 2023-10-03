@@ -5,6 +5,7 @@ use crate::arch::raw::idt::InterruptFrame;
 use crate::arch::syscall::SyscallFrame;
 use crate::arch::utils::StackHelper;
 use crate::kernel::sched::current_task_ref;
+use crate::kernel::signal::DoSignalsResult;
 
 const SYSCALL_INSTRUCTION_SIZE: u64 = 2;
 const REDZONE_SIZE: u64 = 128;
@@ -58,14 +59,14 @@ impl SignalFrame {
 }
 
 pub fn arch_int_check_signals(frame: &mut InterruptFrame, regs: &mut RegsFrame) {
-    if let Some((sig, entry)) = crate::kernel::signal::do_signals() {
+    if let DoSignalsResult::Entry((sig, entry)) = crate::kernel::signal::do_signals() {
         if let syscall_defs::signal::SignalHandler::Handle(f) = entry.handler() {
             let signals = current_task_ref().signals();
             let old_mask = signals.blocked_mask();
 
             let signal_frame = SignalFrame::from_interrupt(frame, regs, old_mask);
 
-            signals.set_mask(syscall_defs::signal::SigProcMask::Block, Some(1u64 << sig), None);
+            signals.set_mask(syscall_defs::signal::SigProcMask::Block, Some(1u64 << (sig - 1)), None);
 
             let mut writer = StackHelper::new(&mut frame.sp);
 
@@ -90,44 +91,53 @@ pub extern "C" fn arch_sys_check_signals(
     syscall_result: isize,
     sys_frame: &mut SyscallFrame,
     regs: &mut RegsFrame,
-) {
-    if let Some((sig, entry)) = crate::kernel::signal::do_signals() {
-        if let syscall_defs::signal::SignalHandler::Handle(f) = entry.handler() {
-            let signals = current_task_ref().signals();
-            let old_mask = signals.blocked_mask();
+) -> bool {
+    match crate::kernel::signal::do_signals() {
+        DoSignalsResult::Entry((sig, entry)) => {
+            if let syscall_defs::signal::SignalHandler::Handle(f) = entry.handler() {
+                let signals = current_task_ref().signals();
+                let old_mask = signals.blocked_mask();
 
-            let res: SyscallResult = syscall_defs::SyscallFrom::syscall_from(syscall_result);
+                let res: SyscallResult = syscall_defs::SyscallFrom::syscall_from(syscall_result);
 
-            signals.set_mask(syscall_defs::signal::SigProcMask::Block, Some(1u64 << sig), None);
+                signals.set_mask(syscall_defs::signal::SigProcMask::Block, Some(1u64 << (sig - 1)), None);
 
-            let restart = res == Err(SyscallError::EINTR)
-                && entry
+                let restart = res == Err(SyscallError::EINTR)
+                    && entry
                     .flags()
                     .contains(syscall_defs::signal::SignalFlags::RESTART);
 
-            let signal_frame = SignalFrame::from_syscall(
-                restart,
-                syscall_result as u64,
-                sys_frame,
-                regs,
-                old_mask,
-            );
+                let signal_frame = SignalFrame::from_syscall(
+                    restart,
+                    syscall_result as u64,
+                    sys_frame,
+                    regs,
+                    old_mask,
+                );
 
-            let mut writer = StackHelper::new(&mut sys_frame.rsp);
+                let mut writer = StackHelper::new(&mut sys_frame.rsp);
 
-            writer.skip_by(REDZONE_SIZE);
-            unsafe {
-                writer.write(signal_frame);
-                writer.write(entry.sigreturn());
+                writer.skip_by(REDZONE_SIZE);
+                unsafe {
+                    writer.write(signal_frame);
+                    writer.write(entry.sigreturn());
+                }
+
+                logln_disabled!("sys_frame set rip: {:#x}", f as usize);
+                sys_frame.rip = f as u64;
+
+                // Signal param
+                regs.rdi = sig as u64;
+
+                logln2!("do signal!!! {}", sig);
             }
-
-            logln_disabled!("sys_frame set rip: {:#x}", f as usize);
-            sys_frame.rip = f as u64;
-
-            // Signal param
-            regs.rdi = sig as u64;
-
-            logln!("do signal!!!");
+            return false;
+        },
+        DoSignalsResult::Restart => {
+            return true;
+        },
+        _ => {
+            return false;
         }
     }
 }

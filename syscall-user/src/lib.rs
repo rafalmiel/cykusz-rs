@@ -417,7 +417,7 @@ pub fn exec(path: &str, args: Option<&[&str]>, env: Option<&[&str]>) -> SyscallR
 }
 
 pub fn waitpid(pid: usize, status: &mut u32) -> SyscallResult {
-    unsafe { syscall3(SYS_WAITPID, pid as usize, status as *const u32 as usize, 0) }
+    unsafe { syscall3(SYS_WAITPID, pid as usize, status as *const u32 as usize, syscall_defs::waitpid::WaitPidFlags::STOPPED.bits()) }
 }
 
 pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {

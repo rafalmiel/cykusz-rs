@@ -1,3 +1,5 @@
+use syscall_defs::SyscallRestartable;
+
 pub mod sys;
 
 pub fn init() {
@@ -24,11 +26,13 @@ fn conditional_enable_int(sys: usize) {
 pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> isize {
     conditional_enable_int(num as usize);
 
+    logln2!("SYS: {}", num);
+
     use syscall_defs::*;
     match num as usize {
-        SYS_READ => sys::sys_read(a, b, c),
-        SYS_WRITE => sys::sys_write(a, b, c),
-        SYS_OPEN => sys::sys_open(a, b, c, d),
+        SYS_READ => sys::sys_read(a, b, c).maybe_into_erestart(),
+        SYS_WRITE => sys::sys_write(a, b, c).maybe_into_erestart(),
+        SYS_OPEN => sys::sys_open(a, b, c, d).maybe_into_erestart(),
         SYS_CLOSE => sys::sys_close(a),
         SYS_CHDIR => sys::sys_chdir(a, b),
         SYS_GETCWD => sys::sys_getcwd(a, b),
@@ -36,12 +40,12 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_GETDENTS => sys::sys_getdents(a, b, c),
         SYS_GETADDRINFO => sys::sys_getaddrinfo(a, b, c, d),
         SYS_EXIT => sys::sys_exit(a),
-        SYS_SLEEP => sys::sys_sleep(a),
+        SYS_SLEEP => sys::sys_sleep(a).maybe_into_erestart(),
         SYS_POWEROFF => sys::sys_poweroff(),
         SYS_REBOOT => sys::sys_reboot(),
         SYS_BIND => sys::sys_bind(a, b),
         SYS_CONNECT => sys::sys_connect(a, b, c, d),
-        SYS_SELECT => sys::sys_select(a, b, c, d, e, f),
+        SYS_SELECT => sys::sys_select(a, b, c, d, e, f).maybe_into_erestart(),
         SYS_MOUNT => sys::sys_mount(a, b, c, d, e, f),
         SYS_UMOUNT => sys::sys_umount(a, b),
         SYS_TIME => sys::sys_time(),
@@ -59,7 +63,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_SEEK => sys::sys_seek(a, b, c),
         SYS_PREAD => sys::sys_pread(a, b, c, d),
         SYS_PWRITE => sys::sys_pwrite(a, b, c, d),
-        SYS_WAITPID => sys::sys_waitpid(a, b, c),
+        SYS_WAITPID => sys::sys_waitpid(a, b, c).maybe_into_erestart(),
         SYS_IOCTL => sys::sys_ioctl(a, b, c),
         SYS_SIGACTION => sys::sys_sigaction(a, b, c, d),
         SYS_SIGPROCMASK => sys::sys_sigprocmask(a, b, c),

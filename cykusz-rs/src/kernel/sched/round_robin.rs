@@ -2,11 +2,12 @@ use alloc::sync::Arc;
 
 use crate::{arch, kernel};
 use intrusive_collections::LinkedList;
+use syscall_defs::waitpid::WaitPidFlags;
 
 use crate::kernel::sched::SchedulerInterface;
 use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
-use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
+use crate::kernel::task::{SchedTaskAdapter, Task, TaskState, WaitPidTaskAdapter};
 use crate::kernel::utils::wait_queue::WaitQueue;
 use crate::kernel::utils::PerCpu;
 
@@ -42,7 +43,7 @@ struct Queues {
 
     stopped: LinkedList<SchedTaskAdapter>,
 
-    dead: LinkedList<SchedTaskAdapter>,
+    dead: LinkedList<WaitPidTaskAdapter>,
     dead_wq: WaitQueue,
 
     prev_id: usize,
@@ -64,7 +65,7 @@ impl Default for Queues {
             awaiting: LinkedList::new(SchedTaskAdapter::new()),
             stopped: LinkedList::new(SchedTaskAdapter::new()),
 
-            dead: LinkedList::new(SchedTaskAdapter::new()),
+            dead: LinkedList::new(WaitPidTaskAdapter::new()),
             dead_wq: WaitQueue::new(),
 
             prev_id: 0,
@@ -126,8 +127,8 @@ impl Queues {
         if let Some(to_run) = self.runnable.pop_front() {
             if let Some(current) = self.current.clone() {
                 //println!("{} -> {}", current.id(), to_run.id());
-                if !current.sched.is_linked() && current.tid() != to_run.tid() {
-                    self.push_runnable(current);
+                if !current.sched.is_linked() && !current.waitpid.is_linked() && current.tid() != to_run.tid() {
+                    self.push_runnable(current, false);
                 }
             }
 
@@ -164,7 +165,7 @@ impl Queues {
 
     fn queue_task(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
         //println!("queue task {}", task.id());
-        self.push_runnable(task);
+        self.push_runnable(task, false);
     }
 
     fn sleep(&mut self, time_ns: Option<usize>, lock: SpinGuard<()>) -> SignalResult<()> {
@@ -215,7 +216,7 @@ impl Queues {
             };
 
             if let Some(task) = cursor.remove() {
-                self.push_runnable(task);
+                self.push_runnable(task, false);
             }
         } else {
             task.set_has_pending_io(true);
@@ -242,7 +243,7 @@ impl Queues {
         }
     }
 
-    fn stop(&mut self, lock: SpinGuard<()>) {
+    fn stop(&mut self, sig: usize, lock: SpinGuard<()>) {
         let task = get_current().clone();
 
         assert_ne!(
@@ -251,7 +252,7 @@ impl Queues {
             "Idle task should not sleep"
         );
 
-        self.push_stopped(task);
+        self.push_stopped(sig, task);
 
         self.reschedule(lock);
     }
@@ -261,7 +262,8 @@ impl Queues {
             let mut cursor = unsafe { self.stopped.cursor_mut_from_ptr(task.as_ref()) };
 
             if let Some(task) = cursor.remove() {
-                self.push_runnable(task);
+                logln2!("CONTINUE TASK {}", task.tid());
+                self.push_runnable(task, true);
             }
         }
     }
@@ -269,8 +271,8 @@ impl Queues {
     fn exit(&mut self, status: syscall_defs::waitpid::Status, lock: SpinGuard<()>) -> ! {
         let current = get_current();
 
-        logln_disabled!(
-            "exit tid: {}, sc: {}, wc: {}, st: {}",
+        logln2!(
+            "exit tid: {}, sc: {}, wc: {}, st: {:?}",
             current.tid(),
             Arc::strong_count(current),
             Arc::weak_count(current),
@@ -281,7 +283,9 @@ impl Queues {
         assert_eq!(current.sched.is_linked(), false);
         assert!(current.is_process_leader());
 
-        self.dead.push_back(current.clone());
+        if !current.waitpid.is_linked() {
+            self.dead.push_back(current.clone());
+        }
 
         logln!(
             "FREE MEM h:{} p:{}",
@@ -289,7 +293,8 @@ impl Queues {
             arch::mm::phys::used_mem()
         );
 
-        current.set_exit_status(status);
+        current.set_waitpid_status(status);
+        assert_eq!(current.sched.is_linked(), false);
         self.switch_to_sched(current, lock);
 
         unreachable!()
@@ -317,10 +322,27 @@ impl Queues {
 
     fn reap_dead(&mut self, locked: SpinGuard<()>) {
         if let Some(dead) = self.dead.pop_front() {
-            dead.set_state(TaskState::Unused);
+            match dead.waitpid_status() {
+                syscall_defs::waitpid::Status::Exited(_) | syscall_defs::waitpid::Status::Signaled(_) => {
+                    dead.set_state(TaskState::Unused);
 
-            drop(locked);
-            dead.make_zombie();
+                    logln2!("IS LINKED {} {}", dead.sched.is_linked(), dead.waitpid.is_linked());
+
+                    drop(locked);
+                    dead.make_zombie();
+                },
+                syscall_defs::waitpid::Status::Stopped(_) => {
+                    drop(locked);
+                    dead.notify_stopped();
+                },
+                syscall_defs::waitpid::Status::Continued => {
+                    drop(locked);
+                    dead.notify_continued();
+                },
+                _ => {
+                    panic!("Unexpected reap dead");
+                }
+            }
 
             logln_disabled!(
                 "reap thread zombie {} pl: {} sc: {}, wc: {}",
@@ -342,14 +364,18 @@ impl Queues {
         self.awaiting.push_back(task);
     }
 
-    fn push_stopped(&mut self, task: Arc<Task>) {
+    fn push_stopped(&mut self, sig: usize, task: Arc<Task>) {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
 
         task.set_state(TaskState::Stopped);
         task.set_sleep_until(0);
+        task.set_waitpid_status(syscall_defs::waitpid::Status::Stopped(sig as u64));
 
-        self.stopped.push_back(task);
+        self.stopped.push_back(task.clone());
+        if !task.waitpid.is_linked() {
+            self.dead.push_back(task);
+        }
     }
 
     fn push_deadline_awaiting(&mut self, task: Arc<Task>, time_ns: usize) {
@@ -364,14 +390,21 @@ impl Queues {
         self.deadline_awaiting.push_back(task);
     }
 
-    fn push_runnable(&mut self, task: Arc<Task>) {
+    fn push_runnable(&mut self, task: Arc<Task>, continued: bool) {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
 
         task.set_state(TaskState::Runnable);
         //task.set_sleep_until(0);
 
-        self.runnable.push_back(task);
+        self.runnable.push_back(task.clone());
+
+        if continued {
+            if !task.waitpid.is_linked() {
+                task.set_waitpid_status(syscall_defs::waitpid::Status::Continued);
+                self.dead.push_back(task);
+            }
+        }
     }
 
     fn push_runnable_front(&mut self, task: Arc<Task>) {
@@ -455,12 +488,12 @@ impl SchedulerInterface for RRScheduler {
         queue.cont(task, lock);
     }
 
-    fn stop(&self) {
+    fn stop(&self, sig: usize) {
         let (lock, queue) = self.queues.this_cpu_mut();
 
         let lock = lock.lock_irq();
 
-        queue.stop(lock);
+        queue.stop(sig, lock);
     }
 
     fn exit(&self, status: syscall_defs::waitpid::Status) -> ! {

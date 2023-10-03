@@ -161,6 +161,38 @@ impl WaitQueue {
 
         Ok(Some(lock))
     }
+    pub fn wait_2lock_for_no_hang<'a, T, U, F: FnMut(&mut SpinGuard<T>, &mut SpinGuard<U>) -> bool>(
+        &self,
+        nohang: bool,
+        mtx1: &'a Spin<T>,
+        mtx2: &'a Spin<U>,
+        mut cond: F,
+    ) -> SignalResult<Option<(SpinGuard<'a, T>, SpinGuard<'a, U>)>> {
+        let mut lock1 = mtx1.lock();
+        let mut lock2 = mtx2.lock();
+
+        if cond(&mut lock1, &mut lock2) {
+            return Ok(Some((lock1, lock2)));
+        } else if nohang {
+            return Ok(None);
+        }
+
+        let task = current_task();
+
+        let _guard = WaitQueueGuard::new(self, &task);
+
+        while !cond(&mut lock1, &mut lock2) {
+            core::mem::drop(lock2);
+            core::mem::drop(lock1);
+
+            task.await_io()?;
+
+            lock1 = mtx1.lock();
+            lock2 = mtx2.lock();
+        }
+
+        return Ok(Some((lock1, lock2)));
+    }
 
     pub fn wait_for_irq<F: FnMut() -> bool>(&self, mut cond: F) -> SignalResult<()> {
         let _irq = IrqGuard::new();
@@ -208,7 +240,12 @@ impl WaitQueue {
 
     pub fn add_task_debug(&self, task: Arc<Task>) {
         let mut tasks = self.tasks.lock_irq();
+
+        let tid = task.tid();
+
         tasks.push(task);
+
+        logln2!("add task {}, tasks in wq: {}", tid, tasks.len());
     }
 
     pub fn remove_task(&self, task: Arc<Task>) {

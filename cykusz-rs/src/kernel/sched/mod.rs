@@ -54,7 +54,7 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn wake(&self, task: Arc<Task>);
     fn wake_as_next(&self, task: Arc<Task>);
     fn cont(&self, task: Arc<Task>);
-    fn stop(&self);
+    fn stop(&self, sig: usize);
     fn exit(&self, status: syscall_defs::waitpid::Status) -> !;
     fn exit_thread(&self) -> !;
 }
@@ -152,8 +152,8 @@ impl Scheduler {
         self.sched.wake_as_next(task);
     }
 
-    fn stop(&self) {
-        self.sched.stop();
+    fn stop(&self, sig: usize) {
+        self.sched.stop(sig);
     }
 
     fn cont(&self, task: Arc<Task>) {
@@ -382,8 +382,8 @@ pub fn wake_as_next(task: Arc<Task>) {
     scheduler().wake_as_next(task);
 }
 
-pub fn stop() {
-    scheduler().stop();
+pub fn stop(sig: usize) {
+    scheduler().stop(sig);
 }
 
 pub fn cont(task: Arc<Task>) {

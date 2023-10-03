@@ -8,6 +8,7 @@ use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
 use syscall_defs::{ConnectionFlags, FcntlCmd, FcntlSetFDFlags, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
+use syscall_defs::waitpid::WaitPidFlags;
 
 use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::path::Path;
@@ -782,6 +783,7 @@ pub fn sys_exit(status: u64) -> ! {
 }
 
 pub fn sys_sleep(time_ns: u64) -> SyscallResult {
+    logln2!("sys_sleep {}", time_ns);
     let t = current_task_ref();
     t.sleep(time_ns as usize)?;
     Ok(0)
@@ -840,17 +842,23 @@ pub fn sys_spawn_thread(entry: u64, stack: u64) -> SyscallResult {
 }
 
 pub fn sys_waitpid(pid: u64, status: u64, flags: u64) -> SyscallResult {
+    use syscall_defs::waitpid::*;
+
     let current = current_task_ref();
 
     let status = unsafe { VirtAddr(status as usize).read_mut::<u32>() };
 
     logln2!("SYS WAITPID {} {:x}", pid, flags);
 
-    let mut st = syscall_defs::waitpid::Status::Invalid(0);
+    let mut st = Status::Invalid(0);
 
-    let res = current.wait_pid(pid as isize, &mut st, flags)?;
+    let res = current.wait_pid(pid as isize, &mut st, 
+                               WaitPidFlags::from_bits_truncate(flags as usize)
+                                   | WaitPidFlags::EXITED)?;
 
     *status = st.into();
+
+    logln2!("SYS WAITPID RESULT {} {:?}", pid, *status);
 
     res
 }
@@ -935,7 +943,7 @@ pub fn sys_sigaction(sig: u64, sigact: u64, sigreturn: u64, old: u64) -> Syscall
         unsafe { Some(VirtAddr(old as usize).read_mut::<SigAction>()) }
     };
 
-    logln!("sigaction: {} {:?}, old: {:?}", sig, entry, old);
+    logln2!("sigaction: {} {:?}, old: {:?}", sig, entry, old);
 
     current_task_ref()
         .signals()
@@ -945,7 +953,7 @@ pub fn sys_sigaction(sig: u64, sigact: u64, sigreturn: u64, old: u64) -> Syscall
 }
 
 pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {
-    logln!("sigprocmask: {} {} {}", how, set, old_set);
+    logln2!("sigprocmask: {} {} {}", how, set, old_set);
     let how = syscall_defs::signal::SigProcMask::from(how);
     let set = if set > 0 {
         Some(unsafe { VirtAddr(set as usize).read::<u64>() })

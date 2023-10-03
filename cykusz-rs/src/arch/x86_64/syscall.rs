@@ -51,7 +51,11 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
 
         logln_disabled!("done syscall {} = {}", regs.rax, res);
 
-        crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs);
+        if -res == syscall_defs::SyscallError::ERESTART as isize &&
+            crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs) {
+
+            return fast_syscall_handler(sys_frame, regs);
+        }
 
         // Store syscall result in rax
         regs.rax = res as u64

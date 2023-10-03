@@ -6,7 +6,6 @@ use crate::kernel::task::Task;
 pub enum Action {
     Ignore,
     Handle(fn(usize)),
-    Exec(fn(usize, Arc<Task>)),
 }
 
 static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
@@ -28,7 +27,7 @@ static DEFAULT_ACTIONS: [Action; super::SIGNAL_COUNT] = [
     Action::Handle(terminate),        // SIGTERM
     Action::Ignore,                   // UNUSED
     Action::Ignore,                   // SIGCHLD
-    Action::Exec(cont),               // SIGCONT
+    Action::Ignore,                   // SIGCONT
     Action::Handle(stop),             // SIGSTOP
     Action::Handle(stop),             // SIGTSTP
     Action::Ignore,                   // UNUSED
@@ -54,10 +53,11 @@ fn terminate_thread(_sig: usize) {
 }
 
 fn stop(sig: usize) {
-    crate::kernel::sched::stop();
+    crate::kernel::sched::stop(sig);
 }
 
-fn cont(sig: usize, task: Arc<Task>) {
+pub fn cont(sig: usize, task: Arc<Task>) {
+    logln2!("CONT {}", task.tid());
     crate::kernel::sched::cont(task);
 }
 

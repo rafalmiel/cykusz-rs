@@ -1,3 +1,31 @@
+bitflags! {
+    pub struct WaitPidFlags: usize {
+        const NOHANG        = 1 << 0;
+        const UNTRACED      = 1 << 1;
+        const STOPPED       = 1 << 1;
+        const EXITED        = 1 << 2;
+        const CONTINUED     = 1 << 3;
+    }
+}
+
+impl WaitPidFlags {
+    pub fn nohang(&self) -> bool {
+        self.contains(WaitPidFlags::NOHANG)
+    }
+
+    pub fn stopped(&self) -> bool {
+        self.contains(WaitPidFlags::STOPPED)
+    }
+
+    pub fn continued(&self) -> bool {
+        self.contains(WaitPidFlags::CONTINUED)
+    }
+
+    pub fn exited(&self) -> bool {
+        self.contains(WaitPidFlags::EXITED) || self.is_empty()
+    }
+}
+
 #[derive(Debug)]
 pub enum Status {
     Exited(u64),
@@ -5,6 +33,31 @@ pub enum Status {
     Stopped(u64),
     Continued,
     Invalid(u64),
+}
+
+impl Status {
+    pub fn is_exited(&self) -> bool {
+        if let Status::Exited(_) = self {
+            return true;
+        }
+
+        false
+    }
+    pub fn is_continued(&self) -> bool {
+        if let Status::Continued = self {
+            return true;
+        }
+
+        false
+    }
+
+    pub fn is_stopped(&self) -> bool {
+        if let Status::Stopped(_) = self {
+            return true;
+        }
+
+        false
+    }
 }
 
 pub struct RawStatus(u64);

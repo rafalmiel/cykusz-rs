@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
-use core::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use intrusive_collections::{LinkedList, LinkedListLink};
 
@@ -19,7 +19,7 @@ use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
-use crate::kernel::task::children_events::ChildrenEvents;
+use crate::kernel::task::children_events::WaitPidEvents;
 use crate::kernel::tty::Terminal;
 
 pub mod cwd;
@@ -51,6 +51,7 @@ impl From<usize> for TaskState {
 
 intrusive_adapter!(pub TaskAdapter = Arc<Task> : Task { sibling: LinkedListLink });
 intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLink });
+intrusive_adapter!(pub WaitPidTaskAdapter = Arc<Task> : Task { waitpid: LinkedListLink });
 
 #[derive(Default)]
 pub struct Task {
@@ -64,6 +65,7 @@ pub struct Task {
     children: Spin<intrusive_collections::LinkedList<TaskAdapter>>,
     sibling: intrusive_collections::LinkedListLink,
     pub sched: intrusive_collections::LinkedListLink,
+    pub waitpid: intrusive_collections::LinkedListLink,
     state: AtomicUsize,
     locks: AtomicUsize,
     pending_io: AtomicBool,
@@ -75,8 +77,8 @@ pub struct Task {
     sref: Weak<Task>,
     signals: Signals,
     terminal: Terminal,
-    children_events: ChildrenEvents,
-    exit_status: AtomicU64,
+    children_events: WaitPidEvents,
+    waitpid_status: AtomicU64,
 }
 
 unsafe impl Sync for Task {}
@@ -365,12 +367,12 @@ impl Task {
         }
     }
 
-    pub fn exit_status(&self) -> syscall_defs::waitpid::Status {
-        self.exit_status.load(Ordering::SeqCst).into()
+    pub fn waitpid_status(&self) -> syscall_defs::waitpid::Status {
+        self.waitpid_status.load(Ordering::SeqCst).into()
     }
 
-    pub fn set_exit_status(&self, status: syscall_defs::waitpid::Status) {
-        self.exit_status.store(status.into(), Ordering::SeqCst);
+    pub fn set_waitpid_status(&self, status: syscall_defs::waitpid::Status) {
+        self.waitpid_status.store(status.into(), Ordering::SeqCst);
     }
 
     pub fn set_state(&self, state: TaskState) {
@@ -576,6 +578,7 @@ impl Task {
                 return false;
             }
             TriggerResult::Execute(f) => {
+                logln2!("SIG TRIGGER EXECUTE {}", sig);
                 f(sig, self.me());
 
                 true
@@ -609,6 +612,7 @@ impl Task {
     }
 
     pub fn signal(&self, sig: usize) -> bool {
+        logln2!("signal {} sig: {}", self.pid(), sig);
         self.do_signal(sig, false)
     }
 
@@ -637,8 +641,29 @@ impl Task {
             }
         }
     }
+    pub fn notify_continued(&self) {
+        if let Some(parent) = self.get_parent() {
+            logln2!("add stopped to parent: {}", parent.pid());
+            parent.children_events.add_continued(self.me());
 
-    pub fn wait_pid(&self, pid: isize, status: &mut syscall_defs::waitpid::Status, flags: u64) -> SignalResult<SyscallResult> {
+            if self.is_process_leader() {
+                parent.signal(SIGCHLD);
+            }
+        }
+    }
+
+    pub fn notify_stopped(&self) {
+        if let Some(parent) = self.get_parent() {
+            logln2!("add stopped to parent: {}", parent.pid());
+            parent.children_events.add_stopped(self.me());
+
+            if self.is_process_leader() {
+                parent.signal(SIGCHLD);
+            }
+        }
+    }
+
+    pub fn wait_pid(&self, pid: isize, status: &mut syscall_defs::waitpid::Status, flags: syscall_defs::waitpid::WaitPidFlags) -> SignalResult<SyscallResult> {
         self.children_events.wait_pid(pid, status, flags)
     }
 

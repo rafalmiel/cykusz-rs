@@ -6,7 +6,7 @@ use core::fmt::{Error, Formatter};
 use input::*;
 use syscall_defs::ioctl::tty;
 use syscall_defs::poll::PollEventFlags;
-use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT};
+use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT, SIGTSTP};
 use syscall_defs::OpenFlags;
 
 use crate::arch::output::{video, Color, ConsoleWriter};
@@ -22,6 +22,7 @@ use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::task::Task;
+use crate::kernel::timer::Timer;
 use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
@@ -235,6 +236,11 @@ impl Tty {
             KeyCode::KEY_C if (state.lctrl || state.rctrl) && !released => {
                 if let Some(t) = self.fg_group.lock_irq().as_ref() {
                     t.signal(SIGINT);
+                }
+            }
+            KeyCode::KEY_Z if (state.lctrl || state.rctrl) && !released => {
+                if let Some(t) = self.fg_group.lock_irq().clone() {
+                    t.signal(SIGTSTP);
                 }
             }
             KeyCode::KEY_D if (state.lctrl || state.rctrl) && !released => {

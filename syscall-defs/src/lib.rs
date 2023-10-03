@@ -175,6 +175,7 @@ pub enum SyscallError {
     EBADFD = 1081,
     ENOMEDIUM = 1082,
     ENOTBLK = 1083,
+    ERESTART = 1106,
 
     UnknownError = 0xffff,
 }
@@ -340,6 +341,20 @@ bitflags! {
 }
 
 pub type SyscallResult = Result<usize, SyscallError>;
+
+pub trait SyscallRestartable {
+    fn maybe_into_erestart(&self) -> SyscallResult;
+}
+
+impl SyscallRestartable for SyscallResult {
+    fn maybe_into_erestart(&self) -> SyscallResult {
+        if let Err(SyscallError::EINTR) = self {
+            Err(SyscallError::ERESTART)
+        } else {
+            *self
+        }
+    }
+}
 
 pub trait SyscallFrom<T> {
     fn syscall_from(e: T) -> Self;

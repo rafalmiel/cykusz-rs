@@ -643,7 +643,7 @@ fn exec(cmd: &str) {
             start_process(
                 "/usr/bin/gcc",
                 Some(&["/usr/bin/gcc", "/test.c", "-o", "/test"]),
-                Some(&["PATH=/usr/bin", "TERM=cykusz"]),
+                Some(&["PATH=/bin:/usr/bin", "TERM=cykusz"]),
             );
         }
     } else if cmd.starts_with("thread_test") {
@@ -708,7 +708,7 @@ fn exec(cmd: &str) {
             start_process(
                 args[0],
                 Some(args.as_slice()),
-                Some(&["PATH=/usr/bin", "TERM=cykusz"]),
+                Some(&["PATH=/bin:/usr/bin", "TERM=cykusz"]),
             );
         }
     }
@@ -758,6 +758,17 @@ pub fn main() {
 
     if let Err(e) = syscall::sigaction(
         syscall_defs::signal::SIGINT,
+        Some(&SigAction::new(
+            SignalHandler::Handle(sigint_handler),
+            0,
+            SignalFlags::RESTART,
+        )),
+        None,
+    ) {
+        println!("Failed to install signal handler: {:?}", e);
+    }
+    if let Err(e) = syscall::sigaction(
+        syscall_defs::signal::SIGTSTP,
         Some(&SigAction::new(
             SignalHandler::Handle(sigint_handler),
             0,

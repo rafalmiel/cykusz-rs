@@ -300,7 +300,7 @@ function _cykusz_nano {
 	pushd .
 
 	cd $NANO_CYKUSZ_BUILD_DIR
-	$NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
+	CFLAGS="-O0 -g" $NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
 
 	popd
 

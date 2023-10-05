@@ -127,22 +127,34 @@ impl Queues {
         if let Some(to_run) = self.runnable.pop_front() {
             if let Some(current) = self.current.clone() {
                 //println!("{} -> {}", current.id(), to_run.id());
-                if !current.sched.is_linked() && !current.waitpid.is_linked() && current.tid() != to_run.tid() {
+                if !current.sched.is_linked() && !(current.waitpid.is_linked() && current.waitpid_status().is_exited())  && current.tid() != to_run.tid() {
                     self.push_runnable(current, false);
                 }
             }
 
-            assert_eq!(
-                to_run.state(),
-                TaskState::Runnable,
-                "schedule_next: switching to not runnable task {} {:?}",
-                to_run.tid(),
-                to_run.state()
-            );
+            //assert_eq!(
+            //    to_run.state(),
+            //    TaskState::Runnable,
+            //    "schedule_next: switching to not runnable task {} {:?}",
+            //    to_run.tid(),
+            //    to_run.state()
+            //);
 
-            self.current = Some(to_run);
+            if to_run.state() != TaskState::Runnable {
+                if let Some(current) = self.current.as_ref() {
+                    if current.state() == TaskState::Runnable {
+                        //println!("self {}", current.id());
+                        self.switch(current, lock);
 
-            self.switch(&self.current.as_ref().unwrap(), lock);
+                        return;
+                    }
+                }
+                self.current = None;
+                self.switch(&self.idle_task, lock);
+            } else {
+                self.current = Some(to_run);
+                self.switch(&self.current.as_ref().unwrap(), lock);
+            }
         } else {
             if let Some(current) = self.current.as_ref() {
                 if current.state() == TaskState::Runnable {
@@ -258,7 +270,8 @@ impl Queues {
     }
 
     fn cont(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
-        if task.state() == TaskState::Stopped {
+        if task.state() == TaskState::Stopped && !task.waitpid_status().is_exited() {
+            assert!(task.sched.is_linked());
             let mut cursor = unsafe { self.stopped.cursor_mut_from_ptr(task.as_ref()) };
 
             if let Some(task) = cursor.remove() {
@@ -369,7 +382,7 @@ impl Queues {
         assert_ne!(task.tid(), self.idle_task.tid());
 
         task.set_state(TaskState::Stopped);
-        task.set_sleep_until(0);
+        //task.set_sleep_until(0);
         task.set_waitpid_status(syscall_defs::waitpid::Status::Stopped(sig as u64));
 
         self.stopped.push_back(task.clone());

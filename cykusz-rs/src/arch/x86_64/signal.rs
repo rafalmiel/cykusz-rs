@@ -163,6 +163,7 @@ pub fn arch_sys_sigreturn(sys_frame: &mut SyscallFrame, user_regs: &mut RegsFram
     sys_frame.rip = signal_frame.rip;
 
     if signal_frame.restart_syscall != u64::MAX {
+        logln2!("RESTART SYSCALL");
         sys_frame.rip -= SYSCALL_INSTRUCTION_SIZE as u64;
     }
 

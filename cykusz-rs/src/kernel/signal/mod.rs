@@ -49,7 +49,7 @@ const UNBLOCKABLE_MASK: u64 = {
 };
 
 fn can_override(sig: usize) -> bool {
-    IMMUTABLE_MASK.get_bit(sig) == false
+    IMMUTABLE_MASK.get_bit(sig - 1) == false
 }
 
 pub type SignalResult<T> = core::result::Result<T, SignalError>;

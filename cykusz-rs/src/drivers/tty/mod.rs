@@ -181,6 +181,9 @@ impl Tty {
             KeyCode::KEY_RIGHTALT => {
                 state.altgr = !released;
             }
+            KeyCode::KEY_LEFTMETA | KeyCode::KEY_RIGHTMETA => {
+                return true;
+            }
             _ => {
                 return false;
             }
@@ -411,6 +414,7 @@ impl TerminalDevice for Tty {
 
 impl INode for Tty {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
+        logln2!("try tty read");
         let r = self.read(buf.as_mut_ptr(), buf.len());
         logln2!("tty read {:?} {:?}", r, buf);
 
@@ -419,6 +423,7 @@ impl INode for Tty {
                 Ok(s)
             },
             Err(e) => {
+                logln2!("tty signal error");
                 Err(e.into())
             }
         }

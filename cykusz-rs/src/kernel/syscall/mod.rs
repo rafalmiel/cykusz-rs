@@ -1,4 +1,4 @@
-use syscall_defs::SyscallRestartable;
+use syscall_defs::{SyscallInto, SyscallRestartable};
 
 pub mod sys;
 
@@ -26,13 +26,11 @@ fn conditional_enable_int(sys: usize) {
 pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64) -> isize {
     conditional_enable_int(num as usize);
 
-    logln2!("SYS: {}", num);
-
     use syscall_defs::*;
-    match num as usize {
-        SYS_READ => sys::sys_read(a, b, c).maybe_into_erestart(),
-        SYS_WRITE => sys::sys_write(a, b, c).maybe_into_erestart(),
-        SYS_OPEN => sys::sys_open(a, b, c, d).maybe_into_erestart(),
+    let res = match num as usize {
+        SYS_READ => sys::sys_read(a, b, c),
+        SYS_WRITE => sys::sys_write(a, b, c),
+        SYS_OPEN => sys::sys_open(a, b, c, d),
         SYS_CLOSE => sys::sys_close(a),
         SYS_CHDIR => sys::sys_chdir(a, b),
         SYS_GETCWD => sys::sys_getcwd(a, b),
@@ -45,7 +43,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_REBOOT => sys::sys_reboot(),
         SYS_BIND => sys::sys_bind(a, b),
         SYS_CONNECT => sys::sys_connect(a, b, c, d),
-        SYS_SELECT => sys::sys_select(a, b, c, d, e, f).maybe_into_erestart(),
+        SYS_SELECT => sys::sys_select(a, b, c, d, e, f),
         SYS_MOUNT => sys::sys_mount(a, b, c, d, e, f),
         SYS_UMOUNT => sys::sys_umount(a, b),
         SYS_TIME => sys::sys_time(),
@@ -67,7 +65,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_IOCTL => sys::sys_ioctl(a, b, c),
         SYS_SIGACTION => sys::sys_sigaction(a, b, c, d),
         SYS_SIGPROCMASK => sys::sys_sigprocmask(a, b, c),
-        SYS_FUTEX_WAIT => sys::sys_futex_wait(a, b),
+        SYS_FUTEX_WAIT => sys::sys_futex_wait(a, b).maybe_into_erestart(),
         SYS_FUTEX_WAKE => sys::sys_futex_wake(a),
         SYS_ARCH_PRCTL => crate::arch::syscall::sys_arch_prctl(a, b),
         SYS_SPAWN_THREAD => sys::sys_spawn_thread(a, b),
@@ -94,6 +92,9 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
             logln!("NO SYS????? {}", a);
             Err(SyscallError::ENOSYS)
         }
-    }
-    .syscall_into()
+    };
+
+    logln2!("SYS {} res {:?}", num, res);
+
+    res.syscall_into()
 }

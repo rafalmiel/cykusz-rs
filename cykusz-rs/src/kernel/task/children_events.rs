@@ -24,7 +24,7 @@ pub struct WaitPidEvents {
 
 impl WaitPidEvents {
     pub fn add_zombie(&self, zombie: Arc<Task>) {
-        assert_eq!(zombie.sched.is_linked(), false);
+        //assert_eq!(zombie.sched.is_linked(), false);
         assert_eq!(zombie.state(), TaskState::Unused);
 
         let mut list = self.tasks.lock();

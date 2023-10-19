@@ -32,6 +32,7 @@ cross_nyancat := sysroot/build/nyancat
 cross_ttytest := sysroot/build/ttytest
 cross_fork := sysroot/build/fork
 cross_forktest := sysroot/build/forktest
+cross_poweroff := sysroot/build/poweroff
 
 usb_dev := /dev/sdb1
 
@@ -119,6 +120,7 @@ hello: $(cross_cpp) sysroot/test.c sysroot/test.cpp sysroot/hello.cpp sysroot/st
 	$(cross_c) sysroot/ttytest.c -o $(cross_ttytest)
 	$(cross_c) sysroot/fork.c -o $(cross_fork)
 	$(cross_c) sysroot/forktest.c -o $(cross_forktest)
+	$(cross_c) sysroot/poweroff.c -o $(cross_poweroff)
 	$(cross_c) sysroot/stat.c -o sysroot/build/stat
 	sysroot/build.sh cykusz_nyancat
 	$(cross_strip) $(cross_hello)

@@ -84,6 +84,12 @@ impl InputBuffer {
         n - remaining
     }
 
+    pub(crate) fn flush(&mut self) {
+        self.r = self.w;
+
+        self.clear_eof();
+    }
+
     pub(crate) fn commit_write(&mut self) {
         self.w = self.e;
     }

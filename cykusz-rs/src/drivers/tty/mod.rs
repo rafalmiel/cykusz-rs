@@ -19,7 +19,7 @@ use crate::kernel::kbd::KeyListener;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::session::{sessions, Group};
-use crate::kernel::signal::SignalResult;
+use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::task::Task;
 
@@ -125,6 +125,14 @@ impl Tty {
     }
 
     fn read(&self, buf: *mut u8, len: usize) -> SignalResult<usize> {
+        if let Some(fg) = &*self.fg_group.lock_irq() {
+            let task = current_task_ref();
+
+            if !fg.has_process(task.pid()) {
+                task.signal(syscall_defs::signal::SIGTTIN);
+                return Err(SignalError::Interrupted);
+            }
+        }
         let mut buffer = self
             .wait_queue
             .wait_lock_for(WaitQueueFlags::IRQ_DISABLE, &self.buffer, |lck| {
@@ -570,6 +578,15 @@ impl INode for Tty {
             ioctl @ (tty::TCSETS | tty::TCSETSW | tty::TCSETSF) => {
                 let termios =
                     unsafe { VirtAddr(arg).read_ref::<syscall_defs::ioctl::tty::Termios>() };
+
+                if let Some(fg) = &*self.fg_group.lock_irq() {
+                    let task = current_task_ref();
+
+                    if !fg.has_process(task.pid()) {
+                        task.signal(syscall_defs::signal::SIGTTOU);
+                        return Err(FsError::Interrupted);
+                    }
+                }
 
                 logln3!("termios TCSETS 0x{:x}", termios.c_lflag);
                 logln3!("{:?}", termios);

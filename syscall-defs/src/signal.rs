@@ -13,6 +13,8 @@ pub const SIGCHLD: usize = 17;
 pub const SIGCONT: usize = 18;
 pub const SIGSTOP: usize = 19;
 pub const SIGTSTP: usize = 20;
+pub const SIGTTIN: usize = 21;
+pub const SIGTTOU: usize = 22;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SignalHandler {

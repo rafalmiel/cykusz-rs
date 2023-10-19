@@ -47,6 +47,7 @@ https://user-images.githubusercontent.com/3881998/183302450-65193783-b10f-4ddd-8
 - [x] mlibc (<https://github.com/rafalmiel/mlibc/tree/cykusz>) ([upstream](https://github.com/managarm/mlibc))
 - [x] binutils (<https://github.com/rafalmiel/binutils-gdb/tree/cykusz>)
 - [x] gcc (<https://github.com/rafalmiel/gcc/tree/cykusz>)
+- [x] coreutils (<https://github.com/rafalmiel/coreutils/tree/cykusz>)
 - [x] nyancat (<https://github.com/rafalmiel/nyancat/tree/cykusz>)
 - [x] ncurses (<https://github.com/rafalmiel/ncurses/tree/cykusz>)
 - [x] bash (<https://github.com/rafalmiel/bash/tree/cykusz>)

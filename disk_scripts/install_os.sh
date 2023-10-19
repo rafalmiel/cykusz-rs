@@ -25,6 +25,7 @@ for prog in $PROGS; do
 done
 
 cp -r sysroot/cykusz/usr mnt/
+cp -r sysroot/cykusz/etc mnt/
 
 #cp -r sysroot/cross/x86_64-cykusz/lib/* mnt/usr/lib/
 #cp sysroot/test.c mnt/

@@ -19,6 +19,9 @@ $SPATH/build.sh gcc > $LOGDIR/gcc.log 2>&1
 echo "Building mlibc..."
 $SPATH/build.sh mlibc > $LOGDIR/mlibc.log 2>&1
 
+echo "Building tzdb..."
+$SPATH/build.sh tzdb > $LOGDIR/tzdb.log 2>&1
+
 echo "Building libgcc..."
 $SPATH/build.sh libgcc > $LOGDIR/libgcc.log 2>&1
 

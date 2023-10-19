@@ -88,6 +88,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_TICKSNS => sys::sys_ticksns(),
         SYS_GETPPID => sys::sys_getppid(),
         SYS_GETPGID => sys::sys_getpgid(a),
+        SYS_FSTATAT => sys::sys_fstatat(a, b, c, d),
         a => {
             logln!("NO SYS????? {}", a);
             Err(SyscallError::ENOSYS)

@@ -17,6 +17,7 @@ MPFR_SRC_DIR=$SRC_DIR/mpfr
 MPC_SRC_DIR=$SRC_DIR/mpc
 DOOM_SRC_DIR=$SRC_DIR/doomgeneric
 COREUTILS_SRC_DIR=$SRC_DIR/coreutils
+TZDB_SRC_DIR=$SRC_DIR/tzdb
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -31,6 +32,7 @@ MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
 MPFR_BUILD_DIR=$BUILD_DIR/mpfr
 MPC_BUILD_DIR=$BUILD_DIR/mpc
+TZDB_BUILD_DIR=$BUILD_DIR/tzdb
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
 CROSS=$CYKUSZ_DIR/sysroot/cross
@@ -107,6 +109,13 @@ function _prepare_coreutils {
         rm build-aux/config.sub
         mv config.sub.cykusz build-aux/config.sub
         popd
+    fi
+}
+
+function _prepare_tzdb {
+    if [ ! -d $TZDB_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/tzdb.git $TZDB_SRC_DIR
     fi
 }
 
@@ -210,6 +219,18 @@ function _libgcc {
 function _libstd {
     make -C $GCC_BUILD_DIR -j4 all-target-libstdc++-v3
     make -C $GCC_BUILD_DIR install-target-libstdc++-v3
+}
+
+function _tzdb {
+    _prepare_tzdb
+
+    make -C $TZDB_SRC_DIR
+    make -C $TZDB_SRC_DIR DESTDIR=$SYSROOT install
+
+    pushd .
+    cd $SYSROOT/etc
+    ln -sf ../usr/share/zoneinfo/Europe/London localtime
+    popd
 }
 
 function _cykusz_binutils {

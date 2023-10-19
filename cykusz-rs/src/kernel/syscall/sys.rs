@@ -15,7 +15,7 @@ use syscall_defs::{OpenFlags, SyscallError};
 use crate::kernel::fs::dirent::DirEntry;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::{lookup_by_path, lookup_by_real_path, LookupMode};
+use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::{current_task, current_task_ref, SleepFlags};
@@ -1113,6 +1113,35 @@ pub fn sys_fstat(fd: u64, stat: u64) -> SyscallResult {
     *stat = file.inode.inode().stat()?;
 
     logln!("fstat {}, {:?}", fd, stat);
+
+    Ok(0)
+}
+
+pub fn sys_fstatat(fd: u64, path: u64, path_len: u64, stat: u64) -> SyscallResult {
+    let fd = OpenFD::try_from(fd)?;
+    let path = Path::new(make_str(path, path_len));
+
+    let task = current_task_ref();
+
+    let dirent = match fd {
+        OpenFD::Fd(fd) => {
+            task.get_handle(fd).ok_or(SyscallError::EBADFD)?.inode.clone()
+        }
+        OpenFD::Cwd => {
+            task.get_dent().ok_or(SyscallError::EBADFD)?.clone()
+        }
+        OpenFD::None => {
+            return Err(SyscallError::EINVAL);
+        }
+    };
+
+    let stat = unsafe { VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>() };
+
+    let file = lookup_by_path_at(dirent, path, LookupMode::None)?;
+
+    *stat = file.inode().stat()?;
+
+    logln!("fstatat {:?}, {:?}", fd, stat);
 
     Ok(0)
 }

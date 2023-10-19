@@ -86,6 +86,7 @@ pub const SYS_TICKSNS: usize = 58;
 
 pub const SYS_GETPPID: usize = 59;
 pub const SYS_GETPGID: usize = 60;
+pub const SYS_FSTATAT: usize = 61;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]
@@ -184,9 +185,11 @@ pub enum SyscallError {
     UnknownError = 0xffff,
 }
 
+#[derive(Debug)]
 pub enum OpenFD {
     Fd(usize),
     Cwd,
+    None,
 }
 
 impl TryFrom<u64> for OpenFD {
@@ -197,6 +200,7 @@ impl TryFrom<u64> for OpenFD {
 
         match v {
             -100 => Ok(OpenFD::Cwd),
+            -1 => Ok(OpenFD::None),
             a if a >= 0 && a < 256 => Ok(OpenFD::Fd(a as usize)),
             _ => Err(SyscallError::EINVAL),
         }
@@ -208,6 +212,7 @@ impl From<OpenFD> for usize {
         match v {
             OpenFD::Fd(a) => a,
             OpenFD::Cwd => (-100isize) as usize,
+            OpenFD::None => (-1isize) as usize,
         }
     }
 }

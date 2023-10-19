@@ -24,21 +24,8 @@ for prog in $PROGS; do
 	cp -f sysroot/build/$prog mnt/bin/$prog
 done
 
-cp -r sysroot/cykusz/usr mnt/
-cp -r sysroot/cykusz/etc mnt/
-
-#cp -r sysroot/cross/x86_64-cykusz/lib/* mnt/usr/lib/
-#cp sysroot/test.c mnt/
-#cp sysroot/stack.c mnt/
-cp sysroot/sum.cpp mnt/
-cp sysroot/money.cpp mnt/
-cp sysroot/lest.hpp mnt/
-cp sysroot/ncurses.c mnt/
-cp sysroot/kbd.c mnt/
-cp sysroot/float.c mnt/
-cp sysroot/ncurses mnt/
-#cp sysroot/hello.cpp mnt/
-##cp sysroot/cykusz/usr/bin/{readelf,objdump,nm,strings,size} mnt/bin/
+rsync -a sysroot/cykusz/usr mnt/
+rsync -a sysroot/cykusz/etc mnt/
 
 mkdir -p mnt/etc
 mkdir -p mnt/home

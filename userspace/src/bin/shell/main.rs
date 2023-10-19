@@ -768,68 +768,34 @@ fn sigchld_handler(_sig: usize) {
     }
 }
 
+fn setup_signal_handler(sig: usize, handler: SignalHandler, flags: SignalFlags) {
+    if let Err(e) = syscall::sigaction(sig, Some(&SigAction::new(handler, 0, flags)), None) {
+        println!("Failed to install signal handler: {:?}", e);
+    }
+}
+
 #[no_mangle]
 pub fn main() {
-    {
-        let tty = Tty::new();
-        tty.attach();
-    }
-
-    if let Err(e) = syscall::sigaction(
+    setup_signal_handler(
         syscall_defs::signal::SIGINT,
-        Some(&SigAction::new(
-            SignalHandler::Handle(sigint_handler),
-            0,
-            SignalFlags::RESTART,
-        )),
-        None,
-    ) {
-        println!("Failed to install signal handler: {:?}", e);
-    }
-    if let Err(e) = syscall::sigaction(
+        SignalHandler::Handle(sigint_handler),
+        SignalFlags::RESTART,
+    );
+    setup_signal_handler(
         syscall_defs::signal::SIGTSTP,
-        Some(&SigAction::new(
-            SignalHandler::Handle(sigint_handler),
-            0,
-            SignalFlags::RESTART,
-        )),
-        None,
-    ) {
-        println!("Failed to install signal handler: {:?}", e);
-    }
-    if let Err(e) = syscall::sigaction(
+        SignalHandler::Handle(sigint_handler),
+        SignalFlags::RESTART,
+    );
+    setup_signal_handler(
         syscall_defs::signal::SIGQUIT,
-        Some(&SigAction::new(
-            SignalHandler::Ignore,
-            0,
-            SignalFlags::empty(),
-        )),
-        None,
-    ) {
-        println!("Failed to install signal handler: {:?}", e);
-    }
-    if let Err(e) = syscall::sigaction(
-        syscall_defs::signal::SIGCHLD,
-        Some(&SigAction::new(
-            SignalHandler::Ignore,
-            0,
-            SignalFlags::RESTART,
-        )),
-        None,
-    ) {
-        println!("Failed to install signal handler: {:?}", e);
-    }
-    if let Err(e) = syscall::sigaction(
+        SignalHandler::Ignore,
+        SignalFlags::empty(),
+    );
+    setup_signal_handler(
         syscall_defs::signal::SIGHUP,
-        Some(&SigAction::new(
-            SignalHandler::Ignore,
-            0,
-            SignalFlags::RESTART,
-        )),
-        None,
-    ) {
-        println!("Failed to install signal handler: {:?}", e);
-    }
+        SignalHandler::Ignore,
+        SignalFlags::RESTART,
+    );
 
     loop {
         let mut buf = [0u8; 256];

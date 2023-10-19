@@ -28,8 +28,8 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
 
     use syscall_defs::*;
     let res = match num as usize {
-        SYS_READ => sys::sys_read(a, b, c),
-        SYS_WRITE => sys::sys_write(a, b, c),
+        SYS_READ => sys::sys_read(a, b, c).maybe_into_erestartsys(),
+        SYS_WRITE => sys::sys_write(a, b, c).maybe_into_erestartsys(),
         SYS_OPEN => sys::sys_open(a, b, c, d),
         SYS_CLOSE => sys::sys_close(a),
         SYS_CHDIR => sys::sys_chdir(a, b),

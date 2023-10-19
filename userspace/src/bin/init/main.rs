@@ -16,6 +16,7 @@ fn spawn_shell() -> usize {
             }
             syscall::ioctl(0, syscall_defs::ioctl::tty::TIOCSCTTY, 0)
                 .expect("Failed to attach tty");
+            syscall::setpgid(0, 0).expect("Failed to make process a group leader");
             if let Err(e) = syscall::exec(
                 "/usr/bin/bash",
                 None,

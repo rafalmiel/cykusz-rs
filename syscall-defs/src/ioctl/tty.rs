@@ -1,5 +1,7 @@
 pub const TCGETS: usize = 0x5401;
 pub const TCSETS: usize = 0x5402;
+pub const TCSETSW: usize = 0x5403;
+pub const TCSETSF: usize = 0x5404;
 
 pub const TIOCSCTTY: usize = 0x540E;
 pub const TIOCNOTTY: usize = 0x5422;

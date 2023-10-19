@@ -496,7 +496,7 @@ impl INode for Tty {
                 }
 
                 if current_task_ref().terminal().connect(tty().clone()) {
-                    println!("TERMINAL ATTACHED TO TASK {}", current.tid());
+                    logln!("TERMINAL ATTACHED TO TASK {}", current.tid());
                     Ok(0)
                 } else {
                     Err(FsError::EntryExists)
@@ -567,14 +567,18 @@ impl INode for Tty {
 
                 Ok(0)
             }
-            tty::TCSETS => {
+            ioctl @ (tty::TCSETS | tty::TCSETSW | tty::TCSETSF) => {
                 let termios =
                     unsafe { VirtAddr(arg).read_ref::<syscall_defs::ioctl::tty::Termios>() };
 
-                logln!("termios TCSETS 0x{:x}", termios.c_lflag);
-                logln!("{:?}", termios);
+                logln3!("termios TCSETS 0x{:x}", termios.c_lflag);
+                logln3!("{:?}", termios);
 
                 *self.termios.lock_irq() = *termios;
+
+                if ioctl == tty::TCSETSF {
+                    self.buffer.lock_irq().flush();
+                }
 
                 Ok(0)
             }

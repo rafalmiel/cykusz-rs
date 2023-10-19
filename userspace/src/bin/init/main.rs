@@ -14,9 +14,13 @@ fn spawn_shell() -> usize {
             if let Err(e) = syscall::setsid() {
                 println!("[ init ] setsid failed {:?}", e);
             }
-            //syscall::ioctl(0, syscall_defs::ioctl::tty::TIOCSCTTY, 0)
-            //   .expect("Failed to attach tty");
-            if let Err(e) = syscall::exec("/bin/shell", None, None) {
+            syscall::ioctl(0, syscall_defs::ioctl::tty::TIOCSCTTY, 0)
+                .expect("Failed to attach tty");
+            if let Err(e) = syscall::exec(
+                "/usr/bin/bash",
+                None,
+                Some(&["PATH=/bin:/usr/bin", "TERM=cykusz"]),
+            ) {
                 panic!("Failed to spawn shell {:?}", e);
             }
 

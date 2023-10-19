@@ -410,20 +410,16 @@ impl Queues {
         self.deadline_awaiting.push_back(task);
     }
 
-    fn push_runnable(&mut self, task: Arc<Task>, continued: bool) {
+    fn push_runnable(&mut self, task: Arc<Task>, _continued: bool) {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
 
         task.set_state(TaskState::Runnable);
         //task.set_sleep_until(0);
         self.runnable.push_back(task.clone());
-
-        if continued {
-            task.set_has_pending_io(true);
-        }
     }
 
-    fn push_runnable_front(&mut self, task: Arc<Task>, continued: bool) {
+    fn push_runnable_front(&mut self, task: Arc<Task>, _continued: bool) {
         assert_eq!(task.sched.is_linked(), false);
         assert_ne!(task.tid(), self.idle_task.tid());
 
@@ -431,10 +427,6 @@ impl Queues {
         //task.set_sleep_until(0);
 
         self.runnable.push_front(task.clone());
-
-        if continued {
-            task.set_has_pending_io(true);
-        }
     }
 }
 

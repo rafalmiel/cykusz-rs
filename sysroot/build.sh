@@ -16,6 +16,7 @@ GMP_SRC_DIR=$SRC_DIR/gmp
 MPFR_SRC_DIR=$SRC_DIR/mpfr
 MPC_SRC_DIR=$SRC_DIR/mpc
 DOOM_SRC_DIR=$SRC_DIR/doomgeneric
+COREUTILS_SRC_DIR=$SRC_DIR/coreutils
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -24,6 +25,7 @@ GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
 NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
 NANO_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-nano
 BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
+COREUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-coreutils
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
@@ -91,6 +93,20 @@ function _prepare_bash {
     if [ ! -d $BASH_SRC_DIR ]; then
         mkdir -p $SRC_DIR
         git clone --depth 1 -b cykusz https://github.com/rafalmiel/bash.git $BASH_SRC_DIR
+    fi
+}
+
+function _prepare_coreutils {
+    if [ ! -d $COREUTILS_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/coreutils.git $COREUTILS_SRC_DIR
+
+        pushd .
+        cd $COREUTILS_SRC_DIR
+        ./bootstrap
+        rm build-aux/config.sub
+        mv config.sub.cykusz build-aux/config.sub
+        popd
     fi
 }
 
@@ -314,6 +330,23 @@ function _cykusz_nano {
 
     make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT LIBS="-lncursesw" -j4
     make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+}
+
+function _cykusz_coreutils {
+    _prepare_coreutils
+
+    mkdir -p $COREUTILS_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $COREUTILS_CYKUSZ_BUILD_DIR
+
+    CFLAGS="-DSLOW_BUT_NO_HACKS -Wno-error" $COREUTILS_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr
+
+    popd
+
+    make -C $COREUTILS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+    make -C $COREUTILS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
 function _cykusz_bash {

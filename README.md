@@ -6,7 +6,8 @@
 
 cykusz-rs is a toy operating system written in Rust programming language.
 
-https://user-images.githubusercontent.com/3881998/183302450-65193783-b10f-4ddd-8e3e-a702d0d928cf.mov
+https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-200129e6900d.mov
+
 
 ## Kernel
 
@@ -18,6 +19,9 @@ https://user-images.githubusercontent.com/3881998/183302450-65193783-b10f-4ddd-8
 - [x] Interrupt handlers
 - [x] ACPI support (ioapic, lapic, acpica)
 - [x] SMP
+
+
+
 - [x] Per-CPU-Storage using thread_local
 - [x] Preemptive per-cpu scheduler
 - [x] PS2/Keyboard driver

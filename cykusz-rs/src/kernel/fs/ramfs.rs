@@ -9,6 +9,7 @@ use core::sync::atomic::Ordering;
 
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::stat::Stat;
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::devnode::DevNode;
@@ -246,6 +247,14 @@ impl INode for LockedRamINode {
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
         if let Content::DevNode(Some(d)) = &self.0.read().content {
             d.ioctl(cmd, arg)
+        } else {
+            Err(FsError::NotSupported)
+        }
+    }
+
+    fn stat(&self) -> Result<Stat> {
+        if let Content::DevNode(Some(d)) = &self.0.read().content {
+            d.stat()
         } else {
             Err(FsError::NotSupported)
         }

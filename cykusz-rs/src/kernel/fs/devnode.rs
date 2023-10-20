@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 
 use syscall_defs::poll::PollEventFlags;
+use syscall_defs::stat::Stat;
 use syscall_defs::OpenFlags;
 
 use crate::kernel::device::Result as DevResult;
@@ -8,7 +9,7 @@ use crate::kernel::device::{DevError, Device};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::MappedAccess;
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::vfs::Result;
+use crate::kernel::fs::vfs::{Metadata, Result};
 
 pub struct DevNode {
     dev: Arc<dyn Device>,
@@ -31,6 +32,18 @@ impl DevNode {
 }
 
 impl INode for DevNode {
+    fn id(&self) -> Result<usize> {
+        self.dev.inode().id()
+    }
+
+    fn metadata(&self) -> Result<Metadata> {
+        self.dev.inode().metadata()
+    }
+
+    fn stat(&self) -> Result<Stat> {
+        self.dev.inode().stat()
+    }
+
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         self.dev.inode().read_at(offset, buf)
     }

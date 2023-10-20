@@ -326,7 +326,15 @@ pub fn lookup_by_path_at(
     path: Path,
     lookup_mode: LookupMode,
 ) -> Result<DirEntryItem> {
-    lookup_by_path_from(path, lookup_mode, dir, false, 0)
+    if let Some(cur) = if !path.is_absolute() {
+        Some(dir)
+    } else {
+        root_dentry().cloned()
+    } {
+        lookup_by_path_from(path, lookup_mode, cur, false, 0)
+    } else {
+        return Err(FsError::NotSupported);
+    }
 }
 
 pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {

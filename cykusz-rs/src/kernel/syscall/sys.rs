@@ -1087,43 +1087,17 @@ pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
     crate::kernel::futex::futex().wake(uaddr)
 }
 
-pub fn sys_stat(path: u64, path_len: u64, stat: u64) -> SyscallResult {
-    let _str = make_str(path, path_len);
-    let path = Path::new(make_str(path, path_len));
-
-    let stat = unsafe { VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>() };
-
-    let inode = lookup_by_path(path, LookupMode::None)?;
-
-    *stat = inode.inode().stat()?;
-
-    logln!("stat {}, {:?}", _str, stat);
-
-    Ok(0)
-}
-
-pub fn sys_fstat(fd: u64, stat: u64) -> SyscallResult {
-    let file = current_task_ref()
-        .filetable()
-        .get_handle(fd as usize)
-        .ok_or(SyscallError::EBADFD)?;
-
-    let stat = unsafe { VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>() };
-
-    *stat = file.inode.inode().stat()?;
-
-    logln!("fstat {}, {:?}", fd, stat);
-
-    Ok(0)
-}
-
-pub fn sys_fstatat(fd: u64, path: u64, path_len: u64, stat: u64) -> SyscallResult {
+pub fn sys_stat(fd: u64, path: u64, path_len: u64, stat: u64) -> SyscallResult {
     let fd = OpenFD::try_from(fd)?;
-    let path = Path::new(make_str(path, path_len));
+    let path = if path != 0 {
+        Some(Path::new(make_str(path, path_len)))
+    } else {
+        None
+    };
 
     let task = current_task_ref();
 
-    let dirent = match fd {
+    let file_dir = match fd {
         OpenFD::Fd(fd) => {
             task.get_handle(fd).ok_or(SyscallError::EBADFD)?.inode.clone()
         }
@@ -1137,9 +1111,13 @@ pub fn sys_fstatat(fd: u64, path: u64, path_len: u64, stat: u64) -> SyscallResul
 
     let stat = unsafe { VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>() };
 
-    let file = lookup_by_path_at(dirent, path, LookupMode::None)?;
+    if let Some(path) = path {
+        let file = lookup_by_path_at(file_dir, path, LookupMode::None)?;
 
-    *stat = file.inode().stat()?;
+        *stat = file.inode().stat()?;
+    } else {
+        *stat = file_dir.inode().stat()?;
+    }
 
     logln!("fstatat {:?}, {:?}", fd, stat);
 

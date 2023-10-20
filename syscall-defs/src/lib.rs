@@ -73,7 +73,6 @@ pub const SYS_PIPE: usize = 47;
 pub const SYS_DUP: usize = 48;
 pub const SYS_DUP2: usize = 49;
 pub const SYS_STAT: usize = 50;
-pub const SYS_FSTAT: usize = 51;
 
 pub const SYS_GETRLIMIT: usize = 52;
 pub const SYS_DEBUG: usize = 53;
@@ -86,7 +85,6 @@ pub const SYS_TICKSNS: usize = 58;
 
 pub const SYS_GETPPID: usize = 59;
 pub const SYS_GETPGID: usize = 60;
-pub const SYS_FSTATAT: usize = 61;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

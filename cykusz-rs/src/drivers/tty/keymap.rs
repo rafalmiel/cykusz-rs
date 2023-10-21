@@ -126,7 +126,23 @@ pub static RAW_MODE_MAP: [Option<&'static [u8]>; 128] = {
         [KeyCode::KEY_ENTER, b"\x0d"],
         [KeyCode::KEY_KPENTER, b"\x0d"],
         [KeyCode::KEY_BACKSPACE, b"\x08"],
+        [KeyCode::KEY_HOME, b"\x1bOH"],
+        [KeyCode::KEY_END, b"\x1bOF"],
+        [KeyCode::KEY_PAGEDOWN, b"\x1b[6~"],
+        [KeyCode::KEY_PAGEUP, b"\x1b[5~"],
         [KeyCode::KEY_DELETE, b"\x1b[3~"]
+    );
+
+    arr
+};
+pub static RAW_MODE_CTRL_MAP: [Option<&'static [u8]>; 128] = {
+    let mut arr: [Option<&'static [u8]>; 128] = [None; 128];
+
+    init_arr!(
+        arr,
+        [KeyCode::KEY_RIGHT, b"\x1b[1;5C"],
+        [KeyCode::KEY_LEFT, b"\x1b[1;5D"],
+        [KeyCode::KEY_DELETE, b"\x1b[3;5~"]
     );
 
     arr

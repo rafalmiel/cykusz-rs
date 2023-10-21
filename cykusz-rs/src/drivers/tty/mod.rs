@@ -79,8 +79,12 @@ impl State {
         }
     }
 
-    fn map_raw_sequence(&self, key_code: KeyCode) -> Option<&'static [u8]> {
-        return keymap::RAW_MODE_MAP[key_code as usize];
+    fn map_raw_sequence(&self, key_code: KeyCode, state: &SpinGuard<State>) -> Option<&'static [u8]> {
+        if state.lctrl | state.rctrl {
+            return keymap::RAW_MODE_CTRL_MAP[key_code as usize]
+        } else {
+            return keymap::RAW_MODE_MAP[key_code as usize];
+        }
     }
 
     fn map(&self, apply_caps: bool) -> Option<&'static [u16]> {
@@ -277,7 +281,7 @@ impl Tty {
 
     fn output_sym(&self, key: KeyCode, state: SpinGuard<State>, canonical: bool) {
         if !canonical {
-            if let Some(seq) = state.map_raw_sequence(key) {
+            if let Some(seq) = state.map_raw_sequence(key, &state) {
                 let mut buf = self.buffer.lock_irq();
                 for v in seq {
                     buf.put_char(*v);

@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::cmp::max;
 
 use crate::arch::output::{video, Color, ColorCode, ScreenChar};
 use crate::kernel::utils::types::Align;
@@ -371,6 +372,8 @@ impl OutputBuffer {
 
         let bytes = str.as_bytes();
 
+        //logln4!("tty: {:?}", bytes);
+
         for c in bytes.iter() {
             self.state.advance(&mut performer, *c);
         }
@@ -551,7 +554,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 if let Some(&[x, ..]) = iter.next() {
                     let cur = self.output.cursor_x;
 
-                    self.output.cursor_x = min(self.output.size_x - 1, cur + x as usize);
+                    self.output.cursor_x = min(self.output.size_x - 1, cur + max(1, x as usize));
                 }
             }
             'D' => {

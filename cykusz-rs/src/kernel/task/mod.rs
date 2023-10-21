@@ -14,6 +14,7 @@ use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::sched::{new_task_tid, SleepFlags};
+
 use crate::kernel::signal::{SignalResult, Signals, KSIGSTOPTHR};
 use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
 use crate::kernel::task::children_events::WaitPidEvents;
@@ -690,7 +691,11 @@ impl Task {
 
     pub fn signal(&self, sig: usize) -> bool {
         logln2!("signal {} sig: {}", self.pid(), sig);
-        self.do_signal(sig, false)
+        if self.state() != TaskState::Unused {
+            self.do_signal(sig, false)
+        } else {
+            false
+        }
     }
 
     pub fn signal_thread(&self, sig: usize) -> bool {
@@ -761,6 +766,6 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        logln!("drop task {}", self.tid());
+        logln4!("drop task {}", self.tid());
     }
 }

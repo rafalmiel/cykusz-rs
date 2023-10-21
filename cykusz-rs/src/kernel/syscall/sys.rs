@@ -1098,12 +1098,12 @@ pub fn sys_stat(fd: u64, path: u64, path_len: u64, stat: u64) -> SyscallResult {
     let task = current_task_ref();
 
     let file_dir = match fd {
-        OpenFD::Fd(fd) => {
-            task.get_handle(fd).ok_or(SyscallError::EBADFD)?.inode.clone()
-        }
-        OpenFD::Cwd => {
-            task.get_dent().ok_or(SyscallError::EBADFD)?.clone()
-        }
+        OpenFD::Fd(fd) => task
+            .get_handle(fd)
+            .ok_or(SyscallError::EBADFD)?
+            .inode
+            .clone(),
+        OpenFD::Cwd => task.get_dent().ok_or(SyscallError::EBADFD)?.clone(),
         OpenFD::None => {
             return Err(SyscallError::EINVAL);
         }

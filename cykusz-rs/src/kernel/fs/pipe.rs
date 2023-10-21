@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use syscall_defs::stat::Stat;
 use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
@@ -16,6 +17,7 @@ pub struct Pipe {
 
 impl Pipe {
     pub fn new() -> Arc<Pipe> {
+        logln4!("Created PIPE");
         Arc::new(Pipe {
             buf: BufferQueue::new(4096 * 4),
 
@@ -41,7 +43,24 @@ impl Pipe {
     }
 }
 
+impl Drop for Pipe {
+    fn drop(&mut self) {
+        logln4!("Dopped PIPE");
+    }
+}
+
 impl INode for Pipe {
+    fn stat(&self) -> Result<Stat> {
+        let mut stat = Stat::default();
+
+        stat.st_mode.insert(syscall_defs::stat::Mode::IFIFO);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
+
+        Ok(stat)
+    }
+
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         Ok(self.buf.read_data(buf)?)
     }

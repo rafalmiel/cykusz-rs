@@ -257,3 +257,16 @@ macro_rules! log3 {
         //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
     }};
 }
+
+#[macro_export]
+macro_rules! logln4 {
+    ($fmt:expr) => (log4!(concat!("[log4]: ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log4!(concat!("[log4]: ", $fmt, "\n"), $($arg)*));
+}
+
+#[macro_export]
+macro_rules! log4 {
+    ($($arg:tt)*) => {{
+        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+    }};
+}

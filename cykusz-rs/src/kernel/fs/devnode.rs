@@ -40,10 +40,6 @@ impl INode for DevNode {
         self.dev.inode().metadata()
     }
 
-    fn stat(&self) -> Result<Stat> {
-        self.dev.inode().stat()
-    }
-
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         self.dev.inode().read_at(offset, buf)
     }

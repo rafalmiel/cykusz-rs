@@ -432,22 +432,6 @@ impl INode for Tty {
         Ok(self.dev_id)
     }
 
-    fn stat(&self) -> Result<syscall_defs::stat::Stat, FsError> {
-        let mut stat = syscall_defs::stat::Stat::default();
-
-        logln!("CALLING STAT ON TTY");
-
-        stat.st_ino = self.inode().id()? as u64;
-        //stat.st_dev = self.device().unwrap().id() as u64;
-        stat.st_mode.insert(syscall_defs::stat::Mode::IFCHR);
-
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
-
-        Ok(stat)
-    }
-
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
         logln2!("try tty read");
         let r = self.read(buf.as_mut_ptr(), buf.len());

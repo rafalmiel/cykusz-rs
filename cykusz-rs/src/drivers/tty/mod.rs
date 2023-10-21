@@ -79,9 +79,13 @@ impl State {
         }
     }
 
-    fn map_raw_sequence(&self, key_code: KeyCode, state: &SpinGuard<State>) -> Option<&'static [u8]> {
+    fn map_raw_sequence(
+        &self,
+        key_code: KeyCode,
+        state: &SpinGuard<State>,
+    ) -> Option<&'static [u8]> {
         if state.lctrl | state.rctrl {
-            return keymap::RAW_MODE_CTRL_MAP[key_code as usize]
+            return keymap::RAW_MODE_CTRL_MAP[key_code as usize];
         } else {
             return keymap::RAW_MODE_MAP[key_code as usize];
         }

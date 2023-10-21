@@ -44,8 +44,8 @@ impl OutputUpdate {
 
                     *cur = line;
                     *len += offset;
-                } else if *cur + *len < line {
-                    let offset = line - *cur + *len;
+                } else if *cur + *len - 1 < line {
+                    let offset = line - *cur + *len - 1;
 
                     *len += offset;
                 }
@@ -372,7 +372,16 @@ impl OutputBuffer {
 
         let bytes = str.as_bytes();
 
-        //logln4!("tty: {:?}", bytes);
+        log4!("[tty in]: ");
+        for b in bytes {
+            let c = *b as char;
+            if c.is_ascii_alphabetic() || c.is_ascii_punctuation() {
+                log4!("{}", c);
+            } else {
+                log4!("{}", *b);
+            }
+        }
+        log4!("\n");
 
         for c in bytes.iter() {
             self.state.advance(&mut performer, *c);
@@ -524,8 +533,9 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 let mut iter = params.iter();
 
                 if let Some(&[x, ..]) = iter.next() {
+                    logln4!("Action A: x: {}", x);
                     if self.output.cursor_y >= x as usize {
-                        self.output.cursor_y -= x as usize;
+                        self.output.cursor_y -= max(1, x) as usize;
                     } else {
                         self.output.cursor_y = 0;
                     }
@@ -642,6 +652,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
             'K' => {
                 let mut iter = params.iter();
                 if let Some(&[x, ..]) = iter.next() {
+                    logln4!("K Action, x: {}", x);
                     let buf_pos = self.output.cursor_buf_pos();
 
                     let blank = self.output.blank();

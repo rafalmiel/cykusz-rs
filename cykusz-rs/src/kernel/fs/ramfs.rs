@@ -8,8 +8,8 @@ use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
 use syscall_defs::poll::PollEventFlags;
-use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::stat::Stat;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::devnode::DevNode;

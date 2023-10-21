@@ -22,6 +22,8 @@ impl Group {
 
         leader.set_gid(group.id);
 
+        logln4!("New group {}, sid: {}", leader.pid(), leader.sid());
+
         group.processes.lock().insert(leader.pid(), leader);
 
         Arc::new(group)
@@ -93,6 +95,8 @@ impl Session {
             groups: Spin::new(hashbrown::HashMap::new()),
         };
 
+        logln4!("New session {}", leader.pid());
+
         leader.set_sid(session.id);
 
         session
@@ -109,6 +113,7 @@ impl Session {
         if let Some(group) = groups.get(&process.gid()) {
             if let Ok(num) = group.remove_process(process.pid()) {
                 if num == 0 {
+                    logln4!("Remove group {}", process.gid());
                     groups.remove(&process.gid());
                 }
 
@@ -126,12 +131,28 @@ impl Session {
 
         let to = if group != 0 { groups.get(&group) } else { None };
 
+        if group != 0 && to.is_none() {
+            for (_id, _g) in groups.iter() {
+                logln4!("Group {} not found, existing: {}", group, id);
+            }
+        }
+
+        logln4!(
+            "Move from {} to {}",
+            from.id(),
+            if to.is_some() { to.unwrap().id() } else { 0 }
+        );
+
         if group == 0 || (to.is_none() && group == process.pid()) {
             from.remove_process(process.pid())?;
 
-            if groups.insert(process.pid(), Group::new(process)).is_some() {
+            if groups
+                .insert(process.pid(), Group::new(process.clone()))
+                .is_some()
+            {
                 Err(SyscallError::EPERM)
             } else {
+                logln4!("Group {} inserted", process.gid());
                 Ok(0)
             }
         } else if let Some(to) = to {
@@ -167,6 +188,10 @@ impl Session {
         for (_id, group) in groups.iter() {
             group.for_each(&f);
         }
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
     }
 }
 
@@ -229,6 +254,8 @@ impl Sessions {
         if let Some(session) = sessions.get(&process.sid()) {
             assert!(!process.is_session_leader());
 
+            logln4!("Add {} to session {}", process.pid(), session.id());
+
             session.register_task(process);
         } else {
             assert!(process.is_session_leader());
@@ -269,7 +296,7 @@ impl Sessions {
     pub fn set_pgid(&self, pid: usize, gid: usize) -> SyscallResult {
         let caller = current_task().process_leader();
 
-        logln3!("set_pgid {} {}", pid, gid);
+        logln4!("set_pgid {} {}", pid, gid);
 
         let process = if pid == 0 || pid == caller.pid() {
             caller.clone()

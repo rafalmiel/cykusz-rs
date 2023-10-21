@@ -200,6 +200,8 @@ impl Scheduler {
 
         let forked = current.fork();
 
+        logln4!("fork {} -> {}", current.tid(), forked.tid());
+
         self.tasks.register_task(forked.clone());
 
         sessions().register_process(forked.clone());
@@ -265,10 +267,6 @@ impl Scheduler {
             current.close_all_files();
 
             self.tasks.remove_task(current.tid());
-
-            if let Err(e) = sessions().remove_process(current) {
-                panic!("Failed to remove process from a session {:?}", e);
-            }
 
             current.migrate_children_to_init();
 

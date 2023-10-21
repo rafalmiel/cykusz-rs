@@ -1,6 +1,7 @@
 use alloc::sync::Arc;
 
 use crate::kernel::sched::current_task_ref;
+use crate::kernel::session::sessions;
 use intrusive_collections::LinkedList;
 use syscall_defs::waitpid::WaitPidFlags;
 use syscall_defs::{SyscallError, SyscallResult};
@@ -85,6 +86,12 @@ impl WaitPidEvents {
 
                     if status.is_exited() || status.is_signaled() {
                         t.remove_from_parent();
+
+                        if t.is_process_leader() {
+                            if let Err(e) = sessions().remove_process(&t.me()) {
+                                panic!("Failed to remove process from a session {:?}", e);
+                            }
+                        }
                     }
 
                     cur.remove();

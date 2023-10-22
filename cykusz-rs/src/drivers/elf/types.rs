@@ -89,6 +89,7 @@ pub enum AuxvType {
     AtPhEnt = 4,
     AtPhNum = 5,
     AtEntry = 9,
+    AtExecFn = 31,
 }
 
 impl Default for AuxvType {

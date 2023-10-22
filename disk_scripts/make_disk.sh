@@ -2,13 +2,13 @@
 
 set -e
 
-dd if=/dev/zero of=disk.img count=$((1024*3 + 64)) bs=$((1024*1024))
+dd if=/dev/zero of=disk.img count=$((1024*4 + 64)) bs=$((1024*1024))
 chown $1:$1 disk.img
 
 parted disk.img mktable msdos -s
 parted disk.img mkpart primary ext2 2048s 64MiB
-parted -- disk.img mkpart primary ext2 64Mib 2Gib # 112MB
-parted -- disk.img mkpart primary ext2 2GiB 2.5Gib # 64
+parted -- disk.img mkpart primary ext2 64Mib 3Gib # 112MB
+parted -- disk.img mkpart primary ext2 3GiB 3.5Gib # 64
 parted disk.img set 1 boot on
 
 losetup -D

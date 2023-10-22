@@ -73,6 +73,7 @@ pub const SYS_PIPE: usize = 47;
 pub const SYS_DUP: usize = 48;
 pub const SYS_DUP2: usize = 49;
 pub const SYS_STAT: usize = 50;
+pub const SYS_READLINK: usize = 51;
 
 pub const SYS_GETRLIMIT: usize = 52;
 pub const SYS_DEBUG: usize = 53;

@@ -18,6 +18,8 @@ MPC_SRC_DIR=$SRC_DIR/mpc
 DOOM_SRC_DIR=$SRC_DIR/doomgeneric
 COREUTILS_SRC_DIR=$SRC_DIR/coreutils
 TZDB_SRC_DIR=$SRC_DIR/tzdb
+ZSTD_SRC_DIR=$SRC_DIR/zstd
+LLVM_SRC_DIR=$SRC_DIR/llvm-project
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -27,12 +29,13 @@ NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
 NANO_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-nano
 BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
 COREUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-coreutils
+ZSTD_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zstd
+LLVM_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-llvm
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
 MPFR_BUILD_DIR=$BUILD_DIR/mpfr
 MPC_BUILD_DIR=$BUILD_DIR/mpc
-TZDB_BUILD_DIR=$BUILD_DIR/tzdb
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
 CROSS=$CYKUSZ_DIR/sysroot/cross
@@ -116,6 +119,20 @@ function _prepare_tzdb {
     if [ ! -d $TZDB_SRC_DIR ]; then
         mkdir -p $SRC_DIR
         git clone --depth 1 -b cykusz https://github.com/rafalmiel/tzdb.git $TZDB_SRC_DIR
+    fi
+}
+
+function _prepare_zstd {
+    if [ ! -d $ZSTD_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/zstd.git $ZSTD_SRC_DIR
+    fi
+}
+
+function _prepare_llvm {
+    if [ ! -d $LLVM_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/llvm-project.git $LLVM_SRC_DIR
     fi
 }
 
@@ -221,7 +238,7 @@ function _libstd {
     make -C $GCC_BUILD_DIR install-target-libstdc++-v3
 }
 
-function _tzdb {
+function _cykusz_tzdb {
     _prepare_tzdb
 
     make -C $TZDB_SRC_DIR
@@ -230,6 +247,9 @@ function _tzdb {
     pushd .
     cd $SYSROOT/etc
     ln -sf ../usr/share/zoneinfo/Europe/London localtime
+
+    cd $TZDB_SRC_DIR
+    git clean -xfd
     popd
 }
 
@@ -384,6 +404,42 @@ function _cykusz_bash {
 
     make -C $BASH_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT
     make -C $BASH_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+}
+
+function _cykusz_llvm {
+    _prepare_llvm
+
+    mkdir -p $LLVM_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LLVM_CYKUSZ_BUILD_DIR
+
+    export CYKUSZ_SYSROOT_DIR=$SYSROOT
+    export CYKUSZ_ROOT_DIR=$SPATH
+    cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_TARGET_ARCH=x86_64 -DLLVM_DEFAULT_TARGET_TRIPLE=$TRIPLE -DLLVM_HOST_TRIPLE=$TRIPLE -Wno-dev $LLVM_SRC_DIR/llvm
+
+    ninja
+    
+    DESTDIR=$SYSROOT ninja install
+
+    popd
+}
+
+function _cykusz_zstd {
+    _prepare_zstd
+
+    mkdir -p $ZSTD_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $ZSTD_CYKUSZ_BUILD_DIR
+
+    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $ZSTD_SRC_DIR/build/cmake
+    make -j8
+    DESTDIR=$SYSROOT make install
+
+    popd
 }
 
 function _cross {

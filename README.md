@@ -47,6 +47,7 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 - [x] mlibc (<https://github.com/rafalmiel/mlibc/tree/cykusz>) ([upstream](https://github.com/managarm/mlibc))
 - [x] binutils (<https://github.com/rafalmiel/binutils-gdb/tree/cykusz>)
 - [x] gcc (<https://github.com/rafalmiel/gcc/tree/cykusz>)
+- [x] llvm (<https://github.com/rafalmiel/llvm-project/tree/cykusz>)
 - [x] coreutils (<https://github.com/rafalmiel/coreutils/tree/cykusz>)
 - [x] nyancat (<https://github.com/rafalmiel/nyancat/tree/cykusz>)
 - [x] ncurses (<https://github.com/rafalmiel/ncurses/tree/cykusz>)

@@ -126,6 +126,32 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     };
 }
 
+pub fn sys_readlink(path: u64, path_len: u64, buf: u64, max_size: u64, len: u64) -> SyscallResult {
+    let target = make_str(path, path_len);
+
+    let inode = lookup_by_real_path(Path::new(target), LookupMode::None)?;
+
+    if inode.inode().ftype()? != FileType::Symlink {
+        return Err(SyscallError::EINVAL);
+    }
+
+    let link = crate::kernel::fs::read_link(&inode.inode())?;
+
+    if link.len() > max_size as usize {
+        return Err(SyscallError::EFAULT);
+    }
+
+    make_buf_mut(buf, link.len() as u64).copy_from_slice(link.as_bytes());
+
+    logln4!("read link read {}, len: {}", link, link.len());
+
+    unsafe {
+        *VirtAddr(len as usize).read_mut() = link.len();
+    }
+
+    Ok(0)
+}
+
 pub fn sys_pread(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
     let fd = fd as usize;
 
@@ -1144,7 +1170,7 @@ pub fn sys_getrlimit(resource: u64, rlimit: u64) -> SyscallResult {
 }
 
 pub fn sys_debug(str: u64, str_len: u64) -> SyscallResult {
-    logln!("{}", make_str(str, str_len));
+    logln4!("{}", make_str(str, str_len));
 
     Ok(0)
 }

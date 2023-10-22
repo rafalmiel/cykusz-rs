@@ -133,7 +133,7 @@ impl Session {
 
         if group != 0 && to.is_none() {
             for (_id, _g) in groups.iter() {
-                logln4!("Group {} not found, existing: {}", group, id);
+                logln4!("Group {} not found, existing: {}", group, _id);
             }
         }
 

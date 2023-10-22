@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use crate::arch::mm::VirtAddr;
 use crate::drivers::elf::types::AuxvType;
 use crate::drivers::elf::ElfHeader;
@@ -59,12 +60,13 @@ impl<'a> StackHelper<'a> {
         v
     }
 
-    pub unsafe fn write_aux(&mut self, hdr: &ElfHeader, base_addr: VirtAddr) {
-        let hdr: [(AuxvType, usize); 4] = [
+    pub unsafe fn write_aux(&mut self, hdr: &ElfHeader, base_addr: VirtAddr, path_ptr: u64) {
+        let mut hdr: [(AuxvType, usize); 5] = [
             (AuxvType::AtPhdr, hdr.e_phoff as usize + base_addr.0),
             (AuxvType::AtPhEnt, hdr.e_phentsize as usize),
             (AuxvType::AtPhNum, hdr.e_phnum as usize),
             (AuxvType::AtEntry, hdr.e_entry as usize),
+            (AuxvType::AtExecFn, path_ptr as usize),
         ];
 
         self.write(0usize); // Make it 16 bytes aligned

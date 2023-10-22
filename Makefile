@@ -23,6 +23,8 @@ kernel := build/kernel-$(arch).bin
 endif
 cross_cpp := sysroot/cross/bin/x86_64-cykusz-g++
 cross_c := sysroot/cross/bin/x86_64-cykusz-gcc
+cross_clang := sysroot/cross/bin/clang --sysroot sysroot/cykusz/  -target x86_64-cykusz
+cross_clangpp := sysroot/cross/bin/clang++ --sysroot sysroot/cykusz/  -target x86_64-cykusz
 cross_strip := sysroot/cross/bin/x86_64-cykusz-strip
 cross_hello := sysroot/build/hello
 cross_test := sysroot/build/test

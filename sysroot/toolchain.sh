@@ -58,4 +58,10 @@ $SPATH/build.sh cykusz_doom > $LOGDIR/cykusz_doom.log 2>&1
 echo "Cross building bash..."
 $SPATH/build.sh cykusz_bash > $LOGDIR/cykusz_bash.log 2>&1
 
+echo "Cross building zstd..."
+$SPATH/build.sh cykusz_zstd > $LOGDIR/cykusz_zstd.log 2>&1
+
+echo "Cross building llvm..."
+$SPATH/build.sh cykusz_llvm > $LOGDIR/cykusz_llvm.log 2>&1
+
 echo "Success!"

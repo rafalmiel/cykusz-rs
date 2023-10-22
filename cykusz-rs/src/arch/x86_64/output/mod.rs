@@ -230,7 +230,7 @@ macro_rules! logln {
 #[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => ({
-        $crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
     });
 }
 #[macro_export]
@@ -267,6 +267,6 @@ macro_rules! logln4 {
 #[macro_export]
 macro_rules! log4 {
     ($($arg:tt)*) => {{
-        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        $crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
     }};
 }

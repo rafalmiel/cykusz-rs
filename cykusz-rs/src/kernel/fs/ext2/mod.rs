@@ -4,6 +4,7 @@ use alloc::sync::{Arc, Weak};
 use crate::kernel::block::BlockDev;
 use spin::Once;
 use uuid::Uuid;
+use crate::kernel::device::Device;
 
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};

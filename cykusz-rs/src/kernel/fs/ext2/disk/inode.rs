@@ -95,6 +95,10 @@ impl INode {
         let mask = 0b1111_1111_1111;
         self.type_and_perm = (self.type_and_perm & !mask) | (perm & mask);
     }
+    pub fn perm(&self) -> u16 {
+        let mask = 0b1111_1111_1111;
+        self.type_and_perm & mask
+    }
     pub fn user_id(&self) -> u16 {
         self.user_id
     }

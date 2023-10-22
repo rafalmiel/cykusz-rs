@@ -372,16 +372,16 @@ impl OutputBuffer {
 
         let bytes = str.as_bytes();
 
-        log4!("[tty in]: ");
-        for b in bytes {
-            let c = *b as char;
-            if c.is_ascii_alphabetic() || c.is_ascii_punctuation() {
-                log4!("{}", c);
-            } else {
-                log4!("{}", *b);
-            }
-        }
-        log4!("\n");
+        //log4!("[tty in]: ");
+        //for b in bytes {
+        //    let c = *b as char;
+        //    if c.is_ascii_alphabetic() || c.is_ascii_punctuation() {
+        //        log4!("{}", c);
+        //    } else {
+        //        log4!("{}", *b);
+        //    }
+        //}
+        //log4!("\n");
 
         for c in bytes.iter() {
             self.state.advance(&mut performer, *c);

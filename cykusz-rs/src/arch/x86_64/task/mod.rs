@@ -1,3 +1,4 @@
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::mem::size_of;
 use core::ptr::Unique;
@@ -487,6 +488,7 @@ impl Task {
         hdr: &ElfHeader,
         vm: &VM,
         tls_vm: Option<TlsVmInfo>,
+        path: String,
         args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> ! {
@@ -544,6 +546,12 @@ impl Task {
         if let Some(a) = args {
             argp = a.write_strings(&mut helper);
         }
+        unsafe {
+            helper.write(0u8);
+            helper.write_bytes(path.as_bytes());
+        };
+
+        let path_ptr = helper.current();
 
         helper.align_down();
 
@@ -557,7 +565,7 @@ impl Task {
         }
 
         unsafe {
-            helper.write_aux(hdr, base_addr);
+            helper.write_aux(hdr, base_addr, path_ptr);
         }
 
         unsafe {

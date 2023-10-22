@@ -193,7 +193,7 @@ impl From<OpenFlags> for LookupMode {
     }
 }
 
-fn read_link(inode: &Arc<dyn INode>) -> Result<String> {
+pub fn read_link(inode: &Arc<dyn INode>) -> Result<String> {
     let mut path = Vec::<u8>::new();
     path.resize(128, 0);
 

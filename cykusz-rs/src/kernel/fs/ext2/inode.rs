@@ -72,7 +72,7 @@ impl LockedExt2INode {
             *inner = disk::inode::INode::default();
 
             inner.set_ftype(typ.into());
-            inner.set_perm(0o755);
+            inner.set_perm(0o644);
             inner.set_user_id(0);
             inner.set_group_id(0);
 
@@ -534,11 +534,18 @@ impl INode for LockedExt2INode {
         let inode = self.read_debug(28);
 
         stat.st_ino = inode.id as u64;
-        //stat.st_dev = self.device().unwrap().id() as u64;
+        stat.st_dev = self.ext2_fs().dev().id() as u64;
         stat.st_nlink = inode.d_inode.hl_count() as u32;
         stat.st_blksize = self.ext2_fs().superblock().block_size() as u64;
         stat.st_blocks = inode.d_inode.sector_count() as u64;
         stat.st_size = inode.d_inode.size_lower() as i64;
+
+        stat.st_atim =
+            syscall_defs::time::Timespec::from_secs(inode.d_inode.last_access() as usize);
+        stat.st_mtim =
+            syscall_defs::time::Timespec::from_secs(inode.d_inode.last_modification() as usize);
+        stat.st_ctim =
+            syscall_defs::time::Timespec::from_secs(inode.d_inode.creation_time() as usize);
 
         let ftype = inode.ftype();
         if ftype == FileType::File {
@@ -551,9 +558,10 @@ impl INode for LockedExt2INode {
             stat.st_mode.insert(syscall_defs::stat::Mode::IFCHR);
         }
 
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
+        stat.st_mode
+            .insert(syscall_defs::stat::Mode::from_bits_truncate(
+                inode.d_inode.perm() as u32,
+            ));
 
         Ok(stat)
     }

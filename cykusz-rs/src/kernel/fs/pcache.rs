@@ -204,6 +204,8 @@ pub trait CachedBlockDev: CachedAccess {
     fn notify_dirty_inode(&self, _page: &PageCacheItemArc);
     fn notify_clean_inode(&self, _page: &PageCacheItem);
     fn sync_all(&self);
+
+    fn id(&self) -> usize;
 }
 
 pub enum MMapPage {

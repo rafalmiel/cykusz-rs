@@ -353,6 +353,10 @@ impl CachedBlockDev for BlockDevice {
 
         logln!("Syncing... finished");
     }
+
+    fn id(&self) -> usize {
+        self.id
+    }
 }
 
 pub fn sync_all() {

@@ -34,6 +34,7 @@ jobs:
         run: ./sysroot/toolchain.sh
 
       - name: Upload toolchain build logs
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: toolchain_logs

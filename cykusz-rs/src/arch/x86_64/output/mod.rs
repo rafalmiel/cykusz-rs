@@ -195,6 +195,11 @@ pub fn log_fmt(args: core::fmt::Arguments) -> core::fmt::Result {
     core::fmt::write(&mut Log {}, args)
 }
 
+pub fn log_fmt_disabled(_args: core::fmt::Arguments) -> core::fmt::Result {
+    //core::fmt::write(&mut Log {}, args)
+    Ok(())
+}
+
 #[macro_export]
 macro_rules! println {
     ($fmt:expr) => (print!(concat!($fmt, "\n")));
@@ -215,9 +220,11 @@ macro_rules! logln_disabled {
 }
 
 #[macro_export]
+#[allow(unused)]
 macro_rules! log_disabled {
     ($($arg:tt)*) => {{
-        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        let _ = ($($arg)*);
+        $crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
     }};
 }
 
@@ -228,9 +235,10 @@ macro_rules! logln {
 }
 
 #[macro_export]
+#[allow(unused)]
 macro_rules! log {
     ($($arg:tt)*) => ({
-        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        $crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
     });
 }
 #[macro_export]
@@ -240,9 +248,10 @@ macro_rules! logln2 {
 }
 
 #[macro_export]
+#[allow(unused)]
 macro_rules! log2 {
     ($($arg:tt)*) => {{
-        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        $crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
     }};
 }
 #[macro_export]
@@ -252,9 +261,10 @@ macro_rules! logln3 {
 }
 
 #[macro_export]
+#[allow(unused)]
 macro_rules! log3 {
     ($($arg:tt)*) => {{
-        //$crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        $crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
     }};
 }
 
@@ -265,8 +275,9 @@ macro_rules! logln4 {
 }
 
 #[macro_export]
+#[allow(unused)]
 macro_rules! log4 {
     ($($arg:tt)*) => {{
-        $crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        $crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
     }};
 }

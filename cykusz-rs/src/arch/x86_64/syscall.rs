@@ -56,7 +56,7 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
             regs.rax, regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9,
         );
 
-        logln_disabled!("done syscall {} = {}", regs.rax, res);
+        logln_disabled!("done syscall {} = {:?}", regs.rax, res);
 
         crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs);
     }

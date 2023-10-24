@@ -812,16 +812,16 @@ impl VMData {
 
     fn log_vm(&self) {
         for e in self.maps.iter() {
-            if let Some(_f) = &e.mmaped_file {
+            if let Some(f) = &e.mmaped_file {
                 logln_disabled!(
                     "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
                     e.start,
                     e.end,
                     e.prot,
                     e.flags,
-                    _f.file.full_path(),
-                    _f.starting_offset,
-                    _f.len,
+                    f.file.full_path(),
+                    f.starting_offset,
+                    f.len,
                 );
             } else {
                 logln_disabled!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);

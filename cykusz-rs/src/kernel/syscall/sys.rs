@@ -460,6 +460,8 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
 }
 
 pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResult {
+    let path = Path::new(make_str(path, path_len));
+    logln4!("sys_unlink: {}", path.str());
     if flags != 0 {
         return Err(SyscallError::EINVAL);
     }
@@ -471,9 +473,7 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
         return Err(SyscallError::EBADFD);
     }
 
-    let path = Path::new(make_str(path, path_len));
 
-    logln!("sys_unlink: {}", path.str());
 
     let (_, name) = path.containing_dir();
 
@@ -1101,6 +1101,15 @@ pub fn sys_dup2(fd: u64, new_fd: u64, flags: u64) -> SyscallResult {
 
     task.filetable()
         .duplicate_at(fd as usize, new_fd as usize, flags)
+}
+
+pub fn sys_truncate(fd: u64, size: u64) -> SyscallResult {
+    logln4!("truncate {} to size {}", fd, size);
+    let task = current_task_ref();
+
+    task.filetable().get_handle(fd as usize).ok_or(SyscallError::EBADFD)?.inode.inode().truncate(size as usize).map(|_r| {
+        Ok(0)
+    })?
 }
 
 pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {

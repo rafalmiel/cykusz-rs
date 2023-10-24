@@ -473,8 +473,6 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
         return Err(SyscallError::EBADFD);
     }
 
-
-
     let (_, name) = path.containing_dir();
 
     let file = lookup_by_real_path(path, LookupMode::None)?;
@@ -1107,9 +1105,13 @@ pub fn sys_truncate(fd: u64, size: u64) -> SyscallResult {
     logln4!("truncate {} to size {}", fd, size);
     let task = current_task_ref();
 
-    task.filetable().get_handle(fd as usize).ok_or(SyscallError::EBADFD)?.inode.inode().truncate(size as usize).map(|_r| {
-        Ok(0)
-    })?
+    task.filetable()
+        .get_handle(fd as usize)
+        .ok_or(SyscallError::EBADFD)?
+        .inode
+        .inode()
+        .truncate(size as usize)
+        .map(|_r| Ok(0))?
 }
 
 pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {

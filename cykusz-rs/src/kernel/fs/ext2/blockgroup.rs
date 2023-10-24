@@ -359,7 +359,7 @@ impl BlockGroupDescriptors {
     pub fn debug(&self) {
         let l = self.d_desc.lock();
 
-        for _d in l.vec.iter() {
+        for d in l.vec.iter() {
             logln_disabled!("{:?}", d);
         }
     }

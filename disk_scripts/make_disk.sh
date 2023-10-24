@@ -7,7 +7,7 @@ chown $1:$1 disk.img
 
 parted disk.img mktable msdos -s
 parted disk.img mkpart primary ext2 2048s 64MiB
-parted -- disk.img mkpart primary ext2 64Mib 3Gib # 112MB
+parted -- disk.img mkpart primary ext2 64Mib 3GiB # 112MB
 parted -- disk.img mkpart primary ext2 3GiB 3.5Gib # 64
 parted disk.img set 1 boot on
 

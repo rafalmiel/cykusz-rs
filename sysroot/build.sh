@@ -20,6 +20,7 @@ COREUTILS_SRC_DIR=$SRC_DIR/coreutils
 TZDB_SRC_DIR=$SRC_DIR/tzdb
 ZSTD_SRC_DIR=$SRC_DIR/zstd
 LLVM_SRC_DIR=$SRC_DIR/llvm-project
+LESS_SRC_DIR=$SRC_DIR/less
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -31,6 +32,7 @@ BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
 COREUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-coreutils
 ZSTD_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zstd
 LLVM_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-llvm
+LESS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-less
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
@@ -146,6 +148,18 @@ function _prepare_nano {
         ./autogen.sh
         rm config.sub
         mv config.sub.cykusz config.sub
+        popd
+    fi
+}
+
+function _prepare_less {
+    if [ ! -d $LESS_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/less.git $LESS_SRC_DIR
+
+        pushd .
+        cd $LESS_SRC_DIR
+        make -f Makefile.aut distfiles
         popd
     fi
 }
@@ -371,6 +385,22 @@ function _cykusz_nano {
 
     make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT LIBS="-lncursesw" -j4
     make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+}
+
+function _cykusz_less {
+    _prepare_less
+
+    mkdir -p $LESS_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LESS_CYKUSZ_BUILD_DIR
+    $LESS_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr
+
+    popd
+
+    make -C $LESS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+    make -C $LESS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
 function _cykusz_coreutils {

@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::cmp::max;
+use core::ops::Range;
 
 use crate::arch::output::{video, Color, ColorCode, ScreenChar};
 use crate::kernel::utils::types::Align;
@@ -59,13 +60,67 @@ impl OutputUpdate {
     }
 }
 
+struct BufRangeIter {
+    size: usize,
+    start: usize,
+    end: usize,
+    index: usize,
+}
+
+impl BufRangeIter {
+    fn new(size: usize, start: usize, end: usize) -> BufRangeIter {
+        BufRangeIter {
+            size,
+            start,
+            end,
+            index: 0,
+        }
+    }
+}
+
+impl Iterator for BufRangeIter {
+    type Item = Range<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.index += 1;
+        if self.start < self.end && self.index == 1 {
+            Some(self.start..self.end)
+        } else if self.start > self.end && self.index < 3 {
+            match self.index {
+                1 => Some(self.start..self.size),
+                2 => Some(0..self.end),
+                _ => unreachable!(),
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl DoubleEndedIterator for BufRangeIter {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.index += 1;
+        if self.start < self.end && self.index == 1 {
+            Some(self.start..self.end)
+        } else if self.start > self.end && self.index < 3 {
+            match self.index {
+                1 => Some(0..self.end),
+                2 => Some(self.start..self.size),
+                _ => unreachable!(),
+            }
+        } else {
+            None
+        }
+    }
+}
+
 impl OutputBuffer {
     fn blank(&self) -> ScreenChar {
         ScreenChar::new(b' ', self.color)
     }
 
     pub fn new(size_x: usize, size_y: usize, backlog: usize, fg: Color, bg: Color) -> OutputBuffer {
-        let y = core::cmp::max(size_y, backlog);
+        let y = max(size_y, backlog);
 
         let buf_size = size_x * y;
 
@@ -81,7 +136,7 @@ impl OutputBuffer {
             buffer_start_y: 0,
 
             line_count: 0,
-            buffer_lines: backlog,
+            buffer_lines: y,
 
             cursor_x: 0,
             cursor_y: 0,
@@ -136,7 +191,6 @@ impl OutputBuffer {
     }
 
     fn store_char(&mut self, char: u8, update: &mut OutputUpdate) {
-        //log!("{}", char as char);
         match char {
             b'\n' => {
                 self.new_line();
@@ -164,12 +218,12 @@ impl OutputBuffer {
             }
         }
 
+        self.line_count = core::cmp::max(self.line_count, self.current_line() + 1);
+
         update.update_line(self.cursor_y);
     }
 
     fn scroll(&mut self, update: &mut OutputUpdate) {
-        self.line_count = core::cmp::max(self.line_count, self.current_line() + 1);
-
         if self.cursor_y >= self.size_y {
             let off = self.cursor_y - self.size_y + 1;
 
@@ -189,6 +243,20 @@ impl OutputBuffer {
         }
     }
 
+    fn get_buffer_line_pos(&self, line: usize) -> usize {
+        (self.viewport_y * self.size_x + line * self.size_x) % self.buffer.len()
+    }
+
+    fn get_buffer_line_end_pos(&self, line: usize) -> usize {
+        let mut pos = self.viewport_y * self.size_x + line * self.size_x;
+
+        if pos > self.buffer.len() {
+            pos -= self.buffer.len();
+        }
+
+        pos
+    }
+
     fn get_buffer_line_mut(&mut self, line: usize) -> &mut [ScreenChar] {
         let buf = (self.viewport_y * self.size_x + line * self.size_x) % self.buffer.len();
 
@@ -206,7 +274,13 @@ impl OutputBuffer {
     }
 
     fn viewport_buf_end(&self) -> usize {
-        (self.viewport_buf_start() + self.size_x * self.size_y) % self.buffer.len()
+        let end = self.viewport_buf_start() + self.size_x * self.size_y;
+
+        if end > self.buffer.len() {
+            return end - self.buffer.len();
+        }
+
+        end
     }
 
     fn update_screen(&mut self, update: OutputUpdate) {
@@ -315,6 +389,96 @@ impl OutputBuffer {
         }
     }
 
+    fn clear_lines(&mut self, line_start: usize, line_end: usize) {
+        let blank = self.blank();
+
+        let pos_start = self.get_buffer_line_pos(line_start);
+        let pos_end = self.get_buffer_line_end_pos(line_end);
+
+        if pos_start < pos_end {
+            self.buffer[pos_start..pos_end].fill(blank);
+        }
+    }
+
+    fn copy_lines_within(
+        &mut self,
+        cursor_start_line: usize,
+        cursor_end_line: usize,
+        cursor_dest_line: usize,
+    ) {
+        logln4!(
+            "Copy lines {} - {} -> {}",
+            cursor_start_line,
+            cursor_end_line,
+            cursor_dest_line
+        );
+        if cursor_start_line == cursor_end_line {
+            return;
+        }
+        assert!(cursor_end_line > cursor_start_line);
+        assert!(cursor_dest_line + (cursor_end_line - cursor_start_line) <= self.size_y);
+
+        let start_pos = self.get_buffer_line_pos(cursor_start_line);
+        let end_pos = self.get_buffer_line_end_pos(cursor_end_line);
+        let remaining_lines = cursor_end_line - cursor_start_line;
+        let start_dest_pos = self.get_buffer_line_pos(cursor_dest_line);
+        let end_dest_pos = self.get_buffer_line_end_pos(cursor_dest_line + remaining_lines);
+
+        if cursor_dest_line < cursor_start_line {
+            // Copy from start
+            let mut source_iter = BufRangeIter::new(self.buffer.len(), start_pos, end_pos);
+            let mut dest_iter = BufRangeIter::new(self.buffer.len(), start_dest_pos, end_dest_pos);
+
+            let mut source_range = source_iter.next();
+            let mut dest_range = dest_iter.next();
+
+            while let (Some(s), Some(d)) = (source_range.clone(), dest_range.clone()) {
+                if s.len() < d.len() {
+                    self.buffer.copy_within(s.clone(), d.start);
+                    dest_range = Some(d.start + s.len()..d.end);
+                    source_range = source_iter.next();
+                } else if s.len() > d.len() {
+                    self.buffer.copy_within(s.start..s.start + d.len(), d.start);
+                    source_range = Some(s.start + d.len()..s.end);
+                    dest_range = dest_iter.next();
+                } else {
+                    self.buffer.copy_within(s.clone(), d.start);
+                    source_range = source_iter.next();
+                    dest_range = dest_iter.next();
+                }
+            }
+        } else if cursor_dest_line > cursor_start_line {
+            // Copy from end
+            let mut source_iter = BufRangeIter::new(self.buffer.len(), start_pos, end_pos).rev();
+            let mut dest_iter =
+                BufRangeIter::new(self.buffer.len(), start_dest_pos, end_dest_pos).rev();
+
+            let mut source_range = source_iter.next();
+            let mut dest_range = dest_iter.next();
+
+            while let (Some(s), Some(d)) = (source_range.clone(), dest_range.clone()) {
+                if s.len() < d.len() {
+                    self.buffer.copy_within(s.clone(), d.end - s.len());
+                    dest_range = Some(d.start..d.end - s.len());
+                    source_range = source_iter.next();
+                } else if s.len() > d.len() {
+                    self.buffer.copy_within(s.end - d.len()..s.end, d.start);
+                    source_range = Some(s.start..s.end - d.len());
+                    dest_range = dest_iter.next();
+                } else {
+                    self.buffer.copy_within(s.clone(), d.start);
+                    source_range = source_iter.next();
+                    dest_range = dest_iter.next();
+                }
+            }
+        }
+    }
+
+    pub fn shift_up(&mut self, lines: usize) {
+        self.copy_lines_within(self.cursor_y, self.size_y - lines, self.cursor_y + lines);
+        self.clear_lines(self.cursor_y, self.cursor_y + lines);
+    }
+
     pub fn scroll_up(&mut self, lines: usize) {
         if self._scroll_up(lines) {
             self.update_screen(OutputUpdate::Viewport);
@@ -372,16 +536,16 @@ impl OutputBuffer {
 
         let bytes = str.as_bytes();
 
-        //log4!("[tty in]: ");
-        //for b in bytes {
-        //    let c = *b as char;
-        //    if c.is_ascii_alphabetic() || c.is_ascii_punctuation() {
-        //        log4!("{}", c);
-        //    } else {
-        //        log4!("{}", *b);
-        //    }
-        //}
-        //log4!("\n");
+        log4!("[tty in]: ");
+        for b in bytes {
+            let c = *b as char;
+            if c.is_ascii_alphabetic() || c.is_ascii_punctuation() {
+                log4!("{}", c);
+            } else {
+                log4!("{}", *b);
+            }
+        }
+        log4!("\n");
 
         for c in bytes.iter() {
             self.state.advance(&mut performer, *c);
@@ -392,6 +556,12 @@ impl OutputBuffer {
         self.scroll(&mut update);
 
         self.update_screen(update);
+
+        logln4!(
+            "buf_y: {}, view_y: {}",
+            self.buffer_start_y,
+            self.viewport_y
+        );
     }
 
     pub fn remove_last_n(&mut self, mut n: usize) {
@@ -491,6 +661,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
     }
 
     fn execute(&mut self, byte: u8) {
+        logln4!("Execute: {}", byte);
         if byte == b'\n' {
             self.output.store_char(byte, &mut self.update);
         } else if byte == b'\t' {
@@ -502,20 +673,27 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 self.output.cursor_x -= 1;
             }
         } else {
-            //logln!("unrecognised ctrl {}", byte);
+            logln4!("unrecognised ctrl {}", byte);
         }
     }
 
     fn csi_dispatch(
         &mut self,
         params: &vte::Params,
-        _intermediates: &[u8],
+        intermediates: &[u8],
         ignore: bool,
         action: char,
     ) {
         use core::cmp::min;
 
-        if ignore && false {
+        logln4!(
+            "CSI DISPATCH: action: {}, params: {:?}, intermediates: {:?}",
+            action,
+            params,
+            intermediates
+        );
+
+        if ignore {
             return;
         }
 
@@ -720,6 +898,14 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 }
                 _ => {}
             },
+            'L' => {
+                let mut iter = params.iter();
+                if let Some(&[x, ..]) = iter.next() {
+                    let lines = max(1, x);
+                    self.output.shift_up(lines as usize);
+                    self.update.update_viewport();
+                }
+            }
             's' => {
                 self.output.saved_x = self.output.cursor_x;
                 self.output.saved_y = self.output.cursor_y;

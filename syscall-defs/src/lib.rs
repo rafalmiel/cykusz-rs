@@ -87,6 +87,7 @@ pub const SYS_TICKSNS: usize = 58;
 pub const SYS_GETPPID: usize = 59;
 pub const SYS_GETPGID: usize = 60;
 pub const SYS_TRUNCATE: usize = 61;
+pub const SYS_POLL: usize = 62;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

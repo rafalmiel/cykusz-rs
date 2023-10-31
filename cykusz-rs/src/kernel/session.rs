@@ -1,4 +1,5 @@
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
+use hashbrown::HashMap;
 
 use spin::Once;
 
@@ -10,7 +11,7 @@ use crate::kernel::task::Task;
 
 pub struct Group {
     id: usize,
-    processes: Spin<hashbrown::HashMap<usize, Arc<Task>>>,
+    processes: Spin<HashMap<usize, Arc<Task>>>,
 }
 
 impl Group {
@@ -26,11 +27,21 @@ impl Group {
 
         group.processes.lock().insert(leader.pid(), leader);
 
-        Arc::new(group)
+        let group = Arc::new(group);
+
+        GROUPS
+            .get()
+            .unwrap()
+            .lock()
+            .insert(group.id, Arc::downgrade(&group));
+
+        group
     }
 
     fn remove_process(&self, pid: usize) -> SyscallResult {
         let mut procs = self.processes.lock();
+
+        logln4!("Remove process {} from group {}", pid, self.id);
 
         procs
             .remove(&pid)
@@ -40,6 +51,8 @@ impl Group {
 
     fn add_process(&self, process: Arc<Task>) -> SyscallResult {
         let mut procs = self.processes.lock();
+
+        logln4!("Add {} pid to group {}", process.pid(), self.id);
 
         if procs.insert(process.pid(), process.clone()).is_none() {
             process.set_gid(self.id);
@@ -52,6 +65,8 @@ impl Group {
 
     fn register_process(&self, process: Arc<Task>) {
         let mut procs = self.processes.lock();
+
+        logln4!("Register {} pid to group {}", process.pid(), self.id);
 
         if procs.insert(process.pid(), process).is_some() {
             println!("[ SESSION ] Registered task replaced");
@@ -69,6 +84,13 @@ impl Group {
     pub fn signal(&self, sig: usize) {
         let procs = self.processes.lock();
 
+        logln4!(
+            "Signal group {}, sig: {}, processes: {}",
+            self.id,
+            sig,
+            procs.len()
+        );
+
         for (_pid, proc) in procs.iter() {
             proc.signal(sig);
         }
@@ -80,6 +102,13 @@ impl Group {
         for (_id, task) in procs.iter() {
             f(task);
         }
+    }
+}
+
+impl Drop for Group {
+    fn drop(&mut self) {
+        logln4!("Drop group {}", self.id);
+        GROUPS.get().unwrap().lock().remove(&self.id);
     }
 }
 
@@ -337,12 +366,22 @@ impl Sessions {
     }
 }
 
+static GROUPS: Once<Spin<HashMap<usize, Weak<Group>>>> = Once::new();
 static SESSIONS: Once<Sessions> = Once::new();
 
 pub fn init() {
     SESSIONS.call_once(|| Sessions::new());
+    GROUPS.call_once(|| Spin::new(HashMap::new()));
 }
 
 pub fn sessions() -> &'static Sessions {
     unsafe { SESSIONS.get_unchecked() }
+}
+
+pub fn get_group(id: usize) -> Option<Arc<Group>> {
+    if let Some(g) = GROUPS.get().unwrap().lock().get(&id) {
+        g.upgrade()
+    } else {
+        None
+    }
 }

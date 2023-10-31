@@ -760,6 +760,76 @@ pub fn sys_select(
     return Ok(found);
 }
 
+pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
+    logln4!("POLL");
+    if nfds == 0 {
+        return Ok(0);
+    }
+
+    let timeout_ms = timeout as i32;
+
+    let fds = if fds != 0 {
+        unsafe { VirtAddr(fds as usize).as_slice_mut::<syscall_defs::poll::PollFd>(nfds as usize) }
+    } else {
+        return Err(SyscallError::EINVAL);
+    };
+
+    let task = current_task_ref();
+
+    let mut poll_table = PollTable::new(nfds as usize);
+    let mut first = true;
+    let mut found = 0;
+    let mut timed_out = false;
+
+    'search: loop {
+        for fd in &mut *fds {
+            if fd.fd < 0 {
+                fd.revents = PollEventFlags::empty();
+                continue;
+            }
+            if let Some(handle) = task.get_handle(fd.fd as usize) {
+                if let Ok(f) = handle
+                    .inode
+                    .inode()
+                    .poll(if first { Some(&mut poll_table) } else { None }, fd.events)
+                {
+                    if !f.is_empty() {
+                        found += 1;
+
+                        fd.revents = f;
+
+                        logln4!("found {}: {:?}", fd.fd, fd.revents);
+                    }
+                } else {
+                    break 'search;
+                }
+            } else {
+                fd.revents = PollEventFlags::NVAL;
+            }
+        }
+
+        if found == 0 && !timed_out {
+            task.await_io_timeout(
+                if timeout_ms >= 0 {
+                    Some(timeout_ms as usize * 1000)
+                } else {
+                    None
+                },
+                SleepFlags::empty(),
+            )?;
+
+            timed_out = task.sleep_until() == 0 && timeout_ms >= 0;
+            logln2!("timedout: {}", timed_out);
+        } else {
+            break 'search;
+        }
+
+        first = false;
+    }
+
+    Ok(found)
+}
+
 pub fn sys_mount(
     src: u64,
     src_len: u64,
@@ -1004,6 +1074,7 @@ pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {
 }
 
 pub fn sys_kill(pid: u64, sig: u64) -> SyscallResult {
+    logln4!("kill: {} {}", pid as i64, sig);
     match pid as isize {
         a if a > 0 => {
             let task = crate::kernel::sched::get_task(a as usize).ok_or(SyscallError::ESRCH)?;
@@ -1027,18 +1098,13 @@ pub fn sys_kill(pid: u64, sig: u64) -> SyscallResult {
         -1 => {
             panic!("kill -1 not supported")
         }
-        a if a < -1 => {
-            let task = crate::kernel::sched::get_task(-a as usize).ok_or(SyscallError::ESRCH)?;
+        a if a < -1 => Ok(crate::kernel::session::get_group((-a) as usize)
+            .and_then(|g| {
+                g.signal(sig as usize);
 
-            Ok(crate::kernel::session::sessions()
-                .get_group(task.sid(), task.gid())
-                .and_then(|g| {
-                    g.signal(sig as usize);
-
-                    Some(0)
-                })
-                .ok_or(SyscallError::ESRCH)?)
-        }
+                Some(0)
+            })
+            .ok_or(SyscallError::ESRCH)?),
         _ => {
             unreachable!()
         }

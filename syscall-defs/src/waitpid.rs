@@ -5,6 +5,7 @@ bitflags! {
         const STOPPED       = 1 << 1;
         const EXITED        = 1 << 2;
         const CONTINUED     = 1 << 3;
+        const NOWAIT        = 0x01000000;
     }
 }
 

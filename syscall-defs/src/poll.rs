@@ -1,7 +1,10 @@
 bitflags! {
-    pub struct PollEventFlags: usize {
+    pub struct PollEventFlags: u16 {
         const READ          = 1 << 0;
         const WRITE         = 1 << 1;
+        const ERR           = 0x10;
+        const HUP           = 0x08;
+        const NVAL          = 0x40;
     }
 }
 
@@ -9,6 +12,14 @@ bitflags! {
 #[derive(Copy, Clone)]
 pub struct FdSet {
     pub fds: [u8; 128],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct PollFd {
+    pub fd: i32,
+    pub events: PollEventFlags,
+    pub revents: PollEventFlags,
 }
 
 impl FdSet {

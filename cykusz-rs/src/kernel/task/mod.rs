@@ -698,7 +698,7 @@ impl Task {
     }
 
     pub fn signal(&self, sig: usize) -> bool {
-        logln2!("signal {} sig: {}", self.pid(), sig);
+        logln4!("signal {} sig: {}", self.pid(), sig);
         if self.state() != TaskState::Unused {
             self.do_signal(sig, false)
         } else {

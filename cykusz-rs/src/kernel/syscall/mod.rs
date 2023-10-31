@@ -44,6 +44,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_BIND => sys::sys_bind(a, b),
         SYS_CONNECT => sys::sys_connect(a, b, c, d),
         SYS_SELECT => sys::sys_select(a, b, c, d, e, f),
+        SYS_POLL => sys::sys_poll(a, b, c),
         SYS_MOUNT => sys::sys_mount(a, b, c, d, e, f),
         SYS_UMOUNT => sys::sys_umount(a, b),
         SYS_TIME => sys::sys_time(),

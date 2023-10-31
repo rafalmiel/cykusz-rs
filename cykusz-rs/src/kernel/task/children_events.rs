@@ -138,6 +138,7 @@ impl WaitPidEvents {
         status: &mut syscall_defs::waitpid::Status,
         flags: WaitPidFlags,
     ) -> SignalResult<SyscallResult> {
+        logln4!("{} waitpid {} {:?}", me.tid(), pid, flags);
         let ret = self.wait_on(me, flags, false, |t| {
             if !t.is_process_leader() {
                 false
@@ -150,6 +151,7 @@ impl WaitPidEvents {
                 }
             }
         });
+        logln4!("{} waitpid {} {:?} = {:?}", me.tid(), pid, flags, ret);
 
         return match ret {
             Ok(Some((tid, st))) => {

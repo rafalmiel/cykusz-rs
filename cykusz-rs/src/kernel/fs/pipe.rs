@@ -1,10 +1,12 @@
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Stat;
 use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::utils::buffer::BufferQueue;
 
@@ -41,6 +43,14 @@ impl Pipe {
     fn dec_writers(&self) -> usize {
         self.writers.fetch_sub(1, Ordering::SeqCst) - 1
     }
+
+    fn has_writers(&self) -> bool {
+        self.writers.load(Ordering::Relaxed) > 0
+    }
+
+    fn has_readers(&self) -> bool {
+        self.readers.load(Ordering::Relaxed) > 0
+    }
 }
 
 impl Drop for Pipe {
@@ -67,6 +77,43 @@ impl INode for Pipe {
 
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         self.buf.append_data(buf)
+    }
+
+    fn poll(
+        &self,
+        poll_table: Option<&mut PollTable>,
+        flags: PollEventFlags,
+    ) -> Result<PollEventFlags> {
+        let mut res_flags = PollEventFlags::empty();
+        if flags.contains(PollEventFlags::READ) {
+            if self.buf.has_data() {
+                res_flags.insert(PollEventFlags::READ);
+            }
+
+            if !self.has_writers() {
+                res_flags.insert(PollEventFlags::HUP);
+            }
+        }
+        if flags.contains(PollEventFlags::WRITE) {
+            if self.buf.available_size() > 0 {
+                res_flags.insert(PollEventFlags::WRITE);
+            }
+
+            if !self.has_readers() {
+                res_flags.insert(PollEventFlags::ERR);
+            }
+        }
+
+        if let Some(p) = poll_table {
+            if flags.contains(PollEventFlags::READ) {
+                p.listen(&self.buf.readers_queue());
+            }
+            if flags.contains(PollEventFlags::WRITE) {
+                p.listen(&self.buf.writers_queue());
+            }
+        }
+
+        Ok(res_flags)
     }
 
     fn open(&self, flags: OpenFlags) -> Result<()> {

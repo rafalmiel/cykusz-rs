@@ -78,7 +78,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_PIPE => sys::sys_pipe(a, b),
         SYS_DUP => sys::sys_dup(a, b),
         SYS_DUP2 => sys::sys_dup2(a, b, c),
-        SYS_STAT => sys::sys_stat(a, b, c, d),
+        SYS_STAT => sys::sys_stat(a, b, c, d, e),
         SYS_GETRLIMIT => sys::sys_getrlimit(a, b),
         SYS_DEBUG => sys::sys_debug(a, b),
         SYS_ACCESS => sys::sys_access(a, b, c, d, e),
@@ -89,11 +89,16 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_GETPPID => sys::sys_getppid(),
         SYS_GETPGID => sys::sys_getpgid(a),
         SYS_TRUNCATE => sys::sys_truncate(a, b),
+        SYS_READLINK => sys::sys_readlink(a, b, c, d, e),
         a => {
             logln!("NO SYS????? {}", a);
             Err(SyscallError::ENOSYS)
         }
     };
+
+    if res.is_err() {
+        logln4!("syscall {} result = {:?}", num, res);
+    }
 
     res
 }

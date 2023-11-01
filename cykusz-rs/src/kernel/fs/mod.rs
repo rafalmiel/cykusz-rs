@@ -177,7 +177,7 @@ pub fn mount_root_old() {
     mount::mount(dev_entry, dev_listener().devfs.clone()).expect("/dev mount faiiled");
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum LookupMode {
     None,
     Create,
@@ -325,13 +325,14 @@ pub fn lookup_by_path_at(
     dir: DirEntryItem,
     path: Path,
     lookup_mode: LookupMode,
+    real_path: bool
 ) -> Result<DirEntryItem> {
     if let Some(cur) = if !path.is_absolute() {
         Some(dir)
     } else {
         root_dentry().cloned()
     } {
-        lookup_by_path_from(path, lookup_mode, cur, false, 0)
+        lookup_by_path_from(path, lookup_mode, cur, real_path, 0)
     } else {
         return Err(FsError::NotSupported);
     }

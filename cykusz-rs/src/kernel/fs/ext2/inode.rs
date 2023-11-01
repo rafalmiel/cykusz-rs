@@ -246,8 +246,11 @@ impl From<disk::inode::FileType> for syscall_defs::FileType {
             disk::inode::FileType::File => FileType::File,
             disk::inode::FileType::Symlink => FileType::Symlink,
             disk::inode::FileType::Dir => FileType::Dir,
-            disk::inode::FileType::BlockDev | disk::inode::FileType::CharDev => FileType::DevNode,
-            _ => FileType::File,
+            disk::inode::FileType::BlockDev => FileType::Block,
+            disk::inode::FileType::CharDev => FileType::Char,
+            disk::inode::FileType::Fifo => FileType::Fifo,
+            disk::inode::FileType::Socket => FileType::Socket,
+            disk::inode::FileType::Unknown => FileType::Unknown,
         }
     }
 }

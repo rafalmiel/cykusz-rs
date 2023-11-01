@@ -406,12 +406,12 @@ impl OutputBuffer {
         cursor_end_line: usize,
         cursor_dest_line: usize,
     ) {
-        logln4!(
-            "Copy lines {} - {} -> {}",
-            cursor_start_line,
-            cursor_end_line,
-            cursor_dest_line
-        );
+        //logln4!(
+        //    "Copy lines {} - {} -> {}",
+        //    cursor_start_line,
+        //    cursor_end_line,
+        //    cursor_dest_line
+        //);
         if cursor_start_line == cursor_end_line {
             return;
         }
@@ -536,16 +536,16 @@ impl OutputBuffer {
 
         let bytes = str.as_bytes();
 
-        log4!("[tty in]: ");
-        for b in bytes {
-            let c = *b as char;
-            if c.is_ascii_alphabetic() || c.is_ascii_punctuation() {
-                log4!("{}", c);
-            } else {
-                log4!("{}", *b);
-            }
-        }
-        log4!("\n");
+        //log4!("[tty in]: ");
+        //for b in bytes {
+        //    let c = *b as char;
+        //    if c.is_ascii_alphabetic() || c.is_ascii_punctuation() {
+        //        log4!("{}", c);
+        //    } else {
+        //        log4!("{}", *b);
+        //    }
+        //}
+        //log4!("\n");
 
         for c in bytes.iter() {
             self.state.advance(&mut performer, *c);
@@ -557,11 +557,11 @@ impl OutputBuffer {
 
         self.update_screen(update);
 
-        logln4!(
-            "buf_y: {}, view_y: {}",
-            self.buffer_start_y,
-            self.viewport_y
-        );
+        //logln4!(
+        //    "buf_y: {}, view_y: {}",
+        //    self.buffer_start_y,
+        //    self.viewport_y
+        //);
     }
 
     pub fn remove_last_n(&mut self, mut n: usize) {
@@ -661,7 +661,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
     }
 
     fn execute(&mut self, byte: u8) {
-        logln4!("Execute: {}", byte);
+        //logln4!("Execute: {}", byte);
         if byte == b'\n' {
             self.output.store_char(byte, &mut self.update);
         } else if byte == b'\t' {
@@ -686,12 +686,12 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
     ) {
         use core::cmp::min;
 
-        logln4!(
-            "CSI DISPATCH: action: {}, params: {:?}, intermediates: {:?}",
-            action,
-            params,
-            intermediates
-        );
+        //logln4!(
+        //    "CSI DISPATCH: action: {}, params: {:?}, intermediates: {:?}",
+        //    action,
+        //    params,
+        //    intermediates
+        //);
 
         if ignore {
             return;
@@ -711,7 +711,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 let mut iter = params.iter();
 
                 if let Some(&[x, ..]) = iter.next() {
-                    logln4!("Action A: x: {}", x);
+                    //logln4!("Action A: x: {}", x);
                     if self.output.cursor_y >= x as usize {
                         self.output.cursor_y -= max(1, x) as usize;
                     } else {
@@ -830,7 +830,6 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
             'K' => {
                 let mut iter = params.iter();
                 if let Some(&[x, ..]) = iter.next() {
-                    logln4!("K Action, x: {}", x);
                     let buf_pos = self.output.cursor_buf_pos();
 
                     let blank = self.output.blank();

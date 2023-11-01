@@ -51,8 +51,12 @@ impl From<syscall_defs::FileType> for FileType {
         match t {
             syscall_defs::FileType::File => FileType::File,
             syscall_defs::FileType::Dir => FileType::Dir,
-            syscall_defs::FileType::DevNode => FileType::CharDev,
+            syscall_defs::FileType::Char => FileType::CharDev,
+            syscall_defs::FileType::Block => FileType::BlockDev,
             syscall_defs::FileType::Symlink => FileType::Symlink,
+            syscall_defs::FileType::Unknown => FileType::Unknown,
+            syscall_defs::FileType::Fifo => FileType::Fifo,
+            syscall_defs::FileType::Socket => FileType::Socket,
         }
     }
 }

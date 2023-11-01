@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Path<'a>(&'a str);
 
 impl<'a> Path<'a> {

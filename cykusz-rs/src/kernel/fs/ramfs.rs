@@ -179,7 +179,7 @@ impl INode for LockedRamINode {
     }
 
     fn mknode(&self, name: &str, devid: usize) -> Result<INodeItem> {
-        self.make_inode(name, FileType::DevNode, |inode| {
+        self.make_inode(name, FileType::Char, |inode| {
             inode.0.write().content = Content::DevNode(Some(
                 DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
             ));
@@ -405,10 +405,12 @@ impl RamFS {
             children: BTreeMap::new(),
             fs: Weak::default(),
             content: match typ {
-                FileType::DevNode => Content::DevNode(None),
+                FileType::Char => Content::DevNode(None),
+                FileType::Block => Content::DevNode(None),
                 FileType::File => Content::Bytes(Spin::new(Vec::new())),
                 FileType::Dir => Content::None,
                 FileType::Symlink => Content::None,
+                _ => Content::None,
             },
         })))
     }

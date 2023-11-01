@@ -92,11 +92,13 @@ impl BufferQueue {
             return Ok(0);
         }
 
+        logln4!("appending data len: {}", data.len());
+
         let mut buffer = self
             .writer_queue
             .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| {
                 let _ = &lck;
-                !lck.has_readres() || lck.available_size() >= data.len()
+                !lck.has_readres() || lck.available_size() > 0
             })?
             .unwrap();
 

@@ -51,7 +51,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
     }
 
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        logln3!("sys_open: {} {:?}", path, flags);
+        logln4!("sys_open: {} {:?}", path, flags);
         let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
 
         let task = current_task_ref();
@@ -81,7 +81,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
 pub fn sys_close(fd: u64) -> SyscallResult {
     let task = current_task_ref();
 
-    logln!("sys_close: {} task: {}", fd, task.tid());
+    logln4!("sys_close: {} task: {}", fd, task.tid());
 
     return if task.close_file(fd as usize) {
         Ok(0)
@@ -461,7 +461,7 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
 
 pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResult {
     let path = Path::new(make_str(path, path_len));
-    logln4!("sys_unlink: {}", path.str());
+    logln4!("sys_unlink: {}, flags: {}", path.str(), flags);
     if flags != 0 {
         return Err(SyscallError::EINVAL);
     }
@@ -761,7 +761,6 @@ pub fn sys_select(
 }
 
 pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
-    logln4!("POLL");
     if nfds == 0 {
         return Ok(0);
     }
@@ -773,6 +772,7 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
     } else {
         return Err(SyscallError::EINVAL);
     };
+    logln4!("POLL {:?}", fds);
 
     let task = current_task_ref();
 
@@ -788,20 +788,16 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
                 continue;
             }
             if let Some(handle) = task.get_handle(fd.fd as usize) {
-                if let Ok(f) = handle
+                let f = handle
                     .inode
                     .inode()
-                    .poll(if first { Some(&mut poll_table) } else { None }, fd.events)
-                {
-                    if !f.is_empty() {
-                        found += 1;
+                    .poll(if first { Some(&mut poll_table) } else { None }, fd.events)?;
+                if !f.is_empty() {
+                    found += 1;
 
-                        fd.revents = f;
+                    fd.revents = f;
 
-                        logln4!("found {}: {:?}", fd.fd, fd.revents);
-                    }
-                } else {
-                    break 'search;
+                    logln4!("found {}: {:?}", fd.fd, fd.revents);
                 }
             } else {
                 fd.revents = PollEventFlags::NVAL;

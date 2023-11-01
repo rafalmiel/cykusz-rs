@@ -15,7 +15,7 @@ pub struct FdSet {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct PollFd {
     pub fd: i32,
     pub events: PollEventFlags,

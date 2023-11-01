@@ -53,6 +53,7 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 - [x] ncurses (<https://github.com/rafalmiel/ncurses/tree/cykusz>)
 - [x] bash (<https://github.com/rafalmiel/bash/tree/cykusz>)
 - [x] nano (<https://github.com/rafalmiel/nano/tree/cykusz>)
+- [x] less (<https://github.com/rafalmiel/less/tree/cykusz>)
 - [x] doom (<https://github.com/rafalmiel/doomgeneric/tree/cykusz>)
 
 ## Building

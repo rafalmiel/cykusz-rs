@@ -186,7 +186,7 @@ pub enum SyscallError {
     UnknownError = 0xffff,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum OpenFD {
     Fd(usize),
     Cwd,
@@ -315,10 +315,14 @@ impl From<u64> for FcntlCmd {
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u8)]
 pub enum FileType {
-    File = 0x1,
-    Dir = 0x2,
-    DevNode = 0x3,
-    Symlink = 0x4,
+    Unknown = 0,
+    Fifo = 1,
+    Char = 2,
+    Dir = 4,
+    Block = 6,
+    File = 8,
+    Symlink = 10,
+    Socket = 12,
 }
 
 impl Default for FileType {
@@ -351,6 +355,16 @@ bitflags! {
         const MAP_SHARED = 0x2;
         const MAP_FIXED = 0x4;
         const MAP_ANONYOMUS = 0x8;
+    }
+}
+
+bitflags! {
+    pub struct AtFlags: u64 {
+        const EMPTY_PATH = 1;
+        const SYMLINK_FOLLOW = 2;
+        const SYMLINK_NOFOLLOW = 4;
+        const REMOVEDIR = 8;
+        const EACCESS = 512;
     }
 }
 

@@ -350,7 +350,7 @@ impl FileTable {
     pub fn close_file(&self, fd: usize) -> bool {
         let mut files = self.files.write();
 
-        if let Some(f) = &files[fd] {
+        if let Some(Some(f)) = &files.get(fd) {
             logln4!("close_file {}", fd);
             f.inode.inode().close(f.flags());
             files[fd] = None;
@@ -393,7 +393,7 @@ impl FileTable {
     pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {
         let files = self.files.read();
 
-        if let Some(handle) = &files[fd] {
+        if let Some(Some(handle)) = &files.get(fd) {
             return Some(handle.clone());
         }
 

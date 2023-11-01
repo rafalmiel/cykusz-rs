@@ -6,13 +6,10 @@ use alloc::vec::Vec;
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
-use syscall_defs::{
-    ConnectionFlags, FcntlCmd, FcntlSetFDFlags, FileType, MMapFlags, MMapProt, OpenFD,
-    SyscallResult,
-};
+use syscall_defs::{AtFlags, ConnectionFlags, FcntlCmd, FcntlSetFDFlags, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult};
 use syscall_defs::{OpenFlags, SyscallError};
 
-use crate::kernel::fs::dirent::DirEntry;
+use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
@@ -35,48 +32,70 @@ fn make_str<'a>(b: u64, len: u64) -> &'a str {
     unsafe { core::str::from_utf8_unchecked(make_buf(b, len)) }
 }
 
-pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
-    logln4!("sys_open raw flags: {}", mode);
-    let mut flags =
-        syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
+fn get_dir_entry(fd: OpenFD, path: u64, path_len: u64, lookup_mode: LookupMode, real_path: bool) -> Result<DirEntryItem, SyscallError> {
+    let path = if path != 0 {
+        Some(Path::new(make_str(path, path_len)))
+    } else {
+        None
+    };
 
+    logln4!("get dir entry: {:?} {:?} {:?} real_path: {}", fd, path, lookup_mode, real_path);
+
+    let task = current_task_ref();
+
+    let file_dir = match fd {
+        OpenFD::Fd(fd) => task
+            .get_handle(fd)
+            .ok_or(SyscallError::EBADFD)?
+            .inode
+            .clone(),
+        OpenFD::Cwd => task.get_dent().ok_or(SyscallError::EBADFD)?.clone(),
+        OpenFD::None => {
+            return Err(SyscallError::EINVAL);
+        }
+    };
+
+    if let Some(path) = path {
+        Ok(lookup_by_path_at(file_dir, path, lookup_mode, real_path)?)
+    } else {
+        Ok(file_dir.clone())
+    }
+}
+
+pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
+    let mut flags =
+        OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
     if !flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR | OpenFlags::WRONLY) {
         flags.insert(OpenFlags::RDONLY);
     }
 
     let at = OpenFD::try_from(at)?;
 
-    if let OpenFD::Fd(_) = at {
-        logln4!("open: at fd currently not supported");
-        return Err(SyscallError::EBADFD);
+    let inode = get_dir_entry(at, path, len,
+                              if flags.contains(OpenFlags::CREAT) {
+                                  LookupMode::Create
+                              } else {
+                                  LookupMode::None
+                              }, false
+    )?;
+
+    let task = current_task_ref();
+
+    if flags.contains(OpenFlags::DIRECTORY) && inode.inode().ftype()? != FileType::Dir {
+        return Err(SyscallError::ENOTDIR);
     }
 
-    if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        logln4!("sys_open: {} {:?}", path, flags);
-        let inode = crate::kernel::fs::lookup_by_path(Path::new(path), flags.into())?;
-
-        let task = current_task_ref();
-
-        if flags.contains(OpenFlags::DIRECTORY) && inode.inode().ftype()? != FileType::Dir {
-            return Err(SyscallError::ENOTDIR);
+    if flags.contains(OpenFlags::TRUNC) {
+        if let Err(e) = inode.inode().truncate(0) {
+            println!("Truncate failed: {:?}", e);
         }
-
-        if flags.contains(OpenFlags::TRUNC) {
-            if let Err(e) = inode.inode().truncate(0) {
-                println!("Truncate failed: {:?}", e);
-            }
-        }
-
-        let res = Ok(task.open_file(inode, flags)?);
-
-        logln2!("sys_open: {} flags: {:?} = {}", path, flags, res.unwrap());
-
-        //logln!("opened fd: {}", res.unwrap());
-
-        res
-    } else {
-        Err(SyscallError::EINVAL)
     }
+
+    let res = Ok(task.open_file(inode, flags)?);
+
+    logln2!("sys_open: {} flags: {:?} = {}", path, flags, res.unwrap());
+
+    res
 }
 
 pub fn sys_close(fd: u64) -> SyscallResult {
@@ -206,14 +225,7 @@ pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
 pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) -> SyscallResult {
     let at = OpenFD::try_from(at)?;
 
-    if let OpenFD::Fd(_) = at {
-        logln_disabled!("open: at fd currently not supported");
-        return Err(SyscallError::EBADFD);
-    }
-
-    let path = Path::new(make_str(path, path_len));
-
-    lookup_by_path(path, LookupMode::None)?;
+    get_dir_entry(at, path, path_len, LookupMode::None, false)?;
 
     Ok(0)
 }
@@ -221,7 +233,7 @@ pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) ->
 pub fn sys_fcntl(fd: u64, cmd: u64, flags: u64) -> SyscallResult {
     let cmd = FcntlCmd::from(cmd);
 
-    logln!("SYS_FCNTL {} {:?} {}", fd, cmd, flags);
+    logln!("SYS_FCNTL {} {:?} {}", fd as isize, cmd, flags);
 
     match cmd {
         FcntlCmd::GetFD => {
@@ -468,25 +480,20 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
 }
 
 pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResult {
+    let at = OpenFD::try_from(at)?;
+
+    let file = get_dir_entry(at, path, path_len, LookupMode::None, true)?;
+
+    log!("unlink inode: ");
+    file.inode().debug();
+
     let path = Path::new(make_str(path, path_len));
     logln4!("sys_unlink: {}, flags: {}", path.str(), flags);
     if flags != 0 {
         return Err(SyscallError::EINVAL);
     }
 
-    let at = OpenFD::try_from(at)?;
-
-    if let OpenFD::Fd(_) = at {
-        logln_disabled!("open: at fd currently not supported");
-        return Err(SyscallError::EBADFD);
-    }
-
     let (_, name) = path.containing_dir();
-
-    let file = lookup_by_real_path(path, LookupMode::None)?;
-
-    log!("unlink inode: ");
-    file.inode().debug();
 
     if let Some(dir) = file.parent() {
         if dir.inode().ftype()? == FileType::Dir && file.inode().ftype()? != FileType::Dir {
@@ -1078,7 +1085,7 @@ pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {
 }
 
 pub fn sys_kill(pid: u64, sig: u64) -> SyscallResult {
-    logln4!("kill: {} {}", pid as i64, sig);
+    logln4!("kill: {} -> {} {}", current_task_ref().tid(), pid as i64, sig);
     match pid as isize {
         a if a > 0 => {
             let task = crate::kernel::sched::get_task(a as usize).ok_or(SyscallError::ESRCH)?;
@@ -1202,37 +1209,15 @@ pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
     crate::kernel::futex::futex().wake(uaddr)
 }
 
-pub fn sys_stat(fd: u64, path: u64, path_len: u64, stat: u64) -> SyscallResult {
+pub fn sys_stat(fd: u64, path: u64, path_len: u64, stat: u64, flags: u64) -> SyscallResult {
     let fd = OpenFD::try_from(fd)?;
-    let path = if path != 0 {
-        Some(Path::new(make_str(path, path_len)))
-    } else {
-        None
-    };
+    let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;
 
-    let task = current_task_ref();
-
-    let file_dir = match fd {
-        OpenFD::Fd(fd) => task
-            .get_handle(fd)
-            .ok_or(SyscallError::EBADFD)?
-            .inode
-            .clone(),
-        OpenFD::Cwd => task.get_dent().ok_or(SyscallError::EBADFD)?.clone(),
-        OpenFD::None => {
-            return Err(SyscallError::EINVAL);
-        }
-    };
+    let file = get_dir_entry(fd, path, path_len, LookupMode::None, flags.contains(AtFlags::SYMLINK_NOFOLLOW))?;
 
     let stat = unsafe { VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>() };
 
-    if let Some(path) = path {
-        let file = lookup_by_path_at(file_dir, path, LookupMode::None)?;
-
-        *stat = file.inode().stat()?;
-    } else {
-        *stat = file_dir.inode().stat()?;
-    }
+    *stat = file.inode().stat()?;
 
     logln!("fstatat {:?}, {:?}", fd, stat);
 

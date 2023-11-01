@@ -164,17 +164,6 @@ function _prepare_less {
     fi
 }
 
-function _prepare {
-    _prepare_mlibc
-    _prepare_binutils
-    _prepare_gcc
-    _prepare_nyancat
-    _prepare_ncurses
-    _prepare_bash
-    _prepare_nano
-    _prepare_doom
-}
-
 function _sysroot {
     _prepare_mlibc
 
@@ -472,6 +461,19 @@ function _cykusz_zstd {
     popd
 }
 
+function _prepare {
+    _prepare_mlibc
+    _prepare_binutils
+    _prepare_gcc
+    _prepare_nyancat
+    _prepare_ncurses
+    _prepare_bash
+    _prepare_nano
+    _prepare_less
+    _prepare_zstd
+    _prepare_doom
+}
+
 function _cross {
     _sysroot
     _binutils
@@ -490,6 +492,8 @@ function _cykusz {
     _cykusz_ncurses
     _cykusz_bash
     _cykusz_nano
+    _cykusz_less
+    _cykusz_zstd
     _cykusz_doom
 }
 

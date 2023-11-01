@@ -80,7 +80,7 @@ fn init_cdboot() {
     root_dentry().unwrap().inode().mkdir("dev").unwrap();
 
     crate::kernel::fs::mount::mount(
-        lookup_by_real_path(Path::new("/dev"), LookupMode::None).unwrap(),
+        lookup_by_real_path(&Path::new("/dev"), LookupMode::None).unwrap(),
         dev_listener().devfs.clone(),
     )
     .expect("mount failed");
@@ -104,7 +104,7 @@ pub fn init() {
 }
 
 fn mount_by_path(path: &str, fs: Arc<dyn Filesystem>) {
-    let entry = lookup_by_path(Path::new(path), LookupMode::None)
+    let entry = lookup_by_path(&Path::new(path), LookupMode::None)
         .expect((path.to_string() + " dir not found").as_str());
 
     mount::mount(entry, fs).expect((path.to_string() + " mount faiiled").as_str());
@@ -123,7 +123,7 @@ pub fn mount_root() {
     ROOT_MOUNT.call_once(|| root_fs.clone());
     ROOT_DENTRY.call_once(|| root_fs.root_dentry());
 
-    if let Ok(fstab) = lookup_by_path(Path::new("/etc/fstab"), LookupMode::None) {
+    if let Ok(fstab) = lookup_by_path(&Path::new("/etc/fstab"), LookupMode::None) {
         let data = fstab.inode().read_all();
 
         if let Ok(content) = core::str::from_utf8(data.as_slice()) {
@@ -167,12 +167,12 @@ pub fn mount_root_old() {
     ROOT_DENTRY.call_once(|| root_fs.root_dentry());
 
     let boot_entry =
-        lookup_by_path(Path::new("/boot"), LookupMode::None).expect("/boot dir not found");
+        lookup_by_path(&Path::new("/boot"), LookupMode::None).expect("/boot dir not found");
 
     mount::mount(boot_entry, boot_fs).expect("/boot mount failed");
 
     let dev_entry =
-        lookup_by_path(Path::new("/dev"), LookupMode::None).expect("/dev dir not found");
+        lookup_by_path(&Path::new("/dev"), LookupMode::None).expect("/dev dir not found");
 
     mount::mount(dev_entry, dev_listener().devfs.clone()).expect("/dev mount faiiled");
 }
@@ -215,7 +215,7 @@ pub fn read_link(inode: &Arc<dyn INode>) -> Result<String> {
 }
 
 fn lookup_by_path_from(
-    path: Path,
+    path: &Path,
     lookup_mode: LookupMode,
     mut cur: DirEntryItem,
     real_path: bool,
@@ -274,7 +274,7 @@ fn lookup_by_path_from(
                             let is_absolute = path.is_absolute();
 
                             let new = lookup_by_path_from(
-                                path,
+                                &path,
                                 lookup_mode,
                                 if !is_absolute {
                                     cur.clone()
@@ -323,7 +323,7 @@ fn lookup_by_path_from(
 
 pub fn lookup_by_path_at(
     dir: DirEntryItem,
-    path: Path,
+    path: &Path,
     lookup_mode: LookupMode,
     real_path: bool
 ) -> Result<DirEntryItem> {
@@ -338,7 +338,7 @@ pub fn lookup_by_path_at(
     }
 }
 
-pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
+pub fn lookup_by_path(path: &Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
     if let Some(cur) = if !path.is_absolute() {
         current_task().get_dent()
     } else {
@@ -350,7 +350,7 @@ pub fn lookup_by_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryIte
     }
 }
 
-pub fn lookup_by_real_path(path: Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
+pub fn lookup_by_real_path(path: &Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
     if let Some(cur) = if !path.is_absolute() {
         current_task().get_dent()
     } else {

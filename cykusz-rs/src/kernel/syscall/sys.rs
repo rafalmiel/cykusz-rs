@@ -56,7 +56,7 @@ fn get_dir_entry(fd: OpenFD, path: u64, path_len: u64, lookup_mode: LookupMode, 
     };
 
     if let Some(path) = path {
-        Ok(lookup_by_path_at(file_dir, path, lookup_mode, real_path)?)
+        Ok(lookup_by_path_at(file_dir, &path, lookup_mode, real_path)?)
     } else {
         Ok(file_dir.clone())
     }
@@ -153,7 +153,7 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 pub fn sys_readlink(path: u64, path_len: u64, buf: u64, max_size: u64, len: u64) -> SyscallResult {
     let target = make_str(path, path_len);
 
-    let inode = lookup_by_real_path(Path::new(target), LookupMode::None)?;
+    let inode = lookup_by_real_path(&Path::new(target), LookupMode::None)?;
 
     if inode.inode().ftype()? != FileType::Symlink {
         return Err(SyscallError::EINVAL);
@@ -366,7 +366,7 @@ pub fn sys_maps() -> SyscallResult {
 
 pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
     if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        if let Ok(dentry) = lookup_by_path(Path::new(path), LookupMode::None) {
+        if let Ok(dentry) = lookup_by_path(&Path::new(path), LookupMode::None) {
             let dir = dentry.read().inode.clone();
 
             if dir.ftype()? == FileType::Dir {
@@ -406,7 +406,7 @@ pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
         let (inode, name) = {
             let (dir, target) = path.containing_dir();
 
-            (lookup_by_path(dir, LookupMode::None)?.inode(), target)
+            (lookup_by_path(&dir, LookupMode::None)?.inode(), target)
         };
 
         if inode.ftype()? == FileType::Dir {
@@ -449,7 +449,7 @@ pub fn sys_symlink(
     let (inode, name) = {
         let (dir, target) = path.containing_dir();
 
-        (lookup_by_path(dir, LookupMode::None)?.inode(), target)
+        (lookup_by_path(&dir, LookupMode::None)?.inode(), target)
     };
 
     if inode.ftype()? == FileType::Dir {
@@ -461,22 +461,24 @@ pub fn sys_symlink(
     }
 }
 
-pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
-    let path = Path::new(make_str(path, path_len));
-
-    let (_, name) = path.containing_dir();
-
-    let dir = lookup_by_real_path(path, LookupMode::None)?;
-
-    if dir.inode().ftype()? == FileType::Dir {
-        dir.inode().rmdir(name.str())?;
-
-        dir.drop_from_cache();
-
-        Ok(0)
-    } else {
+fn remove_dir(file: &DirEntryItem, path: &Path) -> SyscallResult {
+    if file.inode().ftype()? != FileType::Dir {
         return Err(SyscallError::ENOTDIR);
     }
+
+    let (_, name) = path.containing_dir();
+    file.inode().rmdir(name.str())?;
+
+    file.drop_from_cache();
+
+    return Ok(0);
+}
+
+pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
+    let path = Path::new(make_str(path, path_len));
+    let dir = lookup_by_real_path(&path, LookupMode::None)?;
+
+    remove_dir(&dir, &path)
 }
 
 pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResult {
@@ -489,8 +491,11 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
 
     let path = Path::new(make_str(path, path_len));
     logln4!("sys_unlink: {}, flags: {}", path.str(), flags);
-    if flags != 0 {
-        return Err(SyscallError::EINVAL);
+
+    let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;
+
+    if flags.contains(AtFlags::REMOVEDIR) {
+        return remove_dir(&file, &path);
     }
 
     let (_, name) = path.containing_dir();
@@ -512,14 +517,14 @@ pub fn sys_link(target: u64, target_len: u64, linkpath: u64, linkpath_len: u64) 
     let target = make_str(target, target_len);
     let path = make_str(linkpath, linkpath_len);
 
-    let target_entry = lookup_by_real_path(Path::new(target), LookupMode::None)?;
+    let target_entry = lookup_by_real_path(&Path::new(target), LookupMode::None)?;
 
     let path = Path::new(path);
 
     let (inode, name) = {
         let (dir, name) = path.containing_dir();
 
-        (lookup_by_path(dir, LookupMode::None)?.inode(), name)
+        (lookup_by_path(&dir, LookupMode::None)?.inode(), name)
     };
 
     if Weak::as_ptr(&inode.fs().unwrap()) != Weak::as_ptr(&target_entry.inode().fs().unwrap()) {
@@ -539,12 +544,12 @@ pub fn sys_rename(oldpath: u64, oldpath_len: u64, newpath: u64, newpath_len: u64
     let old_path = Path::new(make_str(oldpath, oldpath_len));
     let new_path = Path::new(make_str(newpath, newpath_len));
 
-    let old = lookup_by_real_path(old_path, LookupMode::None)?;
+    let old = lookup_by_real_path(&old_path, LookupMode::None)?;
 
     let (new, name) = {
         let (dir, name) = new_path.containing_dir();
 
-        (lookup_by_real_path(dir, LookupMode::None)?, name)
+        (lookup_by_real_path(&dir, LookupMode::None)?, name)
     };
 
     if new.inode().fs().unwrap().as_ptr() != old.inode().fs().unwrap().as_ptr() {
@@ -854,8 +859,8 @@ pub fn sys_mount(
     let fs = make_str(fs, fs_len);
 
     if fs == "ext2" {
-        let dev = lookup_by_path(Path::new(dev_path), LookupMode::None)?.inode();
-        let dest = lookup_by_path(Path::new(dest_path), LookupMode::None)?;
+        let dev = lookup_by_path(&Path::new(dev_path), LookupMode::None)?.inode();
+        let dest = lookup_by_path(&Path::new(dest_path), LookupMode::None)?;
 
         if let Some(dev) = crate::kernel::block::get_blkdev_by_id(dev.device()?.id()) {
             if let Some(fs) = crate::kernel::fs::ext2::Ext2Filesystem::new(dev) {
@@ -878,7 +883,7 @@ pub fn sys_mount(
 pub fn sys_umount(path: u64, path_len: u64) -> SyscallResult {
     let path = make_str(path, path_len);
 
-    let node = lookup_by_path(Path::new(path), LookupMode::None)?;
+    let node = lookup_by_path(&Path::new(path), LookupMode::None)?;
 
     if let Err(e) = crate::kernel::fs::mount::umount(node) {
         Err(e)?
@@ -928,7 +933,7 @@ pub fn sys_exec(
 ) -> SyscallResult {
     let path = make_str(path, path_len);
 
-    let prog = lookup_by_path(Path::new(path), LookupMode::None)?;
+    let prog = lookup_by_path(&Path::new(path), LookupMode::None)?;
 
     let args = if args_len > 0 {
         Some(syscall_defs::exec::from_syscall_slice(

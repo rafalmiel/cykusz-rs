@@ -211,6 +211,30 @@ impl Tty {
         return true;
     }
 
+    fn handle_scroll(&self, key: KeyCode, released: bool, state: &mut SpinGuard<State>) -> bool {
+        if state.lctrl && state.lshift && !released {
+            match key {
+                KeyCode::KEY_PAGEUP => {
+                    self.output.lock_irq().scroll_up(20);
+                },
+                KeyCode::KEY_PAGEDOWN => {
+                    self.output.lock_irq().scroll_down(20);
+                }
+                KeyCode::KEY_HOME => {
+                    self.output.lock_irq().scroll_top();
+                },
+                KeyCode::KEY_END => {
+                    self.output.lock_irq().scroll_top();
+                },
+                _ => {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
     fn handle_canonical(&self, key: KeyCode, released: bool, state: &mut SpinGuard<State>) -> bool {
         match key {
             KeyCode::KEY_BACKSPACE if !released => {
@@ -327,6 +351,10 @@ impl KeyListener for Tty {
         let mut state = self.state.lock();
 
         if Self::handle_key_state(key, released, &mut state) {
+            return;
+        }
+
+        if self.handle_scroll(key, released, &mut state) {
             return;
         }
 

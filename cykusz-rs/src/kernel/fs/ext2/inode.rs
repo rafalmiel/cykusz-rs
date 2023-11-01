@@ -4,6 +4,7 @@ use core::ops::{Deref, DerefMut};
 use intrusive_collections::LinkedList;
 
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::poll::PollEventFlags;
 
 use crate::arch::mm::PAGE_SIZE;
 use crate::kernel::fs::cache::Cacheable;
@@ -18,6 +19,7 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{
     CachedAccess, MappedAccess, PageCacheItem, PageCacheItemAdapter, PageCacheItemArc, RawAccess,
 };
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
@@ -526,6 +528,19 @@ impl INode for LockedExt2INode {
             typ: inode.d_inode.ftype().into(),
             size: inode.d_inode.size_lower() as usize,
         })
+    }
+
+    fn poll(&self, _poll_table: Option<&mut PollTable>, flags: PollEventFlags) -> Result<PollEventFlags> {
+        // Regular files are always ready on POLL
+        let mut ret = PollEventFlags::empty();
+        if flags.contains(PollEventFlags::READ) {
+            ret.insert(PollEventFlags::READ);
+        }
+        if flags.contains(PollEventFlags::WRITE) {
+            ret.insert(PollEventFlags::WRITE);
+        }
+
+        Ok(ret)
     }
 
     fn stat(&self) -> Result<syscall_defs::stat::Stat> {

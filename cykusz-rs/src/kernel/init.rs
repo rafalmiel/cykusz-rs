@@ -21,7 +21,7 @@ pub fn exec() -> ! {
     task.set_cwd(root_dentry().unwrap().clone());
 
     let init =
-        lookup_by_real_path(Path::new("/bin/init"), LookupMode::None).expect("Shell not found");
+        lookup_by_real_path(&Path::new("/bin/init"), LookupMode::None).expect("Shell not found");
 
     crate::kernel::sched::exec(init, None, None).unwrap()
 }

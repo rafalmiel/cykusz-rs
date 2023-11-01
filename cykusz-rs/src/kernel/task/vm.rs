@@ -706,7 +706,7 @@ impl VMData {
                 .filter(|p| p.p_type == ProgramType::Load || /*p.p_type == ProgramType::TLS || */p.p_type == ProgramType::Interp)
             {
                 if p.p_type == ProgramType::Interp {
-                    if let Ok(interp) = lookup_by_path(Path::new("/usr/lib/ld.so"), LookupMode::None) {
+                    if let Ok(interp) = lookup_by_path(&Path::new("/usr/lib/ld.so"), LookupMode::None) {
                         if let Some((_base_addr, entry, _elf, _tls)) = self.load_bin(interp) {
                             entry_addr = entry;
                         }

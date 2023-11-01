@@ -55,7 +55,7 @@ impl Default for Terminal {
 }
 
 pub fn get_tty_by_path(path: &str) -> Result<Arc<dyn TerminalDevice>, FsError> {
-    let entry = lookup_by_real_path(Path::new(path), LookupMode::None)?;
+    let entry = lookup_by_real_path(&Path::new(path), LookupMode::None)?;
 
     let device = entry.inode().device()?;
 

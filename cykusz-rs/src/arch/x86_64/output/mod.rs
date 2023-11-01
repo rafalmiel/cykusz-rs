@@ -278,6 +278,6 @@ macro_rules! logln4 {
 #[allow(unused)]
 macro_rules! log4 {
     ($($arg:tt)*) => {{
-        $crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+        $crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
     }};
 }

@@ -199,6 +199,8 @@ impl Task {
 
         self.filetable().close_on_exec();
 
+        self.filetable().debug();
+
         if let Some((base_addr, entry, elf_hdr, tls_vm)) = vm.load_bin(exe.clone()) {
             vm.log_vm();
             unsafe {

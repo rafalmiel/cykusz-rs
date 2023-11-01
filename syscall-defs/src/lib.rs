@@ -220,14 +220,18 @@ impl From<OpenFD> for usize {
 
 bitflags! {
     pub struct OpenFlags: usize {
+        const EXEC        = 1;
         const RDONLY      = 2;
         const RDWR        = 3;
         const WRONLY      = 5;
+        const APPEND      = 0x08;
         const CREAT       = 0x10;
         const DIRECTORY   = 0x20;
         const EXCL        = 0x40;
         const NOCTTY      = 0x80;
+        const NOFOLLOW    = 0x0100;
         const TRUNC       = 0x0200;
+        const NONBLOCK    = 0x0400;
         const CLOEXEC     = 0x4000;
     }
 }

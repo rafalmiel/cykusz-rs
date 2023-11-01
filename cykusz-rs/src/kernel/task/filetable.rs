@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use syscall_defs::{FileType, OpenFlags, SysDirEntry, SyscallError, SyscallResult};
+use syscall_defs::{FileType, OpenFlags, SysDirEntry, SyscallError, SyscallResult, SeekWhence};
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
@@ -37,11 +37,18 @@ impl FileHandle {
     }
 
     pub fn duplicate(&self, flags: OpenFlags) -> Result<Arc<FileHandle>> {
-        let flags = self.flags() | flags;
+        let mut new_flags = self.flags();
+        if !flags.contains(OpenFlags::CLOEXEC) {
+            new_flags.remove(OpenFlags::CLOEXEC);
+        } else {
+            new_flags.insert(OpenFlags::CLOEXEC);
+        }
 
-        let new = Arc::new(FileHandle::new(self.fd, self.inode.clone(), flags));
+        let new = Arc::new(FileHandle::new(self.fd, self.inode.clone(), new_flags));
 
-        new.inode.inode().open(flags)?;
+        let _ = new.seek(self.offset.load(Ordering::Relaxed) as isize, SeekWhence::SeekSet);
+
+        new.inode.inode().open(new_flags)?;
 
         Ok(new)
     }
@@ -271,6 +278,14 @@ impl FileTable {
         }
     }
 
+    pub fn debug(&self) {
+        for f in &*self.files.read() {
+            if let Some(f) = f {
+                logln4!("[{}] {} {:?}", f.fd, f.inode.full_path(), f.flags());
+            }
+        }
+    }
+
     pub fn open_file(
         &self,
         dentry: DirEntryItem,
@@ -278,6 +293,13 @@ impl FileTable {
     ) -> crate::kernel::fs::vfs::Result<usize> {
         let mut files = self.files.write();
 
+        let append = flags.contains(OpenFlags::APPEND);
+
+        let size = dentry.inode().stat()?.st_size;
+
+        logln4!("open with append: {}, size: {}", append, size);
+
+        flags.remove(OpenFlags::APPEND);
         flags.remove(OpenFlags::CREAT);
         flags.remove(OpenFlags::DIRECTORY);
 
@@ -285,7 +307,7 @@ impl FileTable {
             Some(Arc::new(FileHandle {
                 fd,
                 inode: inode.clone(),
-                offset: AtomicUsize::new(0),
+                offset: AtomicUsize::new(if append { size as usize } else { 0 }),
                 flags: AtomicUsize::new(flags.bits()),
                 dir_iter: Mutex::new((None, None)),
                 //fs: if let Some(fs) = inode.inode().fs() {
@@ -329,6 +351,7 @@ impl FileTable {
         let mut files = self.files.write();
 
         if let Some(f) = &files[fd] {
+            logln4!("close_file {}", fd);
             f.inode.inode().close(f.flags());
             files[fd] = None;
             return true;
@@ -343,6 +366,7 @@ impl FileTable {
         for f in files.iter_mut() {
             if let Some(h) = f {
                 if h.flags().contains(OpenFlags::CLOEXEC) {
+                    logln4!("close file CLOEXEC {}", h.fd);
                     h.inode.inode().close(h.flags());
 
                     *f = None;
@@ -356,6 +380,7 @@ impl FileTable {
 
         for f in files.iter_mut() {
             if let Some(file) = f {
+                logln4!("close_file ALL {}", file.fd);
                 file.inode.inode().close(file.flags());
 
                 *f = None;
@@ -411,17 +436,18 @@ impl FileTable {
         if files[at].is_none() {
             files[at] = Some(handle.duplicate(flags)?);
 
-            Ok(0)
+            Ok(at)
         } else {
             match handle.duplicate(flags) {
                 Ok(handle) => {
                     let old = files[at].take().unwrap();
 
+                    logln4!("close_file DUPLICATE {}", at);
                     old.inode.inode().close(old.flags());
 
                     files[at] = Some(handle);
 
-                    Ok(0)
+                    Ok(at)
                 }
                 Err(e) => Err(e)?,
             }

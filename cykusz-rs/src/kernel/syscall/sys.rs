@@ -36,6 +36,7 @@ fn make_str<'a>(b: u64, len: u64) -> &'a str {
 }
 
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
+    logln4!("sys_open raw flags: {}", mode);
     let mut flags =
         syscall_defs::OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
 
@@ -46,7 +47,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
     let at = OpenFD::try_from(at)?;
 
     if let OpenFD::Fd(_) = at {
-        //logln!("open: at fd currently not supported");
+        logln4!("open: at fd currently not supported");
         return Err(SyscallError::EBADFD);
     }
 
@@ -95,13 +96,17 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
+
     return if let Some(f) = task.get_handle(fd) {
         if f.flags().intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
+            logln4!("write fd {}", fd);
             Ok(f.write(make_buf(buf, len))?)
         } else {
+            logln4!("write fd {} = EACCESS", fd);
             Err(SyscallError::EACCES)
         }
     } else {
+        logln4!("write fd {} = EBADFD", fd);
         Err(SyscallError::EBADFD)
     };
 }
@@ -174,11 +179,14 @@ pub fn sys_pwrite(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
     let task = current_task_ref();
     return if let Some(f) = task.get_handle(fd) {
         if f.flags().intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
+            logln4!("pwrite fd {}", fd);
             Ok(f.write_at(make_buf(buf, len), offset as usize)?)
         } else {
+            logln4!("pwrite fd {} = EACCESS", fd);
             Err(SyscallError::EACCES)
         }
     } else {
+        logln4!("pwrite fd {} = EBADFD", fd);
         Err(SyscallError::EBADFD)
     };
 }
@@ -1150,7 +1158,11 @@ pub fn sys_dup(fd: u64, flags: u64) -> SyscallResult {
     let flags =
         OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)? & OpenFlags::CLOEXEC;
 
-    task.filetable().duplicate(fd as usize, flags, 0)
+    let res = task.filetable().duplicate(fd as usize, flags, 0);
+
+    logln4!("dup {} {:?} = {:?}", fd, flags, res);
+
+    res
 }
 
 pub fn sys_dup2(fd: u64, new_fd: u64, flags: u64) -> SyscallResult {
@@ -1159,8 +1171,12 @@ pub fn sys_dup2(fd: u64, new_fd: u64, flags: u64) -> SyscallResult {
     let flags =
         OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)? & OpenFlags::CLOEXEC;
 
-    task.filetable()
-        .duplicate_at(fd as usize, new_fd as usize, flags)
+
+    let res= task.filetable()
+        .duplicate_at(fd as usize, new_fd as usize, flags);
+    logln4!("dup2 {} {} {:?} = {:?}", fd, new_fd, flags, res);
+
+    return res;
 }
 
 pub fn sys_truncate(fd: u64, size: u64) -> SyscallResult {

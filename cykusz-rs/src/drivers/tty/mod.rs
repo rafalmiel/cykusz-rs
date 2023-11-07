@@ -492,6 +492,10 @@ impl INode for Tty {
         ptable: Option<&mut PollTable>,
         flags: PollEventFlags,
     ) -> Result<PollEventFlags, FsError> {
+        if let Some(p) = ptable {
+            p.listen(&self.wait_queue);
+        }
+
         let mut res_flags = PollEventFlags::empty();
         if flags.contains(PollEventFlags::WRITE) {
             res_flags.insert(PollEventFlags::WRITE);
@@ -501,11 +505,13 @@ impl INode for Tty {
             return Ok(res_flags);
         }
 
-        let has_data = self.buffer.lock_irq().has_data();
-
-        if let Some(p) = ptable {
-            p.listen(&self.wait_queue);
+        if let Some(g) = &*self.fg_group.lock() {
+            if !g.has_process(current_task_ref().pid()) {
+                return Ok(res_flags);
+            }
         }
+
+        let has_data = self.buffer.lock_irq().has_data();
 
         if has_data {
             res_flags.insert(PollEventFlags::READ);

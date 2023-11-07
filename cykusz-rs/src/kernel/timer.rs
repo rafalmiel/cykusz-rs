@@ -119,8 +119,6 @@ fn check_timers() {
         .expect("Timers thread should not be signalled")
         .unwrap();
 
-    let mut tmp_list = LinkedList::<TimerAdapter>::new(TimerAdapter::new());
-
     loop {
         if let Some(timer) = timers.pop_front() {
             if timer.timeout() <= time {
@@ -132,15 +130,13 @@ fn check_timers() {
 
                 timers = TIMERS.lock();
             } else {
-                tmp_list.push_back(timer);
+                timers.push_front(timer);
                 break;
             }
         } else {
             break;
         }
     }
-
-    *timers = tmp_list;
 }
 
 fn timer_fun() {

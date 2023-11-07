@@ -9,7 +9,7 @@ bitflags! {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct FdSet {
     pub fds: [u8; 128],
 }

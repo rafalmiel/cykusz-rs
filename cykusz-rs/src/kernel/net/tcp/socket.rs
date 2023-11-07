@@ -1,19 +1,26 @@
 use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
+
+use syscall_defs::net::{MsgHdr, SockAddr, SockAddrIn, SockOption};
 
 use syscall_defs::poll::PollEventFlags;
-use syscall_defs::OpenFlags;
+use syscall_defs::stat::Stat;
+use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::net::ip::{Ip4, IpHeader};
-use crate::kernel::net::tcp::{Tcp, TcpHeader, TcpService};
-use crate::kernel::net::{Packet, PacketDownHierarchy, PacketHeader, PacketTrait};
+use crate::kernel::net::ip::{Ip, Ip4, IpHeader};
+use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::tcp::{Tcp, TcpHeader};
+use crate::kernel::net::{
+    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketTrait, PacketUpHierarchy,
+};
 use crate::kernel::sched::current_task;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{Mutex, Spin};
 use crate::kernel::timer::{create_timer, current_ns, Timer, TimerCallback};
 use crate::kernel::utils::buffer::{Buffer, BufferQueue};
-use crate::kernel::utils::wait_queue::WaitQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 #[derive(PartialEq, Debug, Copy, Clone)]
 enum State {
@@ -40,13 +47,13 @@ bitflags! {
     }
 }
 
-impl Default for State {
+impl core::default::Default for State {
     fn default() -> Self {
         State::Closed
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Copy, Clone)]
 struct TransmissionCtl {
     snd_nxt: u32,
     snd_una: u32,
@@ -124,7 +131,6 @@ struct SocketData {
     in_buffer: BufferQueue,
     proxy_buffer: BufferQueue,
     snd_buffer: Buffer,
-    send_queue: WaitQueue,
 }
 
 impl SocketData {
@@ -136,6 +142,38 @@ impl SocketData {
             snd_buffer: Buffer::new(4096 * 18),
             ..Default::default()
         }
+    }
+
+    pub fn new_unbound() -> SocketData {
+        SocketData {
+            in_buffer: BufferQueue::new_empty(),
+            proxy_buffer: BufferQueue::new_empty(),
+            snd_buffer: Buffer::new_empty(),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_connected(from: &SocketData, packet: Packet<Tcp>) -> SocketData {
+        let mut data = SocketData {
+            in_buffer: BufferQueue::new_empty(),
+            proxy_buffer: BufferQueue::new_empty(),
+            snd_buffer: Buffer::new_empty(),
+            ctl: from.ctl,
+            ..Default::default()
+        };
+
+        data.init_connected(from.src_port(), packet);
+
+        data
+    }
+
+    fn init(&mut self, listening: bool, obj: Arc<Socket>) {
+        if !listening {
+            self.in_buffer.init_size(4096 * 18);
+            self.proxy_buffer.init_size(4096 * 8);
+            self.snd_buffer.init_size(4096 * 18);
+        }
+        self.init_timers(obj);
     }
 
     fn init_timers(&mut self, obj: Arc<Socket>) {
@@ -168,6 +206,10 @@ impl SocketData {
         self.dc_timer().disable();
     }
 
+    fn is_listening(&self) -> bool {
+        self.state == State::Listen
+    }
+
     fn conn_timer(&mut self) -> &mut ConnTimer {
         &mut self.conn_timer
     }
@@ -197,6 +239,7 @@ impl SocketData {
     }
 
     fn rx_timeout(&mut self) {
+        logln5!("rx timeout send ack");
         self.send_ack();
     }
 
@@ -325,12 +368,13 @@ impl SocketData {
                     .read_data(&mut packet.data_mut()[..cap])
                     .expect("[ NET ] Unexpected signal in process_ack");
 
+                //logln4!("send ack");
                 self.send_packet(packet, true);
 
                 window = self.ctl.available_window();
             }
 
-            self.proxy_buffer.readers_queue().notify_one();
+            self.proxy_buffer.writers_queue().notify_one();
         }
     }
 
@@ -343,9 +387,7 @@ impl SocketData {
         out_hdr.set_seq_nr(self.ctl.snd_nxt);
         out_hdr.set_urgent_ptr(0);
         out_hdr
-            .set_window(
-                core::cmp::min(u16::max_value() as usize, self.in_buffer.available_size()) as u16,
-            );
+            .set_window(core::cmp::min(u16::MAX as usize, self.in_buffer.available_size()) as u16);
 
         out_hdr.set_flags(flags);
 
@@ -376,35 +418,20 @@ impl SocketData {
 
         self.dst_port = hdr.src_port();
         self.target = ip_header.src_ip;
-
-        self.init_seq();
     }
 
     fn update_rcv_next(&mut self, packet: Packet<Tcp>) {
         let hdr = packet.header();
+        logln5!(
+            "update rcv next {} -> {}",
+            self.ctl.rcv_nxt,
+            hdr.seq_nr().wrapping_add(packet.ack_len())
+        );
         self.ctl.rcv_nxt = hdr.seq_nr().wrapping_add(packet.ack_len());
     }
 
-    fn handle_listen(&mut self, packet: Packet<Tcp>) {
-        let hdr = packet.header();
-
-        match (hdr.flag_syn(), hdr.flag_ack()) {
-            (true, false) => {
-                self.ctl.iss = hdr.seq_nr();
-                self.ctl.irs = hdr.seq_nr();
-
-                self.setup_connection(packet);
-
-                self.update_rcv_next(packet);
-
-                self.send_ack_flags(TcpFlags::SYN);
-
-                logln_disabled!("[ TCP ] Syn Received");
-
-                self.state = State::SynReceived;
-            }
-            _ => {}
-        }
+    fn handle_listen(&mut self, _packet: Packet<Tcp>) {
+        panic!("Unexpected listen on a non-listening socket");
     }
 
     fn handle_syn_received(&mut self, packet: Packet<Tcp>) {
@@ -415,10 +442,12 @@ impl SocketData {
                 self.conn_timer().reset();
                 logln_disabled!("[ TCP ] Connection established");
                 self.state = State::Established;
+
+                self.proxy_buffer.writers_queue().notify_all();
             }
             (_, true) => {
                 logln_disabled!("[ TCP ] RST Received, Listening");
-                self.state = State::Listen;
+                self.finalize();
             }
             _ => {
                 logln_disabled!("[ TCP ] Unknown state reached");
@@ -436,7 +465,7 @@ impl SocketData {
 
                 self.update_rcv_next(packet);
 
-                logln_disabled!("[ TCP ] Connection Established");
+                logln5!("[ TCP ] Connection Established");
 
                 self.conn_timer().reset();
 
@@ -476,22 +505,26 @@ impl SocketData {
         if !data.is_empty() || hdr.flag_fin() {
             if hdr.seq_nr() == self.ctl.rcv_nxt {
                 if self.in_buffer.try_append_data(data) == data.len() {
-                    //println!("[ TCP ] Stored {} bytes", data.len());
+                    logln5!("[ TCP ] Stored {} bytes", data.len());
                     self.update_rcv_next(packet);
 
                     self.ctl.rcv_wnd += packet.ack_len();
 
                     if self.ctl.rcv_wnd >= 4096 * 4 {
+                        logln5!("send ack");
                         self.send_ack();
 
                         self.ctl.rcv_wnd = 0;
                         self.rx_timer().disable();
                     } else {
-                        self.rx_timer().start_with_timeout(200);
+                        logln5!("start rx timer");
+                        self.rx_timer().start_with_timeout(150);
                     }
                 } else {
-                    logln_disabled!("[ TCP ] Failed to store data");
+                    logln5!("[ TCP ] Failed to store data");
                 }
+            } else {
+                logln5!("tcp seq missmatch");
             }
 
             if hdr.flag_fin() {
@@ -499,6 +532,8 @@ impl SocketData {
                 self.send_ack_flags(TcpFlags::FIN);
                 self.dc_timer().start_with_timeout(1000);
             }
+        } else {
+            logln5!("data empty and not flag fin");
         }
     }
 
@@ -570,8 +605,44 @@ impl SocketData {
         }
     }
 
+    fn init_connected(&mut self, src_port: u16, packet: Packet<Tcp>) {
+        self.set_src_port(src_port);
+
+        let hdr = packet.header();
+
+        self.ctl.iss = hdr.seq_nr();
+        self.ctl.irs = hdr.seq_nr();
+
+        self.setup_connection(packet);
+
+        self.update_rcv_next(packet);
+
+        logln5!("[ TCP ] Syn Received");
+
+        self.state = State::SynReceived;
+    }
+
+    fn process_new_connection(&mut self, packet: Packet<Tcp>) -> Option<Arc<Socket>> {
+        let hdr = packet.header();
+
+        match (hdr.flag_syn(), hdr.flag_ack()) {
+            (true, false) => {
+                let sock = Socket::new_connected(self, packet);
+
+                crate::kernel::net::tcp::register_handler(sock.clone());
+
+                sock.ack_connection();
+
+                return Some(sock);
+            }
+            _ => {}
+        }
+        None
+    }
+
     fn process(&mut self, packet: Packet<Tcp>) {
         //print!(".");
+        logln5!("process {:?}", self.state);
         let hdr = packet.header();
 
         self.ctl.snd_wnd = hdr.window() as u32;
@@ -587,7 +658,7 @@ impl SocketData {
 
         if self.state != State::Listen && self.state != State::SynSent {
             if self.ctl.rcv_nxt != hdr.seq_nr() {
-                logln_disabled!(
+                logln5!(
                     "[ TCP ] Out of Order Packet Received {}, {} vs {}",
                     (hdr.seq_nr() - self.ctl.irs),
                     self.ctl.rcv_nxt,
@@ -639,8 +710,9 @@ impl SocketData {
 
         self.stop_timers();
 
-        crate::kernel::net::tcp::release_handler(self.src_port as u32);
+        crate::kernel::net::tcp::release_handler(self.src_port as u32, self.target());
 
+        self.in_buffer.set_shutting_down(true);
         self.in_buffer.readers_queue().notify_all();
     }
 
@@ -676,32 +748,71 @@ impl SocketData {
         self.conn_timer().conn_timeout_start();
     }
 
-    pub fn listen(&mut self) {
+    pub fn listen(&mut self, _backlog: i32) {
         logln_disabled!("[ TCP ] Listening");
         self.state = State::Listen;
     }
 }
 
+struct SocketNewConnections {
+    connections: Vec<Arc<Socket>>,
+    backlog: i32,
+}
+
+impl SocketNewConnections {
+    fn new() -> SocketNewConnections {
+        SocketNewConnections {
+            connections: Vec::new(),
+            backlog: 0,
+        }
+    }
+
+    fn init(&mut self, backlog: i32) {
+        self.backlog = backlog;
+        self.connections.reserve(backlog as usize);
+    }
+}
+
 pub struct Socket {
-    data: Spin<SocketData>,
-    wait_queue: WaitQueue,
+    data: Mutex<SocketData>,
+
+    connections: Spin<SocketNewConnections>,
+    connections_wq: WaitQueue,
 
     self_ref: Weak<Socket>,
 }
 
 impl Socket {
-    pub fn new(port: u32) -> Arc<Socket> {
+    pub fn new_unbound() -> Arc<Socket> {
         let sock = Arc::new_cyclic(|me| Socket {
-            data: Spin::new(SocketData::new(
-                port.try_into().expect("Invalid port number"),
-            )),
-            wait_queue: WaitQueue::new(),
+            data: Mutex::new(SocketData::new_unbound()),
+            connections: Spin::new(SocketNewConnections::new()),
+            connections_wq: WaitQueue::new(),
             self_ref: me.clone(),
         });
 
-        sock.data.lock().init_timers(sock.clone());
+        sock
+    }
+
+    fn new_connected(from: &SocketData, packet: Packet<Tcp>) -> Arc<Socket> {
+        let sock = Arc::new_cyclic(|me| Socket {
+            data: Mutex::new(SocketData::new_connected(from, packet)),
+            connections: Spin::new(SocketNewConnections::new()),
+            connections_wq: WaitQueue::new(),
+            self_ref: me.clone(),
+        });
+
+        sock.init(false);
 
         sock
+    }
+
+    fn init(&self, listening: bool) {
+        self.data.lock().init(listening, self.me());
+    }
+
+    pub fn ack_connection(&self) {
+        self.data.lock().send_ack_flags(TcpFlags::SYN);
     }
 
     fn conn_timeout(&self) {
@@ -724,8 +835,8 @@ impl Socket {
         self.data.lock().connect();
     }
 
-    pub fn listen(&self) {
-        self.data.lock().listen()
+    pub fn listen(&self, backlog: i32) {
+        self.data.lock().listen(backlog)
     }
 
     pub fn src_port(&self) -> u16 {
@@ -751,11 +862,30 @@ impl Socket {
     pub fn set_target(&self, val: Ip4) {
         self.data.lock().set_target(val);
     }
+
+    pub fn me(&self) -> Arc<Socket> {
+        self.self_ref.upgrade().unwrap()
+    }
 }
 
 impl INode for Socket {
+    fn stat(&self) -> Result<Stat> {
+        let mut stat = Stat::default();
+
+        stat.st_mode.insert(syscall_defs::stat::Mode::IFSOCK);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
+
+        Ok(stat)
+    }
+
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         let mut data = self.data.lock();
+
+        if data.is_listening() {
+            return Err(FsError::NotSupported);
+        }
 
         let wnd_update = data.in_buffer.available_size() == 0;
 
@@ -765,7 +895,7 @@ impl INode for Socket {
             data.send_ack();
         }
 
-        //println!("[ TCP ] Read {} bytes", r);
+        logln5!("[ TCP ] Read {} bytes", r);
 
         Ok(r)
     }
@@ -773,19 +903,23 @@ impl INode for Socket {
     fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
         let mut data = self.data.lock();
 
+        if data.is_listening() {
+            return Err(FsError::NotSupported);
+        }
+
         if data.state == State::Established {
             if data.ctl.available_window() < buf.len() {
                 let task = current_task();
 
-                data.proxy_buffer.readers_queue().add_task(task.clone());
+                data.proxy_buffer.writers_queue().add_task(task.clone());
 
                 //println!("[ TCP ] Proxy Buffer avail: {}", data.proxy_buffer.available_size());
 
                 while data.proxy_buffer.available_size() < buf.len() {
-                    if let Err(e) = WaitQueue::wait_lock(data) {
+                    if let Err(e) = WaitQueue::wait_mutex(data) {
                         data = self.data.lock();
 
-                        data.proxy_buffer.readers_queue().remove_task(task);
+                        data.proxy_buffer.writers_queue().remove_task(task);
 
                         return Err(e)?;
                     }
@@ -795,17 +929,7 @@ impl INode for Socket {
 
                 data.proxy_buffer.try_append_data(buf);
 
-                data.proxy_buffer.readers_queue().remove_task(task);
-            //data.send_queue.add_task(task.clone());
-
-            //while data.ctl.available_window() < buf.len() && data.state == State::Established {
-            //    //println!("[ TCP ] Awaiting available window {} {}", data.ctl.available_window(), buf.len());
-            //    WaitQueue::wait_lock(data);
-
-            //    data = self.data.lock();
-            //}
-
-            //data.send_queue.remove_task(task);
+                data.proxy_buffer.writers_queue().remove_task(task);
             } else {
                 for o in (0..buf.len()).step_by(1460) {
                     let len = core::cmp::min(1460, buf.len() - o);
@@ -822,6 +946,7 @@ impl INode for Socket {
             }
             Ok(buf.len())
         } else {
+            logln5!("write before connected");
             // Buffer data for when connection is ready?
             Err(FsError::NotSupported)
         }
@@ -832,41 +957,81 @@ impl INode for Socket {
         listen: Option<&mut PollTable>,
         flags: PollEventFlags,
     ) -> Result<PollEventFlags> {
-        if !flags.contains(PollEventFlags::READ) {
-            return Err(FsError::NotSupported);
-        }
+        let mut res = PollEventFlags::empty();
+
         let data = self.data.lock();
 
+        if data.is_listening() {
+            if let Some(pt) = listen {
+                pt.listen(&self.connections_wq);
+            }
+
+            drop(data);
+
+            if !self.connections.lock().connections.is_empty() {
+                res.insert(PollEventFlags::READ);
+            }
+
+            return Ok(res);
+        }
+
         if let Some(pt) = listen {
-            pt.listen(&data.in_buffer.readers_queue());
+            if flags.contains(PollEventFlags::READ) {
+                pt.listen(&data.in_buffer.readers_queue());
+            }
+            if flags.contains(PollEventFlags::WRITE) {
+                pt.listen(&data.proxy_buffer.writers_queue());
+            }
         }
 
         if (data.state == State::Closed || data.state == State::CloseWait)
             && !data.in_buffer.has_data()
         {
-            Err(FsError::NotSupported)
+            res.insert(PollEventFlags::READ);
         } else {
-            Ok(if data.in_buffer.has_data() {
-                PollEventFlags::READ
-            } else {
-                PollEventFlags::empty()
-            })
+            if data.in_buffer.has_data() {
+                logln5!("in buffer has data");
+                res.insert(PollEventFlags::READ);
+            }
         }
+
+        if data.state == State::Established {
+            res.insert(PollEventFlags::WRITE);
+        }
+
+        Ok(res)
     }
 
     fn close(&self, _flags: OpenFlags) {
         self.data.lock().close();
     }
+
+    fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
+        default_driver().ioctl(cmd, arg)
+    }
+
+    fn as_socket(&self) -> Option<Arc<dyn SocketService>> {
+        Some(self.self_ref.upgrade()?)
+    }
 }
 
-impl TcpService for Socket {
-    fn process_packet(&self, packet: Packet<Tcp>) {
+impl SocketService for Socket {
+    fn process_packet(&self, packet: Packet<Ip>) {
+        //logln4!("process packet start");
         let mut data = self.data.lock();
+        logln4!("process packet locked");
 
-        data.process(packet);
+        if !data.is_listening() {
+            data.process(packet.upgrade());
 
-        if data.state == State::Closed {
-            data.in_buffer.readers_queue().notify_all();
+            if data.state == State::Closed {
+                data.in_buffer.readers_queue().notify_all();
+            }
+        } else {
+            if let Some(sock) = data.process_new_connection(packet.upgrade()) {
+                self.connections.lock().connections.push(sock);
+                self.connections_wq.notify_all();
+            }
         }
     }
 
@@ -875,38 +1040,130 @@ impl TcpService for Socket {
 
         self.data.lock().finalize();
     }
+
+    fn listen(&self, backlog: i32) -> SyscallResult {
+        self.init(true);
+
+        crate::kernel::net::tcp::register_handler(self.me()).ok_or(SyscallError::EADDRINUSE)?;
+
+        self.listen(backlog);
+
+        Ok(0)
+    }
+
+    fn accept(
+        &self,
+        sock_addr: Option<&mut SockAddr>,
+        _addrlen: Option<&mut u32>,
+    ) -> core::result::Result<Arc<dyn SocketService>, SyscallError> {
+        let mut lock = self
+            .connections_wq
+            .wait_lock_for(WaitQueueFlags::empty(), &self.connections, |l| {
+                !l.connections.is_empty()
+            })?
+            .unwrap();
+
+        if let Some(addr) = sock_addr {
+            *addr = SockAddrIn::new(self.dst_port(), self.target().into()).into_sock_addr();
+        }
+
+        Ok(lock.connections.pop().unwrap())
+    }
+
+    fn bind(&self, sock_addr: &SockAddr, addrlen: u32) -> SyscallResult {
+        logln5!("tcp bind");
+        if addrlen as usize != core::mem::size_of::<SockAddr>() {
+            return Err(SyscallError::EINVAL);
+        }
+        self.set_src_port(sock_addr.as_sock_addr_in().port());
+
+        Ok(0)
+    }
+
+    fn connect(&self, sock_addr: &SockAddr, addrlen: u32) -> SyscallResult {
+        logln5!("tcp connect");
+        if addrlen as usize != core::mem::size_of::<SockAddr>() {
+            return Err(SyscallError::EINVAL);
+        }
+
+        let addr_in = sock_addr.as_sock_addr_in();
+
+        self.set_dst_port(addr_in.port());
+        self.set_target(addr_in.sin_addr.s_addr.into());
+
+        self.init(false);
+
+        crate::kernel::net::tcp::register_handler(self.me()).ok_or(SyscallError::EADDRINUSE)?;
+
+        self.connect();
+
+        Ok(0)
+    }
+
+    fn msg_send(&self, hdr: &MsgHdr, _flags: i32) -> SyscallResult {
+        let iovecs = hdr.iovecs();
+
+        let mut total = 0;
+
+        for iovec in iovecs {
+            total += self.write_at(0, iovec.get_bytes())?;
+        }
+
+        Ok(total)
+    }
+
+    fn msg_recv(&self, hdr: &mut MsgHdr, _flags: i32) -> SyscallResult {
+        let iovecs = hdr.iovecs_mut();
+
+        let mut total = 0;
+
+        for iovec in iovecs {
+            if total > 0 && !self.data.lock().in_buffer.has_data() {
+                break;
+            }
+
+            let read = self.read_at(0, iovec.get_bytes_mut())?;
+
+            if read == 0 {
+                return Ok(total);
+            }
+
+            total += read
+        }
+
+        return Ok(total);
+    }
+
+    fn get_socket_option(
+        &self,
+        _layer: i32,
+        _option: SockOption,
+        _buffer: *mut (),
+        _socklen: Option<&mut u32>,
+    ) -> SyscallResult {
+        logln5!("getsockopt {:?}", _option);
+        Ok(0)
+    }
+
+    fn src_port(&self) -> u32 {
+        self.src_port() as u32
+    }
+
+    fn target(&self) -> Ip4 {
+        self.target()
+    }
+
+    fn set_src_port(&self, src_port: u32) {
+        self.set_src_port(src_port as u16);
+    }
+
+    fn as_inode(&self) -> Option<Arc<dyn INode>> {
+        Some(self.self_ref.upgrade()?)
+    }
 }
 
 impl Drop for Socket {
     fn drop(&mut self) {
         logln_disabled!("[ TCP ] Socket Removed");
-    }
-}
-
-pub fn bind(port: u32) -> Option<Arc<dyn INode>> {
-    let socket = Socket::new(port);
-
-    if crate::kernel::net::tcp::register_handler(port, socket.clone()) {
-        socket.listen();
-
-        Some(socket)
-    } else {
-        None
-    }
-}
-
-pub fn connect(host: Ip4, port: u32) -> Option<Arc<dyn INode>> {
-    let socket = Socket::new(0);
-
-    if let Some(p) = crate::kernel::net::tcp::register_ephemeral_handler(socket.clone()) {
-        socket.set_src_port(p as u16);
-        socket.set_dst_port(port as u16);
-        socket.set_target(host);
-
-        socket.connect();
-
-        Some(socket)
-    } else {
-        None
     }
 }

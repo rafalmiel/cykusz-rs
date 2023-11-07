@@ -680,7 +680,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
     fn csi_dispatch(
         &mut self,
         params: &vte::Params,
-        intermediates: &[u8],
+        _intermediates: &[u8],
         ignore: bool,
         action: char,
     ) {

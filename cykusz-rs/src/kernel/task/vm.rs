@@ -206,7 +206,10 @@ impl Mapping {
             let bytes = core::cmp::min(PAGE_SIZE, f.len - addr_offset);
 
             if current_task_ref().locks() > 0 {
-                logln!("handle_pf_private_file: locks > 0");
+                logln!(
+                    "handle_pf_private_file: locks > 0 f: {}",
+                    f.file.full_path()
+                );
             }
 
             let mappable = f.file.inode().as_mappable().unwrap();
@@ -929,6 +932,9 @@ impl VM {
     }
 
     pub fn handle_pagefault(&self, reason: PageFaultReason, addr: VirtAddr) -> bool {
+        if current_task_ref().locks() > 0 {
+            logln!("handle_pagefault: locks > 0");
+        }
         let mut res = self.data.lock();
 
         let ret = res.handle_pagefault(reason, addr);

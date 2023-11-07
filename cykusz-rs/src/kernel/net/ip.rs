@@ -2,11 +2,12 @@ use crate::kernel::net::eth::{Eth, EthType};
 use crate::kernel::net::icmp::Icmp;
 use crate::kernel::net::tcp::Tcp;
 use crate::kernel::net::udp::Udp;
-use crate::kernel::net::util::{checksum, NetU16, NetU8};
+use crate::kernel::net::util::checksum;
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
     PacketUpHierarchy,
 };
+use syscall_defs::net::{NetU16, NetU32, NetU8};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(u8)]
@@ -29,6 +30,20 @@ pub struct Ip4 {
     pub v: [u8; 4],
 }
 
+impl From<NetU32> for Ip4 {
+    fn from(value: NetU32) -> Self {
+        Ip4 {
+            v: unsafe { core::mem::transmute::<NetU32, [u8; 4]>(value) },
+        }
+    }
+}
+
+impl From<Ip4> for NetU32 {
+    fn from(value: Ip4) -> Self {
+        unsafe { core::mem::transmute::<Ip4, NetU32>(value) }
+    }
+}
+
 impl Ip4 {
     pub fn limited_broadcast() -> Ip4 {
         Ip4 {
@@ -48,6 +63,10 @@ impl Ip4 {
 
     pub fn empty() -> Ip4 {
         Ip4 { v: [0, 0, 0, 0] }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.v == [0, 0, 0, 0]
     }
 
     pub fn is_same_subnet(&self, ip: Ip4, subnet: Ip4) -> bool {

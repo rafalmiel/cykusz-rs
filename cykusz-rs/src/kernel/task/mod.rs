@@ -190,7 +190,7 @@ impl Task {
         args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> Result<!, SyscallError> {
-        logln2!("exec task {}", self.pid());
+        logln5!("exec task {} {}", self.pid(), exe.full_path());
         let vm = self.vm();
         vm.clear();
 

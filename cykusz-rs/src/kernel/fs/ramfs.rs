@@ -70,6 +70,40 @@ impl INode for LockedRamINode {
         res
     }
 
+    fn stat(&self) -> Result<syscall_defs::stat::Stat> {
+        let mut stat = syscall_defs::stat::Stat::default();
+
+        stat.st_ino = self.id()? as u64;
+        stat.st_dev = 0;
+
+        let content = self.0.read();
+        if let Content::Bytes(b) = &content.content {
+            let bytes = b.lock();
+
+            stat.st_nlink = 1;
+            stat.st_blksize = PAGE_SIZE as u64;
+            stat.st_blocks = bytes.len().ceil_div(PAGE_SIZE) as u64;
+            stat.st_size = bytes.len() as i64;
+        }
+
+        let ftype = content.typ;
+        if ftype == FileType::File {
+            stat.st_mode.insert(syscall_defs::stat::Mode::IFREG);
+        } else if ftype == FileType::Dir {
+            stat.st_mode.insert(syscall_defs::stat::Mode::IFDIR);
+        } else if ftype == FileType::Symlink {
+            stat.st_mode.insert(syscall_defs::stat::Mode::IFLNK);
+        } else {
+            stat.st_mode.insert(syscall_defs::stat::Mode::IFCHR);
+        }
+
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
+        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
+
+        Ok(stat)
+    }
+
     fn lookup(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {
         let this = self.0.read();
 
@@ -247,45 +281,14 @@ impl INode for LockedRamINode {
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
-        if let Content::DevNode(Some(d)) = &self.0.read().content {
-            d.ioctl(cmd, arg)
+        let read = self.0.read();
+        if let Content::DevNode(Some(d)) = &read.content {
+            let dev = d.clone();
+            drop(read);
+            dev.ioctl(cmd, arg)
         } else {
             Err(FsError::NotSupported)
         }
-    }
-
-    fn stat(&self) -> Result<syscall_defs::stat::Stat> {
-        let mut stat = syscall_defs::stat::Stat::default();
-
-        stat.st_ino = self.id()? as u64;
-        stat.st_dev = 0;
-
-        let content = self.0.read();
-        if let Content::Bytes(b) = &content.content {
-            let bytes = b.lock();
-
-            stat.st_nlink = 1;
-            stat.st_blksize = PAGE_SIZE as u64;
-            stat.st_blocks = bytes.len().ceil_div(PAGE_SIZE) as u64;
-            stat.st_size = bytes.len() as i64;
-        }
-
-        let ftype = content.typ;
-        if ftype == FileType::File {
-            stat.st_mode.insert(syscall_defs::stat::Mode::IFREG);
-        } else if ftype == FileType::Dir {
-            stat.st_mode.insert(syscall_defs::stat::Mode::IFDIR);
-        } else if ftype == FileType::Symlink {
-            stat.st_mode.insert(syscall_defs::stat::Mode::IFLNK);
-        } else {
-            stat.st_mode.insert(syscall_defs::stat::Mode::IFCHR);
-        }
-
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
-
-        Ok(stat)
     }
 
     fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {

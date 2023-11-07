@@ -3,6 +3,11 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use syscall_defs::ioctl::net::{IfConf, IfReq, IfrFlags};
+use syscall_defs::net::SockDomain;
+
+use crate::kernel::fs::vfs::FsError;
+use crate::kernel::mm::VirtAddr;
 
 use crate::kernel::net::eth::Eth;
 use crate::kernel::net::ip::Ip4;
@@ -93,6 +98,33 @@ impl NetDevice {
 
     pub fn dns_name(&self) -> String {
         self.data.read().dns_name.clone()
+    }
+
+    pub fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize, FsError> {
+        match cmd {
+            syscall_defs::ioctl::net::SIOCGIFCONF => {
+                let ifreq = unsafe { VirtAddr(arg).read_mut::<IfConf>() };
+                ifreq.ifc_len = core::mem::size_of::<IfReq>() as i32;
+                let buf = ifreq.get_req_array().ok_or(FsError::InvalidParam)?;
+
+                let elem = &mut buf[0];
+
+                elem.ifr_name.fill(0);
+                elem.ifr_name[..4].copy_from_slice(b"eth0");
+
+                let addr = unsafe { elem.ifrequ.ifr_addr.as_sock_addr_in_mut() };
+                addr.sin_family = SockDomain::AfInet;
+                addr.sin_addr.s_addr = self.ip().into();
+
+                Ok(0)
+            }
+            syscall_defs::ioctl::net::SIOCGIFFLAGS => {
+                let ifreq = unsafe { VirtAddr(arg).read_mut::<IfReq>() };
+                ifreq.ifrequ.ifr_flags = IfrFlags::IFF_UP;
+                Ok(0)
+            }
+            _ => Err(FsError::NoTty),
+        }
     }
 }
 

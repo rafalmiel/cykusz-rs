@@ -2,10 +2,12 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 
 use bit_field::BitField;
+use syscall_defs::net::{NetU16, NetU32};
 
 use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
+use crate::kernel::net::socket::SocketService;
 use crate::kernel::net::tcp::socket::TcpFlags;
-use crate::kernel::net::util::{checksum, NetU16, NetU32};
+use crate::kernel::net::util::checksum;
 use crate::kernel::net::{
     Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait, PacketUpHierarchy,
 };
@@ -231,58 +233,77 @@ pub fn send_packet(mut packet: Packet<Tcp>) {
 pub fn process_packet(packet: Packet<Tcp>) {
     let header = packet.header();
 
-    let mut tree = HANDLERS.write();
+    let tree = HANDLERS.write();
 
     let dst_port = header.dst_port.value() as u32;
+    let ip: Packet<Ip> = packet.downgrade();
+    let src = ip.header().src_ip;
 
-    if let Some(f) = tree.get_mut(&dst_port) {
+    if let Some(f) = tree.get(&(dst_port, src)) {
         let f = f.clone();
 
         drop(tree);
+        logln5!("received packet on handler {} {:?}", dst_port, Some(src));
 
-        f.process_packet(packet);
+        f.process_packet(ip);
+    } else if let Some(f) = tree.get(&(dst_port, Ip4::empty())) {
+        let f = f.clone();
+
+        drop(tree);
+        logln5!("received packet on handler {} None", dst_port);
+
+        f.process_packet(ip);
     } else {
+        logln5!("received packet without handler {} {:?}", dst_port, src);
         crate::kernel::net::icmp::send_port_unreachable(packet.downgrade());
     }
 }
 
-pub fn port_unreachable(port: u32, dst_port: u32) {
+pub fn port_unreachable(port: u32, dst_port: u32, _dst_ip: Ip4) {
     let tree = HANDLERS.read();
 
-    if let Some(f) = tree.get(&port) {
+    if let Some(f) = tree.get(&(port, Ip4::empty())) {
         let f2 = f.clone();
 
-        core::mem::drop(tree);
+        drop(tree);
 
         f2.port_unreachable(port, dst_port)
     }
 }
 
-pub trait TcpService: Sync + Send {
-    fn process_packet(&self, packet: Packet<Tcp>);
-    fn port_unreachable(&self, port: u32, dst_port: u32);
-}
+static HANDLERS: RwSpin<BTreeMap<(u32, Ip4), Arc<dyn SocketService>>> =
+    RwSpin::new(BTreeMap::new());
 
-static HANDLERS: RwSpin<BTreeMap<u32, Arc<dyn TcpService>>> = RwSpin::new(BTreeMap::new());
-
-pub fn register_handler(port: u32, handler: Arc<dyn TcpService>) -> bool {
-    let mut handlers = HANDLERS.write();
-
-    if !handlers.contains_key(&port) {
-        handlers.insert(port, handler);
-
-        return true;
+pub fn register_handler(handler: Arc<dyn SocketService>) -> Option<u32> {
+    let port = handler.src_port();
+    if port == 0 {
+        let port = register_ephemeral_handler(handler)?;
+        return Some(port);
     }
 
-    false
+    let target = handler.target();
+    let mut handlers = HANDLERS.write();
+
+    if !handlers.contains_key(&(port as u32, target)) {
+        handlers.insert((port as u32, target), handler);
+
+        logln5!("registered handler {} {:?}", port, target);
+
+        return Some(port as u32);
+    }
+
+    None
 }
 
-pub fn register_ephemeral_handler(handler: Arc<dyn TcpService>) -> Option<u32> {
+pub fn register_ephemeral_handler(handler: Arc<dyn SocketService>) -> Option<u32> {
+    let target = handler.target();
     let mut handlers = HANDLERS.write();
 
     for p in 49152..=65535 {
-        if !handlers.contains_key(&p) {
-            handlers.insert(p, handler);
+        if !handlers.contains_key(&(p, target)) {
+            handler.set_src_port(p);
+            handlers.insert((p, target), handler);
+            logln5!("registered ephemeral handler {} {:?}", p, target);
 
             return Some(p);
         }
@@ -291,11 +312,12 @@ pub fn register_ephemeral_handler(handler: Arc<dyn TcpService>) -> Option<u32> {
     None
 }
 
-pub fn release_handler(port: u32) {
+pub fn release_handler(port: u32, target: Ip4) {
     let mut handlers = HANDLERS.write();
 
-    if handlers.contains_key(&port) {
-        handlers.remove(&port);
+    if handlers.contains_key(&(port, target)) {
+        handlers.remove(&(port, target));
+        logln5!("released handler {} {:?}", port, target);
     } else {
         panic!("TCP port is not registered")
     }

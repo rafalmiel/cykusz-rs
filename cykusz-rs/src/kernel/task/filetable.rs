@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use syscall_defs::{FileType, OpenFlags, SysDirEntry, SyscallError, SyscallResult, SeekWhence};
+use syscall_defs::{FileType, OpenFlags, SeekWhence, SysDirEntry, SyscallError, SyscallResult};
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
@@ -36,7 +36,7 @@ impl FileHandle {
         }
     }
 
-    pub fn duplicate(&self, flags: OpenFlags) -> Result<Arc<FileHandle>> {
+    pub fn duplicate(&self, fd: usize, flags: OpenFlags) -> Result<Arc<FileHandle>> {
         let mut new_flags = self.flags();
         if !flags.contains(OpenFlags::CLOEXEC) {
             new_flags.remove(OpenFlags::CLOEXEC);
@@ -44,9 +44,12 @@ impl FileHandle {
             new_flags.insert(OpenFlags::CLOEXEC);
         }
 
-        let new = Arc::new(FileHandle::new(self.fd, self.inode.clone(), new_flags));
+        let new = Arc::new(FileHandle::new(fd, self.inode.clone(), new_flags));
 
-        let _ = new.seek(self.offset.load(Ordering::Relaxed) as isize, SeekWhence::SeekSet);
+        let _ = new.seek(
+            self.offset.load(Ordering::Relaxed) as isize,
+            SeekWhence::SeekSet,
+        );
 
         new.inode.inode().open(new_flags)?;
 
@@ -279,9 +282,15 @@ impl FileTable {
     }
 
     pub fn debug(&self) {
-        for f in &*self.files.read() {
+        for (i, f) in (&*self.files.read()).iter().enumerate() {
             if let Some(f) = f {
-                logln4!("[{}] {} {:?}", f.fd, f.inode.full_path(), f.flags());
+                logln5!(
+                    "[{}] fd: {} {} {:?}",
+                    i,
+                    f.fd,
+                    f.inode.full_path(),
+                    f.flags()
+                );
             }
         }
     }
@@ -410,13 +419,13 @@ impl FileTable {
             .enumerate()
             .find(|e| e.0 >= min && e.1.is_none())
         {
-            *f = Some(handle.duplicate(flags)?);
+            *f = Some(handle.duplicate(idx, flags)?);
 
             Ok(idx)
         } else if files.len() < FILE_NUM {
             let len = files.len();
 
-            files.push(Some(handle.duplicate(flags)?));
+            files.push(Some(handle.duplicate(len, flags)?));
 
             Ok(len)
         } else {
@@ -434,11 +443,11 @@ impl FileTable {
         let mut files = self.files.write();
 
         if files[at].is_none() {
-            files[at] = Some(handle.duplicate(flags)?);
+            files[at] = Some(handle.duplicate(at, flags)?);
 
             Ok(at)
         } else {
-            match handle.duplicate(flags) {
+            match handle.duplicate(at, flags) {
                 Ok(handle) => {
                     let old = files[at].take().unwrap();
 

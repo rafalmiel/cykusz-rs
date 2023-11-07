@@ -1,5 +1,5 @@
+use syscall_defs::net::{SockAddr, SockAddrIn, SockDomain, SockType, SockTypeFlags};
 use syscall_defs::poll::FdSet;
-use syscall_defs::ConnectionFlags;
 
 fn send(fd: usize) -> bool {
     let mut buf = [0u8; 1300];
@@ -95,16 +95,47 @@ fn start(fd: usize) {
 }
 
 pub fn connect(port: u32, ip: &[u8]) {
-    if let Ok(fd) = syscall::connect(&ip, port, ConnectionFlags::TCP) {
-        start(fd);
+    let sock = syscall::socket(
+        SockDomain::AfInet,
+        SockTypeFlags::new(SockType::Stream as u64),
+    )
+    .unwrap();
+
+    let addr = SockAddrIn::from_array(port as u16, ip);
+
+    if let Ok(_) = syscall::connect(
+        sock,
+        &addr.into_sock_addr(),
+        core::mem::size_of::<SockAddr>(),
+    ) {
+        start(sock);
     } else {
         println!("Connect failed");
     }
 }
 
 pub fn bind(src_port: u32) {
-    if let Ok(fd) = syscall::bind(src_port, ConnectionFlags::TCP) {
-        start(fd);
+    let sock = syscall::socket(
+        SockDomain::AfInet,
+        SockTypeFlags::new(SockType::Stream as u64),
+    )
+    .unwrap();
+
+    let addr = SockAddrIn::from_array(src_port as u16, &[0, 0, 0, 0]);
+
+    if let Ok(_) = syscall::bind(
+        sock,
+        &addr.into_sock_addr(),
+        core::mem::size_of::<SockAddr>(),
+    ) {
+        if syscall::listen(sock, 5).is_err() {
+            println!("Listen failed");
+            return;
+        };
+        if let Ok(new_fd) = syscall::accept(sock, None, None) {
+            println!("new fd: {}", new_fd);
+            start(new_fd);
+        }
     } else {
         println!("Bind failed");
     }

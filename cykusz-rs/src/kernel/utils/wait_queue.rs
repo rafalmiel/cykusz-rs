@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use crate::kernel::sched::{current_task, SleepFlags};
 use crate::kernel::signal::{SignalError, SignalResult};
-use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
+use crate::kernel::sync::{IrqGuard, MutexGuard, Spin, SpinGuard};
 use crate::kernel::task::Task;
 
 pub struct WaitQueue {
@@ -74,6 +74,14 @@ impl WaitQueue {
     }
 
     pub fn wait_lock<T>(lock: SpinGuard<T>) -> SignalResult<()> {
+        let task = current_task();
+
+        core::mem::drop(lock);
+
+        task.await_io(SleepFlags::empty())
+    }
+
+    pub fn wait_mutex<T>(lock: MutexGuard<T>) -> SignalResult<()> {
         let task = current_task();
 
         core::mem::drop(lock);

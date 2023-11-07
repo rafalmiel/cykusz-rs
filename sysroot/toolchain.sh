@@ -63,6 +63,9 @@ $SPATH/build.sh cykusz_zstd > $LOGDIR/cykusz_zstd.log 2>&1
 
 echo "Cross building less..."
 $SPATH/build.sh cykusz_less > $LOGDIR/cykusz_less.log 2>&1
+
+echo "Cross building netcat..."
+$SPATH/build.sh cykusz_netcat > $LOGDIR/cykusz_netcat.log 2>&1
 #
 #echo "Cross building llvm..."
 #$SPATH/build.sh cykusz_llvm > $LOGDIR/cykusz_llvm.log 2>&1

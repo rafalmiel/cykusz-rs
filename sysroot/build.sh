@@ -182,7 +182,8 @@ function _sysroot {
     meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
     meson install -C $MLIBC_BUILD_DIR
 
-    cp $SPATH/resolv.conf $SYSROOT/etc
+    mkdir -p $SYSROOT/etc
+    cp $SPATH/resolv.conf $SYSROOT/etc/
 }
 
 function _binutils {
@@ -210,7 +211,7 @@ function _gcc {
     pushd .
 
     cd $GCC_BUILD_DIR
-    $GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared
+    $GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared --without-headers
 
     popd
 

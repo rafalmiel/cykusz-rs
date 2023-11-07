@@ -3,10 +3,11 @@
 use alloc::string::String;
 use alloc::sync::Arc;
 use core::marker::PhantomData;
+use syscall_defs::net::{NetU16, NetU32, NetU8};
 
-use crate::kernel::net::ip::Ip4;
-use crate::kernel::net::udp::{Udp, UdpService};
-use crate::kernel::net::util::{NetU16, NetU32, NetU8};
+use crate::kernel::net::ip::{Ip, Ip4};
+use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::udp::Udp;
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
@@ -402,11 +403,11 @@ fn process_ack(packet: Packet<Dhcp>) {
 
         drv.configure(my_ip, dg, sb, dns);
 
-        logln!("[ DHCP ] Interface configured:");
-        logln!("[ DHCP ] IP:              {:?}", my_ip);
-        logln!("[ DHCP ] Default Gateway: {:?}", dg);
-        logln!("[ DHCP ] Subnet:          {:?}", sb);
-        logln!("[ DHCP ] DNS:             {:?}", dns);
+        logln4!("[ DHCP ] Interface configured:");
+        logln4!("[ DHCP ] IP:              {:?}", my_ip);
+        logln4!("[ DHCP ] Default Gateway: {:?}", dg);
+        logln4!("[ DHCP ] Subnet:          {:?}", sb);
+        logln4!("[ DHCP ] DNS:             {:?}", dns);
     }
 }
 
@@ -431,18 +432,26 @@ fn process_packet_udp(packet: Packet<Udp>) {
 
 struct DhcpService {}
 
-impl UdpService for DhcpService {
-    fn process_packet(&self, packet: Packet<Udp>) {
-        process_packet_udp(packet);
+impl SocketService for DhcpService {
+    fn process_packet(&self, packet: Packet<Ip>) {
+        process_packet_udp(packet.upgrade());
     }
 
     fn port_unreachable(&self, _port: u32, _dst_port: u32) {
         unimplemented!()
     }
+
+    fn src_port(&self) -> u32 {
+        68
+    }
+
+    fn target(&self) -> Ip4 {
+        Ip4::empty()
+    }
 }
 
 pub fn init() {
-    crate::kernel::net::udp::register_handler(68, Arc::new(DhcpService {}));
+    crate::kernel::net::udp::register_handler(Arc::new(DhcpService {}));
 
     send_discovery();
 }

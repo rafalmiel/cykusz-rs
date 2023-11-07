@@ -238,7 +238,7 @@ macro_rules! logln {
 #[allow(unused)]
 macro_rules! log {
     ($($arg:tt)*) => ({
-        $crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
+        crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
     });
 }
 #[macro_export]
@@ -279,5 +279,19 @@ macro_rules! logln4 {
 macro_rules! log4 {
     ($($arg:tt)*) => {{
         $crate::arch::output::log_fmt_disabled(format_args!($($arg)*)).unwrap();
+    }};
+}
+
+#[macro_export]
+macro_rules! logln5 {
+    ($fmt:expr) => (log5!(concat!("[log5]: ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log5!(concat!("[log5]: ", $fmt, "\n"), $($arg)*));
+}
+
+#[macro_export]
+#[allow(unused)]
+macro_rules! log5 {
+    ($($arg:tt)*) => {{
+        $crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
     }};
 }

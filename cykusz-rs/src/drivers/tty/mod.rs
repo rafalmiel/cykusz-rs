@@ -24,6 +24,7 @@ use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::task::Task;
 
 use crate::kernel::tty::TerminalDevice;
+use crate::kernel::utils::types::Prefault;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 use self::output::OutputBuffer;
@@ -216,16 +217,16 @@ impl Tty {
             match key {
                 KeyCode::KEY_PAGEUP => {
                     self.output.lock_irq().scroll_up(20);
-                },
+                }
                 KeyCode::KEY_PAGEDOWN => {
                     self.output.lock_irq().scroll_down(20);
                 }
                 KeyCode::KEY_HOME => {
                     self.output.lock_irq().scroll_top();
-                },
+                }
                 KeyCode::KEY_END => {
                     self.output.lock_irq().scroll_top();
-                },
+                }
                 _ => {
                     return false;
                 }
@@ -642,6 +643,8 @@ impl INode for Tty {
             tty::TCGETS => {
                 let termios =
                     unsafe { VirtAddr(arg).read_mut::<syscall_defs::ioctl::tty::Termios>() };
+
+                (termios as &tty::Termios).prefault();
 
                 logln!("termios TCGETS 0x{:x}", termios.c_lflag);
                 logln!("{:?}", termios);

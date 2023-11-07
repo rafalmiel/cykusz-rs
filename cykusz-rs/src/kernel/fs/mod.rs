@@ -325,7 +325,7 @@ pub fn lookup_by_path_at(
     dir: DirEntryItem,
     path: &Path,
     lookup_mode: LookupMode,
-    real_path: bool
+    real_path: bool,
 ) -> Result<DirEntryItem> {
     if let Some(cur) = if !path.is_absolute() {
         Some(dir)

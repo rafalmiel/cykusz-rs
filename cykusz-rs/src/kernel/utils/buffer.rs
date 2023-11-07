@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task;
@@ -8,6 +9,7 @@ use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 pub struct BufferQueue {
     buffer: Spin<Buffer>,
+    shutting_down: AtomicBool,
     writer_queue: WaitQueue,
     reader_queue: WaitQueue,
 }
@@ -38,9 +40,27 @@ impl BufferQueue {
     pub fn new(init_size: usize) -> BufferQueue {
         BufferQueue {
             buffer: Spin::new(Buffer::new(init_size)),
+            shutting_down: AtomicBool::new(false),
             writer_queue: WaitQueue::new(),
             reader_queue: WaitQueue::new(),
         }
+    }
+
+    pub fn new_empty() -> BufferQueue {
+        BufferQueue {
+            buffer: Spin::new(Buffer::new_empty()),
+            shutting_down: AtomicBool::new(false),
+            writer_queue: WaitQueue::new(),
+            reader_queue: WaitQueue::new(),
+        }
+    }
+
+    pub fn set_shutting_down(&self, v: bool) {
+        self.shutting_down.store(v, Ordering::SeqCst)
+    }
+
+    pub fn shutting_down(&self) -> bool {
+        self.shutting_down.load(Ordering::Relaxed)
     }
 
     pub fn set_has_readers(&self, has: bool) {
@@ -49,6 +69,10 @@ impl BufferQueue {
         if !has {
             self.writer_queue.signal_all(syscall_defs::signal::SIGPIPE);
         }
+    }
+
+    pub fn init_size(&self, size: usize) {
+        self.buffer.lock().init_size(size);
     }
 
     pub fn set_has_writers(&self, has: bool) {
@@ -80,6 +104,8 @@ impl BufferQueue {
 
         let written = buf.append_data(data);
 
+        drop(buf);
+
         if written > 0 {
             self.reader_queue.notify_one();
         }
@@ -108,6 +134,10 @@ impl BufferQueue {
 
         let written = buffer.append_data(data);
 
+        logln4!("data appended");
+
+        drop(buffer);
+
         self.reader_queue.notify_one();
 
         Ok(written)
@@ -128,10 +158,16 @@ impl BufferQueue {
     pub fn read_data(&self, buf: &mut [u8]) -> SignalResult<usize> {
         let mut buffer = self
             .reader_queue
-            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| lck.has_data())?
+            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| {
+                lck.has_data() || self.shutting_down()
+            })?
             .unwrap();
 
+        logln4!("reading data {}", buf.len());
         let read = buffer.read_data(buf);
+        logln4!("data read");
+
+        drop(buffer);
 
         if read > 0 {
             self.writer_queue.notify_one();
@@ -174,6 +210,22 @@ impl Buffer {
         buf.data.resize(init_size, 0);
 
         buf
+    }
+
+    pub fn new_empty() -> Buffer {
+        Buffer {
+            data: Vec::new(),
+            r: 0,
+            w: 0,
+            full: true,
+            has_writers: true,
+            has_readers: true,
+        }
+    }
+
+    pub fn init_size(&mut self, size: usize) {
+        self.data.resize(size, 0);
+        self.full = false;
     }
 
     pub fn has_readres(&self) -> bool {

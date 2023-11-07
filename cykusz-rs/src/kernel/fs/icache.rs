@@ -37,6 +37,18 @@ impl INodeItemStruct {
         }
     }
 
+    pub fn try_as_impl<T: INode>(&self) -> Option<&T> {
+        self.inode.downcast_ref::<T>()
+    }
+
+    pub fn try_as_arc<T: INode>(&self) -> Option<Arc<T>> {
+        if let Ok(s) = self.inode.clone().downcast_arc::<T>() {
+            Some(s)
+        } else {
+            None
+        }
+    }
+
     pub fn make_key(fs: &Weak<dyn Filesystem>, id: usize) -> ICacheKey {
         (Weak::as_ptr(fs) as *const () as usize, id)
     }

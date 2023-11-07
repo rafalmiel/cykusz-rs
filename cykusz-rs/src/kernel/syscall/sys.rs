@@ -3,10 +3,13 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
+use syscall_defs::net::{MsgHdr, SockAddr, SockDomain, SockOption, SockTypeFlags};
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
-use syscall_defs::{AtFlags, ConnectionFlags, FcntlCmd, FcntlSetFDFlags, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult};
+use syscall_defs::{
+    AtFlags, FcntlCmd, FcntlSetFDFlags, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
+};
 use syscall_defs::{OpenFlags, SyscallError};
 
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
@@ -15,31 +18,55 @@ use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
+use crate::kernel::net::socket::SocketService;
 use crate::kernel::sched::{current_task, current_task_ref, SleepFlags};
 use crate::kernel::signal::SignalEntry;
+use crate::kernel::utils::types::Prefault;
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf_mut(b: u64, len: u64) -> &'static mut [u8] {
-    unsafe { core::slice::from_raw_parts_mut(b as *mut u8, len as usize) }
+    let buf = unsafe { core::slice::from_raw_parts_mut(b as *mut u8, len as usize) };
+
+    // Prefault userspace buffers, otherwise page fault might happen while we are holding a lock
+    buf.prefault();
+
+    buf
 }
 
 //TODO: Check if the pointer from user is actually valid
 fn make_buf(b: u64, len: u64) -> &'static [u8] {
-    unsafe { core::slice::from_raw_parts(b as *const u8, len as usize) }
+    let buf = unsafe { core::slice::from_raw_parts(b as *const u8, len as usize) };
+
+    // Prefault userspace buffers, otherwise page fault might happen while we are holding a lock
+    buf.prefault();
+
+    buf
 }
 
 fn make_str<'a>(b: u64, len: u64) -> &'a str {
     unsafe { core::str::from_utf8_unchecked(make_buf(b, len)) }
 }
 
-fn get_dir_entry(fd: OpenFD, path: u64, path_len: u64, lookup_mode: LookupMode, real_path: bool) -> Result<DirEntryItem, SyscallError> {
+fn get_dir_entry(
+    fd: OpenFD,
+    path: u64,
+    path_len: u64,
+    lookup_mode: LookupMode,
+    real_path: bool,
+) -> Result<DirEntryItem, SyscallError> {
     let path = if path != 0 {
         Some(Path::new(make_str(path, path_len)))
     } else {
         None
     };
 
-    logln4!("get dir entry: {:?} {:?} {:?} real_path: {}", fd, path, lookup_mode, real_path);
+    logln4!(
+        "get dir entry: {:?} {:?} {:?} real_path: {}",
+        fd,
+        path,
+        lookup_mode,
+        real_path
+    );
 
     let task = current_task_ref();
 
@@ -63,20 +90,23 @@ fn get_dir_entry(fd: OpenFD, path: u64, path_len: u64, lookup_mode: LookupMode, 
 }
 
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
-    let mut flags =
-        OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
+    let mut flags = OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
     if !flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR | OpenFlags::WRONLY) {
         flags.insert(OpenFlags::RDONLY);
     }
 
     let at = OpenFD::try_from(at)?;
 
-    let inode = get_dir_entry(at, path, len,
-                              if flags.contains(OpenFlags::CREAT) {
-                                  LookupMode::Create
-                              } else {
-                                  LookupMode::None
-                              }, false
+    let inode = get_dir_entry(
+        at,
+        path,
+        len,
+        if flags.contains(OpenFlags::CREAT) {
+            LookupMode::Create
+        } else {
+            LookupMode::None
+        },
+        false,
     )?;
 
     let task = current_task_ref();
@@ -91,9 +121,15 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
         }
     }
 
-    let res = Ok(task.open_file(inode, flags)?);
+    let res = Ok(task.open_file(inode.clone(), flags)?);
 
-    logln2!("sys_open: {} flags: {:?} = {}", path, flags, res.unwrap());
+    logln5!(
+        "sys_open: {} flags: {:?} = {}",
+        inode.full_path(),
+        flags,
+        res.unwrap()
+    );
+    task.filetable().debug();
 
     res
 }
@@ -101,9 +137,10 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
 pub fn sys_close(fd: u64) -> SyscallResult {
     let task = current_task_ref();
 
-    logln4!("sys_close: {} task: {}", fd, task.tid());
+    logln5!("sys_close: {} task: {}", fd, task.tid());
 
     return if task.close_file(fd as usize) {
+        task.filetable().debug();
         Ok(0)
     } else {
         Err(SyscallError::EBADFD)
@@ -115,10 +152,8 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-
     return if let Some(f) = task.get_handle(fd) {
         if f.flags().intersects(OpenFlags::WRONLY | OpenFlags::RDWR) {
-            logln4!("write fd {}", fd);
             Ok(f.write(make_buf(buf, len))?)
         } else {
             logln4!("write fd {} = EACCESS", fd);
@@ -135,7 +170,7 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    logln2!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
+    logln4!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
 
     return if let Some(f) = task.get_handle(fd) {
         if f.flags().intersects(OpenFlags::RDONLY | OpenFlags::RDWR) {
@@ -233,7 +268,7 @@ pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) ->
 pub fn sys_fcntl(fd: u64, cmd: u64, flags: u64) -> SyscallResult {
     let cmd = FcntlCmd::from(cmd);
 
-    logln!("SYS_FCNTL {} {:?} {}", fd as isize, cmd, flags);
+    logln5!("SYS_FCNTL {} {:?} {}", fd as isize, cmd, flags);
 
     match cmd {
         FcntlCmd::GetFD => {
@@ -279,14 +314,20 @@ pub fn sys_fcntl(fd: u64, cmd: u64, flags: u64) -> SyscallResult {
         FcntlCmd::DupFD => {
             let task = current_task_ref();
 
-            task.filetable()
-                .duplicate(fd as usize, OpenFlags::empty(), flags as usize)
+            let res = task
+                .filetable()
+                .duplicate(fd as usize, OpenFlags::empty(), flags as usize);
+            task.filetable().debug();
+            res
         }
         FcntlCmd::DupFDCloexec => {
             let task = current_task_ref();
 
-            task.filetable()
-                .duplicate(fd as usize, OpenFlags::CLOEXEC, flags as usize)
+            let res = task
+                .filetable()
+                .duplicate(fd as usize, OpenFlags::CLOEXEC, flags as usize);
+            task.filetable().debug();
+            res
         }
         FcntlCmd::Inval => Err(SyscallError::EINVAL),
     }
@@ -603,44 +644,134 @@ pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResu
     Err(SyscallError::EINVAL)
 }
 
-pub fn sys_bind(port: u64, flags: u64) -> SyscallResult {
-    let flags =
-        syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)?;
+pub fn sys_socket(domain: u64, typ: u64, _protocol: u64) -> SyscallResult {
+    logln4!("sys socket AAAAAAAAA {} {}", domain, typ);
+    let sock_domain = SockDomain::try_from(domain)?;
+    let typ = SockTypeFlags::new(typ);
 
-    let socket = if flags.contains(ConnectionFlags::UDP) {
-        crate::kernel::net::socket::udp_bind(port as u32)
-    } else {
-        crate::kernel::net::socket::tcp_bind(port as u32)
-    };
+    logln4!("type flags: {:?}", typ);
 
-    if let Some(socket) = socket {
-        let task = current_task_ref();
+    let task = current_task_ref();
 
-        Ok(task.open_file(DirEntry::inode_wrap(socket), OpenFlags::RDWR)?)
-    } else {
-        Err(SyscallError::EBUSY)
-    }
+    let res = Ok(task.open_file(
+        DirEntry::inode_wrap(crate::kernel::net::socket::new(sock_domain, typ)?),
+        OpenFlags::RDWR,
+    )?);
+
+    logln5!("sys_socket res = {:?}", res);
+    task.filetable().debug();
+
+    res
 }
 
-pub fn sys_connect(host: u64, host_len: u64, port: u64, flags: u64) -> SyscallResult {
-    let flags =
-        syscall_defs::ConnectionFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)?;
+fn get_socket(fd: usize) -> Result<Arc<dyn SocketService>, SyscallError> {
+    let task = current_task_ref();
 
-    let host = Ip4::new(make_buf(host, host_len));
+    let sock = task.get_handle(fd).ok_or(SyscallError::EBADFD)?;
 
-    let socket = if flags.contains(ConnectionFlags::UDP) {
-        crate::kernel::net::socket::udp_connect(host, port as u32)
+    Ok(sock
+        .inode
+        .inode()
+        .as_socket()
+        .ok_or(SyscallError::ENOTSOCK)?)
+}
+
+pub fn sys_bind(sockfd: u64, addr_ptr: u64, addrlen: u64) -> SyscallResult {
+    let sock = get_socket(sockfd as usize)?;
+
+    let addr = unsafe { VirtAddr(addr_ptr as usize).read_ref::<SockAddr>() };
+
+    sock.bind(addr, addrlen as u32)
+}
+
+pub fn sys_connect(sockfd: u64, addr_ptr: u64, addrlen: u64) -> SyscallResult {
+    let sock = get_socket(sockfd as usize)?;
+
+    let addr = unsafe { VirtAddr(addr_ptr as usize).read_ref::<SockAddr>() };
+
+    sock.connect(addr, addrlen as u32)
+}
+
+pub fn sys_accept(fd: u64, addr_ptr: u64, addr_len: u64) -> SyscallResult {
+    let sock = get_socket(fd as usize)?;
+
+    let (ptr, len) = if addr_ptr != 0 && addr_len != 0 {
+        unsafe {
+            (
+                Some(VirtAddr(addr_ptr as usize).read_mut::<SockAddr>()),
+                Some(VirtAddr(addr_len as usize).read_mut::<u32>()),
+            )
+        }
     } else {
-        crate::kernel::net::socket::tcp_connect(host, port as u32)
+        (None, None)
     };
 
-    if let Some(socket) = socket {
-        let task = current_task_ref();
+    let sock = sock.accept(ptr, len)?;
 
-        Ok(task.open_file(DirEntry::inode_wrap(socket), OpenFlags::RDWR)?)
-    } else {
-        Err(SyscallError::EBUSY)
+    let task = current_task_ref();
+
+    Ok(task.open_file(
+        DirEntry::inode_wrap(sock.as_inode().ok_or(SyscallError::EFAULT)?),
+        OpenFlags::RDWR,
+    )?)
+}
+
+pub fn sys_listen(fd: u64, backlog: u64) -> SyscallResult {
+    let sock = get_socket(fd as usize)?;
+
+    sock.listen(backlog as i32)
+}
+
+pub fn sys_msg_recv(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
+    if hdr == 0 {
+        return Err(SyscallError::EINVAL);
     }
+
+    let hdr = unsafe { VirtAddr(hdr as usize).read_mut::<MsgHdr>() };
+
+    let sock = get_socket(sockfd as usize)?;
+
+    sock.msg_recv(hdr, flags as i32)
+}
+
+pub fn sys_msg_send(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
+    if hdr == 0 {
+        return Err(SyscallError::EINVAL);
+    }
+
+    let hdr = unsafe { VirtAddr(hdr as usize).read_ref::<MsgHdr>() };
+
+    let sock = get_socket(sockfd as usize)?;
+
+    sock.msg_send(hdr, flags as i32)
+}
+
+pub fn sys_setsockopt(fd: u64, layer: u64, number: u64, buffer: u64, size: u64) -> SyscallResult {
+    logln5!("setsockopt: {} {} {}", fd, layer, number);
+    let sock = get_socket(fd as usize)?;
+
+    sock.set_socket_option(
+        layer as i32,
+        SockOption::try_from(number)?,
+        buffer as *const (),
+        size as u32,
+    )
+}
+
+pub fn sys_getsockopt(fd: u64, layer: u64, number: u64, buffer: u64, size: u64) -> SyscallResult {
+    logln5!("setsockopt: {} {} {}", fd, layer, number);
+    let sock = get_socket(fd as usize)?;
+
+    sock.get_socket_option(
+        layer as i32,
+        SockOption::try_from(number)?,
+        buffer as *mut (),
+        if size == 0 {
+            None
+        } else {
+            unsafe { Some(VirtAddr(size as usize).read_mut::<u32>()) }
+        },
+    )
 }
 
 pub fn sys_select(
@@ -657,7 +788,16 @@ pub fn sys_select(
         unsafe { Some(VirtAddr(timeout as usize).read_ref::<Timespec>()) }
     };
 
-    logln2!("sys_select nfds: {}", nfds);
+    logln5!(
+        "sys_select nfds: {} {:x} {:x} {:x} {:?}",
+        nfds,
+        readfds,
+        writefds,
+        exceptfds,
+        timeout
+    );
+
+    current_task_ref().filetable().debug();
 
     let mut input: [Option<(FdSet, PollEventFlags)>; 3] = [None, None, None];
 
@@ -666,9 +806,9 @@ pub fn sys_select(
             return;
         }
 
-        let fdset = unsafe { VirtAddr(addr as usize).read_mut::<FdSet>() };
+        let fdset = unsafe { VirtAddr(addr).read_mut::<FdSet>() };
 
-        logln2!("select fdset {} {} {:?}", addr, idx, fdset.fds);
+        logln5!("select fdset {} {:?}", idx, fdset.fds);
 
         input[idx] = Some((*fdset, flags));
     };
@@ -680,6 +820,7 @@ pub fn sys_select(
 
         let fdset = unsafe { VirtAddr(addr as usize).read_mut::<FdSet>() };
         *fdset = inp.unwrap().0;
+        logln5!("select output: {:?}", inp);
     };
 
     initfds(0, readfds as usize, PollEventFlags::READ);
@@ -705,6 +846,8 @@ pub fn sys_select(
             to_poll.push(t);
         }
     }
+
+    logln5!("to poll: {:?}", to_poll);
 
     if let Some(fd) = &mut input[0] {
         fd.0.zero()
@@ -733,17 +876,26 @@ pub fn sys_select(
                     .poll(if first { Some(&mut poll_table) } else { None }, *flags)
                 {
                     if !f.is_empty() {
-                        found += 1;
+                        let mut did_found = false;
 
-                        if f.contains(PollEventFlags::READ) {
+                        if f.contains(PollEventFlags::READ) && flags.contains(PollEventFlags::READ)
+                        {
                             if let Some(fd2) = &mut input[0] {
                                 fd2.0.set(*fd);
+                                did_found = true;
                             }
                         }
-                        if f.contains(PollEventFlags::WRITE) {
+                        if f.contains(PollEventFlags::WRITE)
+                            && flags.contains(PollEventFlags::WRITE)
+                        {
                             if let Some(fd2) = &mut input[1] {
                                 fd2.0.set(*fd);
+                                did_found = true;
                             }
+                        }
+
+                        if did_found {
+                            found += 1;
                         }
                     }
                 } else {
@@ -775,7 +927,7 @@ pub fn sys_select(
     outputfds(&mut input[1], writefds as usize);
     outputfds(&mut input[2], exceptfds as usize);
 
-    logln2!("select found {}", found);
+    logln5!("select found {}", found);
 
     return Ok(found);
 }
@@ -858,26 +1010,21 @@ pub fn sys_mount(
     let dest_path = make_str(dest, dest_len);
     let fs = make_str(fs, fs_len);
 
-    if fs == "ext2" {
-        let dev = lookup_by_path(&Path::new(dev_path), LookupMode::None)?.inode();
-        let dest = lookup_by_path(&Path::new(dest_path), LookupMode::None)?;
-
-        if let Some(dev) = crate::kernel::block::get_blkdev_by_id(dev.device()?.id()) {
-            if let Some(fs) = crate::kernel::fs::ext2::Ext2Filesystem::new(dev) {
-                if let Ok(_) = crate::kernel::fs::mount::mount(dest, fs) {
-                    Ok(0)
-                } else {
-                    Err(SyscallError::EFAULT)
-                }
-            } else {
-                Err(SyscallError::EINVAL)
-            }
-        } else {
-            Err(SyscallError::ENODEV)
-        }
-    } else {
-        Err(SyscallError::EINVAL)
+    if fs != "ext2" {
+        return Err(SyscallError::EINVAL);
     }
+
+    let dev = lookup_by_path(&Path::new(dev_path), LookupMode::None)?.inode();
+    let dest = lookup_by_path(&Path::new(dest_path), LookupMode::None)?;
+
+    let dev =
+        crate::kernel::block::get_blkdev_by_id(dev.device()?.id()).ok_or(SyscallError::ENODEV)?;
+
+    let fs = crate::kernel::fs::ext2::Ext2Filesystem::new(dev).ok_or(SyscallError::EINVAL)?;
+
+    crate::kernel::fs::mount::mount(dest, fs)
+        .and(Ok(0))
+        .or(Err(SyscallError::EFAULT))
 }
 
 pub fn sys_umount(path: u64, path_len: u64) -> SyscallResult {
@@ -1022,7 +1169,7 @@ pub fn sys_exit_thread() -> ! {
 }
 
 pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
-    logln!("ioctl {} 0x{:x}", fd, cmd);
+    logln5!("ioctl {} 0x{:x}", fd, cmd);
     let current = current_task_ref();
 
     if let Some(handle) = current.get_handle(fd as usize) {
@@ -1090,7 +1237,12 @@ pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {
 }
 
 pub fn sys_kill(pid: u64, sig: u64) -> SyscallResult {
-    logln4!("kill: {} -> {} {}", current_task_ref().tid(), pid as i64, sig);
+    logln4!(
+        "kill: {} -> {} {}",
+        current_task_ref().tid(),
+        pid as i64,
+        sig
+    );
     match pid as isize {
         a if a > 0 => {
             let task = crate::kernel::sched::get_task(a as usize).ok_or(SyscallError::ESRCH)?;
@@ -1172,7 +1324,8 @@ pub fn sys_dup(fd: u64, flags: u64) -> SyscallResult {
 
     let res = task.filetable().duplicate(fd as usize, flags, 0);
 
-    logln4!("dup {} {:?} = {:?}", fd, flags, res);
+    logln5!("dup {} {:?} = {:?}", fd, flags, res);
+    task.filetable().debug();
 
     res
 }
@@ -1183,10 +1336,11 @@ pub fn sys_dup2(fd: u64, new_fd: u64, flags: u64) -> SyscallResult {
     let flags =
         OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)? & OpenFlags::CLOEXEC;
 
-
-    let res= task.filetable()
+    let res = task
+        .filetable()
         .duplicate_at(fd as usize, new_fd as usize, flags);
-    logln4!("dup2 {} {} {:?} = {:?}", fd, new_fd, flags, res);
+    logln5!("dup2 {} {} {:?} = {:?}", fd, new_fd, flags, res);
+    task.filetable().debug();
 
     return res;
 }
@@ -1218,7 +1372,13 @@ pub fn sys_stat(fd: u64, path: u64, path_len: u64, stat: u64, flags: u64) -> Sys
     let fd = OpenFD::try_from(fd)?;
     let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;
 
-    let file = get_dir_entry(fd, path, path_len, LookupMode::None, flags.contains(AtFlags::SYMLINK_NOFOLLOW))?;
+    let file = get_dir_entry(
+        fd,
+        path,
+        path_len,
+        LookupMode::None,
+        flags.contains(AtFlags::SYMLINK_NOFOLLOW),
+    )?;
 
     let stat = unsafe { VirtAddr(stat as usize).read_mut::<syscall_defs::stat::Stat>() };
 
@@ -1249,7 +1409,7 @@ pub fn sys_getrlimit(resource: u64, rlimit: u64) -> SyscallResult {
 }
 
 pub fn sys_debug(str: u64, str_len: u64) -> SyscallResult {
-    logln4!("{}", make_str(str, str_len));
+    logln5!("{}", make_str(str, str_len));
 
     Ok(0)
 }

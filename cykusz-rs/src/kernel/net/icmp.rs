@@ -1,9 +1,10 @@
 use core::mem::size_of;
+use syscall_defs::net::NetU16;
 
 use crate::kernel::net::ip::{Ip, IpHeader, IpType};
 use crate::kernel::net::tcp::TcpHeader;
 use crate::kernel::net::udp::UdpHeader;
-use crate::kernel::net::util::{checksum, NetU16};
+use crate::kernel::net::util::checksum;
 use crate::kernel::net::{
     Packet, PacketBaseTrait, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
     PacketUpHierarchy,
@@ -150,7 +151,11 @@ pub fn process_dest_unreachable(packet: Packet<Icmp>) {
                 tcp.src_port(),
                 tcp.dst_port()
             );
-            crate::kernel::net::tcp::port_unreachable(tcp.src_port() as u32, tcp.dst_port() as u32);
+            crate::kernel::net::tcp::port_unreachable(
+                tcp.src_port() as u32,
+                tcp.dst_port() as u32,
+                hdr.iphdr.dest_ip,
+            );
         }
         _ => {}
     }

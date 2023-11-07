@@ -14,6 +14,7 @@ use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
 use crate::kernel::fs::pcache::{CachedAccess, MappedAccess};
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Metadata, Result};
+use crate::kernel::net::socket::SocketService;
 
 pub trait INode: Send + Sync + DowncastSync {
     fn id(&self) -> Result<usize> {
@@ -139,6 +140,10 @@ pub trait INode: Send + Sync + DowncastSync {
 
     fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
         logln!("Calling default???");
+        None
+    }
+
+    fn as_socket(&self) -> Option<Arc<dyn SocketService>> {
         None
     }
 

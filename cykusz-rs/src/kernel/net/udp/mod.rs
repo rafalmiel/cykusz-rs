@@ -1,11 +1,14 @@
 use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
+use syscall_defs::net::NetU16;
 
 use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
-use crate::kernel::net::util::{checksum, NetU16};
+use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::util::checksum;
 use crate::kernel::net::{
     ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
 };
+
 use crate::kernel::sync::RwSpin;
 
 pub mod socket;
@@ -86,9 +89,9 @@ pub fn process_packet(packet: Packet<Udp>) {
     if let Some(f) = tree.get(&dst_port) {
         let f2 = f.clone();
 
-        core::mem::drop(tree);
+        drop(tree);
 
-        f2.process_packet(packet)
+        f2.process_packet(packet.downgrade())
     } else {
         crate::kernel::net::icmp::send_port_unreachable(packet.downgrade());
     }
@@ -100,36 +103,39 @@ pub fn port_unreachable(port: u32, dst_port: u32) {
     if let Some(f) = tree.get(&port) {
         let f2 = f.clone();
 
-        core::mem::drop(tree);
+        drop(tree);
 
         f2.port_unreachable(port, dst_port)
     }
 }
 
-pub trait UdpService: Sync + Send {
-    fn process_packet(&self, packet: Packet<Udp>);
-    fn port_unreachable(&self, port: u32, dst_port: u32);
-}
+static HANDLERS: RwSpin<BTreeMap<u32, Arc<dyn SocketService>>> = RwSpin::new(BTreeMap::new());
 
-static HANDLERS: RwSpin<BTreeMap<u32, Arc<dyn UdpService>>> = RwSpin::new(BTreeMap::new());
+pub fn register_handler(handler: Arc<dyn SocketService>) -> Option<u32> {
+    let port = handler.src_port();
 
-pub fn register_handler(port: u32, handler: Arc<dyn UdpService>) -> bool {
+    if port == 0 {
+        return register_ephemeral_handler(handler);
+    }
+
     let mut handlers = HANDLERS.write();
 
     if !handlers.contains_key(&port) {
         handlers.insert(port, handler);
 
-        return true;
+        return Some(port);
     }
 
-    false
+    None
 }
 
-pub fn register_ephemeral_handler(handler: Arc<dyn UdpService>) -> Option<u32> {
+pub fn register_ephemeral_handler(handler: Arc<dyn SocketService>) -> Option<u32> {
     let mut handlers = HANDLERS.write();
 
     for p in 49152..=65535 {
         if !handlers.contains_key(&p) {
+            handler.set_src_port(p);
+
             handlers.insert(p, handler);
 
             return Some(p);
@@ -144,7 +150,5 @@ pub fn release_handler(port: u32) {
 
     if handlers.contains_key(&port) {
         handlers.remove(&port);
-    } else {
-        panic!("UDP port is not registered")
     }
 }

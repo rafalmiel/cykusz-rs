@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use core::arch::asm;
 use core::sync::atomic::AtomicU32;
 
+use syscall_defs::net::{MsgHdr, SockAddr, SockDomain, SockTypeFlags};
 use syscall_defs::poll::FdSet;
 use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
@@ -275,20 +276,47 @@ pub fn rename(oldpath: &str, newpath: &str) -> SyscallResult {
     }
 }
 
-pub fn bind(port: u32, flags: syscall_defs::ConnectionFlags) -> SyscallResult {
-    unsafe { syscall2(SYS_BIND, port as usize, flags.bits()) }
+pub fn socket(domain: SockDomain, typ: SockTypeFlags) -> SyscallResult {
+    unsafe { syscall2(SYS_SOCKET, domain as usize, typ.into()) }
 }
 
-pub fn connect(host: &[u8], port: u32, flags: syscall_defs::ConnectionFlags) -> SyscallResult {
+pub fn bind(fd: usize, addr: &SockAddr, addr_len: usize) -> SyscallResult {
+    unsafe { syscall3(SYS_BIND, fd, addr as *const _ as usize, addr_len) }
+}
+
+pub fn connect(fd: usize, addr: &SockAddr, addr_len: usize) -> SyscallResult {
+    unsafe { syscall3(SYS_CONNECT, fd, addr as *const _ as usize, addr_len) }
+}
+
+pub fn accept(fd: usize, addr: Option<&mut SockAddr>, len: Option<&mut usize>) -> SyscallResult {
     unsafe {
-        syscall4(
-            SYS_CONNECT,
-            host.as_ptr() as usize,
-            host.len(),
-            port as usize,
-            flags.bits(),
+        syscall3(
+            SYS_ACCEPT,
+            fd,
+            if let Some(a) = addr {
+                a as *mut SockAddr as usize
+            } else {
+                0
+            },
+            if let Some(l) = len {
+                l as *mut _ as usize
+            } else {
+                0
+            },
         )
     }
+}
+
+pub fn listen(fd: usize, backlog: i32) -> SyscallResult {
+    unsafe { syscall2(SYS_LISTEN, fd, backlog as usize) }
+}
+
+pub fn recvmsg(fd: usize, hdr: &mut MsgHdr, flags: i32) -> SyscallResult {
+    unsafe { syscall3(SYS_MSGRECV, fd, hdr as *mut _ as usize, flags as usize) }
+}
+
+pub fn sendmsg(fd: usize, hdr: &MsgHdr, flags: i32) -> SyscallResult {
+    unsafe { syscall3(SYS_MSGSEND, fd, hdr as *const _ as usize, flags as usize) }
 }
 
 pub fn select(

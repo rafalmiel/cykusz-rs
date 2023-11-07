@@ -21,6 +21,7 @@ TZDB_SRC_DIR=$SRC_DIR/tzdb
 ZSTD_SRC_DIR=$SRC_DIR/zstd
 LLVM_SRC_DIR=$SRC_DIR/llvm-project
 LESS_SRC_DIR=$SRC_DIR/less
+NETCAT_SRC_DIR=$SRC_DIR/netcat
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -33,6 +34,7 @@ COREUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-coreutils
 ZSTD_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zstd
 LLVM_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-llvm
 LESS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-less
+NETCAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-netcat
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 GMP_BUILD_DIR=$BUILD_DIR/gmp
@@ -164,6 +166,13 @@ function _prepare_less {
     fi
 }
 
+function _prepare_netcat {
+    if [ ! -d $NETCAT_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/netcat.git $NETCAT_SRC_DIR
+    fi
+}
+
 function _sysroot {
     _prepare_mlibc
 
@@ -172,6 +181,8 @@ function _sysroot {
     rm -rf $MLIBC_BUILD_DIR
     meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
     meson install -C $MLIBC_BUILD_DIR
+
+    cp $SPATH/resolv.conf $SYSROOT/etc
 }
 
 function _binutils {
@@ -390,6 +401,27 @@ function _cykusz_less {
 
     make -C $LESS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
     make -C $LESS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+}
+
+function _cykusz_netcat {
+    _prepare_netcat
+
+    mkdir -p $NETCAT_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $NETCAT_CYKUSZ_BUILD_DIR
+    $NETCAT_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr
+
+    popd
+
+    make -C $NETCAT_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
+    make -C $NETCAT_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+
+    pushd .
+    cd $SYSROOT/usr/bin
+    ln -sf $TRIPLE-netcat netcat
+    popd
 }
 
 function _cykusz_coreutils {

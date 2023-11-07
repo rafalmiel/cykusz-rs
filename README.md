@@ -11,7 +11,7 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 ## Kernel
 
 - [x] 64bit higher-half kernel
-- [x] VGA text output
+- [x] VESA fb output
 - [x] Physical memory allocator
 - [x] Paging
 - [x] Kernel heap
@@ -56,6 +56,7 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 - [x] less (<https://github.com/rafalmiel/less/tree/cykusz>)
 - [x] zstd (<https://github.com/rafalmiel/zstd/tree/cykusz>)
 - [x] doom (<https://github.com/rafalmiel/doomgeneric/tree/cykusz>)
+- [x] netcat (<https://github.com/rafalmiel/netcat/tree/cykusz>)
 
 ## Building
 

@@ -799,7 +799,7 @@ pub fn sys_select(
 
     current_task_ref().filetable().debug();
 
-    let mut input: [Option<(FdSet, PollEventFlags)>; 3] = [None, None, None];
+    let mut input: [Option<(&mut FdSet, PollEventFlags)>; 3] = [None, None, None];
 
     let mut initfds = |idx: usize, addr: usize, flags: PollEventFlags| {
         if addr == 0 {
@@ -810,17 +810,7 @@ pub fn sys_select(
 
         logln5!("select fdset {} {:?}", idx, fdset.fds);
 
-        input[idx] = Some((*fdset, flags));
-    };
-
-    let outputfds = |inp: &mut Option<(FdSet, PollEventFlags)>, addr: usize| {
-        if addr == 0 || inp.is_none() {
-            return;
-        }
-
-        let fdset = unsafe { VirtAddr(addr as usize).read_mut::<FdSet>() };
-        *fdset = inp.unwrap().0;
-        logln5!("select output: {:?}", inp);
+        input[idx] = Some((fdset, flags));
     };
 
     initfds(0, readfds as usize, PollEventFlags::READ);
@@ -922,10 +912,6 @@ pub fn sys_select(
 
         first = false;
     }
-
-    outputfds(&mut input[0], readfds as usize);
-    outputfds(&mut input[1], writefds as usize);
-    outputfds(&mut input[2], exceptfds as usize);
 
     logln5!("select found {}", found);
 

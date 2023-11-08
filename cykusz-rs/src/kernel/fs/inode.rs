@@ -108,6 +108,10 @@ pub trait INode: Send + Sync + DowncastSync {
         return Err(FsError::NotSupported);
     }
 
+    fn chmod(&self, _mode: syscall_defs::stat::Mode) -> Result<()> {
+        return Err(FsError::NotSupported);
+    }
+
     fn truncate(&self, _size: usize) -> Result<()> {
         return Err(FsError::NotSupported);
     }

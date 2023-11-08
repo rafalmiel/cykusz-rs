@@ -5,6 +5,7 @@ use intrusive_collections::LinkedList;
 
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::stat::Mode;
 
 use crate::arch::mm::PAGE_SIZE;
 use crate::kernel::fs::cache::Cacheable;
@@ -908,6 +909,14 @@ impl INode for LockedExt2INode {
         } else {
             return Err(FsError::NotSupported);
         }
+
+        Ok(())
+    }
+
+    fn chmod(&self, mode: Mode) -> Result<()> {
+        let mut node = self.d_inode_writer();
+
+        node.set_perm(mode.bits() as u16);
 
         Ok(())
     }

@@ -6,6 +6,7 @@ use intrusive_collections::LinkedList;
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::stat::Mode;
+use syscall_defs::time::Timespec;
 
 use crate::arch::mm::PAGE_SIZE;
 use crate::kernel::fs::cache::Cacheable;
@@ -25,6 +26,7 @@ use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
 use crate::kernel::sync::{Mutex, RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
+use crate::kernel::time::unix_timestamp;
 use crate::kernel::utils::slice::ToBytes;
 
 pub struct LockedExt2INode {
@@ -917,6 +919,37 @@ impl INode for LockedExt2INode {
         let mut node = self.d_inode_writer();
 
         node.set_perm(mode.bits() as u16);
+
+        logln5!("do chmod! == {:#o}", node.perm());
+
+        Ok(())
+    }
+
+    fn utime(&self, times: &[Timespec; 2]) -> Result<()> {
+        logln5!("times: {:?} {} {}", times, times[0].is_now(), times[1].is_now());
+        let mut node = self.d_inode_writer();
+
+        if !times[0].is_omit() {
+            let access = if !times[0].is_now() {
+                times[0].secs as u32
+            } else {
+                unix_timestamp() as u32
+            };
+
+            logln5!("utime: last access: {}", access);
+            node.set_last_access(access);
+        }
+
+        if !times[1].is_omit() {
+            let modif = if !times[1].is_now() {
+                times[1].secs as u32
+            } else {
+                unix_timestamp() as u32
+            };
+
+            logln5!("utime: last modif: {}", modif);
+            node.set_last_modification(modif);
+        }
 
         Ok(())
     }

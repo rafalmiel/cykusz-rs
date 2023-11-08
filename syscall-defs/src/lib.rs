@@ -101,6 +101,7 @@ pub const SYS_SETSOCKOPT: usize = 68;
 pub const SYS_GETSOCKOPT: usize = 69;
 pub const SYS_YIELD: usize = 70;
 pub const SYS_CHMOD: usize = 71;
+pub const SYS_UTIME: usize = 72;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

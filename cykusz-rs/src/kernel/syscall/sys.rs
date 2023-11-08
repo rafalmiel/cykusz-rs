@@ -619,6 +619,7 @@ pub fn sys_link(
 
 pub fn sys_chmod(at: u64, path: u64, path_len: u64, mode: u64, flags: u64) -> SyscallResult {
     let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;
+    logln5!("sys_chmod: {:?} {:?} {:#o}", OpenFD::try_from(at)?, make_path(path, path_len), mode);
     let inode = get_dir_entry(
         at.try_into()?,
         make_path(path, path_len),
@@ -627,6 +628,30 @@ pub fn sys_chmod(at: u64, path: u64, path_len: u64, mode: u64, flags: u64) -> Sy
     )?;
 
     inode.inode().chmod(Mode::mode_bits_truncate(mode as u32))?;
+
+    Ok(0)
+}
+
+pub fn sys_utime(at: u64, path: u64, path_len: u64, times: u64, flags: u64) -> SyscallResult {
+    let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;
+    logln5!("sys_utime: {:?} {:?} {:#x}", OpenFD::try_from(at)?, make_path(path, path_len), times);
+    let inode = get_dir_entry(
+        at.try_into()?,
+        make_path(path, path_len),
+        LookupMode::None,
+        flags.contains(AtFlags::SYMLINK_NOFOLLOW),
+    )?;
+
+    let times = &if times != 0 {
+        unsafe {
+            VirtAddr(times as usize).read::<[Timespec; 2]>()
+        }
+    } else {
+        let now = crate::kernel::time::unix_timestamp() as u32;
+        [Timespec::from_secs(now as usize); 2]
+    };
+
+    inode.inode().utime(times)?;
 
     Ok(0)
 }

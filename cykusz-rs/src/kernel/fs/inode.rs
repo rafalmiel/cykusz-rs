@@ -112,6 +112,10 @@ pub trait INode: Send + Sync + DowncastSync {
         return Err(FsError::NotSupported);
     }
 
+    fn utime(&self, _times: &[syscall_defs::time::Timespec; 2]) -> Result<()> {
+        return Err(FsError::NotSupported);
+    }
+
     fn truncate(&self, _size: usize) -> Result<()> {
         return Err(FsError::NotSupported);
     }

@@ -220,7 +220,7 @@ pub fn sync() -> SyscallResult {
 }
 
 pub fn chdir(path: &str) -> SyscallResult {
-    unsafe { syscall2(SYS_CHDIR, path.as_ptr() as usize, path.len()) }
+    unsafe { syscall3(SYS_CHDIR, OpenFD::Cwd.into(), path.as_ptr() as usize, path.len()) }
 }
 
 pub fn getcwd(buf: &mut [u8]) -> SyscallResult {
@@ -267,10 +267,12 @@ pub fn unlink(path: &str) -> SyscallResult {
 
 pub fn rename(oldpath: &str, newpath: &str) -> SyscallResult {
     unsafe {
-        syscall4(
+        syscall6(
             SYS_RENAME,
+            OpenFD::Cwd.into(),
             oldpath.as_ptr() as usize,
             oldpath.len(),
+            OpenFD::Cwd.into(),
             newpath.as_ptr() as usize,
             newpath.len(),
         )

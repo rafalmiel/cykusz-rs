@@ -11,6 +11,7 @@ use syscall_defs::{
     AtFlags, FcntlCmd, FcntlSetFDFlags, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
 };
 use syscall_defs::{OpenFlags, SyscallError};
+use syscall_defs::stat::Mode;
 
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::path::Path;
@@ -84,7 +85,12 @@ fn get_dir_entry(
     };
 
     if let Some(path) = path {
-        Ok(lookup_by_path_at(file_dir, &path, lookup_mode, get_symlink_entry)?)
+        Ok(lookup_by_path_at(
+            file_dir,
+            &path,
+            lookup_mode,
+            get_symlink_entry,
+        )?)
     } else {
         Ok(file_dir.clone())
     }
@@ -186,8 +192,20 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     };
 }
 
-pub fn sys_readlink(at: u64, path: u64, path_len: u64, buf: u64, max_size: u64, len: u64) -> SyscallResult {
-    let inode = get_dir_entry(OpenFD::try_from(at)?, make_path(path, path_len), LookupMode::None, true)?;
+pub fn sys_readlink(
+    at: u64,
+    path: u64,
+    path_len: u64,
+    buf: u64,
+    max_size: u64,
+    len: u64,
+) -> SyscallResult {
+    let inode = get_dir_entry(
+        OpenFD::try_from(at)?,
+        make_path(path, path_len),
+        LookupMode::None,
+        true,
+    )?;
 
     if inode.inode().ftype()? != FileType::Symlink {
         return Err(SyscallError::EINVAL);
@@ -404,22 +422,23 @@ pub fn sys_maps() -> SyscallResult {
     Ok(0)
 }
 
-pub fn sys_chdir(path: u64, len: u64) -> SyscallResult {
-    if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        if let Ok(dentry) = lookup_by_path(&Path::new(path), LookupMode::None) {
-            let dir = dentry.read().inode.clone();
+pub fn sys_chdir(at: u64, path: u64, len: u64) -> SyscallResult {
+    let dir = get_dir_entry(
+        OpenFD::try_from(at)?,
+        make_path(path, len),
+        LookupMode::None,
+        false,
+    )?;
 
-            if dir.ftype()? == FileType::Dir {
-                let task = current_task_ref();
-                task.set_cwd(dentry);
-                return Ok(0);
-            } else {
-                return Err(SyscallError::ENOTDIR);
-            }
-        }
-    }
+    let inode = dir.inode();
 
-    Err(SyscallError::EINVAL)
+    return if inode.ftype()? == FileType::Dir {
+        let task = current_task_ref();
+        task.set_cwd(dir);
+        Ok(0)
+    } else {
+        Err(SyscallError::ENOTDIR)
+    };
 }
 
 pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
@@ -447,7 +466,10 @@ pub fn sys_mkdir(at: u64, path: u64, path_len: u64) -> SyscallResult {
     let (inode, name) = {
         let (dir, target) = path.containing_dir();
 
-        (get_dir_entry(at, Some(dir), LookupMode::None, false)?.inode(), target)
+        (
+            get_dir_entry(at, Some(dir), LookupMode::None, false)?.inode(),
+            target,
+        )
     };
 
     if inode.ftype()? != FileType::Dir {
@@ -489,7 +511,10 @@ pub fn sys_symlink(
     let (inode, name) = {
         let (dir, target) = path.containing_dir();
 
-        (get_dir_entry(OpenFD::try_from(at)?, Some(dir), LookupMode::None, false)?.inode(), target)
+        (
+            get_dir_entry(OpenFD::try_from(at)?, Some(dir), LookupMode::None, false)?.inode(),
+            target,
+        )
     };
 
     if inode.ftype()? == FileType::Dir {
@@ -553,18 +578,30 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
     }
 }
 
-pub fn sys_link(target: u64, target_len: u64, linkpath: u64, linkpath_len: u64) -> SyscallResult {
-    let target = make_str(target, target_len);
-    let path = make_str(linkpath, linkpath_len);
-
-    let target_entry = lookup_by_real_path(&Path::new(target), LookupMode::None)?;
-
-    let path = Path::new(path);
+pub fn sys_link(
+    target_at: u64,
+    target: u64,
+    target_len: u64,
+    link_at: u64,
+    linkpath: u64,
+    linkpath_len: u64,
+) -> SyscallResult {
+    let target_entry = get_dir_entry(
+        target_at.try_into()?,
+        make_path(target, target_len),
+        LookupMode::None,
+        true,
+    )?;
 
     let (inode, name) = {
+        let path = Path::new(make_str(linkpath, linkpath_len));
+
         let (dir, name) = path.containing_dir();
 
-        (lookup_by_path(&dir, LookupMode::None)?.inode(), name)
+        (
+            get_dir_entry(link_at.try_into()?, Some(dir), LookupMode::None, false)?.inode(),
+            name,
+        )
     };
 
     if Weak::as_ptr(&inode.fs().unwrap()) != Weak::as_ptr(&target_entry.inode().fs().unwrap()) {
@@ -580,16 +617,44 @@ pub fn sys_link(target: u64, target_len: u64, linkpath: u64, linkpath_len: u64) 
     Ok(0)
 }
 
-pub fn sys_rename(oldpath: u64, oldpath_len: u64, newpath: u64, newpath_len: u64) -> SyscallResult {
-    let old_path = Path::new(make_str(oldpath, oldpath_len));
-    let new_path = Path::new(make_str(newpath, newpath_len));
+pub fn sys_chmod(at: u64, path: u64, path_len: u64, mode: u64, flags: u64) -> SyscallResult {
+    let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;
+    let inode = get_dir_entry(
+        at.try_into()?,
+        make_path(path, path_len),
+        LookupMode::None,
+        flags.contains(AtFlags::SYMLINK_NOFOLLOW),
+    )?;
 
-    let old = lookup_by_real_path(&old_path, LookupMode::None)?;
+    inode.inode().chmod(Mode::mode_bits_truncate(mode as u32))?;
+
+    Ok(0)
+}
+
+pub fn sys_rename(
+    old_at: u64,
+    oldpath: u64,
+    oldpath_len: u64,
+    new_at: u64,
+    newpath: u64,
+    newpath_len: u64,
+) -> SyscallResult {
+    let old = get_dir_entry(
+        old_at.try_into()?,
+        make_path(oldpath, oldpath_len),
+        LookupMode::None,
+        true,
+    )?;
 
     let (new, name) = {
+        let new_path = Path::new(make_str(newpath, newpath_len));
+
         let (dir, name) = new_path.containing_dir();
 
-        (lookup_by_real_path(&dir, LookupMode::None)?, name)
+        (
+            get_dir_entry(new_at.try_into()?, Some(dir), LookupMode::None, true)?,
+            name,
+        )
     };
 
     if new.inode().fs().unwrap().as_ptr() != old.inode().fs().unwrap().as_ptr() {
@@ -1435,4 +1500,10 @@ pub fn sys_reboot() -> SyscallResult {
     } else {
         Ok(0)
     }
+}
+
+pub fn sys_yield() -> SyscallResult {
+    crate::kernel::sched::reschedule();
+
+    Ok(0)
 }

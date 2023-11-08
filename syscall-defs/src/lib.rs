@@ -99,6 +99,8 @@ pub const SYS_MSGRECV: usize = 66;
 pub const SYS_MSGSEND: usize = 67;
 pub const SYS_SETSOCKOPT: usize = 68;
 pub const SYS_GETSOCKOPT: usize = 69;
+pub const SYS_YIELD: usize = 70;
+pub const SYS_CHMOD: usize = 71;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

@@ -34,6 +34,12 @@ bitflags! {
     }
 }
 
+impl Mode {
+    pub fn mode_bits_truncate(v: u32) -> Mode {
+        Mode::from_bits_truncate(v & 0o7777)
+    }
+}
+
 #[repr(C)]
 #[derive(Default, Debug)]
 pub struct Stat {

@@ -173,14 +173,24 @@ function _prepare_netcat {
     fi
 }
 
+LINUX_HEADERS_VERSION=6.6
+LINUX_HEADERS_FOLDER=linux-$LINUX_HEADERS_VERSION
+LINUX_HEADERS_TAR=$LINUX_HEADERS_FOLDER.tar.xz
+LINUX_HEADERS_URL=https://cdn.kernel.org/pub/linux/kernel/v6.x/$LINUX_HEADERS_TAR
+LINUX_HEADERS_SRC=$SRC_DIR/linux_headers
+
 function _linux_headers {
-    wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.tar.xz
-    tar -xf linux-6.6.tar.xz
-    mkdir -p $SPATH/linux_headers
-    pushd .
-    cd linux-6.6
-    make headers_install INSTALL_HDR_PATH=$SPATH/linux_headers
-    popd
+    if [ ! -d $LINUX_HEADERS_SRC ]; then
+        if [ ! -f $LINUX_HEADERS_TAR ]; then
+            wget $LINUX_HEADERS_URL
+            tar -xf $LINUX_HEADERS_TAR
+        fi
+        mkdir -p $LINUX_HEADERS_SRC
+        pushd .
+        cd $LINUX_HEADERS_FOLDER
+        make headers_install INSTALL_HDR_PATH=$LINUX_HEADERS_SRC
+        popd
+    fi
 }
 
 function _sysroot {
@@ -194,9 +204,9 @@ function _sysroot {
 
     mkdir -p $SYSROOT/etc
     cp $SPATH/resolv.conf $SYSROOT/etc/
-    cp -r $SPATH/linux_headers/include/asm $SYSROOT/usr/include/
-    cp -r $SPATH/linux_headers/include/asm-generic $SYSROOT/usr/include/
-    cp -r $SPATH/linux_headers/include/linux $SYSROOT/usr/include/
+    cp -r $LINUX_HEADERS_SRC/include/asm $SYSROOT/usr/include/
+    cp -r $LINUX_HEADERS_SRC/include/asm-generic $SYSROOT/usr/include/
+    cp -r $LINUX_HEADERS_SRC/include/linux $SYSROOT/usr/include/
 }
 
 function _binutils {

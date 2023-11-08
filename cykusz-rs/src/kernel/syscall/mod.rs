@@ -34,7 +34,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_CLOSE => sys::sys_close(a),
         SYS_CHDIR => sys::sys_chdir(a, b),
         SYS_GETCWD => sys::sys_getcwd(a, b),
-        SYS_MKDIR => sys::sys_mkdir(a, b),
+        SYS_MKDIR => sys::sys_mkdir(a, b, c),
         SYS_GETDENTS => sys::sys_getdents(a, b, c),
         SYS_GETADDRINFO => sys::sys_getaddrinfo(a, b, c, d),
         SYS_EXIT => sys::sys_exit(a),
@@ -55,7 +55,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_MOUNT => sys::sys_mount(a, b, c, d, e, f),
         SYS_UMOUNT => sys::sys_umount(a, b),
         SYS_TIME => sys::sys_time(),
-        SYS_SYMLINK => sys::sys_symlink(a, b, c, d),
+        SYS_SYMLINK => sys::sys_symlink(a, b, c, d, e),
         SYS_RMDIR => sys::sys_rmdir(a, b),
         SYS_UNLINK => sys::sys_unlink(a, b, c, d),
         SYS_LINK => sys::sys_link(a, b, c, d),
@@ -96,7 +96,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_GETPPID => sys::sys_getppid(),
         SYS_GETPGID => sys::sys_getpgid(a),
         SYS_TRUNCATE => sys::sys_truncate(a, b),
-        SYS_READLINK => sys::sys_readlink(a, b, c, d, e),
+        SYS_READLINK => sys::sys_readlink(a, b, c, d, e, f),
         a => {
             logln!("NO SYS????? {}", a);
             Err(SyscallError::ENOSYS)

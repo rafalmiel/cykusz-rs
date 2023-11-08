@@ -47,25 +47,26 @@ fn make_str<'a>(b: u64, len: u64) -> &'a str {
     unsafe { core::str::from_utf8_unchecked(make_buf(b, len)) }
 }
 
-fn get_dir_entry(
-    fd: OpenFD,
-    path: u64,
-    path_len: u64,
-    lookup_mode: LookupMode,
-    real_path: bool,
-) -> Result<DirEntryItem, SyscallError> {
-    let path = if path != 0 {
+fn make_path<'a>(path: u64, path_len: u64) -> Option<Path<'a>> {
+    if path != 0 && path_len != 0 {
         Some(Path::new(make_str(path, path_len)))
     } else {
         None
-    };
+    }
+}
 
+fn get_dir_entry(
+    fd: OpenFD,
+    path: Option<Path>,
+    lookup_mode: LookupMode,
+    get_symlink_entry: bool,
+) -> Result<DirEntryItem, SyscallError> {
     logln4!(
-        "get dir entry: {:?} {:?} {:?} real_path: {}",
+        "get dir entry: {:?} {:?} {:?} get_symlink_entry: {}",
         fd,
         path,
         lookup_mode,
-        real_path
+        get_symlink_entry
     );
 
     let task = current_task_ref();
@@ -83,13 +84,14 @@ fn get_dir_entry(
     };
 
     if let Some(path) = path {
-        Ok(lookup_by_path_at(file_dir, &path, lookup_mode, real_path)?)
+        Ok(lookup_by_path_at(file_dir, &path, lookup_mode, get_symlink_entry)?)
     } else {
         Ok(file_dir.clone())
     }
 }
 
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
+    logln5!("sys_open {} {} {:x}", at, make_str(path, len), mode);
     let mut flags = OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
     if !flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR | OpenFlags::WRONLY) {
         flags.insert(OpenFlags::RDONLY);
@@ -99,8 +101,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
 
     let inode = get_dir_entry(
         at,
-        path,
-        len,
+        make_path(path, len),
         if flags.contains(OpenFlags::CREAT) {
             LookupMode::Create
         } else {
@@ -185,10 +186,8 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
     };
 }
 
-pub fn sys_readlink(path: u64, path_len: u64, buf: u64, max_size: u64, len: u64) -> SyscallResult {
-    let target = make_str(path, path_len);
-
-    let inode = lookup_by_real_path(&Path::new(target), LookupMode::None)?;
+pub fn sys_readlink(at: u64, path: u64, path_len: u64, buf: u64, max_size: u64, len: u64) -> SyscallResult {
+    let inode = get_dir_entry(OpenFD::try_from(at)?, make_path(path, path_len), LookupMode::None, true)?;
 
     if inode.inode().ftype()? != FileType::Symlink {
         return Err(SyscallError::EINVAL);
@@ -260,7 +259,7 @@ pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
 pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) -> SyscallResult {
     let at = OpenFD::try_from(at)?;
 
-    get_dir_entry(at, path, path_len, LookupMode::None, false)?;
+    get_dir_entry(at, make_path(path, path_len), LookupMode::None, false)?;
 
     Ok(0)
 }
@@ -440,29 +439,28 @@ pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
     }
 }
 
-pub fn sys_mkdir(path: u64, len: u64) -> SyscallResult {
-    if let Ok(path) = core::str::from_utf8(make_buf(path, len)) {
-        let path = Path::new(path);
+pub fn sys_mkdir(at: u64, path: u64, path_len: u64) -> SyscallResult {
+    let at = OpenFD::try_from(at)?;
 
-        let (inode, name) = {
-            let (dir, target) = path.containing_dir();
+    let path = make_path(path, path_len).ok_or(SyscallError::EINVAL)?;
 
-            (lookup_by_path(&dir, LookupMode::None)?.inode(), target)
-        };
+    let (inode, name) = {
+        let (dir, target) = path.containing_dir();
 
-        if inode.ftype()? == FileType::Dir {
-            if !["", ".", ".."].contains(&name.str()) {
-                inode.mkdir(name.str())?;
-                Ok(0)
-            } else {
-                Err(SyscallError::EEXIST)
-            }
-        } else {
-            Err(SyscallError::ENOTDIR)
-        }
-    } else {
-        Err(SyscallError::EINVAL)
+        (get_dir_entry(at, Some(dir), LookupMode::None, false)?.inode(), target)
+    };
+
+    if inode.ftype()? != FileType::Dir {
+        return Err(SyscallError::ENOTDIR);
     }
+
+    if ["", ".", ".."].contains(&name.str()) {
+        return Err(SyscallError::EEXIST);
+    }
+
+    inode.mkdir(name.str())?;
+
+    Ok(0)
 }
 
 pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
@@ -479,6 +477,7 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
 pub fn sys_symlink(
     target: u64,
     target_len: u64,
+    at: u64,
     linkpath: u64,
     linkpath_len: u64,
 ) -> SyscallResult {
@@ -490,7 +489,7 @@ pub fn sys_symlink(
     let (inode, name) = {
         let (dir, target) = path.containing_dir();
 
-        (lookup_by_path(&dir, LookupMode::None)?.inode(), target)
+        (get_dir_entry(OpenFD::try_from(at)?, Some(dir), LookupMode::None, false)?.inode(), target)
     };
 
     if inode.ftype()? == FileType::Dir {
@@ -525,7 +524,7 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
 pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResult {
     let at = OpenFD::try_from(at)?;
 
-    let file = get_dir_entry(at, path, path_len, LookupMode::None, true)?;
+    let file = get_dir_entry(at, make_path(path, path_len), LookupMode::None, true)?;
 
     log!("unlink inode: ");
     file.inode().debug();
@@ -1360,8 +1359,7 @@ pub fn sys_stat(fd: u64, path: u64, path_len: u64, stat: u64, flags: u64) -> Sys
 
     let file = get_dir_entry(
         fd,
-        path,
-        path_len,
+        make_path(path, path_len),
         LookupMode::None,
         flags.contains(AtFlags::SYMLINK_NOFOLLOW),
     )?;

@@ -243,7 +243,9 @@ bitflags! {
         const NOFOLLOW    = 0x0100;
         const TRUNC       = 0x0200;
         const NONBLOCK    = 0x0400;
+        const DSYNC       = 0x0800;
         const CLOEXEC     = 0x4000;
+        const PATH        = 0x8000;
     }
 }
 

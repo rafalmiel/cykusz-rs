@@ -173,6 +173,16 @@ function _prepare_netcat {
     fi
 }
 
+function _linux_headers {
+    wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.tar.xz
+    tar -xf linux-6.6.tar.xz
+    mkdir -p $SPATH/linux_headers
+    pushd .
+    cd linux-6.6
+    make headers_install INSTALL_HDR_PATH=$SPATH/linux_headers
+    popd
+}
+
 function _sysroot {
     _prepare_mlibc
 
@@ -184,6 +194,9 @@ function _sysroot {
 
     mkdir -p $SYSROOT/etc
     cp $SPATH/resolv.conf $SYSROOT/etc/
+    cp -r $SPATH/linux_headers/include/asm $SYSROOT/usr/include/
+    cp -r $SPATH/linux_headers/include/asm-generic $SYSROOT/usr/include/
+    cp -r $SPATH/linux_headers/include/linux $SYSROOT/usr/include/
 }
 
 function _binutils {
@@ -225,7 +238,7 @@ function _mlibc {
     mkdir -p $BUILD_DIR
 
     rm -rf $MLIBC_BUILD_DIR
-    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
     ninja -C $MLIBC_BUILD_DIR
     meson install -C $MLIBC_BUILD_DIR
@@ -241,6 +254,11 @@ function _mlibc_static {
 
     ninja -C $MLIBC_BUILD_DIR
     meson install -C $MLIBC_BUILD_DIR
+}
+
+function _dummy_libc {
+    mkdir -p $SYSROOT/usr/lib
+    $TRIPLE-gcc -nostdlib -nostartfiles -shared -x c /dev/null -o $SYSROOT/usr/lib/libc.so
 }
 
 function _libgcc {

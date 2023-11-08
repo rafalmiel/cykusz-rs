@@ -7,6 +7,9 @@ LOGDIR=$SPATH/log
 
 mkdir -p $LOGDIR
 
+echo "Getting linux headers..."
+$SPATH/build.sh linux_headers  > $LOGDIR/linux_headers.log 2>&1
+
 echo "Creating sysroot..."
 $SPATH/build.sh sysroot  > $LOGDIR/sysroot.log 2>&1
 
@@ -16,11 +19,14 @@ $SPATH/build.sh binutils > $LOGDIR/binutils.log 2>&1
 echo "Building gcc..."
 $SPATH/build.sh gcc > $LOGDIR/gcc.log 2>&1
 
-echo "Building mlibc..."
-$SPATH/build.sh mlibc > $LOGDIR/mlibc.log 2>&1
+echo "Building dummy_libc..."
+$SPATH/build.sh dummy_libc > $LOGDIR/dummy_libc.log 2>&1
 
 echo "Building libgcc..."
 $SPATH/build.sh libgcc > $LOGDIR/libgcc.log 2>&1
+
+echo "Building mlibc..."
+$SPATH/build.sh mlibc > $LOGDIR/mlibc.log 2>&1
 
 echo "Building libstdc++..."
 $SPATH/build.sh libstd > $LOGDIR/libstd.log 2>&1

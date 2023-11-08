@@ -233,10 +233,11 @@ pub fn mkdir(path: &str) -> SyscallResult {
 
 pub fn symlink(target: &str, path: &str) -> SyscallResult {
     unsafe {
-        syscall4(
+        syscall5(
             SYS_SYMLINK,
             target.as_ptr() as usize,
             target.len(),
+            OpenFD::Cwd.into(),
             path.as_ptr() as usize,
             path.len(),
         )

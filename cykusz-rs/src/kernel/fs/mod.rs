@@ -218,7 +218,7 @@ fn lookup_by_path_from(
     path: &Path,
     lookup_mode: LookupMode,
     mut cur: DirEntryItem,
-    real_path: bool,
+    get_symlink_entry: bool,
     depth: usize,
 ) -> Result<DirEntryItem> {
     //println!("looking up {}", path.str());
@@ -264,7 +264,7 @@ fn lookup_by_path_from(
                         //println!("found {:?}", res.inode().ftype()?);
 
                         if res.inode().ftype()? == FileType::Symlink
-                            && (depth > 0 || !real_path || idx < len - 1)
+                            && (depth > 0 || !get_symlink_entry || idx < len - 1)
                         {
                             let link = read_link(&res.inode())?;
                             //println!("its symlink! {}", link);
@@ -281,7 +281,7 @@ fn lookup_by_path_from(
                                 } else {
                                     root_dentry().unwrap().clone()
                                 },
-                                real_path,
+                                get_symlink_entry,
                                 depth + 1,
                             )?;
 
@@ -325,14 +325,14 @@ pub fn lookup_by_path_at(
     dir: DirEntryItem,
     path: &Path,
     lookup_mode: LookupMode,
-    real_path: bool,
+    get_symlink_entry: bool,
 ) -> Result<DirEntryItem> {
     if let Some(cur) = if !path.is_absolute() {
         Some(dir)
     } else {
         root_dentry().cloned()
     } {
-        lookup_by_path_from(path, lookup_mode, cur, real_path, 0)
+        lookup_by_path_from(path, lookup_mode, cur, get_symlink_entry, 0)
     } else {
         return Err(FsError::NotSupported);
     }

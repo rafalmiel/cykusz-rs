@@ -196,17 +196,19 @@ function _linux_headers {
 function _sysroot {
     _prepare_mlibc
 
+    mkdir -p $SYSROOT/usr/include
+    cp -r $LINUX_HEADERS_SRC/include/asm $SYSROOT/usr/include/
+    cp -r $LINUX_HEADERS_SRC/include/asm-generic $SYSROOT/usr/include/
+    cp -r $LINUX_HEADERS_SRC/include/linux $SYSROOT/usr/include/
+
     mkdir -p $BUILD_DIR
 
     rm -rf $MLIBC_BUILD_DIR
-    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
     meson install -C $MLIBC_BUILD_DIR
 
     mkdir -p $SYSROOT/etc
     cp $SPATH/resolv.conf $SYSROOT/etc/
-    cp -r $LINUX_HEADERS_SRC/include/asm $SYSROOT/usr/include/
-    cp -r $LINUX_HEADERS_SRC/include/asm-generic $SYSROOT/usr/include/
-    cp -r $LINUX_HEADERS_SRC/include/linux $SYSROOT/usr/include/
 }
 
 function _binutils {
@@ -248,19 +250,7 @@ function _mlibc {
     mkdir -p $BUILD_DIR
 
     rm -rf $MLIBC_BUILD_DIR
-    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
-
-    ninja -C $MLIBC_BUILD_DIR
-    meson install -C $MLIBC_BUILD_DIR
-}
-
-function _mlibc_static {
-    _prepare_mlibc
-
-    mkdir -p $BUILD_DIR
-
-    rm -rf $MLIBC_BUILD_DIR
-    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Dheaders_only=false -Dstatic=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    meson setup --cross-file $SPATH/cross-file.ini --prefix $SYSROOT/usr -Ddefault_library=both -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
     ninja -C $MLIBC_BUILD_DIR
     meson install -C $MLIBC_BUILD_DIR

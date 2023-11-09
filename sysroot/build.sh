@@ -250,7 +250,7 @@ function _mlibc {
     mkdir -p $BUILD_DIR
 
     rm -rf $MLIBC_BUILD_DIR
-    meson setup --cross-file $SPATH/cross-file.ini --prefix /usr -Ddefault_library=shared -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    meson setup --cross-file $SPATH/cross-file.ini --prefix /usr -Ddefault_library=both -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
     ninja -C $MLIBC_BUILD_DIR
     meson install -C $MLIBC_BUILD_DIR --destdir=$SYSROOT
@@ -487,7 +487,7 @@ function _cykusz_llvm {
 
     export CYKUSZ_SYSROOT_DIR=$SYSROOT
     export CYKUSZ_ROOT_DIR=$SPATH
-    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_TARGET_ARCH=x86_64 -DLLVM_DEFAULT_TARGET_TRIPLE=$TRIPLE -DLLVM_HOST_TRIPLE=$TRIPLE -Wno-dev $LLVM_SRC_DIR/llvm
+    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_TARGET_ARCH=x86_64 -DLLVM_DEFAULT_TARGET_TRIPLE=$TRIPLE -DLLVM_HOST_TRIPLE=$TRIPLE -Wno-dev $LLVM_SRC_DIR/llvm
 
     VERBOSE=1 make -j12 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install

@@ -100,7 +100,7 @@ impl SignalEntry {
             sa_handler: h as u64,
             sa_mask: self.mask,
             sa_flags: self.flags.bits(),
-            sa_sigaction: 0,
+            sa_restorer: 0,
         }
     }
 }

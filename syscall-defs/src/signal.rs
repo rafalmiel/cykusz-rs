@@ -29,7 +29,7 @@ pub struct SigAction {
     pub sa_handler: u64,
     pub sa_mask: u64,
     pub sa_flags: u32,
-    pub sa_sigaction: u64,
+    pub sa_restorer: u64,
 }
 
 impl SigAction {
@@ -38,7 +38,7 @@ impl SigAction {
             sa_handler: handler.into(),
             sa_mask: mask,
             sa_flags: flags.bits(),
-            sa_sigaction: 0,
+            sa_restorer: 0,
         }
     }
 }
@@ -46,17 +46,16 @@ impl SigAction {
 bitflags! {
     #[derive(Default)]
     pub struct SignalFlags: u32 {
-        const RESTART = (1u32 << 3);
+        const RESTART = 0x10000000;
     }
 }
 
 #[repr(u64)]
 #[derive(Debug)]
 pub enum SigProcMask {
-    None = 0,
-    Block = 1,
-    Unblock = 2,
-    Set = 3,
+    Block = 0,
+    Unblock = 1,
+    Set = 2,
 }
 
 impl Default for SignalHandler {
@@ -69,8 +68,8 @@ impl From<u64> for SignalHandler {
     fn from(v: u64) -> Self {
         let v = v as i64;
         match v {
-            -3 => SignalHandler::Ignore,
-            -2 => SignalHandler::Default,
+            1 => SignalHandler::Ignore,
+            0 => SignalHandler::Default,
             v => SignalHandler::Handle(unsafe { core::mem::transmute::<u64, fn(usize)>(v as u64) }),
         }
     }
@@ -79,8 +78,8 @@ impl From<u64> for SignalHandler {
 impl From<SignalHandler> for usize {
     fn from(h: SignalHandler) -> Self {
         match h {
-            SignalHandler::Ignore => -3isize as usize,
-            SignalHandler::Default => -2isize as usize,
+            SignalHandler::Ignore => 1isize as usize,
+            SignalHandler::Default => 0isize as usize,
             SignalHandler::Handle(f) => f as usize,
         }
     }
@@ -89,8 +88,8 @@ impl From<SignalHandler> for usize {
 impl From<SignalHandler> for u64 {
     fn from(h: SignalHandler) -> Self {
         match h {
-            SignalHandler::Ignore => -3isize as u64,
-            SignalHandler::Default => -2isize as u64,
+            SignalHandler::Ignore => 1isize as u64,
+            SignalHandler::Default => 0isize as u64,
             SignalHandler::Handle(f) => f as u64,
         }
     }
@@ -99,10 +98,9 @@ impl From<SignalHandler> for u64 {
 impl From<u64> for SigProcMask {
     fn from(v: u64) -> Self {
         match v {
-            0 => SigProcMask::None,
-            1 => SigProcMask::Block,
-            2 => SigProcMask::Unblock,
-            3 => SigProcMask::Set,
+            0 => SigProcMask::Block,
+            1 => SigProcMask::Unblock,
+            2 => SigProcMask::Set,
             _ => panic!("Invalid SigProcMask {}", v),
         }
     }

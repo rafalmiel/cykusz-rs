@@ -1255,7 +1255,7 @@ pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
 }
 
 pub fn sys_sigaction(sig: u64, sigact: u64, sigreturn: u64, old: u64) -> SyscallResult {
-    if sig == 34 {
+    if sig == 32 {
         //temporary hack to make mlibc happy
         return Err(SyscallError::ENOSYS);
     }

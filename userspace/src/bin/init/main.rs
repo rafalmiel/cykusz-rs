@@ -23,7 +23,7 @@ fn spawn_shell() -> usize {
             .expect("Failed to attach tty");
 
             if let Err(e) = syscall::exec(
-                "/usr/bin/bash",
+                "/usr/bin/sh",
                 None,
                 Some(&["PATH=/bin:/usr/bin", "TERM=cykusz"]),
             ) {

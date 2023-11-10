@@ -468,7 +468,7 @@ function _cykusz_bash {
     pushd .
 
     cd $BASH_CYKUSZ_BUILD_DIR
-    CFLAGS="-O0 -g" $BASH_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --without-bash-malloc
+    $BASH_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --without-bash-malloc --disable-nls
 
     popd
 

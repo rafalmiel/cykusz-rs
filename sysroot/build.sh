@@ -533,7 +533,7 @@ function _cykusz_zstd {
     popd
 }
 function _cykusz_zlib {
-    _prepare_llvm
+    _prepare_zlib
 
     mkdir -p $ZLIB_CYKUSZ_BUILD_DIR
 

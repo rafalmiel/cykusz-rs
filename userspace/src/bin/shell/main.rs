@@ -769,7 +769,7 @@ fn sigchld_handler(_sig: usize) {
 }
 
 fn setup_signal_handler(sig: usize, handler: SignalHandler, flags: SignalFlags) {
-    if let Err(e) = syscall::sigaction(sig, Some(&SigAction::new(handler, 0, flags)), None) {
+    if let Err(e) = syscall::sigaction(sig, Some(&mut SigAction::new(handler, 0, flags)), None) {
         println!("Failed to install signal handler: {:?}", e);
     }
 }

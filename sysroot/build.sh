@@ -474,6 +474,8 @@ function _cykusz_bash {
 
     make -C $BASH_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT
     make -C $BASH_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+
+    ln -sf /usr/bin/bash $SYSROOT/usr/bin/sh
 }
 
 function _cykusz_llvm {

@@ -55,8 +55,10 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 - [x] nano (<https://github.com/rafalmiel/nano/tree/cykusz>)
 - [x] less (<https://github.com/rafalmiel/less/tree/cykusz>)
 - [x] zstd (<https://github.com/rafalmiel/zstd/tree/cykusz>)
+- [x] zlib (<https://github.com/rafalmiel/zlib/tree/cykusz>)
 - [x] doom (<https://github.com/rafalmiel/doomgeneric/tree/cykusz>)
 - [x] netcat (<https://github.com/rafalmiel/netcat/tree/cykusz>)
+- [x] python (<https://github.com/rafalmiel/cpython/tree/cykusz>)
 
 ## Building
 

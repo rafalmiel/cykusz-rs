@@ -1285,13 +1285,11 @@ pub fn sys_sigaction(sig: u64, sigact: u64, old: u64) -> SyscallResult {
         unsafe { Some(VirtAddr(old as usize).read_mut::<SigAction>()) }
     };
 
-    logln2!("sigaction: {} {:?}, old: {:?}", sig, entry, old);
+    logln5!("sigaction: {} {:?}, old: {:?}", sig, entry, old);
 
     current_task_ref()
         .signals()
-        .set_signal(sig as usize, entry, old);
-
-    Ok(0)
+        .set_signal(sig as usize, entry, old)
 }
 
 pub fn sys_sigprocmask(how: u64, set: u64, old_set: u64) -> SyscallResult {

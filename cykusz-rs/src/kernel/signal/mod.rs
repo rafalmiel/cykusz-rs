@@ -9,7 +9,7 @@ use bit_field::BitField;
 
 use syscall_defs::signal::SignalHandler;
 use syscall_defs::signal::{SigAction, SignalFlags};
-use syscall_defs::SyscallError;
+use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
@@ -338,11 +338,13 @@ impl Signals {
         signal: usize,
         handler: Option<SignalEntry>,
         old: Option<&mut syscall_defs::signal::SigAction>,
-    ) {
-        assert!(signal < SIGNAL_COUNT);
+    ) -> SyscallResult {
+        if signal >= SIGNAL_COUNT {
+            return Err(SyscallError::EINVAL);
+        }
 
         if !can_override(signal) {
-            return;
+            return Err(SyscallError::EINVAL);
         }
 
         let mut signals = self.entries();
@@ -354,6 +356,8 @@ impl Signals {
         if let Some(handler) = handler {
             signals[signal] = handler;
         }
+
+        Ok(0)
     }
 
     pub fn copy_from(&self, signals: &Signals) {

@@ -22,6 +22,8 @@ ZSTD_SRC_DIR=$SRC_DIR/zstd
 LLVM_SRC_DIR=$SRC_DIR/llvm-project
 LESS_SRC_DIR=$SRC_DIR/less
 NETCAT_SRC_DIR=$SRC_DIR/netcat
+ZLIB_SRC_DIR=$SRC_DIR/zlib
+PYTHON_SRC_DIR=$SRC_DIR/cpython
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -35,11 +37,10 @@ ZSTD_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zstd
 LLVM_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-llvm
 LESS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-less
 NETCAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-netcat
+ZLIB_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zlib
+PYTHON_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-python
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
-GMP_BUILD_DIR=$BUILD_DIR/gmp
-MPFR_BUILD_DIR=$BUILD_DIR/mpfr
-MPC_BUILD_DIR=$BUILD_DIR/mpc
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
 CROSS=$CYKUSZ_DIR/sysroot/cross
@@ -130,6 +131,25 @@ function _prepare_zstd {
     if [ ! -d $ZSTD_SRC_DIR ]; then
         mkdir -p $SRC_DIR
         git clone --depth 1 -b cykusz https://github.com/rafalmiel/zstd.git $ZSTD_SRC_DIR
+    fi
+}
+
+function _prepare_zlib {
+    if [ ! -d $ZLIB_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/zlib.git $ZLIB_SRC_DIR
+    fi
+}
+
+function _prepare_python {
+    if [ ! -d $PYTHON_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/cpython.git $PYTHON_SRC_DIR
+
+        pushd .
+        cd $PYTHON_SRC_DIR
+        autoreconf -f -i
+        popd
     fi
 }
 
@@ -509,6 +529,44 @@ function _cykusz_zstd {
     cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $ZSTD_SRC_DIR/build/cmake
     make -j8
     DESTDIR=$SYSROOT make install
+
+    popd
+}
+function _cykusz_zlib {
+    _prepare_llvm
+
+    mkdir -p $ZLIB_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $ZLIB_CYKUSZ_BUILD_DIR
+
+    export CYKUSZ_SYSROOT_DIR=$SYSROOT
+    export CYKUSZ_ROOT_DIR=$SPATH
+    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $ZLIB_SRC_DIR
+
+    VERBOSE=1 make -j12 DESTDIR=$SYSROOT
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_python {
+    _prepare_python
+
+    pushd .
+
+    mkdir -p $PYTHON_CYKUSZ_BUILD_DIR
+
+    cd $PYTHON_CYKUSZ_BUILD_DIR
+    export CONFIG_SITE=$SPATH/python-config-site
+    export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
+    export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
+    $PYTHON_SRC_DIR/configure --with-build-python=python --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --with-system-ffi --with-system-expat --disable-ipv6 --without-ensurepip --without-static-libpython
+
+
+    make -j6 DESTDIR=$SYSROOT
+    make DESTDIR=$SYSROOT install
 
     popd
 }

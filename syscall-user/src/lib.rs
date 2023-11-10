@@ -464,19 +464,21 @@ pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {
 
 pub fn sigaction(
     sig: usize,
-    sigaction: Option<&syscall_defs::signal::SigAction>,
+    mut sigaction: Option<&mut syscall_defs::signal::SigAction>,
     old_sigaction: Option<&mut syscall_defs::signal::SigAction>,
 ) -> SyscallResult {
-    let sigact = sigaction;
+
+    if let Some(ref mut sig) = sigaction {
+        sig.sa_restorer = sigreturn as u64;
+    }
 
     unsafe {
-        syscall4(
+        syscall3(
             SYS_SIGACTION,
             sig,
-            sigact
+            sigaction
                 .and_then(|f| Some(f as *const SigAction as usize))
                 .unwrap_or(0),
-            sigreturn as usize,
             old_sigaction
                 .and_then(|f| Some(f as *mut SigAction as usize))
                 .unwrap_or(0),

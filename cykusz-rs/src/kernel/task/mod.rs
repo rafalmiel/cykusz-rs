@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use core::cell::UnsafeCell;
@@ -186,37 +187,57 @@ impl Task {
 
     pub fn exec(
         &self,
-        exe: DirEntryItem,
-        args: Option<ExeArgs>,
+        mut exe: DirEntryItem,
+        mut args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> Result<!, SyscallError> {
         logln5!("exec task {} {}", self.pid(), exe.full_path());
-        let vm = self.vm();
-        vm.clear();
 
+        let vm = VM::new();
+
+        let (base_addr, entry, elf_hdr, tls_vm, interpreter) =
+            vm.load_bin(exe.clone()).ok_or(SyscallError::EINVAL)?;
+
+        if let Some(interp) = interpreter {
+            // got a shebang interpreter line?? replace exe and pass script as a first param
+            if let Some(args) = &mut args {
+                args.push_front(Box::from(exe.full_path().as_bytes()))
+            } else {
+                args = {
+                    let mut a = ExeArgs::new();
+                    a.push_back(Box::from(exe.full_path().as_bytes()));
+                    Some(a)
+                }
+            }
+            exe = interp;
+        }
+        vm.log_vm();
+
+        // Replace our new vm
+        self.vm.fork(&vm);
+
+        // New process does not inherits signals
         self.signals().clear();
+
+        // No locks
         self.set_locks(0);
 
+        // Close all files with CLOEXEC flags
         self.filetable().close_on_exec();
-
         self.filetable().debug();
 
-        if let Some((base_addr, entry, elf_hdr, tls_vm)) = vm.load_bin(exe.clone()) {
-            vm.log_vm();
-            unsafe {
-                self.arch_task_mut().exec(
-                    base_addr,
-                    entry,
-                    &elf_hdr,
-                    vm,
-                    tls_vm,
-                    exe.full_path(),
-                    args,
-                    envs,
-                )
-            }
-        } else {
-            Err(SyscallError::EINVAL)
+        unsafe {
+            // EXEC!
+            self.arch_task_mut().exec(
+                base_addr,
+                entry,
+                &elf_hdr,
+                self.vm(),
+                tls_vm,
+                exe.full_path(),
+                args,
+                envs,
+            )
         }
     }
 

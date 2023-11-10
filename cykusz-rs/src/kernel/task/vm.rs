@@ -676,7 +676,13 @@ impl VMData {
     fn load_bin(
         &mut self,
         exe: DirEntryItem,
-    ) -> Option<(VirtAddr, VirtAddr, ElfHeader, Option<TlsVmInfo>)> {
+    ) -> Option<(
+        VirtAddr,
+        VirtAddr,
+        ElfHeader,
+        Option<TlsVmInfo>,
+        Option<DirEntryItem>,
+    )> {
         let mut base_addr = VirtAddr(0);
 
         if let Some(MMapPageStruct(MMapPage::Cached(elf_page))) =
@@ -684,11 +690,28 @@ impl VMData {
         {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
 
-            if hdr.is_none()
-            /*|| exe.full_path().ends_with("cc1")*/
-            {
-                println!("failed elf {:?}", &elf_page.data()[..256]);
-                return None;
+            if hdr.is_none() {
+                // check for interpreter line and load it
+                let data = elf_page.data();
+
+                if !data.starts_with(b"#!") {
+                    return None;
+                }
+
+                let interp = data
+                    .iter()
+                    .enumerate()
+                    .find(|(_, &e)| e == b'\n')
+                    .and_then(|(idx, _)| Some(&data[2..idx]))?;
+
+                let path = core::str::from_utf8(interp).ok()?;
+                logln5!("got interp line {}", path);
+
+                let interp = lookup_by_path(&Path::new(path), LookupMode::None).ok()?;
+
+                let (base_addr, entry, elf, tls, _) = self.load_bin(interp.clone())?;
+
+                return Some((base_addr, entry, elf, tls, Some(interp)));
             }
 
             let hdr = hdr.unwrap();
@@ -710,7 +733,7 @@ impl VMData {
             {
                 if p.p_type == ProgramType::Interp {
                     if let Ok(interp) = lookup_by_path(&Path::new("/usr/lib/ld.so"), LookupMode::None) {
-                        if let Some((_base_addr, entry, _elf, _tls)) = self.load_bin(interp) {
+                        if let Some((_base_addr, entry, _elf, _tls, _)) = self.load_bin(interp) {
                             entry_addr = entry;
                         }
                     } else {
@@ -788,7 +811,7 @@ impl VMData {
                 }
             }
 
-            return Some((base_addr, entry_addr, *hdr, tls_vm_info));
+            return Some((base_addr, entry_addr, *hdr, tls_vm_info, None));
         }
 
         None
@@ -945,7 +968,13 @@ impl VM {
     pub fn load_bin(
         &self,
         exe: DirEntryItem,
-    ) -> Option<(VirtAddr, VirtAddr, ElfHeader, Option<TlsVmInfo>)> {
+    ) -> Option<(
+        VirtAddr,
+        VirtAddr,
+        ElfHeader,
+        Option<TlsVmInfo>,
+        Option<DirEntryItem>,
+    )> {
         self.data.lock().load_bin(exe)
     }
 

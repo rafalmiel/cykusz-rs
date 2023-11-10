@@ -1,8 +1,9 @@
 use alloc::boxed::Box;
+use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 use core::mem::MaybeUninit;
 
-pub type ExeArgs = Vec<Box<[u8]>>;
+pub type ExeArgs = VecDeque<Box<[u8]>>;
 
 pub fn into_syscall_slice(args: &[&str]) -> Vec<[usize; 2]> {
     let mut vec = Vec::<[usize; 2]>::with_capacity(args.len());
@@ -29,7 +30,7 @@ pub fn from_syscall_slice(args: usize, len: usize) -> ExeArgs {
             }
         };
 
-        vec.push(vals);
+        vec.push_back(vals);
     }
 
     vec

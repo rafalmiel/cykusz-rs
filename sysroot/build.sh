@@ -19,6 +19,7 @@ DOOM_SRC_DIR=$SRC_DIR/doomgeneric
 COREUTILS_SRC_DIR=$SRC_DIR/coreutils
 TZDB_SRC_DIR=$SRC_DIR/tzdb
 ZSTD_SRC_DIR=$SRC_DIR/zstd
+LIBRESSL_SRC_DIR=$SRC_DIR/libressl-portable
 LLVM_SRC_DIR=$SRC_DIR/llvm-project
 LESS_SRC_DIR=$SRC_DIR/less
 NETCAT_SRC_DIR=$SRC_DIR/netcat
@@ -34,6 +35,7 @@ NANO_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-nano
 BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
 COREUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-coreutils
 ZSTD_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zstd
+LIBRESSL_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libressl
 LLVM_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-llvm
 LESS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-less
 NETCAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-netcat
@@ -138,6 +140,18 @@ function _prepare_zlib {
     if [ ! -d $ZLIB_SRC_DIR ]; then
         mkdir -p $SRC_DIR
         git clone --depth 1 -b cykusz https://github.com/rafalmiel/zlib.git $ZLIB_SRC_DIR
+    fi
+}
+
+function _prepare_libressl {
+    if [ ! -d $LIBRESSL_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libressl-portable.git $LIBRESSL_SRC_DIR
+
+        pushd .
+        cd $LIBRESSL_SRC_DIR
+        ./autogen.sh
+        popd
     fi
 }
 
@@ -532,6 +546,7 @@ function _cykusz_zstd {
 
     popd
 }
+
 function _cykusz_zlib {
     _prepare_zlib
 
@@ -551,6 +566,25 @@ function _cykusz_zlib {
     popd
 }
 
+function _cykusz_libressl {
+    _prepare_libressl
+
+    mkdir -p $LIBRESSL_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LIBRESSL_CYKUSZ_BUILD_DIR
+
+    export CYKUSZ_SYSROOT_DIR=$SYSROOT
+    export CYKUSZ_ROOT_DIR=$SPATH
+    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DBUILD_SHARED_LIBS=ON -DLIBRESSL_APPS=ON -DENABLE_NC=OFF -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $LIBRESSL_SRC_DIR
+
+    VERBOSE=1 make -j12 DESTDIR=$SYSROOT
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
 function _cykusz_python {
     _prepare_python
 
@@ -562,7 +596,7 @@ function _cykusz_python {
     export CONFIG_SITE=$SPATH/python-config-site
     export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
     export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
-    $PYTHON_SRC_DIR/configure --with-build-python=python --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --with-system-ffi --with-system-expat --disable-ipv6 --without-ensurepip --without-static-libpython
+    $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --with-system-ffi --with-system-expat --disable-ipv6 --without-ensurepip --without-static-libpython
 
 
     make -j6 DESTDIR=$SYSROOT

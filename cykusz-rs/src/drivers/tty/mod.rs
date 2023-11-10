@@ -225,7 +225,7 @@ impl Tty {
                     self.output.lock_irq().scroll_top();
                 }
                 KeyCode::KEY_END => {
-                    self.output.lock_irq().scroll_top();
+                    self.output.lock_irq().scroll_bottom();
                 }
                 _ => {
                     return false;

@@ -61,6 +61,9 @@ $SPATH/build.sh cykusz_nano > $LOGDIR/cykusz_nano.log 2>&1
 echo "Cross building doom..."
 $SPATH/build.sh cykusz_doom > $LOGDIR/cykusz_doom.log 2>&1
 
+echo "Cross building readline..."
+$SPATH/build.sh cykusz_readline > $LOGDIR/cykusz_readline.log 2>&1
+
 echo "Cross building bash..."
 $SPATH/build.sh cykusz_bash > $LOGDIR/cykusz_bash.log 2>&1
 

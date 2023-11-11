@@ -541,7 +541,7 @@ impl INode for Tty {
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize, FsError> {
-        logln2!("TTY ioctl 0x{:x}", cmd);
+        logln5!("TTY ioctl 0x{:x}", cmd);
         match cmd {
             tty::TIOCSCTTY => {
                 let current = current_task_ref();

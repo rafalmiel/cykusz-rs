@@ -25,6 +25,7 @@ LESS_SRC_DIR=$SRC_DIR/less
 NETCAT_SRC_DIR=$SRC_DIR/netcat
 ZLIB_SRC_DIR=$SRC_DIR/zlib
 PYTHON_SRC_DIR=$SRC_DIR/cpython
+READLINE_SRC_DIR=$SRC_DIR/readline
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -41,6 +42,7 @@ LESS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-less
 NETCAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-netcat
 ZLIB_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zlib
 PYTHON_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-python
+READLINE_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-readline
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 
@@ -164,6 +166,13 @@ function _prepare_python {
         cd $PYTHON_SRC_DIR
         autoreconf -f -i
         popd
+    fi
+}
+
+function _prepare_readline {
+    if [ ! -d $READLINE_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/readline.git $READLINE_SRC_DIR
     fi
 }
 
@@ -422,6 +431,8 @@ function _cykusz_ncurses {
 
     make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
     make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
+
+    ln -sf libncursesw.so $SYSROOT/usr/lib/libncurses.so
 }
 
 function _cykusz_nano {
@@ -598,6 +609,22 @@ function _cykusz_python {
     export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
     $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --with-system-ffi --with-system-expat --disable-ipv6 --without-ensurepip --without-static-libpython
 
+
+    make -j6 DESTDIR=$SYSROOT
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_readline {
+    _prepare_readline
+
+    pushd .
+
+    mkdir -p $READLINE_CYKUSZ_BUILD_DIR
+
+    cd $READLINE_CYKUSZ_BUILD_DIR
+    $READLINE_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --disable-static --enable-multibyte
 
     make -j6 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install

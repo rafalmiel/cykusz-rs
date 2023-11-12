@@ -32,6 +32,8 @@ PCRE2_SRC_DIR=$SRC_DIR/pcre2
 LIBUNISTRING_SRC_DIR=$SRC_DIR/libunistring
 LIBICONV_SRC_DIR=$SRC_DIR/libiconv
 LIBIDN2_SRC_DIR=$SRC_DIR/libidn2
+LIBFFI_SRC_DIR=$SRC_DIR/libffi
+LIBEXPAT_SRC_DIR=$SRC_DIR/libexpat
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -55,6 +57,8 @@ PCRE2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-pcre2
 LIBUNISTRING_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libunistring
 LIBICONV_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libiconv
 LIBIDN2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libidn2
+LIBFFI_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libffi
+LIBEXPAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libexpat
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 
@@ -175,6 +179,31 @@ function _prepare_libunistring {
         ./autogen.sh
         cp config.sub.cykusz gnulib/build-aux/config.sub
         cp config.sub.cykusz build-aux/config.sub
+        popd
+    fi
+}
+
+function _prepare_libffi {
+    if [ ! -d $LIBFFI_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libffi.git $LIBFFI_SRC_DIR
+
+        pushd .
+        cd $LIBFFI_SRC_DIR
+        ./autogen.sh
+        popd
+    fi
+}
+
+function _prepare_libexpat {
+    if [ ! -d $LIBEXPAT_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libexpat.git $LIBEXPAT_SRC_DIR
+
+        pushd .
+        cd $LIBEXPAT_SRC_DIR/expat
+        ./buildconf.sh
+        cp config.sub.cykusz conftools/config.sub
         popd
     fi
 }
@@ -655,6 +684,40 @@ function _cykusz_libunistring {
     popd
 }
 
+function _cykusz_libffi {
+    _prepare_libffi
+
+    mkdir -p $LIBFFI_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LIBFFI_CYKUSZ_BUILD_DIR
+
+    CFLAGS="-fPIC" $LIBFFI_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --disable-static
+
+    make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_libexpat {
+    _prepare_libexpat
+
+    mkdir -p $LIBEXPAT_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LIBEXPAT_CYKUSZ_BUILD_DIR
+
+    $LIBEXPAT_SRC_DIR/expat/configure --host=$TRIPLE --prefix=/usr --with-sysroot=$SYSROOT --without-xmlwf
+
+    make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
 function _cykusz_libiconv {
     _prepare_libiconv
 
@@ -823,6 +886,8 @@ function _cykusz_python {
 
     make -j6 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install
+
+    ln -sf python3 $SYSROOT/usr/bin/python
 
     popd
 }

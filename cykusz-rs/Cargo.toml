@@ -25,6 +25,11 @@ linked_list_allocator = "*"
 default-features = false
 version = "*"
 
+[dependencies.rand]
+default-features = false
+version = "*"
+features = ["std_rng", "nightly"]
+
 [dependencies.bitmaps]
 default-features = false
 version = "*"

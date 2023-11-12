@@ -60,6 +60,7 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 - [x] libressl (<https://github.com/rafalmiel/libressl-portable/tree/cykusz>)
 - [x] doom (<https://github.com/rafalmiel/doomgeneric/tree/cykusz>)
 - [x] netcat (<https://github.com/rafalmiel/netcat/tree/cykusz>)
+- [x] wget (<https://github.com/rafalmiel/wget/tree/cykusz>)
 - [x] python (<https://github.com/rafalmiel/cpython/tree/cykusz>)
 
 ## Building

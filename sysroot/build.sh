@@ -26,6 +26,12 @@ NETCAT_SRC_DIR=$SRC_DIR/netcat
 ZLIB_SRC_DIR=$SRC_DIR/zlib
 PYTHON_SRC_DIR=$SRC_DIR/cpython
 READLINE_SRC_DIR=$SRC_DIR/readline
+WGET_SRC_DIR=$SRC_DIR/wget
+LIBPSL_SRC_DIR=$SRC_DIR/libpsl
+PCRE2_SRC_DIR=$SRC_DIR/pcre2
+LIBUNISTRING_SRC_DIR=$SRC_DIR/libunistring
+LIBICONV_SRC_DIR=$SRC_DIR/libiconv
+LIBIDN2_SRC_DIR=$SRC_DIR/libidn2
 
 BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
@@ -43,6 +49,12 @@ NETCAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-netcat
 ZLIB_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zlib
 PYTHON_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-python
 READLINE_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-readline
+WGET_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-wget
+LIBPSL_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libpsl
+PCRE2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-pcre2
+LIBUNISTRING_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libunistring
+LIBICONV_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libiconv
+LIBIDN2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libidn2
 GCC_BUILD_DIR=$BUILD_DIR/gcc
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 
@@ -120,6 +132,93 @@ function _prepare_coreutils {
         ./bootstrap
         rm build-aux/config.sub
         mv config.sub.cykusz build-aux/config.sub
+        popd
+    fi
+}
+
+function _prepare_wget {
+    if [ ! -d $WGET_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/wget.git $WGET_SRC_DIR
+
+        pushd .
+        cd $WGET_SRC_DIR
+        ./bootstrap
+        rm build-aux/config.sub
+        mv config.sub.cykusz build-aux/config.sub
+        popd
+    fi
+}
+
+function _prepare_libpsl {
+    if [ ! -d $LIBPSL_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libpsl.git $LIBPSL_SRC_DIR
+
+        pushd .
+        cd $LIBPSL_SRC_DIR
+        ./autogen.sh
+        rm build-aux/config.sub
+        mv config.sub.cykusz build-aux/config.sub
+        popd
+    fi
+}
+
+function _prepare_libunistring {
+    if [ ! -d $LIBUNISTRING_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libunistring.git $LIBUNISTRING_SRC_DIR
+
+        pushd .
+        cd $LIBUNISTRING_SRC_DIR
+        ./gitsub.sh pull
+        ./autogen.sh
+        cp config.sub.cykusz gnulib/build-aux/config.sub
+        cp config.sub.cykusz build-aux/config.sub
+        popd
+    fi
+}
+
+function _prepare_libiconv {
+    if [ ! -d $LIBICONV_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libiconv.git $LIBICONV_SRC_DIR
+
+        pushd .
+        cd $LIBICONV_SRC_DIR
+        ./gitsub.sh pull
+        ./autogen.sh
+        cp config.sub.cykusz gnulib/build-aux/config.sub
+        cp config.sub.cykusz libcharset/build-aux/config.sub
+        cp config.sub.cykusz build-aux/config.sub
+        popd
+    fi
+}
+
+function _prepare_libidn2 {
+    if [ ! -d $LIBIDN2_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libidn2.git $LIBIDN2_SRC_DIR
+
+        pushd .
+        cd $LIBIDN2_SRC_DIR
+        ./bootstrap
+        cp config.sub.cykusz gnulib/build-aux/config.sub
+        cp config.sub.cykusz build-aux/config.sub
+        popd
+    fi
+}
+
+function _prepare_pcre2 {
+    if [ ! -d $PCRE2_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libpsl.git $PCRE2_SRC_DIR
+
+        pushd .
+        cd $PCRE2_SRC_DIR
+        ./autogen.sh
+        rm config.sub
+        mv config.sub.cykusz config.sub
         popd
     fi
 }
@@ -505,6 +604,118 @@ function _cykusz_coreutils {
     make -C $COREUTILS_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 
+function _cykusz_wget {
+    _prepare_wget
+
+    mkdir -p $WGET_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $WGET_CYKUSZ_BUILD_DIR
+
+    $WGET_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --sysconfdir=/etc --disable-nls --with-ssl=openssl --with-openssl
+
+    make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_libpsl {
+    _prepare_libpsl
+
+    mkdir -p $LIBPSL_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LIBPSL_CYKUSZ_BUILD_DIR
+
+    $LIBPSL_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --disable-static --disable-asan --disable-cfi --disable-ubsan --disable-man --disable-runtime
+
+    make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_libunistring {
+    _prepare_libunistring
+
+    mkdir -p $LIBUNISTRING_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LIBUNISTRING_CYKUSZ_BUILD_DIR
+
+    $LIBUNISTRING_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --disable-static --docdir=/usr/share/doc/libunisttring-1.1
+
+    make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_libiconv {
+    _prepare_libiconv
+
+    mkdir -p $LIBICONV_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LIBICONV_CYKUSZ_BUILD_DIR
+
+    $LIBICONV_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --enable-shared --disable-nls --disable-static
+
+    make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_libidn2 {
+    _prepare_libidn2
+
+    mkdir -p $LIBIDN2_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $LIBIDN2_CYKUSZ_BUILD_DIR
+
+    $LIBIDN2_SRC_DIR/configure --disable-doc --disable-nls
+    #cp $LIBIDN2_SRC_DIR/lib/idna-tables-properties.csv ./lib/
+    cp ./lib/idn2.h $LIBIDN2_SRC_DIR/lib/
+    make -j4
+
+    cp ./lib/gendata $LIBIDN2_SRC_DIR/lib/gendata
+    cp ./lib/gentr46map $LIBIDN2_SRC_DIR/lib/gentr46map
+
+    $LIBIDN2_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --disable-nls --disable-static --disable-doc
+
+    cp ./lib/idn2.h $LIBIDN2_SRC_DIR/lib/
+
+    make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_pcre2 {
+    _prepare_pcre2
+
+    mkdir -p $PCRE2_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $PCRE2_CYKUSZ_BUILD_DIR
+
+    $PCRE2_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --docdir=/usr/share/doc/pcre2-10.42 --enable-unicode --enable-jit --enable-pcre2-16 --enable-pcre2-32 --enable-pcre2grep-libz --enable-pcre2test-libreadline --disable-static
+
+    make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
 function _cykusz_bash {
     _prepare_bash
 
@@ -607,7 +818,7 @@ function _cykusz_python {
     export CONFIG_SITE=$SPATH/python-config-site
     export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
     export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
-    $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --with-system-ffi --with-system-expat --disable-ipv6 --without-ensurepip --without-static-libpython
+    $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython
 
 
     make -j6 DESTDIR=$SYSROOT

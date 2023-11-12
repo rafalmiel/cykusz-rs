@@ -44,20 +44,30 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 
 ## Ports
 
+### Libs
 - [x] mlibc (<https://github.com/rafalmiel/mlibc/tree/cykusz>) ([upstream](https://github.com/managarm/mlibc))
+- [x] ncurses (<https://github.com/rafalmiel/ncurses/tree/cykusz>)
+- [x] readline (<https://github.com/rafalmiel/readline/tree/cykusz>)
+- [x] zlib (<https://github.com/rafalmiel/zlib/tree/cykusz>)
+- [x] libressl (<https://github.com/rafalmiel/libressl-portable/tree/cykusz>)
+- [x] libpsl (<https://github.com/rafalmiel/libpsl/tree/cykusz>)
+- [x] pcre2 (<https://github.com/rafalmiel/pcre2/tree/cykusz>)
+- [x] libunistring (<https://github.com/rafalmiel/libunistring/tree/cykusz>)
+- [x] libiconv (<https://github.com/rafalmiel/libiconv/tree/cykusz>)
+- [x] libidn2 (<https://github.com/rafalmiel/libidn2/tree/cykusz>)
+- [x] libffi (<https://github.com/rafalmiel/libffi/tree/cykusz>)
+- [x] libexpat (<https://github.com/rafalmiel/libexpat/tree/cykusz>)
+
+### Apps
 - [x] binutils (<https://github.com/rafalmiel/binutils-gdb/tree/cykusz>)
 - [x] gcc (<https://github.com/rafalmiel/gcc/tree/cykusz>)
 - [x] llvm (<https://github.com/rafalmiel/llvm-project/tree/cykusz>)
+- [x] zstd (<https://github.com/rafalmiel/zstd/tree/cykusz>)
 - [x] coreutils (<https://github.com/rafalmiel/coreutils/tree/cykusz>)
 - [x] nyancat (<https://github.com/rafalmiel/nyancat/tree/cykusz>)
-- [x] ncurses (<https://github.com/rafalmiel/ncurses/tree/cykusz>)
-- [x] readline (<https://github.com/rafalmiel/readline/tree/cykusz>)
 - [x] bash (<https://github.com/rafalmiel/bash/tree/cykusz>)
 - [x] nano (<https://github.com/rafalmiel/nano/tree/cykusz>)
 - [x] less (<https://github.com/rafalmiel/less/tree/cykusz>)
-- [x] zstd (<https://github.com/rafalmiel/zstd/tree/cykusz>)
-- [x] zlib (<https://github.com/rafalmiel/zlib/tree/cykusz>)
-- [x] libressl (<https://github.com/rafalmiel/libressl-portable/tree/cykusz>)
 - [x] doom (<https://github.com/rafalmiel/doomgeneric/tree/cykusz>)
 - [x] netcat (<https://github.com/rafalmiel/netcat/tree/cykusz>)
 - [x] wget (<https://github.com/rafalmiel/wget/tree/cykusz>)

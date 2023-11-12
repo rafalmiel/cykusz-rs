@@ -1,9 +1,12 @@
+use alloc::boxed::Box;
 use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
+use alloc::vec::Vec;
 
 use core::ops::Range;
 
 use syscall_defs::{MMapFlags, MMapProt};
+use syscall_defs::exec::ExeArgs;
 
 use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
@@ -681,7 +684,7 @@ impl VMData {
         VirtAddr,
         ElfHeader,
         Option<TlsVmInfo>,
-        Option<DirEntryItem>,
+        Option<(DirEntryItem, Option<ExeArgs>)>,
     )> {
         let mut base_addr = VirtAddr(0);
 
@@ -704,14 +707,28 @@ impl VMData {
                     .find(|(_, &e)| e == b'\n')
                     .and_then(|(idx, _)| Some(&data[2..idx]))?;
 
-                let path = core::str::from_utf8(interp).ok()?;
-                logln5!("got interp line {}", path);
+                let path = core::str::from_utf8(interp).ok()?.split_whitespace().collect::<Vec<&str>>();
 
-                let interp = lookup_by_path(&Path::new(path), LookupMode::None).ok()?;
+                if path.is_empty() {
+                    return None;
+                }
+                logln5!("got interp line {}", path[0]);
+
+                let interp = lookup_by_path(&Path::new(path[0]), LookupMode::None).ok()?;
 
                 let (base_addr, entry, elf, tls, _) = self.load_bin(interp.clone())?;
 
-                return Some((base_addr, entry, elf, tls, Some(interp)));
+                let exe_args = if path.len() > 1 {
+                    let mut ea = ExeArgs::new();
+                    for p in &path[1..] {
+                        ea.push_back(Box::from(p.as_bytes()))
+                    }
+                    Some(ea)
+                } else {
+                    None
+                };
+
+                return Some((base_addr, entry, elf, tls, Some((interp, exe_args))));
             }
 
             let hdr = hdr.unwrap();
@@ -973,7 +990,7 @@ impl VM {
         VirtAddr,
         ElfHeader,
         Option<TlsVmInfo>,
-        Option<DirEntryItem>,
+        Option<(DirEntryItem, Option<ExeArgs>)>,
     )> {
         self.data.lock().load_bin(exe)
     }

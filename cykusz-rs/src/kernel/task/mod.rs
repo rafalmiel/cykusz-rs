@@ -188,25 +188,25 @@ impl Task {
     pub fn exec(
         &self,
         mut exe: DirEntryItem,
-        mut args: Option<ExeArgs>,
+        args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> Result<!, SyscallError> {
         logln5!("exec task {} {}", self.pid(), exe.full_path());
+
+        let mut args = args.unwrap_or(ExeArgs::new());
 
         let vm = VM::new();
 
         let (base_addr, entry, elf_hdr, tls_vm, interpreter) =
             vm.load_bin(exe.clone()).ok_or(SyscallError::EINVAL)?;
 
-        if let Some(interp) = interpreter {
+        if let Some((interp, additional_args)) = interpreter {
             // got a shebang interpreter line?? replace exe and pass script as a first param
-            if let Some(args) = &mut args {
-                args.push_front(Box::from(exe.full_path().as_bytes()))
-            } else {
-                args = {
-                    let mut a = ExeArgs::new();
-                    a.push_back(Box::from(exe.full_path().as_bytes()));
-                    Some(a)
+            args.push_front(Box::from(exe.full_path().as_bytes()));
+
+            if let Some(aa) = additional_args {
+                for (idx, a) in aa.iter().enumerate() {
+                    args.insert(idx + 1, a.clone());
                 }
             }
             exe = interp;
@@ -235,7 +235,7 @@ impl Task {
                 self.vm(),
                 tls_vm,
                 exe.full_path(),
-                args,
+                Some(args),
                 envs,
             )
         }

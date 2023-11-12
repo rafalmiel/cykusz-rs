@@ -351,6 +351,33 @@ impl SocketData {
         self.send_packet(out, false);
     }
 
+    fn drain_proxy_buffer(&mut self) {
+        if self.state != State::Established {
+            return;
+        }
+
+        let mut window = self.ctl.available_window();
+
+        let max = 1460usize;
+
+        while self.proxy_buffer.has_data() && window > 0 {
+            let cap = core::cmp::min(self.proxy_buffer.size(), core::cmp::min(max, window));
+
+            let mut packet = self.make_ack_packet(cap, TcpFlags::empty());
+
+            self.proxy_buffer
+                .read_data(&mut packet.data_mut()[..cap])
+                .expect("[ NET ] Unexpected signal in process_ack");
+
+            //logln4!("send ack");
+            self.send_packet(packet, true);
+
+            window = self.ctl.available_window();
+        }
+
+        self.proxy_buffer.writers_queue().notify_one();
+    }
+
     fn process_ack(&mut self, header: &TcpHeader) {
         if self.ctl.snd_una != header.ack_nr() {
             //TODO: Do a better check here (in case of wrap around)
@@ -361,26 +388,7 @@ impl SocketData {
 
             self.ctl.snd_una = header.ack_nr();
 
-            let mut window = self.ctl.available_window();
-
-            let max = 1460usize;
-
-            while self.proxy_buffer.has_data() && window > 0 {
-                let cap = core::cmp::min(self.proxy_buffer.size(), core::cmp::min(max, window));
-
-                let mut packet = self.make_ack_packet(cap, TcpFlags::empty());
-
-                self.proxy_buffer
-                    .read_data(&mut packet.data_mut()[..cap])
-                    .expect("[ NET ] Unexpected signal in process_ack");
-
-                //logln4!("send ack");
-                self.send_packet(packet, true);
-
-                window = self.ctl.available_window();
-            }
-
-            self.proxy_buffer.writers_queue().notify_one();
+            self.drain_proxy_buffer();
         }
     }
 
@@ -449,7 +457,7 @@ impl SocketData {
                 logln_disabled!("[ TCP ] Connection established");
                 self.state = State::Established;
 
-                self.proxy_buffer.writers_queue().notify_all();
+                self.drain_proxy_buffer();
             }
             (_, true) => {
                 logln_disabled!("[ TCP ] RST Received, Listening");
@@ -471,13 +479,14 @@ impl SocketData {
 
                 self.update_rcv_next(packet);
 
+                self.state = State::Established;
                 logln5!("[ TCP ] Connection Established");
 
                 self.conn_timer().reset();
 
                 self.send_ack();
 
-                self.state = State::Established;
+                self.drain_proxy_buffer();
             }
             _ => {}
         }
@@ -974,8 +983,7 @@ impl INode for Socket {
             Ok(buf.len())
         } else {
             logln5!("write before connected");
-            // Buffer data for when connection is ready?
-            Err(FsError::NotSupported)
+            Ok(data.proxy_buffer.append_data(buf)?)
         }
     }
 

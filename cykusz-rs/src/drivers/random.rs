@@ -5,20 +5,30 @@ use crate::kernel::fs::inode::INode;
 
 use rand;
 use rand::{RngCore, SeedableRng};
+use crate::kernel::sync::Spin;
+use crate::kernel::timer::current_ns;
 
 struct Random {
     id: usize,
     name: String,
     sref: Weak<Random>,
+    rng: Spin<rand::prelude::StdRng>,
 }
 
 impl Random {
     fn new(name: String) -> Arc<Random> {
+        let mut seed: [u8; 32] = [0; 32];
+
+        for s in &mut seed {
+            *s = current_ns() as u8;
+        }
+
         Arc::new_cyclic(|me| {
             Random {
                 id: crate::kernel::device::alloc_id(),
                 name,
-                sref: me.clone()
+                sref: me.clone(),
+                rng: Spin::new(rand::prelude::StdRng::from_seed(seed)),
             }
         })
     }
@@ -30,9 +40,7 @@ impl Random {
 
 impl INode for Random {
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> crate::kernel::fs::vfs::Result<usize> {
-        let mut rnd = rand::prelude::StdRng::from_seed(Default::default());
-
-        rnd.fill_bytes(buf);
+        self.rng.lock().fill_bytes(buf);
 
         Ok(buf.len())
     }

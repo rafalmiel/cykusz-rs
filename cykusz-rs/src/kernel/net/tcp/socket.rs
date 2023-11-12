@@ -889,8 +889,12 @@ impl Socket {
         self.self_ref.upgrade().unwrap()
     }
 
-    fn read(&self, offset: usize, buf: &mut [u8], flags: MsgFlags) -> SyscallResult {
+    fn read(&self, offset: usize, buf: &mut [u8], flags: MsgFlags) -> Result<usize> {
         Ok(self.in_buffer.read_data_from(offset, buf, flags.contains(MsgFlags::MSG_PEEK))?)
+    }
+
+    fn update_window(&self) {
+        self.data.lock().send_ack();
     }
 }
 
@@ -907,25 +911,16 @@ impl INode for Socket {
     }
 
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        logln5!("read at before lock!");
-        let data = self.data.lock();
-        logln5!("read at after lock!");
+        //let data = self.data.lock();
+        //if data.is_listening() {
+        //    return Err(FsError::NotSupported);
+        //}
+        //drop(data);
+        let r = self.read(0, buf, MsgFlags::empty())?;
 
-        if data.is_listening() {
-            return Err(FsError::NotSupported);
+        if r > 0 {
+            self.update_window();
         }
-
-        drop(data);
-
-        let wnd_update = self.in_buffer.available_size() == 0;
-
-        let r = self.in_buffer.read_data(buf)?;
-
-        if wnd_update {
-            self.data.lock().send_ack();
-        }
-
-        logln5!("[ TCP ] Read {} bytes", r);
 
         Ok(r)
     }
@@ -1148,7 +1143,6 @@ impl SocketService for Socket {
     }
 
     fn msg_recv(&self, hdr: &mut MsgHdr, flags: MsgFlags) -> SyscallResult {
-        logln5!("sock msg recv! num_iovecs: {} {:?}", hdr.msg_iovlen, flags);
         let iovecs = hdr.iovecs_mut();
 
         let mut total = 0;
@@ -1167,14 +1161,16 @@ impl SocketService for Socket {
             let read = self.read(offset, iovec.get_bytes_mut(), flags)?;
 
             if read == 0 {
-                logln5!("msg_recv total {}", total);
                 return Ok(total);
             }
 
             total += read
         }
 
-        logln5!("msg_recv total2 {}", total);
+        if total > 0 && flags.contains(MsgFlags::MSG_PEEK) {
+            self.update_window();
+        }
+
         return Ok(total);
     }
 

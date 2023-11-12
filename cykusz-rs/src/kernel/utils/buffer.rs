@@ -155,31 +155,41 @@ impl BufferQueue {
         self.buffer.lock().size()
     }
 
-    pub fn read_data(&self, buf: &mut [u8]) -> SignalResult<usize> {
+    pub fn read_data_from(&self, offset: usize, buf: &mut [u8], transient: bool) -> SignalResult<usize> {
+        if offset > 0 && !transient {
+            return Ok(0);
+        }
+
         let mut buffer = self
             .reader_queue
             .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| {
-                lck.has_data() || self.shutting_down()
+                lck.has_data() || self.shutting_down() || offset > 0
             })?
             .unwrap();
 
-        logln4!("reading data {}", buf.len());
-        let read = buffer.read_data(buf);
-        logln4!("data read");
+        let read = if transient {
+            buffer.read_data_transient_from(offset, buf)
+        } else {
+            buffer.read_data(buf)
+        };
 
         drop(buffer);
 
-        if read > 0 {
+        if !transient && read > 0 {
             self.writer_queue.notify_one();
         }
 
         Ok(read)
     }
 
+    pub fn read_data(&self, buf: &mut [u8]) -> SignalResult<usize> {
+        self.read_data_from(0, buf, false)
+    }
+
     pub fn try_read_data_transient(&self, buf: &mut [u8]) -> usize {
         let buffer = self.buffer.lock();
 
-        buffer.read_data_transient(buf)
+        buffer.read_data_transient_from(0, buf)
     }
 
     pub fn try_read_data(&self, buf: &mut [u8]) -> usize {
@@ -325,8 +335,14 @@ impl Buffer {
         amount
     }
 
-    pub fn read_data_transient(&self, buf: &mut [u8]) -> usize {
-        if (self.r == self.w && !self.full) || buf.is_empty() {
+    pub fn read_data_transient_from(&self, offset: usize, buf: &mut [u8]) -> usize {
+        if offset > self.size() {
+            return 0;
+        }
+
+        let r = (self.r + offset) & self.data.len();
+
+        if (r == self.w && !self.full && offset == 0) || buf.is_empty() {
             return 0;
         }
 
@@ -340,7 +356,7 @@ impl Buffer {
             let to_read = core::cmp::min(right, buf.len());
             buf[..to_read].copy_from_slice(&self.data.as_slice()[self.r..self.r + to_read]);
             let read = if to_read < buf.len() {
-                self.read_data_transient(&mut buf[to_read..])
+                self.read_data_transient_from(to_read, &mut buf[to_read..])
             } else {
                 0
             };

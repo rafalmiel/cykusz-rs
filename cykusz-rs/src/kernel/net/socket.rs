@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-use syscall_defs::net::{MsgHdr, SockAddr, SockDomain, SockOption, SockType, SockTypeFlags};
+use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockType, SockTypeFlags};
 use syscall_defs::SyscallError::ENOTSUP;
 use syscall_defs::{SyscallError, SyscallResult};
 
@@ -8,10 +8,11 @@ use crate::kernel::net::ip::{Ip, Ip4};
 use crate::kernel::net::Packet;
 
 pub fn new(domain: SockDomain, typ: SockTypeFlags) -> Result<Arc<dyn INode>, SyscallError> {
-    logln4!("new socket: {:?} {:?}", domain, typ);
     if domain != SockDomain::AfInet {
         return Err(SyscallError::ENOTSUP);
     }
+
+    logln4!("new socket: {:?} {:?}", domain, SockType::from(typ));
 
     match SockType::from(typ) {
         SockType::Stream => Ok(crate::kernel::net::tcp::socket::Socket::new_unbound()),
@@ -44,11 +45,11 @@ pub trait SocketService: Sync + Send {
         Err(SyscallError::EOPNOTSUPP)
     }
 
-    fn msg_send(&self, _hdr: &MsgHdr, _flags: i32) -> SyscallResult {
+    fn msg_send(&self, _hdr: &MsgHdr, _flags: MsgFlags) -> SyscallResult {
         Err(SyscallError::EOPNOTSUPP)
     }
 
-    fn msg_recv(&self, _hdr: &mut MsgHdr, _flags: i32) -> SyscallResult {
+    fn msg_recv(&self, _hdr: &mut MsgHdr, _flags: MsgFlags) -> SyscallResult {
         Err(SyscallError::EOPNOTSUPP)
     }
 

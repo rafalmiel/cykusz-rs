@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
-use syscall_defs::net::{MsgHdr, SockAddr, SockDomain, SockOption, SockTypeFlags};
+use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockTypeFlags};
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
@@ -812,6 +812,7 @@ pub fn sys_listen(fd: u64, backlog: u64) -> SyscallResult {
 }
 
 pub fn sys_msg_recv(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
+    logln5!("sys_msg_recv fd: {} hdr: {:#x}, flags: {:#x}", sockfd, hdr, flags);
     if hdr == 0 {
         return Err(SyscallError::EINVAL);
     }
@@ -820,10 +821,13 @@ pub fn sys_msg_recv(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
 
     let sock = get_socket(sockfd as usize)?;
 
-    sock.msg_recv(hdr, flags as i32)
+    logln5!("msg_recv got socket!");
+
+    sock.msg_recv(hdr, MsgFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?)
 }
 
 pub fn sys_msg_send(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
+    logln5!("sys_msg_send {} {:#x} {:#x}", sockfd, hdr, flags);
     if hdr == 0 {
         return Err(SyscallError::EINVAL);
     }
@@ -832,7 +836,9 @@ pub fn sys_msg_send(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
 
     let sock = get_socket(sockfd as usize)?;
 
-    sock.msg_send(hdr, flags as i32)
+    logln5!("sys_msg_send got socket!");
+
+    sock.msg_send(hdr, MsgFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?)
 }
 
 pub fn sys_setsockopt(fd: u64, layer: u64, number: u64, buffer: u64, size: u64) -> SyscallResult {
@@ -954,6 +960,7 @@ pub fn sys_select(
                     .inode()
                     .poll(if first { Some(&mut poll_table) } else { None }, *flags)
                 {
+                    logln5!("select found flags {:?}", f);
                     if !f.is_empty() {
                         let mut did_found = false;
 
@@ -987,6 +994,7 @@ pub fn sys_select(
             "select await io timeout: {:?}",
             timeout.and_then(|t| Some(t.to_nanoseconds()))
         );
+        logln5!("select found {}, timed_out: {}", found, timed_out);
         if found == 0 && !timed_out {
             task.await_io_timeout(
                 timeout.and_then(|t| Some(t.to_nanoseconds())),
@@ -1405,6 +1413,10 @@ pub fn sys_dup(fd: u64, flags: u64) -> SyscallResult {
 
 pub fn sys_dup2(fd: u64, new_fd: u64, flags: u64) -> SyscallResult {
     let task = current_task_ref();
+
+    if fd == new_fd {
+        return Ok(fd as usize);
+    }
 
     let flags =
         OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)? & OpenFlags::CLOEXEC;

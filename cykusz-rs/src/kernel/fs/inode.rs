@@ -152,6 +152,7 @@ pub trait INode: Send + Sync + DowncastSync {
     }
 
     fn as_socket(&self) -> Option<Arc<dyn SocketService>> {
+        logln5!("as_socket default impl!!!!!!!!!");
         None
     }
 

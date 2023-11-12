@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicU32;
 use core::sync::atomic::Ordering;
-use syscall_defs::net::{MsgHdr, NetU16, SockAddr, SockOption};
+use syscall_defs::net::{MsgFlags, MsgHdr, NetU16, SockAddr, SockOption};
 
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
@@ -265,7 +265,8 @@ impl SocketService for Socket {
         Ok(0)
     }
 
-    fn msg_send(&self, hdr: &MsgHdr, _flags: i32) -> SyscallResult {
+    fn msg_send(&self, hdr: &MsgHdr, _flags: MsgFlags) -> SyscallResult {
+        logln5!("UDP msg_send???");
         let dest = if let Some(addr) = hdr.sock_addr() {
             let addr_in = addr.as_sock_addr_in();
             Some((addr_in.port() as u32, addr_in.sin_addr.s_addr.into()))
@@ -289,7 +290,8 @@ impl SocketService for Socket {
         }
     }
 
-    fn msg_recv(&self, hdr: &mut MsgHdr, _flags: i32) -> SyscallResult {
+    fn msg_recv(&self, hdr: &mut MsgHdr, _flags: MsgFlags) -> SyscallResult {
+        logln5!("UDP msg_recv???");
         let mut data = self
             .buffer_wq
             .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |l| !l.is_empty())?

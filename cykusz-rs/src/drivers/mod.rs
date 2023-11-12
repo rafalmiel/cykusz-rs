@@ -5,6 +5,7 @@ pub mod multiboot2;
 pub mod net;
 pub mod pci;
 pub mod ps2;
+pub mod random;
 pub mod tty;
 pub mod video;
 

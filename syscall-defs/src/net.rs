@@ -1,6 +1,6 @@
 use crate::SyscallError;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct SockTypeFlags(u64);
 
 impl SockTypeFlags {
@@ -15,6 +15,28 @@ bitflags! {
         const CLOEXEC = 0x20000;
     }
 }
+
+bitflags! {
+    pub struct MsgFlags: u64 {
+        const MSG_CTRUNC = 0x1;
+        const MSG_DONTROUTE = 0x2;
+        const MSG_EOR = 0x4;
+        const MSG_OOB = 0x8;
+        const MSG_NOSIGNAL = 0x10;
+        const MSG_PEEK = 0x20;
+        const MSG_TRUNC = 0x40;
+        const MSG_WAITALL = 0x80;
+        const MSG_FIN = 0x200;
+        const MSG_CONFIRM = 0x800;
+
+        // Linux extensions.
+        const MSG_DONTWAIT = 0x1000;
+        const MSG_CMSG_CLOEXEC = 0x2000;
+        const MSG_MORE = 0x4000;
+        const MSG_FASTOPEN = 0x20000000;
+    }
+}
+
 #[repr(u64)]
 #[derive(Debug, Copy, Clone)]
 pub enum SockType {

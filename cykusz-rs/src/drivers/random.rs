@@ -1,12 +1,12 @@
-use alloc::string::String;
-use alloc::sync::{Arc, Weak};
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
+use alloc::string::String;
+use alloc::sync::{Arc, Weak};
 
-use rand;
-use rand::{RngCore, SeedableRng};
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::current_ns;
+use rand;
+use rand::{RngCore, SeedableRng};
 
 struct Random {
     id: usize,
@@ -23,13 +23,11 @@ impl Random {
             *s = current_ns() as u8;
         }
 
-        Arc::new_cyclic(|me| {
-            Random {
-                id: crate::kernel::device::alloc_id(),
-                name,
-                sref: me.clone(),
-                rng: Spin::new(rand::prelude::StdRng::from_seed(seed)),
-            }
+        Arc::new_cyclic(|me| Random {
+            id: crate::kernel::device::alloc_id(),
+            name,
+            sref: me.clone(),
+            rng: Spin::new(rand::prelude::StdRng::from_seed(seed)),
         })
     }
 

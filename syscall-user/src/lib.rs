@@ -220,7 +220,14 @@ pub fn sync() -> SyscallResult {
 }
 
 pub fn chdir(path: &str) -> SyscallResult {
-    unsafe { syscall3(SYS_CHDIR, OpenFD::Cwd.into(), path.as_ptr() as usize, path.len()) }
+    unsafe {
+        syscall3(
+            SYS_CHDIR,
+            OpenFD::Cwd.into(),
+            path.as_ptr() as usize,
+            path.len(),
+        )
+    }
 }
 
 pub fn getcwd(buf: &mut [u8]) -> SyscallResult {
@@ -467,7 +474,6 @@ pub fn sigaction(
     mut sigaction: Option<&mut syscall_defs::signal::SigAction>,
     old_sigaction: Option<&mut syscall_defs::signal::SigAction>,
 ) -> SyscallResult {
-
     if let Some(ref mut sig) = sigaction {
         sig.sa_restorer = sigreturn as u64;
     }

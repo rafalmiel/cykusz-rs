@@ -1,5 +1,7 @@
 use alloc::sync::Arc;
-use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockType, SockTypeFlags};
+use syscall_defs::net::{
+    MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockType, SockTypeFlags,
+};
 use syscall_defs::SyscallError::ENOTSUP;
 use syscall_defs::{SyscallError, SyscallResult};
 

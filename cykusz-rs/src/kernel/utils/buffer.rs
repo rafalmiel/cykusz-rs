@@ -155,7 +155,12 @@ impl BufferQueue {
         self.buffer.lock().size()
     }
 
-    pub fn read_data_from(&self, offset: usize, buf: &mut [u8], transient: bool) -> SignalResult<usize> {
+    pub fn read_data_from(
+        &self,
+        offset: usize,
+        buf: &mut [u8],
+        transient: bool,
+    ) -> SignalResult<usize> {
         if offset > 0 && !transient {
             return Ok(0);
         }

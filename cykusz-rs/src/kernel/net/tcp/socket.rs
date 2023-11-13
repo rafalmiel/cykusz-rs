@@ -154,7 +154,11 @@ impl SocketData {
         }
     }
 
-    pub fn new_connected(from: &SocketData, packet: Packet<Tcp>, socket: &Weak<Socket>) -> SocketData {
+    pub fn new_connected(
+        from: &SocketData,
+        packet: Packet<Tcp>,
+        socket: &Weak<Socket>,
+    ) -> SocketData {
         let mut data = SocketData {
             proxy_buffer: BufferQueue::new_empty(),
             snd_buffer: Buffer::new_empty(),
@@ -263,7 +267,9 @@ impl SocketData {
 
                 hdr.set_seq_nr(self.ctl.snd_una + o as u32);
 
-                len = self.snd_buffer.read_data_transient_from(0, &mut data[..len]);
+                len = self
+                    .snd_buffer
+                    .read_data_transient_from(0, &mut data[..len]);
 
                 packet.data_mut().copy_from_slice(&data[..len]);
 
@@ -400,8 +406,10 @@ impl SocketData {
 
         out_hdr.set_seq_nr(self.ctl.snd_nxt);
         out_hdr.set_urgent_ptr(0);
-        out_hdr
-            .set_window(core::cmp::min(u16::MAX as usize, self.socket().in_buffer().available_size()) as u16);
+        out_hdr.set_window(core::cmp::min(
+            u16::MAX as usize,
+            self.socket().in_buffer().available_size(),
+        ) as u16);
 
         out_hdr.set_flags(flags);
 
@@ -686,10 +694,7 @@ impl SocketData {
                     hdr.seq_nr()
                 );
 
-                logln_disabled!(
-                    "[ TCP ] Available buffer: {}",
-                    in_buffer.available_size()
-                );
+                logln_disabled!("[ TCP ] Available buffer: {}", in_buffer.available_size());
 
                 //self.send_ack();
                 //self.send_ack();
@@ -828,7 +833,7 @@ impl Socket {
             self_ref: me.clone(),
         });
 
-        sock.in_buffer.init_size(4096*18);
+        sock.in_buffer.init_size(4096 * 18);
         sock.init(false);
 
         sock
@@ -839,7 +844,7 @@ impl Socket {
     }
 
     fn in_buffer(&self) -> &BufferQueue {
-        return &self.in_buffer
+        return &self.in_buffer;
     }
 
     pub fn ack_connection(&self) {
@@ -899,7 +904,9 @@ impl Socket {
     }
 
     fn read(&self, offset: usize, buf: &mut [u8], flags: MsgFlags) -> Result<usize> {
-        Ok(self.in_buffer.read_data_from(offset, buf, flags.contains(MsgFlags::MSG_PEEK))?)
+        Ok(self
+            .in_buffer
+            .read_data_from(offset, buf, flags.contains(MsgFlags::MSG_PEEK))?)
     }
 
     fn update_window(&self) {
@@ -1038,7 +1045,7 @@ impl INode for Socket {
     }
 
     fn close(&self, _flags: OpenFlags) {
-        self.data.lock().close();
+        //self.data.lock().close();
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
@@ -1212,6 +1219,7 @@ impl SocketService for Socket {
 
 impl Drop for Socket {
     fn drop(&mut self) {
+        self.data.lock().close();
         logln_disabled!("[ TCP ] Socket Removed");
     }
 }

@@ -1,15 +1,14 @@
-use crate::drivers::ps2::controller;
-use crate::drivers::ps2::ConfigFlags;
-use crate::drivers::ps2::PS2Controller;
+use crate::arch::int;
 use crate::drivers::ps2::PS;
+use crate::drivers::ps2::{controller, Command, Error};
 
 pub mod handler;
 mod scancode;
 
 #[repr(u8)]
 #[allow(dead_code)]
+#[derive(Debug, Copy, Clone)]
 enum KeyboardCommand {
-    Identify = 0xF2,
     EnableReporting = 0xF4,
     SetDefaultsDisable = 0xF5,
     SetDefaults = 0xF6,
@@ -17,90 +16,97 @@ enum KeyboardCommand {
 }
 
 #[repr(u8)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone, Debug)]
 #[allow(dead_code)]
 enum KeyboardCommandData {
     ScancodeSet = 0xF0,
 }
 
 impl PS {
-    fn keyboard_command_inner(&self, command: u8) -> u8 {
-        let mut ret = 0xFE;
-        for i in 0..4 {
-            self.write(command);
-            ret = self.read();
-            if ret == 0xFE {
-                println!("ps2d: retry keyboard command {:X}: {}", command, i);
-            } else {
-                break;
-            }
+    fn keyboard_command_inner(&self, command: u8) -> Result<u8, Error> {
+        self.write(command)?;
+        match self.read()? {
+            0xFE => Err(Error::CommandRetry),
+            value => Ok(value),
         }
-        ret
     }
 
-    fn keyboard_command(&self, command: KeyboardCommand) -> u8 {
-        self.keyboard_command_inner(command as u8)
+    fn keyboard_command(&self, command: KeyboardCommand) -> Result<u8, Error> {
+        self.retry(format_args!("keyboard command {:?}", command), 4, |x| {
+            x.keyboard_command_inner(command as u8)
+        })
     }
 
     #[allow(dead_code)]
-    fn keyboard_command_data(&self, command: KeyboardCommandData, data: u8) -> u8 {
-        let res = self.keyboard_command_inner(command as u8);
-        if res != 0xFA {
-            return res;
-        }
-        self.write(data as u8);
-        let res = self.read();
-        res
+    fn keyboard_command_data(&self, command: KeyboardCommandData, data: u8) -> Result<u8, Error> {
+        self.retry(
+            format_args!("keyboard command {:?} {:#x}", command, data),
+            4,
+            |x| {
+                let res = x.keyboard_command_inner(command as u8)?;
+                if res != 0xFA {
+                    //TODO: error?
+                    return Ok(res);
+                }
+                x.write(data)?;
+                x.read()
+            },
+        )
     }
 }
 
-fn init() {
-    handler::init();
-
-    let ctrl = controller();
-
-    use crate::arch::int;
-
-    int::disable();
-
-    if ctrl.keyboard_command(KeyboardCommand::Reset) == 0xFA {
-        if ctrl.read() != 0xAA {
-            println!("Keyboard self test failed");
-        }
-    } else {
-        println!("Keyboard failed to reset");
-    }
-
-    ctrl.flush_read();
-
-    if ctrl.keyboard_command(KeyboardCommand::SetDefaultsDisable) != 0xFA {
-        println!("Keyboard scanning disabled failed");
-    }
-
-    ctrl.flush_read();
-
-    if ctrl.keyboard_command(KeyboardCommand::EnableReporting) != 0xFA {
-        println!("Keyboard failed to enable reporting");
-    }
-
+fn setup_interrupts() {
     use crate::arch::idt;
 
     int::set_irq_dest(1, 33);
     idt::add_shared_irq_handler(33, keyboard_interrupt);
+}
+
+pub fn init() -> Result<(), Error> {
+    handler::init();
+
+    let ps = controller();
 
     {
-        let mut config = ctrl.config();
-        config.remove(ConfigFlags::FIRST_DISABLED);
-        config.remove(ConfigFlags::FIRST_TRANSLATE); // Use scancode set 2
-        config.insert(ConfigFlags::FIRST_INTERRUPT);
-        ctrl.set_config(config);
+        ps.command(Command::EnableFirst)?;
+        ps.flush_read();
     }
 
-    ctrl.flush_read();
+    {
+        let r = ps.keyboard_command(KeyboardCommand::Reset)?;
+        if r == 0xFA {
+            let b = ps.read().unwrap_or(0);
+            if b != 0xAA {
+                logln6!("ps2: keyboard faield to self test");
+            }
+        } else {
+            logln6!("ps2: keyboard failed to reset");
+        }
 
-    println!("[ OK ] Keyboard Initialised");
+        ps.flush_read();
+    }
 
-    int::enable();
+    ps.retry(format_args!("keyboard defaults"), 4, |x| {
+        x.flush_read();
+
+        let b = x.keyboard_command(KeyboardCommand::SetDefaultsDisable)?;
+
+        if b != 0xFA {
+            return Err(Error::CommandRetry);
+        }
+
+        x.flush_read();
+
+        Ok(b)
+    })?;
+
+    {
+        ps.keyboard_command_inner(KeyboardCommand::EnableReporting as u8)?;
+    }
+
+    setup_interrupts();
+
+    Ok(())
 }
 
 fn keyboard_interrupt() -> bool {
@@ -108,5 +114,3 @@ fn keyboard_interrupt() -> bool {
 
     true
 }
-
-module_init!(init);

@@ -5,8 +5,8 @@ use alloc::vec::Vec;
 
 use core::ops::Range;
 
-use syscall_defs::{MMapFlags, MMapProt};
 use syscall_defs::exec::ExeArgs;
+use syscall_defs::{MMapFlags, MMapProt};
 
 use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
@@ -707,7 +707,10 @@ impl VMData {
                     .find(|(_, &e)| e == b'\n')
                     .and_then(|(idx, _)| Some(&data[2..idx]))?;
 
-                let path = core::str::from_utf8(interp).ok()?.split_whitespace().collect::<Vec<&str>>();
+                let path = core::str::from_utf8(interp)
+                    .ok()?
+                    .split_whitespace()
+                    .collect::<Vec<&str>>();
 
                 if path.is_empty() {
                     return None;

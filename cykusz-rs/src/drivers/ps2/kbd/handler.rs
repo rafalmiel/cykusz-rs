@@ -1,4 +1,4 @@
-use crate::drivers::ps2::{controller, PS2Controller};
+use crate::drivers::ps2::{controller, Error};
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::buffer::BufferQueue;
 use alloc::string::String;
@@ -100,19 +100,17 @@ impl State {
 static KEYBOARD: Once<Arc<KbdState>> = Once::new();
 
 impl KbdState {
-    fn handle_interrupt(&self) {
-        let data = controller().read();
+    fn handle_interrupt(&self) -> Result<(), Error> {
+        let data = controller().read()?;
 
         let mut state = self.state.lock_irq();
 
         match data {
             0xf0 => {
                 state.f = true;
-                return;
             }
             0xe0 => {
                 state.e = true;
-                return;
             }
             _ => {
                 let released = state.f;
@@ -157,6 +155,7 @@ impl KbdState {
                 }
             }
         }
+        return Ok(());
     }
 }
 
@@ -179,5 +178,7 @@ pub fn init() {
 }
 
 pub fn handle_interrupt() {
-    keyboard().handle_interrupt()
+    if let Err(e) = keyboard().handle_interrupt() {
+        logln6!("kbd interrupt error: {:?}", e);
+    }
 }

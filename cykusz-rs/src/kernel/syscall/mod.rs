@@ -98,8 +98,8 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_TRUNCATE => sys::sys_truncate(a, b),
         SYS_READLINK => sys::sys_readlink(a, b, c, d, e, f),
         SYS_YIELD => sys::sys_yield(),
-        SYS_CHMOD => sys::sys_chmod(a, b, c, d,e),
-        SYS_UTIME => sys::sys_utime(a, b, c, d,e),
+        SYS_CHMOD => sys::sys_chmod(a, b, c, d, e),
+        SYS_UTIME => sys::sys_utime(a, b, c, d, e),
         a => {
             logln!("NO SYS????? {}", a);
             Err(SyscallError::ENOSYS)

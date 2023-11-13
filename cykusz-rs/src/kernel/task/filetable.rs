@@ -366,16 +366,19 @@ impl FileTable {
     pub fn close_on_exec(&self) {
         let mut files = self.files.write();
 
-        files.iter_mut().filter(|p| {
-            if let Some(p) = p {
-                p.fd_flags().contains(FDFlags::FD_CLOEXEC)
-            } else {
-                false
-            }
-        }).for_each(|f| {
-            // inode.close() called on FileHandle Drop
-            *f = None;
-        });
+        files
+            .iter_mut()
+            .filter(|p| {
+                if let Some(p) = p {
+                    p.fd_flags().contains(FDFlags::FD_CLOEXEC)
+                } else {
+                    false
+                }
+            })
+            .for_each(|f| {
+                // inode.close() called on FileHandle Drop
+                *f = None;
+            });
     }
 
     pub fn close_all_files(&self) {

@@ -4,9 +4,9 @@ use core::ops::{Deref, DerefMut};
 use intrusive_collections::LinkedList;
 
 use syscall_defs::poll::PollEventFlags;
-use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::stat::Mode;
 use syscall_defs::time::Timespec;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::arch::mm::PAGE_SIZE;
 use crate::kernel::fs::cache::Cacheable;
@@ -926,7 +926,12 @@ impl INode for LockedExt2INode {
     }
 
     fn utime(&self, times: &[Timespec; 2]) -> Result<()> {
-        logln5!("times: {:?} {} {}", times, times[0].is_now(), times[1].is_now());
+        logln5!(
+            "times: {:?} {} {}",
+            times,
+            times[0].is_now(),
+            times[1].is_now()
+        );
         let mut node = self.d_inode_writer();
 
         if !times[0].is_omit() {

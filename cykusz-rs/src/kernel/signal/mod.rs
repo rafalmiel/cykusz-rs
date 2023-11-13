@@ -82,9 +82,7 @@ pub struct SignalEntry {
 }
 
 impl SignalEntry {
-    pub fn from_sigaction(
-        act: SigAction,
-    ) -> core::result::Result<SignalEntry, SyscallError> {
+    pub fn from_sigaction(act: SigAction) -> core::result::Result<SignalEntry, SyscallError> {
         Ok(SignalEntry {
             handler: SignalHandler::from(act.sa_handler),
             flags: SignalFlags::from_bits(act.sa_flags).ok_or(SyscallError::EINVAL)?,

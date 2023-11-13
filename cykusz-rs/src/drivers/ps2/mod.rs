@@ -1,9 +1,23 @@
+use core::hint::spin_loop;
 use spin::Once;
 
-use crate::drivers::ps2::Command::{DisableFirst, DisableSecond};
+use crate::kernel::sync::IrqGuard;
 
 mod i8042;
 pub mod kbd;
+pub mod mouse;
+
+fn pause() {
+    spin_loop();
+}
+
+#[derive(Debug)]
+pub enum Error {
+    CommandRetry,
+    NoMoreTries,
+    ReadTimeout,
+    WriteTimeout,
+}
 
 pub trait PS2Controller: Sync {
     fn write(&self, byte: u8);
@@ -73,92 +87,165 @@ pub enum Command {
 }
 
 impl PS {
-    fn wait_write(&self) {
-        while self.status().contains(StatusFlags::INPUT_FULL) {}
+    fn wait_write(&self) -> Result<(), Error> {
+        let mut timeout = 1_000_000;
+        while timeout > 0 {
+            if !self.status().contains(StatusFlags::INPUT_FULL) {
+                return Ok(());
+            }
+            pause();
+            timeout -= 1;
+        }
+        Err(Error::WriteTimeout)
     }
 
-    fn wait_read(&self) {
-        while !self.status().contains(StatusFlags::OUTPUT_FULL) {}
+    fn wait_read(&self) -> Result<(), Error> {
+        let mut timeout = 1_000_000;
+        while timeout > 0 {
+            if self.status().contains(StatusFlags::OUTPUT_FULL) {
+                return Ok(());
+            }
+            pause();
+            timeout -= 1;
+        }
+        Err(Error::ReadTimeout)
     }
 
     fn flush_read(&self) {
-        while self.status().contains(StatusFlags::OUTPUT_FULL) {
-            let _ = self.read();
+        let mut timeout = 100;
+        while timeout > 0 && self.status().contains(StatusFlags::OUTPUT_FULL) {
+            let _ = self.ops.read();
+            pause();
+            timeout -= 1;
         }
     }
 
-    fn config(&self) -> ConfigFlags {
-        self.command(Command::ReadConfig);
-        ConfigFlags::from_bits_truncate(self.read())
+    #[allow(dead_code)]
+    fn config(&self) -> Result<ConfigFlags, Error> {
+        self.retry(format_args!("read config"), 4, |x| {
+            x.command(Command::ReadConfig)?;
+            x.read()
+        })
+        .map(ConfigFlags::from_bits_truncate)
     }
 
-    fn set_config(&self, config: ConfigFlags) {
-        self.command(Command::WriteConfig);
-        self.write(config.bits());
+    fn set_config(&self, config: ConfigFlags) -> Result<(), Error> {
+        self.retry(format_args!("read config"), 4, |x| {
+            x.command(Command::WriteConfig)?;
+            x.write(config.bits())?;
+            Ok(0)
+        })?;
+        Ok(())
     }
-}
 
-impl PS2Controller for PS {
-    fn write(&self, byte: u8) {
-        self.wait_write();
+    fn write(&self, byte: u8) -> Result<(), Error> {
+        self.wait_write()?;
         self.ops.write(byte);
+        Ok(())
     }
 
-    fn read(&self) -> u8 {
-        self.wait_read();
-        self.ops.read()
+    fn read(&self) -> Result<u8, Error> {
+        self.wait_read()?;
+        Ok(self.ops.read())
     }
 
-    fn command(&self, byte: Command) {
-        self.wait_write();
-        self.ops.command(byte)
+    fn command(&self, byte: Command) -> Result<(), Error> {
+        self.wait_write()?;
+        self.ops.command(byte);
+        Ok(())
     }
 
     fn status(&self) -> StatusFlags {
         self.ops.status()
     }
+
+    fn retry<F: Fn(&Self) -> Result<u8, Error>>(
+        &self,
+        name: core::fmt::Arguments,
+        retries: usize,
+        f: F,
+    ) -> Result<u8, Error> {
+        let mut res = Err(Error::NoMoreTries);
+        for retry in 0..retries {
+            res = f(self);
+            match res {
+                Ok(ok) => {
+                    return Ok(ok);
+                }
+                Err(ref err) => {
+                    logln6!("ps2d: {}: retry {}/{}: {:?}", name, retry + 1, retries, err);
+                }
+            }
+        }
+        res
+    }
 }
 
-fn init() {
-    let ctrl = controller();
+fn init() -> Result<(), Error> {
+    let _irq = IrqGuard::new();
 
-    ctrl.flush_read();
+    let ps = controller();
 
-    ctrl.command(DisableFirst);
-    ctrl.command(DisableSecond);
-
-    ctrl.flush_read();
+    ps.flush_read();
 
     {
-        let mut config = ctrl.config();
-        config.insert(ConfigFlags::FIRST_DISABLED);
-        config.insert(ConfigFlags::SECOND_DISABLED);
-        config.remove(ConfigFlags::FIRST_INTERRUPT);
-        config.remove(ConfigFlags::SECOND_INTERRUPT);
-        ctrl.set_config(config);
+        ps.command(Command::DisableFirst)?;
+        ps.command(Command::DisableSecond)?;
+
+        ps.flush_read();
     }
 
-    ctrl.command(Command::TestController);
-    let read = ctrl.read();
-    if read != 0x55 {
-        panic!(
-            "[ ERROR ] Could not initialise PS/2 - Self Test Failed (got: 0x{:x})",
-            read
-        );
+    let mut config;
+    {
+        config =
+            ConfigFlags::POST_PASSED | ConfigFlags::FIRST_DISABLED | ConfigFlags::SECOND_DISABLED;
+        ps.set_config(config)?;
+
+        ps.flush_read();
     }
 
-    ctrl.command(Command::EnableFirst);
-    //ctrl.command(Command::EnableSecond);
+    let keyboard_found = kbd::init().is_ok();
 
-    ctrl.flush_read();
+    if !keyboard_found {
+        panic!("no keyboard!");
+    }
+
+    let (mouse_found, _mouse_extra) = match mouse::init() {
+        Err(_) | Ok((false, _)) => (false, false),
+        Ok((true, extra)) => (true, extra),
+    };
+
+    {
+        if keyboard_found {
+            config.remove(ConfigFlags::FIRST_DISABLED);
+            config.insert(ConfigFlags::FIRST_INTERRUPT);
+        } else {
+            config.insert(ConfigFlags::FIRST_DISABLED);
+            config.remove(ConfigFlags::FIRST_INTERRUPT);
+        }
+        if mouse_found {
+            config.remove(ConfigFlags::SECOND_DISABLED);
+            config.insert(ConfigFlags::SECOND_INTERRUPT);
+        } else {
+            config.insert(ConfigFlags::SECOND_DISABLED);
+            config.remove(ConfigFlags::SECOND_INTERRUPT);
+        }
+        if let Err(e) = ps.set_config(config) {
+            logln6!("ps2: Failed to set config: {:?}", e);
+        }
+    }
+
+    ps.flush_read();
+
+    Ok(())
 }
 
 fn ps2_init() {
     i8042::init();
 
-    init();
-
-    println!("[ OK ] PS/2 Initialised");
+    if let Ok(()) = init() {
+        println!("[ OK ] PS/2 Initialised");
+    }
 }
 
 platform_init!(ps2_init);

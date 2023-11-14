@@ -247,8 +247,21 @@ bitflags! {
         const TRUNC       = 0x0200;
         const NONBLOCK    = 0x0400;
         const DSYNC       = 0x0800;
+        const RSYNC       = 0x1000;
+        const SYNC        = 0x2000;
         const CLOEXEC     = 0x4000;
         const PATH        = 0x8000;
+        const LARGEFILE   = 0x10000;
+        const NOATIME     = 0x20000;
+        const ASYNC       = 0x40000;
+        const TMPFILE     = 0x80000;
+        const DIRECT      = 0x100000;
+    }
+}
+
+impl OpenFlags {
+    pub fn set_fd_flags_mask() -> usize {
+        (OpenFlags::APPEND | OpenFlags::ASYNC | OpenFlags::DIRECT | OpenFlags::NOATIME).bits()
     }
 }
 
@@ -277,13 +290,6 @@ impl From<SeekWhence> for usize {
     }
 }
 
-bitflags! {
-    pub struct ConnectionFlags: usize {
-        const UDP   = (1usize << 0);
-        const TCP   = (1usize << 1);
-    }
-}
-
 #[repr(i64)]
 #[derive(Debug)]
 pub enum FcntlCmd {
@@ -297,17 +303,28 @@ pub enum FcntlCmd {
 }
 
 bitflags! {
-    pub struct FcntlSetFDFlags: u64 {
+    pub struct FDFlags: u64 {
         const FD_CLOEXEC = 1;
     }
 }
 
-impl From<FcntlSetFDFlags> for OpenFlags {
-    fn from(value: FcntlSetFDFlags) -> Self {
+impl From<FDFlags> for OpenFlags {
+    fn from(value: FDFlags) -> Self {
         let mut flags = OpenFlags::empty();
 
-        if value.contains(FcntlSetFDFlags::FD_CLOEXEC) {
+        if value.contains(FDFlags::FD_CLOEXEC) {
             flags.insert(OpenFlags::CLOEXEC);
+        }
+
+        flags
+    }
+}
+
+impl From<OpenFlags> for FDFlags {
+    fn from(value: OpenFlags) -> Self {
+        let mut flags = FDFlags::empty();
+        if value.contains(OpenFlags::CLOEXEC) {
+            flags.insert(FDFlags::FD_CLOEXEC);
         }
 
         flags

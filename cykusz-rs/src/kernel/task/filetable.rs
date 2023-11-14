@@ -1,10 +1,13 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-use syscall_defs::{FileType, OpenFlags, SeekWhence, SysDirEntry, SyscallError, SyscallResult};
+use syscall_defs::{
+    FDFlags, FileType, OpenFlags, SeekWhence, SysDirEntry, SyscallError, SyscallResult,
+};
 
 use crate::kernel::fs::dirent::DirEntryItem;
+use crate::kernel::fs::icache::INodeItem;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
 use crate::kernel::sync::{Mutex, RwMutex};
 
@@ -121,17 +124,17 @@ impl FileHandle {
 
         if meta.typ == FileType::File {
             match whence {
-                syscall_defs::SeekWhence::SeekSet => {
+                SeekWhence::SeekSet => {
                     self.offset.store(off as usize, Ordering::SeqCst);
                 }
-                syscall_defs::SeekWhence::SeekCur => {
+                SeekWhence::SeekCur => {
                     let mut offset = self.offset.load(Ordering::SeqCst) as isize;
 
                     offset += off;
 
                     self.offset.store(offset as usize, Ordering::SeqCst);
                 }
-                syscall_defs::SeekWhence::SeekEnd => {
+                SeekWhence::SeekEnd => {
                     let mut offset = meta.size as isize;
 
                     offset += off;
@@ -170,12 +173,15 @@ impl FileHandle {
     }
 
     pub fn flags(&self) -> OpenFlags {
-        OpenFlags::from_bits_truncate(self.flags.load(Ordering::SeqCst))
+        OpenFlags::from_bits_truncate(self.flags.load(Ordering::Relaxed))
     }
 
     pub fn add_flags(&self, flags: OpenFlags) {
-        self.flags
-            .store(self.flags().bits() | flags.bits(), Ordering::SeqCst);
+        let mask = OpenFlags::set_fd_flags_mask();
+        self.flags.store(
+            (self.flags().bits() & !mask) | (flags.bits() & mask),
+            Ordering::Relaxed,
+        );
     }
 
     pub fn get_dents(&self, mut buf: &mut [u8]) -> Result<usize> {
@@ -245,19 +251,58 @@ impl FileHandle {
     }
 }
 
+impl Drop for FileHandle {
+    fn drop(&mut self) {
+        self.inode.inode().close(self.flags());
+    }
+}
+
+pub struct FileDescriptor {
+    handle: Arc<FileHandle>,
+    flags: AtomicU64,
+}
+
+impl FileDescriptor {
+    fn new(handle: Arc<FileHandle>, flags: FDFlags) -> FileDescriptor {
+        FileDescriptor {
+            handle,
+            flags: AtomicU64::new(flags.bits()),
+        }
+    }
+
+    fn handle(&self) -> Arc<FileHandle> {
+        self.handle.clone()
+    }
+
+    fn inode(&self) -> INodeItem {
+        self.handle.inode.inode()
+    }
+
+    pub(crate) fn fd_flags(&self) -> FDFlags {
+        FDFlags::from_bits_truncate(self.flags.load(Ordering::Relaxed))
+    }
+
+    pub(crate) fn set_fd_flags(&self, flags: FDFlags) {
+        self.flags.store(flags.bits(), Ordering::Relaxed);
+    }
+}
+
+impl Clone for FileDescriptor {
+    fn clone(&self) -> Self {
+        FileDescriptor {
+            handle: self.handle.clone(),
+            flags: AtomicU64::new(self.flags.load(Ordering::Relaxed)),
+        }
+    }
+}
+
 pub struct FileTable {
-    files: RwMutex<Vec<Option<Arc<FileHandle>>>>,
+    files: RwMutex<Vec<Option<FileDescriptor>>>,
 }
 
 impl Clone for FileTable {
     fn clone(&self) -> FileTable {
         let files = self.files.read().clone();
-
-        for f in &files {
-            if let Some(f) = f {
-                f.inode.inode().open(f.flags()).expect("Open failed");
-            }
-        }
 
         FileTable {
             files: RwMutex::new(files),
@@ -287,19 +332,15 @@ impl FileTable {
                 logln5!(
                     "[{}] fd: {} {} {:?}",
                     i,
-                    f.fd,
-                    f.inode.full_path(),
-                    f.flags()
+                    f.handle.fd,
+                    f.handle.inode.full_path(),
+                    f.handle.flags()
                 );
             }
         }
     }
 
-    pub fn open_file(
-        &self,
-        dentry: DirEntryItem,
-        mut flags: OpenFlags,
-    ) -> crate::kernel::fs::vfs::Result<usize> {
+    pub fn open_file(&self, dentry: DirEntryItem, flags: OpenFlags) -> Result<usize> {
         let mut files = self.files.write();
 
         let append = flags.contains(OpenFlags::APPEND);
@@ -308,49 +349,42 @@ impl FileTable {
 
         logln4!("open with append: {}, size: {}", append, size);
 
-        flags.remove(OpenFlags::APPEND);
-        flags.remove(OpenFlags::CREAT);
-        flags.remove(OpenFlags::DIRECTORY);
-
         let mk_handle = |fd: usize, inode: DirEntryItem| {
-            Some(Arc::new(FileHandle {
-                fd,
-                inode: inode.clone(),
-                offset: AtomicUsize::new(if append { size as usize } else { 0 }),
-                flags: AtomicUsize::new(flags.bits()),
-                dir_iter: Mutex::new((None, None)),
-                //fs: if let Some(fs) = inode.inode().fs() {
-                //    fs.upgrade()
-                //} else {
-                //    None
-                //},
-            }))
+            Some(FileDescriptor::new(
+                Arc::new(FileHandle {
+                    fd,
+                    inode: inode.clone(),
+                    offset: AtomicUsize::new(if append { size as usize } else { 0 }),
+                    flags: AtomicUsize::new(flags.bits()),
+                    dir_iter: Mutex::new((None, None)),
+                    //fs: if let Some(fs) = inode.inode().fs() {
+                    //    fs.upgrade()
+                    //} else {
+                    //    None
+                    //},
+                }),
+                FDFlags::from(flags),
+            ))
         };
 
         if let Some((idx, f)) = files.iter_mut().enumerate().find(|e| e.1.is_none()) {
-            if let Some(h) = mk_handle(idx, dentry) {
-                h.inode.inode().open(flags)?;
+            let h = mk_handle(idx, dentry).ok_or(FsError::Busy)?;
 
-                *f = Some(h);
+            h.inode().open(flags)?;
 
-                Ok(idx)
-            } else {
-                println!("[ WARN ] Failed to open file");
+            *f = Some(h);
 
-                Err(FsError::NotSupported)
-            }
+            Ok(idx)
         } else if files.len() < FILE_NUM {
             let len = files.len();
 
-            if let Some(h) = mk_handle(len, dentry) {
-                h.inode.inode().open(flags)?;
+            let h = mk_handle(len, dentry).ok_or(FsError::Busy)?;
 
-                files.push(Some(h));
+            h.inode().open(flags)?;
 
-                Ok(len)
-            } else {
-                Err(FsError::Busy)
-            }
+            files.push(Some(h));
+
+            Ok(len)
         } else {
             Err(FsError::Busy)
         }
@@ -359,9 +393,9 @@ impl FileTable {
     pub fn close_file(&self, fd: usize) -> bool {
         let mut files = self.files.write();
 
-        if let Some(Some(f)) = &files.get(fd) {
+        if let Some(Some(_)) = &files.get(fd) {
             logln4!("close_file {}", fd);
-            f.inode.inode().close(f.flags());
+            // inode.close() called on FileHandle Drop
             files[fd] = None;
             return true;
         }
@@ -372,29 +406,21 @@ impl FileTable {
     pub fn close_on_exec(&self) {
         let mut files = self.files.write();
 
-        for f in files.iter_mut() {
-            if let Some(h) = f {
-                if h.flags().contains(OpenFlags::CLOEXEC) {
-                    logln4!("close file CLOEXEC {}", h.fd);
-                    h.inode.inode().close(h.flags());
-
-                    *f = None;
-                }
+        files.iter_mut().filter(|p| {
+            if let Some(p) = p {
+                p.fd_flags().contains(FDFlags::FD_CLOEXEC)
+            } else {
+                false
             }
-        }
+        }).for_each(|f| {
+            // inode.close() called on FileHandle Drop
+            *f = None;
+        });
     }
 
     pub fn close_all_files(&self) {
         let mut files = self.files.write();
 
-        for f in files.iter_mut() {
-            if let Some(file) = f {
-                logln4!("close_file ALL {}", file.fd);
-                file.inode.inode().close(file.flags());
-
-                *f = None;
-            }
-        }
         files.clear();
         files.shrink_to_fit();
     }
@@ -402,14 +428,16 @@ impl FileTable {
     pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {
         let files = self.files.read();
 
-        if let Some(Some(handle)) = &files.get(fd) {
-            return Some(handle.clone());
-        }
-
-        None
+        Some((files.get(fd)?.clone())?.handle())
     }
 
-    pub fn duplicate(&self, fd: usize, flags: OpenFlags, min: usize) -> SyscallResult {
+    pub fn get_fd(&self, fd: usize) -> Option<FileDescriptor> {
+        let files = self.files.read();
+
+        files.get(fd)?.clone()
+    }
+
+    pub fn duplicate(&self, fd: usize, flags: FDFlags, min: usize) -> SyscallResult {
         let handle = self.get_handle(fd).ok_or(SyscallError::EINVAL)?;
 
         let mut files = self.files.write();
@@ -419,13 +447,14 @@ impl FileTable {
             .enumerate()
             .find(|e| e.0 >= min && e.1.is_none())
         {
-            *f = Some(handle.duplicate(idx, flags)?);
+            // inode.close() called on FileHandle Drop
+            *f = Some(FileDescriptor::new(handle, flags));
 
             Ok(idx)
         } else if files.len() < FILE_NUM {
             let len = files.len();
 
-            files.push(Some(handle.duplicate(len, flags)?));
+            files.push(Some(FileDescriptor::new(handle, flags)));
 
             Ok(len)
         } else {
@@ -433,7 +462,7 @@ impl FileTable {
         }
     }
 
-    pub fn duplicate_at(&self, fd: usize, at: usize, flags: OpenFlags) -> SyscallResult {
+    pub fn duplicate_at(&self, fd: usize, at: usize, flags: FDFlags) -> SyscallResult {
         if at >= FILE_NUM {
             return Err(SyscallError::EINVAL);
         }
@@ -442,24 +471,9 @@ impl FileTable {
 
         let mut files = self.files.write();
 
-        if files[at].is_none() {
-            files[at] = Some(handle.duplicate(at, flags)?);
+        // inode.close() called on FileHandle Drop
+        files[at] = Some(FileDescriptor::new(handle, flags));
 
-            Ok(at)
-        } else {
-            match handle.duplicate(at, flags) {
-                Ok(handle) => {
-                    let old = files[at].take().unwrap();
-
-                    logln4!("close_file DUPLICATE {}", at);
-                    old.inode.inode().close(old.flags());
-
-                    files[at] = Some(handle);
-
-                    Ok(at)
-                }
-                Err(e) => Err(e)?,
-            }
-        }
+        Ok(at)
     }
 }

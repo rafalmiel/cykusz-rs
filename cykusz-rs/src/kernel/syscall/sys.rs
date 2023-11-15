@@ -294,7 +294,7 @@ pub fn sys_fcntl(fd: u64, cmd: u64, flags: u64) -> SyscallResult {
             let handle = &task
                 .filetable()
                 .get_fd(fd as usize)
-                .ok_or(SyscallError::EINVAL)?;
+                .ok_or(SyscallError::EBADFD)?;
             Ok(handle.fd_flags().bits() as usize)
         }
         FcntlCmd::SetFD => {
@@ -303,7 +303,7 @@ pub fn sys_fcntl(fd: u64, cmd: u64, flags: u64) -> SyscallResult {
             let handle = &task
                 .filetable()
                 .get_fd(fd as usize)
-                .ok_or(SyscallError::EINVAL)?;
+                .ok_or(SyscallError::EBADFD)?;
             handle.set_fd_flags(FDFlags::from_bits_truncate(flags));
 
             Ok(0)

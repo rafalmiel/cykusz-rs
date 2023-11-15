@@ -539,7 +539,7 @@ function _cykusz_doom {
     cd $DOOM_SRC_DIR/doomgeneric
     CYKUSZ_ROOT=$SYSROOT make -f Makefile.cykusz
     cp fbdoom $BUILD_DIR
-    cp ../DOOM1.WAD $BUILD_DIR
+    cp ../doom1.wad $BUILD_DIR
     make clean
 
     popd

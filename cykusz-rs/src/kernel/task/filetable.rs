@@ -39,26 +39,6 @@ impl FileHandle {
         }
     }
 
-    pub fn duplicate(&self, fd: usize, flags: OpenFlags) -> Result<Arc<FileHandle>> {
-        let mut new_flags = self.flags();
-        if !flags.contains(OpenFlags::CLOEXEC) {
-            new_flags.remove(OpenFlags::CLOEXEC);
-        } else {
-            new_flags.insert(OpenFlags::CLOEXEC);
-        }
-
-        let new = Arc::new(FileHandle::new(fd, self.inode.clone(), new_flags));
-
-        let _ = new.seek(
-            self.offset.load(Ordering::Relaxed) as isize,
-            SeekWhence::SeekSet,
-        );
-
-        new.inode.inode().open(new_flags)?;
-
-        Ok(new)
-    }
-
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let offset = self.offset.load(Ordering::SeqCst);
 
@@ -69,26 +49,6 @@ impl FileHandle {
         self.offset.fetch_add(read, Ordering::SeqCst);
 
         Ok(read)
-    }
-
-    pub fn read_all(&self) -> Result<Vec<u8>> {
-        let mut res = Vec::<u8>::new();
-        res.resize(1024, 0);
-
-        let mut size = 0;
-
-        while let Ok(r) = self.read(&mut res.as_mut_slice()[size..size + 1024]) {
-            size += r;
-
-            if r < 1024 {
-                res.shrink_to_fit();
-                return Ok(res);
-            }
-
-            res.resize(size + 1024, 0);
-        }
-
-        Err(FsError::NotSupported)
     }
 
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
@@ -438,7 +398,7 @@ impl FileTable {
     }
 
     pub fn duplicate(&self, fd: usize, flags: FDFlags, min: usize) -> SyscallResult {
-        let handle = self.get_handle(fd).ok_or(SyscallError::EINVAL)?;
+        let handle = self.get_handle(fd).ok_or(SyscallError::EBADFD)?;
 
         let mut files = self.files.write();
 
@@ -467,7 +427,7 @@ impl FileTable {
             return Err(SyscallError::EINVAL);
         }
 
-        let handle = self.get_handle(fd).ok_or(SyscallError::EINVAL)?;
+        let handle = self.get_handle(fd).ok_or(SyscallError::EBADFD)?;
 
         let mut files = self.files.write();
 

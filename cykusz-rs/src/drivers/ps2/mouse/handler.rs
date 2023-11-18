@@ -3,7 +3,7 @@ use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{IrqGuard, Spin};
 use crate::kernel::timer::current_ns;
 use crate::kernel::utils::buffer::BufferQueue;
 use alloc::string::String;
@@ -142,6 +142,7 @@ impl INode for MouseState {
         if buf.len() % core::mem::size_of::<Event>() != 0 {
             Err(FsError::InvalidParam)
         } else {
+            let _irq = IrqGuard::new();
             Ok(self.buf.read_data(buf)?)
         }
     }

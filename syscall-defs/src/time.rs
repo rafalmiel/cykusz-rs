@@ -43,4 +43,8 @@ impl Timeval {
             usecs: (nsecs / 1000) % 1000_000,
         }
     }
+
+    pub fn to_nanoseconds(&self) -> usize {
+        self.secs as usize * 1000000000usize + self.usecs as usize * 1000usize
+    }
 }

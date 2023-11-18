@@ -12,6 +12,8 @@ use crate::kernel::fs::vfs::FsError;
 use syscall_defs::events::{Event, EventType};
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::OpenFlags;
+use syscall_defs::time::Timeval;
+use crate::kernel::timer::current_ns;
 
 use super::scancode;
 
@@ -134,6 +136,7 @@ impl KbdState {
                 if opened {
                     let repeat = !released && was_pressed;
                     let evt = Event {
+                        timeval: Timeval::from_nsecs(current_ns()),
                         typ: EventType::Key,
                         code: key as u16,
                         val: if released {

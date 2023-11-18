@@ -1,5 +1,4 @@
-use crate::kernel::kbd::keys::KeyCode;
-
+use syscall_defs::events::keys::KeyCode;
 macro_rules! init_arr (
     ($a: ident, $([$k: expr, $v: expr]),+) => {
         $($a[$k] = $v;)*

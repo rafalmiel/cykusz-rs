@@ -28,3 +28,19 @@ impl Timespec {
         self.nsecs == UTIME_OMIT
     }
 }
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct Timeval {
+    pub secs: u64,
+    pub usecs: u64,
+}
+
+impl Timeval {
+    pub fn from_nsecs(nsecs: u64) -> Timeval {
+        Timeval {
+            secs: nsecs / 1000_000_000,
+            usecs: (nsecs / 1000) % 1000_000,
+        }
+    }
+}

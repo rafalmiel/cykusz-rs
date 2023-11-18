@@ -4,6 +4,7 @@ use core::fmt::Debug;
 use core::fmt::{Error, Formatter};
 
 use input::*;
+use syscall_defs::events::keys::KeyCode;
 use syscall_defs::ioctl::tty;
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT, SIGTSTP};
@@ -14,7 +15,6 @@ use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::kbd::keys::KeyCode;
 use crate::kernel::kbd::KeyListener;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;

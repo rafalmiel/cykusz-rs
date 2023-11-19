@@ -906,7 +906,7 @@ impl Socket {
     fn read(&self, offset: usize, buf: &mut [u8], flags: MsgFlags) -> Result<usize> {
         Ok(self
             .in_buffer
-            .read_data_from(offset, buf, flags.contains(MsgFlags::MSG_PEEK))?)
+            .read_data_from(offset, buf, flags.contains(MsgFlags::MSG_PEEK), WaitQueueFlags::empty())?)
     }
 
     fn update_window(&self) {

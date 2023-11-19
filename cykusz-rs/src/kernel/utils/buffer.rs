@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task;
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 pub struct BufferQueue {
@@ -100,8 +100,22 @@ impl BufferQueue {
             return 0;
         }
 
-        let mut buf = self.buffer.lock();
+        let buf = self.buffer.lock();
 
+        self.do_try_append_data(data, buf)
+    }
+
+    pub fn try_append_data_irq(&self, data: &[u8]) -> usize {
+        if data.is_empty() {
+            return 0;
+        }
+
+        let buf = self.buffer.lock_irq();
+
+        self.do_try_append_data(data, buf)
+    }
+
+    fn do_try_append_data(&self, data: &[u8], mut buf: SpinGuard<Buffer>) -> usize {
         let written = buf.append_data(data);
 
         drop(buf);
@@ -111,6 +125,7 @@ impl BufferQueue {
         }
 
         written
+
     }
 
     pub fn append_data(&self, data: &[u8]) -> crate::kernel::fs::vfs::Result<usize> {
@@ -160,6 +175,7 @@ impl BufferQueue {
         offset: usize,
         buf: &mut [u8],
         transient: bool,
+        wg_flags: WaitQueueFlags
     ) -> SignalResult<usize> {
         if offset > 0 && !transient {
             return Ok(0);
@@ -167,7 +183,7 @@ impl BufferQueue {
 
         let mut buffer = self
             .reader_queue
-            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| {
+            .wait_lock_for(wg_flags, &self.buffer, |lck| {
                 lck.has_data() || self.shutting_down() || offset > 0
             })?
             .unwrap();
@@ -188,7 +204,11 @@ impl BufferQueue {
     }
 
     pub fn read_data(&self, buf: &mut [u8]) -> SignalResult<usize> {
-        self.read_data_from(0, buf, false)
+        self.read_data_from(0, buf, false, WaitQueueFlags::empty())
+    }
+
+    pub fn read_data_flags(&self, buf: &mut [u8], wg_flags: WaitQueueFlags) -> SignalResult<usize> {
+        self.read_data_from(0, buf, false, wg_flags)
     }
 
     pub fn try_read_data_transient(&self, buf: &mut [u8]) -> usize {

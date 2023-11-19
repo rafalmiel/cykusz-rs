@@ -3,7 +3,7 @@ use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sync::{IrqGuard, Spin};
+use crate::kernel::sync::Spin;
 use crate::kernel::timer::current_ns;
 use crate::kernel::utils::buffer::BufferQueue;
 use alloc::string::String;
@@ -15,6 +15,7 @@ use syscall_defs::events::buttons::{ButtonCode, RelCode};
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::OpenFlags;
 use syscall_defs::time::Timeval;
+use crate::kernel::utils::wait_queue::WaitQueueFlags;
 
 struct MouseState {
     state: Spin<State>,
@@ -142,8 +143,7 @@ impl INode for MouseState {
         if buf.len() % core::mem::size_of::<Event>() != 0 {
             Err(FsError::InvalidParam)
         } else {
-            let _irq = IrqGuard::new();
-            Ok(self.buf.read_data(buf)?)
+            Ok(self.buf.read_data_flags(buf, WaitQueueFlags::IRQ_DISABLE)?)
         }
     }
 
@@ -191,12 +191,13 @@ impl MouseState {
 
         if state.index == 0 && state.opened {
             if let Some(evt) = state.iter().next() {
+                drop(state);
                 unsafe {
                     let bytes: &[u8] = core::slice::from_raw_parts(
                         &evt as *const Event as *const u8,
                         core::mem::size_of::<Event>(),
                     );
-                    self.buf.try_append_data(bytes);
+                    self.buf.try_append_data_irq(bytes);
                 }
             }
         }

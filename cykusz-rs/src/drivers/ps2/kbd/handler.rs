@@ -14,6 +14,7 @@ use syscall_defs::poll::PollEventFlags;
 use syscall_defs::OpenFlags;
 use syscall_defs::time::Timeval;
 use crate::kernel::timer::current_ns;
+use crate::kernel::utils::wait_queue::WaitQueueFlags;
 
 use super::scancode;
 
@@ -43,7 +44,7 @@ impl INode for KbdState {
         if buf.len() % core::mem::size_of::<Event>() != 0 {
             Err(FsError::InvalidParam)
         } else {
-            Ok(self.buf.read_data(buf)?)
+            Ok(self.buf.read_data_flags(buf, WaitQueueFlags::IRQ_DISABLE)?)
         }
     }
 
@@ -153,7 +154,7 @@ impl KbdState {
                             &evt as *const Event as *const u8,
                             core::mem::size_of::<Event>(),
                         );
-                        self.buf.try_append_data(bytes);
+                        self.buf.try_append_data_irq(bytes);
                     }
                 }
             }

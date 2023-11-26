@@ -70,14 +70,38 @@ $SPATH/build.sh cykusz_bash > $LOGDIR/cykusz_bash.log 2>&1
 echo "Cross building zstd..."
 $SPATH/build.sh cykusz_zstd > $LOGDIR/cykusz_zstd.log 2>&1
 
+echo "Cross building libffi..."
+$SPATH/build.sh cykusz_libffi > $LOGDIR/cykusz_libffi.log 2>&1
+
+echo "Cross building libexpat..."
+$SPATH/build.sh cykusz_libexpat > $LOGDIR/cykusz_libexpat.log 2>&1
+
+echo "Cross building libunistring..."
+$SPATH/build.sh cykusz_libunistring > $LOGDIR/cykusz_libunistring.log 2>&1
+
+echo "Cross building libiconv..."
+$SPATH/build.sh cykusz_libiconv > $LOGDIR/cykusz_libiconv.log 2>&1
+
+echo "Cross building libidn2..."
+$SPATH/build.sh cykusz_libidn2 > $LOGDIR/cykusz_libidn2.log 2>&1
+
 echo "Cross building zlib..."
 $SPATH/build.sh cykusz_zlib > $LOGDIR/cykusz_zlib.log 2>&1
+
+echo "Cross building pcre2..."
+$SPATH/build.sh cykusz_pcre2 > $LOGDIR/cykusz_pcre2.log 2>&1
+
+echo "Cross building libressl..."
+$SPATH/build.sh cykusz_libressl > $LOGDIR/cykusz_libressl.log 2>&1
 
 echo "Cross building less..."
 $SPATH/build.sh cykusz_less > $LOGDIR/cykusz_less.log 2>&1
 
 echo "Cross building netcat..."
 $SPATH/build.sh cykusz_netcat > $LOGDIR/cykusz_netcat.log 2>&1
+
+echo "Cross building wget..."
+$SPATH/build.sh cykusz_wget > $LOGDIR/cykusz_wget.log 2>&1
 
 echo "Cross building python..."
 $SPATH/build.sh cykusz_python > $LOGDIR/cykusz_python.log 2>&1

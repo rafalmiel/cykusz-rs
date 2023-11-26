@@ -7,6 +7,7 @@ CYKUSZ_DIR=$(realpath $SPATH/..)
 SRC_DIR=$CYKUSZ_DIR/sysroot/src
 BINUTILS_SRC_DIR=$SRC_DIR/binutils-gdb
 GCC_SRC_DIR=$SRC_DIR/gcc
+LIBTOOL_SRC_DIR=$SRC_DIR/libtool
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
 NCURSES_SRC_DIR=$SRC_DIR/ncurses
@@ -39,6 +40,7 @@ BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
 BINUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-binutils-gdb
 GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
+LIBTOOL_BUILD_DIR=$BUILD_DIR/libtool
 NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
 NANO_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-nano
 BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
@@ -93,6 +95,21 @@ function _prepare_gcc {
         cd $GCC_SRC_DIR
         ./contrib/download_prerequisites
         git apply patch-01.patch
+
+        popd
+    fi
+}
+
+function _prepare_libtool {
+    if [ ! -d $LIBTOOL_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libtool.git $LIBTOOL_SRC_DIR
+
+        pushd .
+
+        cd $LIBTOOL_SRC_DIR
+        git submodule update --init
+        ./bootstrap
 
         popd
     fi
@@ -413,6 +430,22 @@ function _gcc {
 
     make -C $GCC_BUILD_DIR -j4 all-gcc
     make -C $GCC_BUILD_DIR install-gcc
+}
+
+function _libtool {
+    _prepare_libtool
+
+    mkdir -p $LIBTOOL_BUILD_DIR
+
+    pushd .
+
+    cd $LIBTOOL_BUILD_DIR
+    $LIBTOOL_SRC_DIR/configure --prefix=$CROSS
+
+    make -j4
+    make install
+
+    popd
 }
 
 function _mlibc {

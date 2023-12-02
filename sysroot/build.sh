@@ -920,7 +920,7 @@ function _cykusz_python {
     export CONFIG_SITE=$SPATH/python-config-site
     export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
     export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
-    $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython
+    $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython --without-ensurepip
 
 
     make -j6 DESTDIR=$SYSROOT

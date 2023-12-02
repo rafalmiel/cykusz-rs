@@ -13,6 +13,9 @@ $SPATH/build.sh linux_headers  > $LOGDIR/linux_headers.log 2>&1
 echo "Creating sysroot..."
 $SPATH/build.sh sysroot  > $LOGDIR/sysroot.log 2>&1
 
+echo "Building libtool..."
+$SPATH/build.sh libtool > $LOGDIR/libtool.log 2>&1
+
 echo "Building binutils..."
 $SPATH/build.sh binutils > $LOGDIR/binutils.log 2>&1
 

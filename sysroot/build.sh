@@ -70,6 +70,8 @@ CROSS=$CYKUSZ_DIR/sysroot/cross
 TRIPLE=x86_64-cykusz
 
 export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:$PATH
+export ACLOCAL_PATH=$CROSS/share/aclocal
+export PKG_CONFIG_PATH=$SYSROOT/usr/lib/pkgconfig
 
 function _prepare_mlibc {
     if [ ! -d $MLIBC_SRC_DIR ]; then
@@ -103,7 +105,7 @@ function _prepare_gcc {
 function _prepare_libtool {
     if [ ! -d $LIBTOOL_SRC_DIR ]; then
         mkdir -p $SRC_DIR
-        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libtool.git $LIBTOOL_SRC_DIR
+        git clone --depth 100 -b cykusz https://github.com/rafalmiel/libtool.git $LIBTOOL_SRC_DIR
 
         pushd .
 
@@ -258,7 +260,7 @@ function _prepare_libidn2 {
 function _prepare_pcre2 {
     if [ ! -d $PCRE2_SRC_DIR ]; then
         mkdir -p $SRC_DIR
-        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libpsl.git $PCRE2_SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/pcre2.git $PCRE2_SRC_DIR
 
         pushd .
         cd $PCRE2_SRC_DIR
@@ -407,7 +409,7 @@ function _binutils {
     pushd .
 
     cd $BINUTILS_BUILD_DIR
-    $BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared
+    PKG_CONFIG_PATH=/usr/lib/pkgconfig $BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared
 
     popd
 
@@ -424,7 +426,7 @@ function _gcc {
     pushd .
 
     cd $GCC_BUILD_DIR
-    $GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared
+    PKG_CONFIG_PATH=/usr/lib/pkgconfig $GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared
 
     popd
 
@@ -440,7 +442,7 @@ function _libtool {
     pushd .
 
     cd $LIBTOOL_BUILD_DIR
-    $LIBTOOL_SRC_DIR/configure --prefix=$CROSS
+    PKG_CONFIG_PATH=/usr/lib/pkgconfig $LIBTOOL_SRC_DIR/configure --prefix=$CROSS
 
     make -j4
     make install
@@ -604,7 +606,7 @@ function _cykusz_nano {
     pushd .
 
     cd $NANO_CYKUSZ_BUILD_DIR
-    CFLAGS="-O0 -g" $NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
+    $NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
 
     popd
 
@@ -692,7 +694,7 @@ function _cykusz_libpsl {
 
     cd $LIBPSL_CYKUSZ_BUILD_DIR
 
-    $LIBPSL_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --disable-static --disable-asan --disable-cfi --disable-ubsan --disable-man --disable-runtime
+    $LIBPSL_SRC_DIR/configure --host=$TRIPLE --with-sysroot=$SYSROOT --prefix=/usr --disable-static --disable-asan --disable-cfi --disable-ubsan --disable-man --disable-runtime
 
     make DESTDIR=$SYSROOT -j4
     make DESTDIR=$SYSROOT install
@@ -777,10 +779,14 @@ function _cykusz_libidn2 {
 
     cd $LIBIDN2_CYKUSZ_BUILD_DIR
 
-    $LIBIDN2_SRC_DIR/configure --disable-doc --disable-nls
+    PKG_CONFIG_PATH=/usr/lib/pkgconfig $LIBIDN2_SRC_DIR/configure --disable-doc --disable-nls
     #cp $LIBIDN2_SRC_DIR/lib/idna-tables-properties.csv ./lib/
     cp ./lib/idn2.h $LIBIDN2_SRC_DIR/lib/
-    make -j4
+
+    cd lib
+    make gendata
+    make gentr46map
+    cd ../
 
     cp ./lib/gendata $LIBIDN2_SRC_DIR/lib/gendata
     cp ./lib/gentr46map $LIBIDN2_SRC_DIR/lib/gentr46map
@@ -789,7 +795,7 @@ function _cykusz_libidn2 {
 
     cp ./lib/idn2.h $LIBIDN2_SRC_DIR/lib/
 
-    make DESTDIR=$SYSROOT -j4
+    VERBOSE=1 make DESTDIR=$SYSROOT -j4
     make DESTDIR=$SYSROOT install
 
     popd

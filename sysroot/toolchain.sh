@@ -49,6 +49,9 @@ $SPATH/build.sh cykusz_libgcc > $LOGDIR/cykusz_libgcc.log 2>&1
 echo "Cross building libstdc++..."
 $SPATH/build.sh cykusz_libstd > $LOGDIR/cykusz_libstd.log 2>&1
 
+echo "Cross building apps..."
+$SPATH/build.sh cykusz_apps > $LOGDIR/cykusz_apps.log 2>&1
+
 echo "Cross building coreutils..."
 $SPATH/build.sh cykusz_coreutils > $LOGDIR/cykusz_coreutils.log 2>&1
 

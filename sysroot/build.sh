@@ -947,6 +947,19 @@ function _cykusz_readline {
     popd
 }
 
+function _cykusz_apps {
+	$TRIPLE-gcc $SPATH/test.c -o $BUILD_DIR/test
+	$TRIPLE-gcc $SPATH/stack.c -o $BUILD_DIR/stack
+	$TRIPLE-g++ $SPATH/hello.cpp -o $BUILD_DIR/hello
+	$TRIPLE-g++ $SPATH/test.cpp -o $BUILD_DIR/testcpp
+	$TRIPLE-gcc $SPATH/ttytest.c -o $BUILD_DIR/ttytest
+	$TRIPLE-gcc $SPATH/fork.c -o $BUILD_DIR/fork
+	$TRIPLE-gcc $SPATH/forktest.c -o $BUILD_DIR/forktest
+	$TRIPLE-gcc $SPATH/poweroff.c -o $BUILD_DIR/poweroff
+	$TRIPLE-gcc $SPATH/stat.c -o $BUILD_DIR/stat
+	_cykusz_nyancat
+}
+
 function _prepare {
     _prepare_mlibc
     _prepare_binutils

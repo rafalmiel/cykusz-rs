@@ -21,20 +21,10 @@ rust_shell := target/$(target)/release/shell
 rust_init := target/$(target)/release/init
 kernel := build/kernel-$(arch).bin
 endif
-cross_cpp := sysroot/cross/bin/x86_64-cykusz-g++
 cross_c := sysroot/cross/bin/x86_64-cykusz-gcc
+cross_cpp := sysroot/cross/bin/x86_64-cykusz-g++
 cross_clang := sysroot/cross/bin/clang --sysroot sysroot/cykusz/  -target x86_64-cykusz
 cross_clangpp := sysroot/cross/bin/clang++ --sysroot sysroot/cykusz/  -target x86_64-cykusz
-cross_strip := sysroot/cross/bin/x86_64-cykusz-strip
-cross_hello := sysroot/build/hello
-cross_test := sysroot/build/test
-cross_testcpp := sysroot/build/testcpp
-cross_stack := sysroot/build/stack
-cross_nyancat := sysroot/build/nyancat
-cross_ttytest := sysroot/build/ttytest
-cross_fork := sysroot/build/fork
-cross_forktest := sysroot/build/forktest
-cross_poweroff := sysroot/build/poweroff
 
 usb_dev := /dev/sdb1
 
@@ -87,7 +77,7 @@ $(iso): $(kernel) $(grub_cfg) $(rust_shell)
 	cp $(rust_shell) build/isofiles/boot/program
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
-$(disk): $(kernel) $(rust_shell) $(rust_init) hello
+$(disk): $(kernel) $(rust_shell) $(rust_init) $(cross_cpp)
 	#echo fake install_os
 	sudo disk_scripts/install_os.sh
 
@@ -115,19 +105,6 @@ fsck:
 	sudo disk_scripts/fsck_disk.sh
 
 $(cross_cpp): toolchain
-
-hello: $(cross_cpp) sysroot/test.c sysroot/test.cpp sysroot/hello.cpp sysroot/stack.c
-	$(cross_c) sysroot/test.c -o $(cross_test)
-	$(cross_c) sysroot/stack.c -o $(cross_stack)
-	$(cross_cpp) sysroot/hello.cpp -o $(cross_hello)
-	$(cross_cpp) sysroot/test.cpp -o $(cross_testcpp)
-	$(cross_c) sysroot/ttytest.c -o $(cross_ttytest)
-	$(cross_c) sysroot/fork.c -o $(cross_fork)
-	$(cross_c) sysroot/forktest.c -o $(cross_forktest)
-	$(cross_c) sysroot/poweroff.c -o $(cross_poweroff)
-	$(cross_c) sysroot/stat.c -o sysroot/build/stat
-	sysroot/build.sh cykusz_nyancat
-	$(cross_strip) $(cross_hello)
 
 # compile assembly files
 build/arch/$(arch)/asm/%.o: cykusz-rs/src/arch/$(arch)/asm/%.asm

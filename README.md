@@ -73,7 +73,7 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 - [x] wget (<https://github.com/rafalmiel/wget/tree/cykusz>)
 - [x] python (<https://github.com/rafalmiel/cpython/tree/cykusz>)
 
-## Building
+## Building OS
 
 You will need following packages to compile and run the os:
 * rust ([rustup](https://rustup.rs/))
@@ -81,6 +81,7 @@ You will need following packages to compile and run the os:
 * qemu
 * grub2
 * parted
+* docker (for userspace docker build)
 
 Building:
 ```bash
@@ -94,17 +95,32 @@ make
 ./create_disk.sh
 ```
 
-Running on qemu:
+## Building Userspace
+It is recommended to use docker for building userspace for stable environment.
+
+### Using docker
+```bash
+./sysroot/make_docker_image.sh
+./sysroot/toolchain_docker.sh
+```
+
+### Using host
+```bash
+./sysroot/toolchain.sh
+```
+
+## Running
+### qemu
 ```bash
 make run
 ```
 
-Running on bochs:
+### bochs
 ```bash
 make bochs
 ```
 
-Running on VirtualBox:
+### VirtualBox
 ```bash
 # Run only once to import the image into VirtualBox
 ./create_vbox_image.sh

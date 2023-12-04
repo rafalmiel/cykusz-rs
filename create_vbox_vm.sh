@@ -1,3 +1,3 @@
 #!/bin/bash
 
-VBoxManage import cykusz.ova
+VBoxManage import sysroot/cfg/cykusz.ova

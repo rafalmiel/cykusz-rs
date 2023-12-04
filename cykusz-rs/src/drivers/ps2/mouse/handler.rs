@@ -6,16 +6,16 @@ use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::current_ns;
 use crate::kernel::utils::buffer::BufferQueue;
+use crate::kernel::utils::wait_queue::WaitQueueFlags;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use bit_field::BitField;
 use spin::Once;
-use syscall_defs::events::{Event, EventType};
 use syscall_defs::events::buttons::{ButtonCode, RelCode};
+use syscall_defs::events::{Event, EventType};
 use syscall_defs::poll::PollEventFlags;
-use syscall_defs::OpenFlags;
 use syscall_defs::time::Timeval;
-use crate::kernel::utils::wait_queue::WaitQueueFlags;
+use syscall_defs::OpenFlags;
 
 struct MouseState {
     state: Spin<State>,
@@ -60,7 +60,7 @@ impl<'a> StateIter<'a> {
             0 => Some(ButtonCode::BTN_LEFT),
             1 => Some(ButtonCode::BTN_RIGHT),
             2 => Some(ButtonCode::BTN_MIDDLE),
-            _ => None
+            _ => None,
         }
     }
 
@@ -90,7 +90,7 @@ impl<'a> Iterator for StateIter<'a> {
                     typ: EventType::Key,
                     code: btn_code as u16,
                     val: if self.state.btn_state[idx] { 1 } else { 0 },
-                })
+                });
             }
         }
 
@@ -103,7 +103,7 @@ impl<'a> Iterator for StateIter<'a> {
                     typ: EventType::Rel,
                     code: RelCode::REL_X as u16,
                     val: rel_x,
-                })
+                });
             }
         }
 
@@ -116,7 +116,7 @@ impl<'a> Iterator for StateIter<'a> {
                     typ: EventType::Rel,
                     code: RelCode::REL_Y as u16,
                     val: rel_y,
-                })
+                });
             }
         }
 

@@ -394,11 +394,11 @@ function _sysroot {
     mkdir -p $BUILD_DIR
 
     rm -rf $MLIBC_BUILD_DIR
-    meson setup --cross-file $SPATH/cross-file.ini --prefix /usr -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    meson setup --cross-file $SPATH/cfg/cross-file.ini --prefix /usr -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
     meson install -C $MLIBC_BUILD_DIR --destdir=$SYSROOT
 
     mkdir -p $SYSROOT/etc
-    cp $SPATH/resolv.conf $SYSROOT/etc/
+    cp $SPATH/cfg/resolv.conf $SYSROOT/etc/
 }
 
 function _binutils {
@@ -456,7 +456,7 @@ function _mlibc {
     mkdir -p $BUILD_DIR
 
     rm -rf $MLIBC_BUILD_DIR
-    meson setup --cross-file $SPATH/cross-file.ini --prefix /usr -Ddefault_library=both -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    meson setup --cross-file $SPATH/cfg/cross-file.ini --prefix /usr -Ddefault_library=both -Dlinux_kernel_headers=$SYSROOT/usr/include -Dheaders_only=false $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
 
     ninja -C $MLIBC_BUILD_DIR
     meson install -C $MLIBC_BUILD_DIR --destdir=$SYSROOT
@@ -847,7 +847,7 @@ function _cykusz_llvm {
 
     export CYKUSZ_SYSROOT_DIR=$SYSROOT
     export CYKUSZ_ROOT_DIR=$SPATH
-    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_TARGET_ARCH=x86_64 -DLLVM_DEFAULT_TARGET_TRIPLE=$TRIPLE -DLLVM_HOST_TRIPLE=$TRIPLE -Wno-dev $LLVM_SRC_DIR/llvm
+    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/cfg/CMakeToolchain-x86_64-cykusz.txt -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_TARGET_ARCH=x86_64 -DLLVM_DEFAULT_TARGET_TRIPLE=$TRIPLE -DLLVM_HOST_TRIPLE=$TRIPLE -Wno-dev $LLVM_SRC_DIR/llvm
 
     VERBOSE=1 make -j12 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install
@@ -864,7 +864,7 @@ function _cykusz_zstd {
 
     cd $ZSTD_CYKUSZ_BUILD_DIR
 
-    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $ZSTD_SRC_DIR/build/cmake
+    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/cfg/CMakeToolchain-x86_64-cykusz.txt -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $ZSTD_SRC_DIR/build/cmake
     make -j8
     DESTDIR=$SYSROOT make install
 
@@ -882,7 +882,7 @@ function _cykusz_zlib {
 
     export CYKUSZ_SYSROOT_DIR=$SYSROOT
     export CYKUSZ_ROOT_DIR=$SPATH
-    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $ZLIB_SRC_DIR
+    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/cfg/CMakeToolchain-x86_64-cykusz.txt  -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $ZLIB_SRC_DIR
 
     VERBOSE=1 make -j12 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install
@@ -901,7 +901,7 @@ function _cykusz_libressl {
 
     export CYKUSZ_SYSROOT_DIR=$SYSROOT
     export CYKUSZ_ROOT_DIR=$SPATH
-    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/CMakeToolchain-x86_64-cykusz.txt -DBUILD_SHARED_LIBS=ON -DLIBRESSL_APPS=ON -DENABLE_NC=OFF -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $LIBRESSL_SRC_DIR
+    cmake -DCMAKE_TOOLCHAIN_FILE=$SPATH/cfg/CMakeToolchain-x86_64-cykusz.txt -DBUILD_SHARED_LIBS=ON -DLIBRESSL_APPS=ON -DENABLE_NC=OFF -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release $LIBRESSL_SRC_DIR
 
     VERBOSE=1 make -j12 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install
@@ -917,7 +917,7 @@ function _cykusz_python {
     mkdir -p $PYTHON_CYKUSZ_BUILD_DIR
 
     cd $PYTHON_CYKUSZ_BUILD_DIR
-    export CONFIG_SITE=$SPATH/python-config-site
+    export CONFIG_SITE=$SPATH/cfg/python-config-site
     export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
     export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
     $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython --without-ensurepip
@@ -948,15 +948,15 @@ function _cykusz_readline {
 }
 
 function _cykusz_apps {
-	$TRIPLE-gcc $SPATH/test.c -o $BUILD_DIR/test
-	$TRIPLE-gcc $SPATH/stack.c -o $BUILD_DIR/stack
-	$TRIPLE-g++ $SPATH/hello.cpp -o $BUILD_DIR/hello
-	$TRIPLE-g++ $SPATH/test.cpp -o $BUILD_DIR/testcpp
-	$TRIPLE-gcc $SPATH/ttytest.c -o $BUILD_DIR/ttytest
-	$TRIPLE-gcc $SPATH/fork.c -o $BUILD_DIR/fork
-	$TRIPLE-gcc $SPATH/forktest.c -o $BUILD_DIR/forktest
-	$TRIPLE-gcc $SPATH/poweroff.c -o $BUILD_DIR/poweroff
-	$TRIPLE-gcc $SPATH/stat.c -o $BUILD_DIR/stat
+	$TRIPLE-gcc $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
+	$TRIPLE-gcc $SRC_DIR/cykusz_apps/stack.c -o $BUILD_DIR/stack
+	$TRIPLE-g++ $SRC_DIR/cykusz_apps/hello.cpp -o $BUILD_DIR/hello
+	$TRIPLE-g++ $SRC_DIR/cykusz_apps/test.cpp -o $BUILD_DIR/testcpp
+	$TRIPLE-gcc $SRC_DIR/cykusz_apps/ttytest.c -o $BUILD_DIR/ttytest
+	$TRIPLE-gcc $SRC_DIR/cykusz_apps/fork.c -o $BUILD_DIR/fork
+	$TRIPLE-gcc $SRC_DIR/cykusz_apps/forktest.c -o $BUILD_DIR/forktest
+	$TRIPLE-gcc $SRC_DIR/cykusz_apps/poweroff.c -o $BUILD_DIR/poweroff
+	$TRIPLE-gcc $SRC_DIR/cykusz_apps/stat.c -o $BUILD_DIR/stat
 	_cykusz_nyancat
 }
 

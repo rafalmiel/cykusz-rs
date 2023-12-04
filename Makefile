@@ -79,17 +79,17 @@ $(iso): $(kernel) $(grub_cfg) $(rust_shell)
 
 $(disk): $(kernel) $(rust_shell) $(rust_init) $(cross_cpp)
 	#echo fake install_os
-	sudo disk_scripts/install_os.sh
+	sudo disk-scripts/install_os.sh
 
 $(vdi): $(disk)
-	disk_scripts/make_vdi.sh
-	disk_scripts/attach_vdi.sh
+	disk-scripts/make_vdi.sh
+	disk-scripts/attach_vdi.sh
 
 $(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
 	ld -n --whole-archive --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 usb: $(kernel)
-	sudo disk_scripts/install_usb.sh $(usb_dev)
+	sudo disk-scripts/install_usb.sh $(usb_dev)
 
 cargo:
 ifdef dev
@@ -102,7 +102,7 @@ toolchain: $(cross_cpp)
 	sysroot/build.sh check_build
 
 fsck:
-	sudo disk_scripts/fsck_disk.sh
+	sudo disk-scripts/fsck_disk.sh
 
 $(cross_cpp): toolchain
 

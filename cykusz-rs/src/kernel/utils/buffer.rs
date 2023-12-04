@@ -125,7 +125,6 @@ impl BufferQueue {
         }
 
         written
-
     }
 
     pub fn append_data(&self, data: &[u8]) -> crate::kernel::fs::vfs::Result<usize> {
@@ -175,7 +174,7 @@ impl BufferQueue {
         offset: usize,
         buf: &mut [u8],
         transient: bool,
-        wg_flags: WaitQueueFlags
+        wg_flags: WaitQueueFlags,
     ) -> SignalResult<usize> {
         if offset > 0 && !transient {
             return Ok(0);

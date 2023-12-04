@@ -32,7 +32,7 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 
 ## Userspace
 
-- [x] Basic shell
+- [x] Bash shell
 - [x] libc (mlibc port)
 - [x] Exec/fork
 - [x] Threads
@@ -92,7 +92,7 @@ rustup override set nightly
 rustup component add rust-src
 make
 
-./create_disk.sh
+./disk-scripts/create_disk.sh
 ```
 
 ## Building Userspace

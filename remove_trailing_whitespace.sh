@@ -1,3 +1,3 @@
 #!/bin/bash
 
-find ./src -type f -exec sed --in-place 's/[[:space:]]\+$//' {} \+
+find ./cykusz-rs/src -type f -exec sed --in-place 's/[[:space:]]\+$//' {} \+

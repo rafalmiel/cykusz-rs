@@ -1,7 +1,7 @@
 use crate::time::Timeval;
 
-pub mod keys;
 pub mod buttons;
+pub mod keys;
 
 #[repr(u16)]
 #[derive(Debug)]

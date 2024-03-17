@@ -364,7 +364,7 @@ fn exec(cmd: &str) {
         }
     } else if cmd.starts_with("date") {
         if let Ok(t) = syscall::time() {
-            let time = chrono::NaiveDateTime::from_timestamp_opt(t as i64, 0).unwrap();
+            let time = chrono::DateTime::from_timestamp(t as i64, 0).unwrap();
             println!(
                 "{}-{}-{} {}:{}:{}",
                 time.year(),

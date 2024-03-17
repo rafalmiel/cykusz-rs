@@ -41,7 +41,7 @@ fn read_naive_date() -> chrono::NaiveDateTime {
 }
 
 fn set_date() {
-    UNIX_TX.store(read_naive_date().timestamp(), Ordering::SeqCst);
+    UNIX_TX.store(read_naive_date().and_utc().timestamp(), Ordering::SeqCst);
 }
 
 pub fn init() {

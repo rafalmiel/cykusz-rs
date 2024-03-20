@@ -15,13 +15,6 @@ use core::panic::PanicInfo;
 
 use syscall_defs::{FcntlCmd, OpenFlags, SyscallError};
 
-#[allow(unused)]
-pub fn bochs() {
-    unsafe {
-        asm!("xchg bx, bx");
-    }
-}
-
 #[linkage = "weak"]
 #[no_mangle]
 pub fn main() {}

@@ -1,3 +1,4 @@
+use core::ptr::addr_of_mut;
 use syscall_defs::net::{SockAddr, SockAddrIn, SockDomain, SockType, SockTypeFlags};
 use syscall_defs::poll::FdSet;
 
@@ -23,7 +24,7 @@ static mut RECV_BUF: [u8; 2 * 4096] = [0u8; 2 * 4096];
 static mut SENT: usize = 0;
 
 fn recv(fd: usize) -> bool {
-    let res = unsafe { syscall::read(fd, &mut RECV_BUF) };
+    let res = unsafe { syscall::read(fd, &mut *addr_of_mut!(RECV_BUF)) };
 
     match res {
         Ok(len) if len > 1 => {

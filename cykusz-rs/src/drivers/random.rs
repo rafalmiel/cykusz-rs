@@ -5,7 +5,6 @@ use alloc::sync::{Arc, Weak};
 
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::current_ns;
-use rand;
 use rand::{RngCore, SeedableRng};
 
 struct Random {

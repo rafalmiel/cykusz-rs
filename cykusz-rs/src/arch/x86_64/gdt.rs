@@ -1,3 +1,4 @@
+use core::ptr::addr_of;
 use crate::arch::raw::descriptor as dsc;
 use crate::arch::raw::gdt;
 use crate::arch::raw::segmentation as sgm;
@@ -61,7 +62,7 @@ pub const fn ring3_ds() -> sgm::SegmentSelector {
 pub fn early_init() {
     unsafe {
         INIT_GDTR.init(&INIT_GDT[..]);
-        dsc::lgdt(&INIT_GDTR);
+        dsc::lgdt(addr_of!(INIT_GDTR));
 
         sgm::set_cs(ring0_cs());
         sgm::load_ds(ring0_ds());
@@ -87,19 +88,19 @@ fn init_tss(stack_top: VirtAddr, fs_base: u64) {
             let gdt_low = &mut GDT[5];
             //logln!("here {:p}", gdt_low as *mut _);
 
-            gdt_low.set_offset(&TSS as *const _ as u32);
+            gdt_low.set_offset(addr_of!(TSS) as u32);
             gdt_low.set_limit(::core::mem::size_of::<TaskStateSegment>() as u32);
         }
 
         {
             let gdt_high = &mut GDT[6];
-            gdt_high.set_raw((&TSS as *const _ as u64) >> 32);
+            gdt_high.set_raw((addr_of!(TSS) as u64) >> 32);
         }
 
         dsc::load_tr(&sgm::SegmentSelector::from_raw(5 << 3));
 
         use crate::arch::raw::msr;
-        msr::wrmsr(msr::IA32_KERNEL_GS_BASE, &TSS as *const _ as u64);
+        msr::wrmsr(msr::IA32_KERNEL_GS_BASE, addr_of!(TSS) as u64);
     }
 }
 
@@ -107,7 +108,7 @@ fn init_tss(stack_top: VirtAddr, fs_base: u64) {
 pub fn init(stack_top: VirtAddr, fs_base: u64) {
     unsafe {
         GDTR.init(&GDT[..]);
-        dsc::lgdt(&GDTR);
+        dsc::lgdt(addr_of!(GDTR));
 
         sgm::set_cs(ring0_cs());
         sgm::load_ds(ring0_ds());

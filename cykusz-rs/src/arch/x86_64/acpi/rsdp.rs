@@ -12,6 +12,7 @@ pub enum Address {
 trait Header {
     fn signature(&'static self) -> &'static [u8; 8];
     fn rsdt_address(&'static self) -> MappedAddr;
+    #[allow(dead_code)]
     fn revision(&'static self) -> u8;
 }
 

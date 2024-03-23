@@ -10,6 +10,7 @@ extern crate syscall_user as syscall;
 
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::ptr::{addr_of, addr_of_mut};
 
 use chrono::{Datelike, Timelike};
 use syscall::bochs;
@@ -45,7 +46,7 @@ fn ls(path: &str) {
                 let struct_len = core::mem::size_of::<SysDirEntry>();
 
                 loop {
-                    let dentry = unsafe { &*(buf.as_ptr().offset(offset) as *const SysDirEntry) };
+                    let dentry = unsafe { &*(addr_of!(buf).offset(offset) as *const SysDirEntry) };
                     let namebytes = unsafe {
                         core::slice::from_raw_parts(
                             dentry.name.as_ptr(),
@@ -736,12 +737,12 @@ static mut READY: bool = false;
 
 fn set_ready(r: bool) {
     unsafe {
-        (&mut READY as *mut bool).write_volatile(r);
+        addr_of_mut!(READY).write_volatile(r);
     }
 }
 
 fn ready() -> bool {
-    unsafe { (&READY as *const bool).read_volatile() }
+    unsafe { addr_of!(READY).read_volatile() }
 }
 
 fn signal_test() {
@@ -836,7 +837,9 @@ fn main_old() -> ! {
         print!("[root {}]# ", make_str(&pwd[0..pwd_r]));
 
         // Read some data from stdin
-        let r = syscall::read(1, &mut buf).unwrap();
+        let r = syscall::read(1, &mut unsafe {
+            *addr_of_mut!(buf)
+        }).unwrap();
 
         {
             // Write data from stdin into the file

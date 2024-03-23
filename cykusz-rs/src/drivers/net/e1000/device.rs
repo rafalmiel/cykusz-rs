@@ -1,12 +1,9 @@
-use alloc::vec::Vec;
 use bit_field::BitField;
 
-use crate::drivers::net::e1000::addr::Addr;
-use crate::drivers::net::e1000::regs::Regs;
-use crate::drivers::pci::{PciData, PciHeader, PciHeader0};
+use crate::drivers::pci::{PciData, PciHeader0};
 use crate::kernel::mm::allocate_order;
 use crate::kernel::mm::heap::{allocate_align, deallocate_align};
-use crate::kernel::mm::{MappedAddr, PhysAddr, VirtAddr};
+use crate::kernel::mm::{PhysAddr, VirtAddr};
 use crate::kernel::net::PacketBaseTrait;
 use crate::kernel::timer::busy_sleep;
 

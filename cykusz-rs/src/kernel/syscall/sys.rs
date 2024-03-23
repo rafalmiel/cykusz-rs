@@ -591,7 +591,7 @@ pub fn sys_link(
         )
     };
 
-    if Weak::as_ptr(&inode.fs().unwrap()) != Weak::as_ptr(&target_entry.inode().fs().unwrap()) {
+    if !Weak::ptr_eq(&inode.fs().unwrap(), &target_entry.inode().fs().unwrap()) {
         return Err(SyscallError::EINVAL);
     }
 
@@ -677,7 +677,7 @@ pub fn sys_rename(
         )
     };
 
-    if new.inode().fs().unwrap().as_ptr() != old.inode().fs().unwrap().as_ptr() {
+    if !Weak::ptr_eq(&new.inode().fs().unwrap(), &old.inode().fs().unwrap()) {
         return Err(SyscallError::EACCES);
     }
 

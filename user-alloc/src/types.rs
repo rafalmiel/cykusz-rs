@@ -5,6 +5,7 @@ pub trait Align {
 }
 
 pub trait CeilDiv {
+    #[allow(dead_code)]
     fn ceil_div(self, d: Self) -> Self;
 }
 

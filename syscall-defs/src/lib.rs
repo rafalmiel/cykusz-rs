@@ -6,9 +6,6 @@
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;
-
-use core::convert::TryFrom;
-
 pub mod events;
 pub mod exec;
 pub mod ioctl;

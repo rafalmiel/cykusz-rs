@@ -2,8 +2,6 @@ use core::marker::PhantomData;
 
 use crate::arch::mm::virt::entry::Entry;
 use crate::arch::x86_64::mm::phys::PhysPage;
-use crate::kernel::mm::virt;
-use crate::kernel::mm::Frame;
 use crate::kernel::mm::*;
 use crate::kernel::sync::SpinGuard;
 

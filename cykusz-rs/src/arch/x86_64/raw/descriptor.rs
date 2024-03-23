@@ -102,7 +102,7 @@ pub unsafe fn lidt(idt: &DescriptorTablePointer<idt::IdtEntry>) {
     asm!("lidt [{0}]", in(reg) idt);
 }
 
-pub unsafe fn lgdt(gdt: &DescriptorTablePointer<gdt::GdtEntry>) {
+pub unsafe fn lgdt(gdt: *const DescriptorTablePointer<gdt::GdtEntry>) {
     asm!("lgdt [{0}]", in(reg) gdt);
 }
 

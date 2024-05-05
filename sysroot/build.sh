@@ -401,6 +401,19 @@ function _sysroot {
     cp $SPATH/cfg/resolv.conf $SYSROOT/etc/
 }
 
+function _sysroot_rust_bindings {
+    _prepare_mlibc
+
+    SYSROOT_BIND=${SYSROOT}_mlibc
+    rm -rf $SYSROOT_BIND
+
+    mkdir -p $BUILD_DIR
+
+    rm -rf $MLIBC_BUILD_DIR
+    meson setup --cross-file $SPATH/cfg/cross-file.ini --prefix /usr -Dlinux_kernel_headers=${LINUX_HEADERS_SRC}/include -Dheaders_only=true $MLIBC_BUILD_DIR $MLIBC_SRC_DIR
+    meson install -C $MLIBC_BUILD_DIR --destdir=${SYSROOT_BIND}
+}
+
 function _binutils {
     _prepare_binutils
 

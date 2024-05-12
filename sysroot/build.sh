@@ -47,6 +47,7 @@ BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
 COREUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-coreutils
 ZSTD_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zstd
 LIBRESSL_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libressl
+LLVM_BUILD_DIR=$BUILD_DIR/llvm
 LLVM_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-llvm
 LESS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-less
 NETCAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-netcat
@@ -445,6 +446,23 @@ function _gcc {
 
     make -C $GCC_BUILD_DIR -j4 all-gcc
     make -C $GCC_BUILD_DIR install-gcc
+}
+
+function _llvm {
+    _prepare_llvm
+
+    mkdir -p $LLVM_BUILD_DIR
+
+    pushd .
+
+    cd $LLVM_BUILD_DIR
+
+    cmake -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DDEFAULT_SYSROOT=$SYSROOT -DCMAKE_INSTALL_PREFIX="$CROSS" -DCMAKE_BUILD_TYPE=Release -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_TARGET_ARCH=x86_64 -DLLVM_DEFAULT_TARGET_TRIPLE=$TRIPLE -Wno-dev $LLVM_SRC_DIR/llvm
+
+    VERBOSE=1 make -j12
+    make install
+
+    popd
 }
 
 function _libtool {

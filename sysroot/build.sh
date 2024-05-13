@@ -7,6 +7,7 @@ CYKUSZ_DIR=$(realpath $SPATH/..)
 SRC_DIR=$CYKUSZ_DIR/sysroot/src
 BINUTILS_SRC_DIR=$SRC_DIR/binutils-gdb
 GCC_SRC_DIR=$SRC_DIR/gcc
+RUST_SRC_DIR=$HOME/rust
 LIBTOOL_SRC_DIR=$SRC_DIR/libtool
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
@@ -63,6 +64,7 @@ LIBIDN2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libidn2
 LIBFFI_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libffi
 LIBEXPAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libexpat
 GCC_BUILD_DIR=$BUILD_DIR/gcc
+RUST_BUILD_DIR=$HOME/build-rust
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
@@ -98,6 +100,45 @@ function _prepare_gcc {
         cd $GCC_SRC_DIR
         ./contrib/download_prerequisites
         git apply patch-01.patch
+
+        popd
+    fi
+}
+
+function _prepare_rust {
+    if [ ! -d $RUST_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/rust.git $RUST_SRC_DIR
+
+        pushd .
+
+        cd $RUST_SRC_DIR
+        cat > config.toml <<EOL
+change-id = 124501
+
+[llvm]
+download-ci-llvm = false
+targets = "X86"
+
+[build]
+target = ["x86_64-unknown-cykusz", "x86_64-unknown-linux-gnu"]
+build-dir = "$RUST_BUILD_DIR"
+docs = false
+
+[install]
+prefix = ""
+sysconfdir = "etc"
+
+[rust]
+codegen-tests = false
+deny-warnings = false # work around rust-num-cpus warning
+
+[target.x86_64-unknown-linux-gnu]
+llvm-config = "$CROSS/bin/llvm-config"
+
+[target.x86_64-unknown-cykusz]
+llvm-config = "$CROSS/bin/llvm-config"
+EOL
 
         popd
     fi
@@ -446,6 +487,24 @@ function _gcc {
 
     make -C $GCC_BUILD_DIR -j4 all-gcc
     make -C $GCC_BUILD_DIR install-gcc
+}
+
+function _rust {
+    _prepare_rust
+
+    pushd .
+
+    cd $RUST_SRC_DIR
+    CARGO_HOME=/tmp/cargo-home
+    mkdir -p $CARGO_HOME
+
+    cp $SPATH/cfg/rust/host-config.toml $CARGO_HOME/config.toml
+
+    rustup component add rust-src
+    CARGO_HOME=$CARGO_HOME ./x.py build --stage 2 -j12 --verbose
+    CARGO_HOME=$CARGO_HOME DESTDIR=$CROSS ./x.py install
+
+    popd
 }
 
 function _llvm {
@@ -979,8 +1038,8 @@ function _cykusz_readline {
 }
 
 function _cykusz_apps {
-	$TRIPLE-gcc $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
-	$TRIPLE-gcc $SRC_DIR/cykusz_apps/stack.c -o $BUILD_DIR/stack
+	clang $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
+	clang $SRC_DIR/cykusz_apps/stack.c -o $BUILD_DIR/stack
 	$TRIPLE-g++ $SRC_DIR/cykusz_apps/hello.cpp -o $BUILD_DIR/hello
 	$TRIPLE-g++ $SRC_DIR/cykusz_apps/test.cpp -o $BUILD_DIR/testcpp
 	$TRIPLE-gcc $SRC_DIR/cykusz_apps/ttytest.c -o $BUILD_DIR/ttytest

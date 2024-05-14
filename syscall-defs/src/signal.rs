@@ -27,18 +27,18 @@ pub enum SignalHandler {
 #[derive(Copy, Clone, Debug)]
 pub struct SigAction {
     pub sa_handler: u64,
-    pub sa_mask: u64,
     pub sa_flags: u32,
     pub sa_restorer: u64,
+    pub sa_mask: u64,
 }
 
 impl SigAction {
     pub fn new(handler: SignalHandler, mask: u64, flags: SignalFlags) -> SigAction {
         SigAction {
             sa_handler: handler.into(),
-            sa_mask: mask,
             sa_flags: flags.bits(),
             sa_restorer: 0,
+            sa_mask: mask,
         }
     }
 }

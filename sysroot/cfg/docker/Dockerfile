@@ -13,8 +13,9 @@ RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 12
 
 USER ck
 
-RUN mkdir -p /home/ck/cykusz-rs
-WORKDIR /home/ck/cykusz-rs/sysroot
+RUN mkdir -p /home/ck/code/cykusz-rs
+RUN mkdir -p /home/ck/sysroot
+WORKDIR /home/ck/code/cykusz-rs/sysroot
 
 RUN curl https://sh.rustup.rs -sSf | \
     sh -s -- -y

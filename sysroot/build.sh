@@ -7,7 +7,7 @@ CYKUSZ_DIR=$(realpath $SPATH/..)
 SRC_DIR=$CYKUSZ_DIR/sysroot/src
 BINUTILS_SRC_DIR=$SRC_DIR/binutils-gdb
 GCC_SRC_DIR=$SRC_DIR/gcc
-RUST_SRC_DIR=$HOME/rust
+RUST_SRC_DIR=$HOME/sysroot/src/rust
 LIBTOOL_SRC_DIR=$SRC_DIR/libtool
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
@@ -64,11 +64,11 @@ LIBIDN2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libidn2
 LIBFFI_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libffi
 LIBEXPAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libexpat
 GCC_BUILD_DIR=$BUILD_DIR/gcc
-RUST_BUILD_DIR=$HOME/build-rust
+RUST_BUILD_DIR=$HOME/sysroot/build/rust
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
-CROSS=$CYKUSZ_DIR/sysroot/cross
+CROSS=$CYKUSZ_DIR/sysroot/cross/usr
 
 TRIPLE=x86_64-cykusz
 
@@ -503,6 +503,10 @@ function _rust {
     rustup component add rust-src
     CARGO_HOME=$CARGO_HOME ./x.py build --stage 2 -j12 --verbose
     CARGO_HOME=$CARGO_HOME DESTDIR=$CROSS ./x.py install
+
+    mkdir -p $CROSS/lib/rustlib/src
+    cd $CROSS/lib/rustlib/src
+    ln -sf $SRC_DIR/rust ./rust
 
     popd
 }
@@ -1038,16 +1042,22 @@ function _cykusz_readline {
 }
 
 function _cykusz_apps {
-	clang $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
-	clang $SRC_DIR/cykusz_apps/stack.c -o $BUILD_DIR/stack
-	$TRIPLE-g++ $SRC_DIR/cykusz_apps/hello.cpp -o $BUILD_DIR/hello
-	$TRIPLE-g++ $SRC_DIR/cykusz_apps/test.cpp -o $BUILD_DIR/testcpp
-	$TRIPLE-gcc $SRC_DIR/cykusz_apps/ttytest.c -o $BUILD_DIR/ttytest
-	$TRIPLE-gcc $SRC_DIR/cykusz_apps/fork.c -o $BUILD_DIR/fork
-	$TRIPLE-gcc $SRC_DIR/cykusz_apps/forktest.c -o $BUILD_DIR/forktest
-	$TRIPLE-gcc $SRC_DIR/cykusz_apps/poweroff.c -o $BUILD_DIR/poweroff
-	$TRIPLE-gcc $SRC_DIR/cykusz_apps/stat.c -o $BUILD_DIR/stat
-	_cykusz_nyancat
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
+    $TRIPLE-gcc  $SRC_DIR/cykusz_apps/stack.c -o $BUILD_DIR/stack
+    $TRIPLE-g++ $SRC_DIR/cykusz_apps/hello.cpp -o $BUILD_DIR/hello
+    $TRIPLE-g++ $SRC_DIR/cykusz_apps/test.cpp -o $BUILD_DIR/testcpp
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/ttytest.c -o $BUILD_DIR/ttytest
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/fork.c -o $BUILD_DIR/fork
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/forktest.c -o $BUILD_DIR/forktest
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/poweroff.c -o $BUILD_DIR/poweroff
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/stat.c -o $BUILD_DIR/stat
+    _cykusz_nyancat
+
+    pushd .
+    cd $CYKUSZ_DIR/rust-test
+    CARGO_HOME=$SPATH/cargo_home cargo build --target x86_64-unknown-cykusz
+    cp target/x86_64-unknown-cykusz/debug/rust-test $BUILD_DIR/rust-test
+    popd
 }
 
 function _prepare {

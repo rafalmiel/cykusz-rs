@@ -1,0 +1,10 @@
+[build]
+rustc = "cross/usr/bin/rustc"
+target = "x86_64-unknown-cykusz"
+rustflags = ["-C", "link-args=-no-pie", "-C", "link-args=-lgcc_s"]
+
+[target.x86_64-unknown-cykusz]
+linker = "cross/usr/bin/x86_64-cykusz-gcc"
+
+[patch.crates-io]
+libc = { git = "https://github.com/rafalmiel/libc.git", branch = "cykusz" }

@@ -1,6 +1,3 @@
-[build]
-target = "x86_64-cykusz_os.json"
-
 [unstable]
 build-std-features = ["compiler-builtins-mem"]
 build-std = ["alloc", "core", "compiler_builtins"]

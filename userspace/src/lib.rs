@@ -1,6 +1,8 @@
 #![feature(naked_functions)]
 #![feature(asm_const)]
 
+pub mod print;
+
 use std::arch::asm;
 use std::sync::atomic::AtomicU32;
 
@@ -9,9 +11,6 @@ use syscall_defs::poll::FdSet;
 use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
 use syscall_defs::*;
-
-#[macro_use]
-pub mod print;
 
 pub unsafe fn syscall0(mut a: usize) -> SyscallResult {
     asm!("syscall",

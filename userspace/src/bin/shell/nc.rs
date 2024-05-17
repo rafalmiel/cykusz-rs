@@ -2,6 +2,8 @@ use std::ptr::addr_of_mut;
 use syscall_defs::net::{SockAddr, SockAddrIn, SockDomain, SockType, SockTypeFlags};
 use syscall_defs::poll::FdSet;
 
+use userspace as syscall;
+
 fn send(fd: usize) -> bool {
     let mut buf = [0u8; 1300];
 

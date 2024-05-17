@@ -132,6 +132,7 @@ sysconfdir = "etc"
 [rust]
 codegen-tests = false
 deny-warnings = false # work around rust-num-cpus warning
+channel = "nightly"
 
 [target.x86_64-unknown-linux-gnu]
 llvm-config = "$CROSS/bin/llvm-config"
@@ -495,20 +496,22 @@ function _rust {
     pushd .
 
     cd $RUST_SRC_DIR
-    CARGO_HOME=/tmp/cargo-home
+    CARGO_HOME=$BUILD_DIR/cargo_home
     mkdir -p $CARGO_HOME
 
     cp $SPATH/cfg/rust/host-config.toml $CARGO_HOME/config.toml
 
     rustup component add rust-src
-    CARGO_HOME=$CARGO_HOME ./x.py build --stage 2 -j12 --verbose
+    mv $CYKUSZ_DIR/.cargo $CYKUSZ_DIR/.cargo_backup # move .cargo out of the way as it messes up the with build
+    CARGO_HOME=$CARGO_HOME ./x.py build --stage 2 -j12
     CARGO_HOME=$CARGO_HOME DESTDIR=$CROSS ./x.py install
+    mv $CYKUSZ_DIR/.cargo_backup $CYKUSZ_DIR/.cargo
 
     mkdir -p $CROSS/lib/rustlib/src
     cd $CROSS/lib/rustlib/src
     ln -sf $SRC_DIR/rust ./rust
     cd $CROSS/bin
-    ln -sf $(which cargo)
+    ln -sf "$(which cargo)" .
 
     popd
 }
@@ -1059,8 +1062,7 @@ function _cykusz_apps {
 function _cargo_userspace {
     pushd .
     cd $CYKUSZ_DIR/userspace
-    CARGO_HOME=$SPATH/cargo_home cargo build --release
-    cp target/x86_64-unknown-cykusz/release/init $BUILD_DIR/init
+    cargo build --release
     popd
 }
 

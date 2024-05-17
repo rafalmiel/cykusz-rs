@@ -17,8 +17,8 @@ PROGS="test testcpp hello stack nyancat ttytest fork forktest poweroff stat fbdo
 
 mount /dev/loop0p2 mnt
 mkdir -p mnt/bin
-cp -f target/x86_64-cykusz_os/release/init mnt/bin/init
-cp -f target/x86_64-cykusz_os/release/shell mnt/bin/shell
+cp -f userspace/target/x86_64-unknown-cykusz/release/init mnt/bin/init
+cp -f userspace/target/x86_64-unknown-cykusz/release/shell mnt/bin/shell
 
 for prog in $PROGS; do
 	cp -f sysroot/build/$prog mnt/bin/$prog

@@ -1,12 +1,8 @@
 #![feature(naked_functions)]
 #![feature(asm_const)]
-#![no_std]
 
-extern crate alloc;
-
-use alloc::vec::Vec;
-use core::arch::asm;
-use core::sync::atomic::AtomicU32;
+use std::arch::asm;
+use std::sync::atomic::AtomicU32;
 
 use syscall_defs::net::{MsgHdr, SockAddr, SockDomain, SockTypeFlags};
 use syscall_defs::poll::FdSet;

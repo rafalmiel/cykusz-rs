@@ -7,7 +7,7 @@ CYKUSZ_DIR=$(realpath $SPATH/..)
 SRC_DIR=$CYKUSZ_DIR/sysroot/src
 BINUTILS_SRC_DIR=$SRC_DIR/binutils-gdb
 GCC_SRC_DIR=$SRC_DIR/gcc
-RUST_SRC_DIR=$HOME/sysroot/src/rust
+RUST_SRC_DIR=$SRC_DIR/rust
 LIBTOOL_SRC_DIR=$SRC_DIR/libtool
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
@@ -64,7 +64,7 @@ LIBIDN2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libidn2
 LIBFFI_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libffi
 LIBEXPAT_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libexpat
 GCC_BUILD_DIR=$BUILD_DIR/gcc
-RUST_BUILD_DIR=$HOME/sysroot/build/rust
+RUST_BUILD_DIR=$BUILD_DIR/rust
 MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
@@ -507,6 +507,8 @@ function _rust {
     mkdir -p $CROSS/lib/rustlib/src
     cd $CROSS/lib/rustlib/src
     ln -sf $SRC_DIR/rust ./rust
+    cd $CROSS/bin
+    ln -sf $(which cargo)
 
     popd
 }
@@ -1052,11 +1054,13 @@ function _cykusz_apps {
     $TRIPLE-gcc $SRC_DIR/cykusz_apps/poweroff.c -o $BUILD_DIR/poweroff
     $TRIPLE-gcc $SRC_DIR/cykusz_apps/stat.c -o $BUILD_DIR/stat
     _cykusz_nyancat
+}
 
+function _cargo_userspace {
     pushd .
-    cd $CYKUSZ_DIR/rust-test
-    CARGO_HOME=$SPATH/cargo_home cargo build --target x86_64-unknown-cykusz
-    cp target/x86_64-unknown-cykusz/debug/rust-test $BUILD_DIR/rust-test
+    cd $CYKUSZ_DIR/userspace
+    CARGO_HOME=$SPATH/cargo_home cargo build --release
+    cp target/x86_64-unknown-cykusz/release/init $BUILD_DIR/init
     popd
 }
 

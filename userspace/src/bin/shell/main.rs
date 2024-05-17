@@ -1,16 +1,8 @@
-#![no_std]
-#![no_main]
-#![feature(thread_local)]
-
-extern crate alloc;
-extern crate program;
 extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
 
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::ptr::{addr_of, addr_of_mut};
+use std::ptr::{addr_of, addr_of_mut};
 
 use chrono::{Datelike, Timelike};
 use syscall::bochs;
@@ -21,8 +13,8 @@ use crate::file::File;
 use syscall_defs::signal::{SigAction, SignalFlags, SignalHandler};
 use syscall_defs::waitpid::WaitPidFlags;
 
-pub mod file;
-pub mod nc;
+mod file;
+mod nc;
 
 pub static mut TEST: usize = 33;
 
@@ -775,7 +767,6 @@ fn setup_signal_handler(sig: usize, handler: SignalHandler, flags: SignalFlags) 
     }
 }
 
-#[no_mangle]
 pub fn main() {
     setup_signal_handler(
         syscall_defs::signal::SIGINT,

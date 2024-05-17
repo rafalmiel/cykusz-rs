@@ -140,21 +140,6 @@ impl Task {
         Self::make_ptr(task)
     }
 
-    #[cfg(disabled)]
-    pub fn new_user(exe: DirEntryItem) -> Arc<Task> {
-        let mut task = Task::new();
-
-        let vm = task.vm();
-
-        if let Some((_base_addr, entry, elf_hdr, tls_vm)) = vm.load_bin(exe) {
-            task.arch_task = UnsafeCell::new(ArchTask::new_user(entry, &elf_hdr, vm, tls_vm));
-
-            Self::make_ptr(task)
-        } else {
-            panic!("Failed to exec task")
-        }
-    }
-
     pub fn fork(&self) -> Arc<Task> {
         let mut task = Task::new();
 

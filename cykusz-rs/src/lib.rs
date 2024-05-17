@@ -28,6 +28,9 @@ extern crate intrusive_collections;
 extern crate lazy_static;
 
 use core::arch::asm;
+use syscall_defs::OpenFlags;
+use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::fs::path::Path;
 
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
@@ -145,6 +148,10 @@ fn init_task() {
     kernel::futex::init();
 
     println!("[ OK ] Futexes Initialized");
+
+    current_task_ref().open_file(lookup_by_path(&Path::new("/dev/tty"), LookupMode::None).unwrap(), OpenFlags::WRONLY).expect("Failed to open tty");
+    current_task_ref().open_file(lookup_by_path(&Path::new("/dev/tty"), LookupMode::None).unwrap(), OpenFlags::WRONLY).expect("Failed to open tty");
+    current_task_ref().open_file(lookup_by_path(&Path::new("/dev/tty"), LookupMode::None).unwrap(), OpenFlags::WRONLY).expect("Failed to open tty");
 
     // Start shell on this cpu
     crate::kernel::init::exec();

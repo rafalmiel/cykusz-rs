@@ -1,4 +1,4 @@
-use core::ptr::addr_of_mut;
+use std::ptr::addr_of_mut;
 use syscall_defs::net::{SockAddr, SockAddrIn, SockDomain, SockType, SockTypeFlags};
 use syscall_defs::poll::FdSet;
 

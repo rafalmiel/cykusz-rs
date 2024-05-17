@@ -1,0 +1,2 @@
+[patch.crates-io]
+libc = { git = "https://github.com/rafalmiel/libc.git", branch = "cykusz" }

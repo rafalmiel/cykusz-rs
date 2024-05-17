@@ -10,15 +10,16 @@ assembly_object_files := $(patsubst cykusz-rs/src/arch/$(arch)/asm/%.asm, \
 		build/arch/$(arch)/asm/%.o, $(assembly_source_files))
 
 target ?= $(arch)-cykusz_os
+target_user ?= $(arch)-unknown-cykusz
 ifdef dev
 rust_os := target/$(target)/debug/libcykusz_rs.a
-rust_shell := target/$(target)/debug/shell
-rust_init := target/$(target)/debug/init
+rust_shell := userspace/target/$(target)/debug/shell
+rust_init := userspace/target/$(target)/debug/init
 kernel := build/kernel-$(arch)-g.bin
 else
 rust_os := target/$(target)/release/libcykusz_rs.a
-rust_shell := target/$(target)/release/shell
-rust_init := target/$(target)/release/init
+rust_shell := userspace/target/$(target_user)/release/shell
+rust_init := userspace/target/$(target_user)/release/init
 kernel := build/kernel-$(arch).bin
 endif
 cross_c := sysroot/cross/bin/x86_64-cykusz-gcc
@@ -30,7 +31,7 @@ usb_dev := /dev/sdb1
 
 .PHONY: all clean run ata bochs iso toolchain fsck
 
-all: $(kernel) $(rust_shell) $(rust_init)
+all: cargo_kernel cargo_user
 
 clean:
 	cargo clean
@@ -77,7 +78,7 @@ $(iso): $(kernel) $(grub_cfg) $(rust_shell)
 	cp $(rust_shell) build/isofiles/boot/program
 	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
 
-$(disk): $(kernel) $(rust_shell) $(rust_init) $(cross_cpp)
+$(disk): $(kernel) cargo_user $(cross_cpp)
 	#echo fake install_os
 	sudo disk-scripts/install_os.sh
 
@@ -85,18 +86,21 @@ $(vdi): $(disk)
 	disk-scripts/make_vdi.sh
 	disk-scripts/attach_vdi.sh
 
-$(kernel): cargo $(rust_os) $(assembly_object_files) $(linker_script)
+$(kernel): cargo_kernel $(rust_os) $(assembly_object_files) $(linker_script)
 	ld -n --whole-archive --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 usb: $(kernel)
 	sudo disk-scripts/install_usb.sh $(usb_dev)
 
-cargo:
+cargo_kernel:
 ifdef dev
-	cargo build --workspace --verbose
+	cd cykusz-rs && cargo build  --verbose && cd ../
 else
-	cargo build --workspace --release --verbose
+	cd cykusz-rs && cargo build --release --verbose && cd ../
 endif
+
+cargo_user:
+	sysroot/build.sh cargo_userspace
 
 toolchain: $(cross_cpp)
 	sysroot/build.sh check_build

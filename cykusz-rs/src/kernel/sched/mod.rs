@@ -126,19 +126,6 @@ impl Scheduler {
         task
     }
 
-    #[cfg(disabled)]
-    fn create_user_task(&self, exe: DirEntryItem) -> Arc<Task> {
-        let task = Task::new_user(exe);
-
-        self.tasks.register_task(task.clone());
-
-        sessions().register_process(task.clone());
-
-        self.sched.queue_task(task.clone());
-
-        task
-    }
-
     pub fn as_impl<T: SchedulerInterface>(&self) -> &T {
         match self.sched.downcast_ref::<T>() {
             Some(e) => e,
@@ -398,11 +385,6 @@ pub fn create_task(fun: fn()) -> Arc<Task> {
 
 pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
     scheduler().create_param_task(fun, val)
-}
-
-#[cfg(disabled)]
-pub fn create_user_task(exe: DirEntryItem) -> Arc<Task> {
-    scheduler().create_user_task(exe)
 }
 
 pub fn sleep(time_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {

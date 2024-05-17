@@ -1,8 +1,3 @@
-#![no_std]
-#![no_main]
-
-extern crate program;
-extern crate syscall_defs;
 #[macro_use]
 extern crate syscall_user as syscall;
 
@@ -20,7 +15,7 @@ fn spawn_shell() -> usize {
                 syscall_defs::ioctl::tty::TIOCSPGRP,
                 core::ptr::addr_of!(pid) as usize,
             )
-            .expect("Failed to attach tty");
+                .expect("Failed to attach tty");
 
             if let Err(e) = syscall::exec(
                 "/usr/bin/sh",
@@ -40,7 +35,6 @@ fn spawn_shell() -> usize {
     };
 }
 
-#[no_mangle]
 pub fn main() {
     let mut shell_pid = spawn_shell();
 

@@ -398,44 +398,6 @@ impl Task {
         )
     }
 
-    #[cfg(disabled)]
-    pub fn new_user(entry: VirtAddr, hdr: &ElfHeader, vm: &VM, tls_vm: Option<TlsVmInfo>) -> Task {
-        logln!("entry point: {}", entry);
-
-        let p_table = prepare_p4();
-
-        vm.mmap_vm(
-            Some(VirtAddr(0x8000_0000_0000 - USER_STACK_SIZE)),
-            USER_STACK_SIZE,
-            MMapProt::PROT_WRITE | MMapProt::PROT_READ,
-            MMapFlags::MAP_FIXED | MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS,
-            None,
-            0,
-        );
-
-        let tls_ptr = if let Some(tls) = &tls_vm {
-            prepare_tls(vm, p_table, tls)
-        } else {
-            VirtAddr(0)
-        };
-
-        let f = unsafe { ::core::mem::transmute::<usize, fn()>(entry.0) };
-
-        let mut t = Task::new(
-            f as usize,
-            gdt::ring3_cs(),
-            gdt::ring3_ds(),
-            true,
-            p_table.phys_addr(),
-            Some(0x8000_0000_0000),
-            0,
-        );
-
-        t.user_fs_base = tls_ptr.0;
-
-        t
-    }
-
     pub fn fork(&self) -> Task {
         let orig_p4 = P4Table::new_mut_at_phys(PhysAddr(self.cr3));
 

@@ -1,5 +1,5 @@
 [workspace]
-members = ["syscall-defs", "syscall-user", "user-alloc", "acpica", "cykusz-rs"]
+members = ["syscall-defs", "syscall-user", "acpica", "cykusz-rs"]
 exclude = ["userspace", "sysroot/src/rust"]
 resolver = "2"
 

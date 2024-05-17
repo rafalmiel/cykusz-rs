@@ -24,6 +24,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "libc"
+version = "0.2.153"
+source = "git+https://github.com/rafalmiel/libc.git?branch=cykusz#dcd7bda5ed7544cd803e0a37cd8897d2a1dc5d3c"
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -40,22 +45,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "syscall-user"
-version = "0.1.0"
-dependencies = [
- "syscall-defs",
-]
-
-[[package]]
 name = "userspace"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "libc",
  "syscall-defs",
- "syscall-user",
 ]
-
-[[patch.unused]]
-name = "libc"
-version = "0.2.153"
-source = "git+https://github.com/rafalmiel/libc.git?branch=cykusz#dcd7bda5ed7544cd803e0a37cd8897d2a1dc5d3c"

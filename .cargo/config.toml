@@ -1,0 +1,2 @@
+[build]
+target = "cykusz-rs/x86_64-cykusz_os.json"

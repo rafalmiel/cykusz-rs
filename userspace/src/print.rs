@@ -44,14 +44,14 @@ macro_rules! print {
 }
 
 #[macro_export]
-macro_rules! logln {
-    ($fmt:expr) => (log!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (log!(concat!($fmt, "\n"), $($arg)*));
-}
-
-#[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => ({
         $crate::print::debug_fmt(format_args!($($arg)*)).unwrap();
     });
+}
+
+#[macro_export]
+macro_rules! logln {
+    ($fmt:expr) => (usersapce::log!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (userspace::log!(concat!($fmt, "\n"), $($arg)*));
 }

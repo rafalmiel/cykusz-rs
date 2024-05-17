@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate syscall_user as syscall;
+use userspace as syscall;
 
 use syscall_defs::waitpid::WaitPidFlags;
 

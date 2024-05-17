@@ -1,8 +1,0 @@
-[package]
-name = "syscall-user"
-version = "0.1.0"
-authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
-edition = "2021"
-
-[dependencies]
-syscall-defs = { path = "../syscall-defs" }

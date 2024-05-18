@@ -1,5 +1,5 @@
 [build]
-rustc = "../sysroot/cross/usr/bin/rustc"
+rustc = "../sysroot/cross/usr/local/bin/rustc"
 target = "x86_64-unknown-cykusz"
 rustflags = ["-C", "link-args=-no-pie", "-C", "link-args=-lgcc_s"]
 

@@ -501,16 +501,21 @@ function _rust {
 
     cp $SPATH/cfg/rust/host-config.toml $CARGO_HOME/config.toml
 
+    INSTALL_PATH="$SPATH/cross"
+
     rustup component add rust-src
     mv $CYKUSZ_DIR/.cargo $CYKUSZ_DIR/.cargo_backup # move .cargo out of the way as it messes up the with build
     CARGO_HOME=$CARGO_HOME ./x.py build --stage 2 -j12
-    CARGO_HOME=$CARGO_HOME DESTDIR=$CROSS ./x.py install
+    CARGO_HOME=$CARGO_HOME DESTDIR="$INSTALL_PATH/usr/local" ./x.py install
+    CARGO_HOME=$CARGO_HOME DESTDIR="$INSTALL_PATH/usr/local" ./x.py dist
     mv $CYKUSZ_DIR/.cargo_backup $CYKUSZ_DIR/.cargo
 
-    mkdir -p $CROSS/lib/rustlib/src
-    cd $CROSS/lib/rustlib/src
-    ln -sf $SRC_DIR/rust ./rust
-    cd $CROSS/bin
+    cd $BUILD_DIR/rust/dist
+    tar -xf rust-src-nightly.tar.xz
+    cd rust-src-nightly
+    ./install.sh --destdir="$INSTALL_PATH"
+
+    cd "$INSTALL_PATH/usr/local/bin"
     ln -sf "$(which cargo)" .
 
     popd

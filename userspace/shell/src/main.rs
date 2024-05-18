@@ -1,5 +1,9 @@
 extern crate syscall_defs;
-use userspace as syscall;
+
+#[macro_use]
+extern crate syscall_user;
+
+use syscall_user as syscall;
 
 use std::ptr::{addr_of, addr_of_mut};
 
@@ -569,7 +573,7 @@ fn exec(cmd: &str) {
                 Some(file),
                 0,
             ) {
-                userspace::logln!("MMaped fb at addr: 0x{:x}", addr);
+                logln!("MMaped fb at addr: 0x{:x}", addr);
 
                 unsafe {
                     let ptr = addr as *mut u32;

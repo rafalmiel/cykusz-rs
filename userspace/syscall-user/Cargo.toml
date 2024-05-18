@@ -1,0 +1,10 @@
+[package]
+name = "syscall-user"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc="*"
+
+[dependencies.syscall-defs]
+path = "../../syscall-defs"

@@ -1,4 +1,4 @@
-use userspace as syscall;
+use syscall_user as syscall;
 
 pub struct File {
     fd: usize,

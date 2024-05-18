@@ -1,0 +1,14 @@
+[package]
+name = "shell"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.syscall-defs]
+path = "../../syscall-defs"
+
+[dependencies.syscall-user]
+path = "../syscall-user"
+
+[dependencies.chrono]
+default-features = false
+version = "*"

@@ -13,8 +13,8 @@ target ?= $(arch)-cykusz_os
 target_user ?= $(arch)-unknown-cykusz
 ifdef dev
 rust_os := target/$(target)/debug/libcykusz_rs.a
-rust_shell := userspace/target/$(target)/debug/shell
-rust_init := userspace/target/$(target)/debug/init
+rust_shell := userspace/target/$(target_user)/debug/shell
+rust_init := userspace/target/$(target_user)/debug/init
 kernel := build/kernel-$(arch)-g.bin
 else
 rust_os := target/$(target)/release/libcykusz_rs.a

@@ -1,14 +1,3 @@
-[package]
-name = "userspace"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-libc = "*"
-
-[dependencies.chrono]
-default-features = false
-version = "*"
-
-[dependencies.syscall-defs]
-path = "../syscall-defs"
+[workspace]
+resolver = "2"
+members = ["init", "shell", "syscall-user"]

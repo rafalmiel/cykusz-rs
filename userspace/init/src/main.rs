@@ -1,4 +1,4 @@
-use userspace as syscall;
+use syscall_user as syscall;
 
 use syscall_defs::waitpid::WaitPidFlags;
 

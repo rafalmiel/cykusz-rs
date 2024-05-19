@@ -52,6 +52,10 @@ impl INodeItemStruct {
     pub fn make_key(fs: &Weak<dyn Filesystem>, id: usize) -> ICacheKey {
         (Weak::as_ptr(fs) as *const () as usize, id)
     }
+
+    pub fn inode_arc(&self) -> Arc<dyn INode> {
+        return self.inode.clone()
+    }
 }
 
 impl Deref for INodeItemStruct {

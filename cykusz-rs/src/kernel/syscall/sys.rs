@@ -122,7 +122,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
         return Err(SyscallError::ENOTDIR);
     }
 
-    if flags.contains(OpenFlags::TRUNC) {
+    if flags.contains(OpenFlags::TRUNC) && inode.inode().ftype()? == FileType::File {
         if let Err(e) = inode.inode().truncate(0) {
             println!("Truncate failed: {:?}", e);
         }
@@ -1068,10 +1068,7 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
                 continue;
             }
             if let Some(handle) = task.get_handle(fd.fd as usize) {
-                let f = handle
-                    .inode
-                    .inode()
-                    .poll(if first { Some(&mut poll_table) } else { None }, fd.events)?;
+                let f = handle.poll(if first { Some(&mut poll_table) } else { None }, fd.events)?;
                 if !f.is_empty() {
                     found += 1;
 
@@ -1281,7 +1278,7 @@ pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
     let current = current_task_ref();
 
     if let Some(handle) = current.get_handle(fd as usize) {
-        Ok(handle.inode.inode().ioctl(cmd as usize, arg as usize)?)
+        Ok(handle.ioctl(cmd as usize, arg as usize)?)
     } else {
         Err(SyscallError::EBADFD)
     }
@@ -1397,7 +1394,7 @@ pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
 pub fn sys_pipe(fds: u64, flags: u64) -> SyscallResult {
     let fds = unsafe { core::slice::from_raw_parts_mut(fds as *mut u32, 2) };
 
-    let pipe = crate::kernel::fs::pipe::Pipe::new();
+    let pipe = crate::kernel::fs::pipe::Pipe::new(None);
 
     let entry = DirEntry::inode_wrap(pipe);
 
@@ -1405,7 +1402,7 @@ pub fn sys_pipe(fds: u64, flags: u64) -> SyscallResult {
 
     let flags = OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)?;
 
-    let f1 = OpenFlags::RDONLY | (flags & OpenFlags::CLOEXEC);
+    let f1 = OpenFlags::RDONLY | (flags & OpenFlags::CLOEXEC | OpenFlags::NONBLOCK);
     let f2 = OpenFlags::WRONLY | (flags & OpenFlags::CLOEXEC);
 
     if let Ok(fd1) = task.open_file(entry.clone(), f1) {

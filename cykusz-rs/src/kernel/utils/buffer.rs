@@ -2,7 +2,6 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sched::current_task;
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
@@ -46,6 +45,15 @@ impl BufferQueue {
         }
     }
 
+    pub fn new_no_readers_writers(init_size: usize) -> BufferQueue {
+        BufferQueue {
+            buffer: Spin::new(Buffer::new(init_size)),
+            shutting_down: AtomicBool::new(false),
+            writer_queue: WaitQueue::new(),
+            reader_queue: WaitQueue::new(),
+        }
+    }
+
     pub fn new_empty() -> BufferQueue {
         BufferQueue {
             buffer: Spin::new(Buffer::new_empty()),
@@ -63,32 +71,44 @@ impl BufferQueue {
         self.shutting_down.load(Ordering::Relaxed)
     }
 
+    pub fn init_size(&self, size: usize) {
+        self.buffer.lock().init_size(size);
+    }
+
     pub fn set_has_readers(&self, has: bool) {
         self.buffer.lock().has_readers = has;
 
         if !has {
             self.writer_queue.signal_all(syscall_defs::signal::SIGPIPE);
+        } else {
+            self.writer_queue.notify_all();
         }
-    }
-
-    pub fn init_size(&self, size: usize) {
-        self.buffer.lock().init_size(size);
     }
 
     pub fn set_has_writers(&self, has: bool) {
         self.buffer.lock().has_writers = has;
 
-        if !has {
-            self.reader_queue.notify_all();
-        }
+        self.reader_queue.notify_all();
     }
 
-    pub fn listen(&self) {
-        self.reader_queue.add_task(current_task());
+    pub fn wait_for_readers(&self) -> SignalResult<()> {
+        logln!("waiting for readers {}", self.buffer.lock().has_readers);
+        self.writer_queue.wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |b| {
+            b.has_readres()
+        })?.unwrap();
+        logln!("got readers");
+
+        Ok(())
     }
 
-    pub fn unlisten(&self) {
-        self.reader_queue.remove_task(current_task());
+    pub fn wait_for_writers(&self) -> SignalResult<()> {
+        logln!("waiting for writers {}", self.buffer.lock().has_writers);
+        self.reader_queue.wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |b| {
+            b.has_writers()
+        })?.unwrap();
+        logln!("got writers");
+
+        Ok(())
     }
 
     pub fn has_data(&self) -> bool {
@@ -238,8 +258,8 @@ impl Buffer {
             r: 0,
             w: 0,
             full: false,
-            has_writers: true,
-            has_readers: true,
+            has_writers: false,
+            has_readers: false,
         };
         buf.data.resize(init_size, 0);
 
@@ -252,8 +272,8 @@ impl Buffer {
             r: 0,
             w: 0,
             full: true,
-            has_writers: true,
-            has_readers: true,
+            has_writers: false,
+            has_readers: false,
         }
     }
 

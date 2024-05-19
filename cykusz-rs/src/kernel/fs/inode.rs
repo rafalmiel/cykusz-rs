@@ -142,6 +142,10 @@ pub trait INode: Send + Sync + DowncastSync {
 
     fn ref_update(&self, _new_ref: Weak<INodeItemInt>) {}
 
+    fn as_inode(&self) -> Option<Arc<dyn INode>> {
+        None
+    }
+
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {
         None
     }

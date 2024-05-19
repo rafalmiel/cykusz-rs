@@ -1,5 +1,7 @@
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use core::sync::atomic::{AtomicUsize, Ordering};
+use hashbrown::HashMap;
+use spin::Once;
 
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Stat;
@@ -7,25 +9,40 @@ use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::vfs::Result;
+use crate::kernel::fs::vfs::{FsError, Result};
+use crate::kernel::sync::{Mutex, MutexGuard};
 use crate::kernel::utils::buffer::BufferQueue;
 
 pub struct Pipe {
     buf: BufferQueue,
+    sref: Weak<Pipe>,
+    key: Option<(usize, usize)>,
 
     readers: AtomicUsize,
     writers: AtomicUsize,
 }
 
 impl Pipe {
-    pub fn new() -> Arc<Pipe> {
+    pub fn new(key: Option<(usize, usize)>) -> Arc<Pipe> {
         logln4!("Created PIPE");
-        Arc::new(Pipe {
-            buf: BufferQueue::new(4096 * 4),
+        Arc::new_cyclic(|me| {
+            Pipe {
+                buf: BufferQueue::new_no_readers_writers(4096 * 4),
+                sref: me.clone(),
+                key,
 
-            readers: AtomicUsize::new(0),
-            writers: AtomicUsize::new(0),
+                readers: AtomicUsize::new(0),
+                writers: AtomicUsize::new(0),
+            }
         })
+    }
+
+    pub fn sref(&self) -> Arc<Pipe> {
+        self.sref.upgrade().unwrap()
+    }
+
+    fn key(&self) -> Option<(usize, usize)> {
+        self.key
     }
 
     fn inc_readers(&self) -> usize {
@@ -117,16 +134,33 @@ impl INode for Pipe {
     }
 
     fn open(&self, flags: OpenFlags) -> Result<()> {
+        logln!("pipe open: {:?}", flags);
+        if flags.contains(OpenFlags::RDWR) {
+            return Err(FsError::InvalidParam);
+        }
+
         if flags.contains(OpenFlags::RDONLY) {
             self.inc_readers();
 
             self.buf.set_has_readers(true);
+
+            if !flags.contains(OpenFlags::NONBLOCK) {
+                self.buf.wait_for_writers()?;
+            }
         }
 
         if flags.contains(OpenFlags::WRONLY) {
+            if flags.contains(OpenFlags::NONBLOCK) && !self.has_readers() {
+                return Err(FsError::NoSuchDevice);
+            }
+
             self.inc_writers();
 
             self.buf.set_has_writers(true);
+
+            if !flags.contains(OpenFlags::NONBLOCK) {
+                self.buf.wait_for_readers()?;
+            }
         }
 
         Ok(())
@@ -144,5 +178,61 @@ impl INode for Pipe {
                 self.buf.set_has_writers(false);
             }
         }
+
+        if !self.has_readers() && !self.has_writers() {
+            pipes().remove(&self.sref());
+        }
+    }
+}
+
+pub struct PipeMap {
+    map: HashMap<(usize, usize), Arc<Pipe>>,
+}
+
+impl PipeMap {
+    pub fn new() -> PipeMap {
+        PipeMap {
+            map: HashMap::new(),
+        }
+    }
+
+    fn get_key(inode: &Arc<dyn INode>) -> Option<(usize, usize)> {
+        Some((inode.fs()?.as_ptr() as *const () as usize, inode.id().unwrap()))
+    }
+
+    pub fn get_or_insert(&mut self, inode: &Arc<dyn INode>) -> Option<Arc<Pipe>> {
+        let key = Self::get_key(inode)?;
+
+        match self.map.try_insert(key, Pipe::new(Some(key))) {
+            Ok(v) => {
+                logln!("getting new pipe -> created: {:?}", key);
+                Some(v.clone())
+            }
+            Err(e) => {
+                logln!("getting new pipe -> returned: {:?}", key);
+                Some(e.entry.get().clone())
+            }
+        }
+    }
+
+    pub fn remove(&mut self, inode: &Arc<Pipe>) {
+        if let Some(k) = inode.key() {
+            logln!("remove pipe {:?}", k);
+            self.map.remove(&k);
+        }
+    }
+}
+
+static PIPES: Once<Mutex<PipeMap>> = Once::new();
+
+pub fn init() {
+    PIPES.call_once(|| {
+        Mutex::new(PipeMap::new())
+    });
+}
+
+pub fn pipes<'a>() -> MutexGuard<'a, PipeMap> {
+    unsafe {
+        PIPES.get_unchecked().lock()
     }
 }

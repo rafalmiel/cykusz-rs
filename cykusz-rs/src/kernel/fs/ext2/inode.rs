@@ -65,6 +65,7 @@ impl LockedExt2INode {
     }
 
     pub fn mk_inode(&self, typ: FileType) -> Result<INodeItem> {
+        logln!("mk_inode: {:?}", typ);
         let fs = self.ext2_fs();
 
         let parent_id = self.id()?;
@@ -1030,6 +1031,10 @@ impl INode for LockedExt2INode {
         self.read().sync_blocks(&self.ext2_fs());
 
         return Ok(());
+    }
+
+    fn as_inode(&self) -> Option<Arc<dyn INode>> {
+        Some(self.self_ref())
     }
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {

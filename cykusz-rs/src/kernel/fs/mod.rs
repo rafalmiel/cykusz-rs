@@ -88,6 +88,7 @@ fn init_cdboot() {
 }
 
 pub fn init() {
+    pipe::init();
     pcache::init();
     icache::init();
     dirent::init();

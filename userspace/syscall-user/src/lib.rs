@@ -267,6 +267,12 @@ pub fn unlink(path: &str) -> SyscallResult {
     unsafe { syscall4(SYS_UNLINK, fd.into(), path.as_ptr() as usize, path.len(), 0) }
 }
 
+pub fn mknod(path: &str, typ: syscall_defs::stat::Mode) -> SyscallResult {
+    unsafe {
+        syscall5(SYS_MKNODE, OpenFD::Cwd.into(), path.as_ptr() as usize, path.len(), typ.bits() as usize, 0usize)
+    }
+}
+
 pub fn rename(oldpath: &str, newpath: &str) -> SyscallResult {
     unsafe {
         syscall6(

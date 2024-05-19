@@ -1,3 +1,4 @@
+use syscall_defs::stat::Mode;
 use syscall_user as syscall;
 
 use syscall_defs::waitpid::WaitPidFlags;

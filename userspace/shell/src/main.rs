@@ -14,6 +14,7 @@ use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SysDirEntry, SyscallError};
 
 use crate::file::File;
 use syscall_defs::signal::{SigAction, SignalFlags, SignalHandler};
+use syscall_defs::stat::Mode;
 use syscall_defs::waitpid::WaitPidFlags;
 
 mod file;
@@ -470,6 +471,18 @@ fn exec(cmd: &str) {
                 println!("mv failed: {:?}", e);
             }
         }
+    } else if cmd.starts_with("mknod ") {
+        let mut split = cmd.split_whitespace();
+        split.next();
+
+        if let Some(path) = split.next() {
+            if let Err(e) = syscall::mknod(path, Mode::IFIFO) {
+                println!("mknod failed {:?}", e);
+            }
+        } else {
+            println!("Expected path");
+        }
+
     } else if cmd == "fork" {
         let tty = Tty::new();
         tty.detach();

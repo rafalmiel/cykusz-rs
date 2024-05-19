@@ -556,15 +556,7 @@ impl INode for LockedExt2INode {
             syscall_defs::time::Timespec::from_secs(inode.d_inode.creation_time() as usize);
 
         let ftype = inode.ftype();
-        if ftype == FileType::File {
-            stat.st_mode.insert(syscall_defs::stat::Mode::IFREG);
-        } else if ftype == FileType::Dir {
-            stat.st_mode.insert(syscall_defs::stat::Mode::IFDIR);
-        } else if ftype == FileType::Symlink {
-            stat.st_mode.insert(syscall_defs::stat::Mode::IFLNK);
-        } else {
-            stat.st_mode.insert(syscall_defs::stat::Mode::IFCHR);
-        }
+        stat.st_mode.insert(Mode::from(ftype));
 
         stat.st_mode
             .insert(syscall_defs::stat::Mode::from_bits_truncate(
@@ -762,7 +754,7 @@ impl INode for LockedExt2INode {
         Some(self.fs())
     }
 
-    fn create(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {
+    fn create(&self, parent: DirEntryItem, name: &str, ftype: FileType) -> Result<DirEntryItem> {
         if self.ftype()? != FileType::Dir {
             return Err(FsError::NotDir);
         }
@@ -778,7 +770,7 @@ impl INode for LockedExt2INode {
             return Err(FsError::EntryExists);
         }
 
-        let new_inode = self.mk_inode(FileType::File)?;
+        let new_inode = self.mk_inode(ftype)?;
 
         let mut iter = DirEntIter::new_no_skip(self.self_ref());
 
@@ -800,6 +792,10 @@ impl INode for LockedExt2INode {
 
     fn close(&self, _flags: OpenFlags) {
         logln!("close inode: {:?}", self.read_debug(30).d_inode);
+    }
+
+    fn mknode(&self, parent: DirEntryItem, name: &str, mode: syscall_defs::stat::Mode, _devid: usize) -> Result<INodeItem> {
+        Ok(self.create(parent, name, mode.into())?.inode())
     }
 
     fn symlink(&self, name: &str, target: &str) -> Result<()> {

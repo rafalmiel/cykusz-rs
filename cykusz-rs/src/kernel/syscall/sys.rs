@@ -536,16 +536,20 @@ pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
 pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResult {
     let at = OpenFD::try_from(at)?;
 
-    let file = get_dir_entry(at, make_path(path, path_len), LookupMode::None, true)?;
+    let path_str = make_str(path, path_len);
+
+    let path = Path::new(path_str);
+
+    logln4!("sys_unlink: {}, flags: {}", path.str(), flags);
+
+    let file = get_dir_entry(at, Some(path), LookupMode::None, true)?;
 
     log!("unlink inode: ");
     file.inode().debug();
 
-    let path = Path::new(make_str(path, path_len));
-    logln4!("sys_unlink: {}, flags: {}", path.str(), flags);
-
     let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;
 
+    let path = Path::new(path_str);
     if flags.contains(AtFlags::REMOVEDIR) {
         return remove_dir(&file, &path);
     }
@@ -562,6 +566,28 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
         Ok(0)
     } else {
         return Err(SyscallError::EFAULT);
+    }
+}
+
+pub fn sys_mknode(at: u64, path: u64, path_len: u64, mode: u64, devid: u64) -> SyscallResult {
+    let at = OpenFD::try_from(at)?;
+
+    let path = Path::new(make_str(path, path_len));
+
+    let mode = Mode::from_bits_truncate(mode as u32);
+
+    logln!("mknode: {:?} {:?}", path.str(), mode);
+
+    let (dir_path, name) = path.containing_dir();
+
+    let dir = get_dir_entry(at, Some(dir_path), LookupMode::None, true)?;
+
+    if dir.inode().ftype()? == FileType::Dir {
+        dir.inode().mknode(dir, name.str(), mode.ftype_bits_truncate(), devid as usize)?;
+
+        Ok(0)
+    } else {
+        Err(SyscallError::EFAULT)
     }
 }
 
@@ -619,7 +645,7 @@ pub fn sys_chmod(at: u64, path: u64, path_len: u64, mode: u64, flags: u64) -> Sy
         flags.contains(AtFlags::SYMLINK_NOFOLLOW),
     )?;
 
-    inode.inode().chmod(Mode::mode_bits_truncate(mode as u32))?;
+    inode.inode().chmod(Mode::from_bits_truncate(mode as u32).mode_bits_truncate())?;
 
     Ok(0)
 }
@@ -729,7 +755,6 @@ pub fn sys_getaddrinfo(name: u64, nlen: u64, buf: u64, blen: u64) -> SyscallResu
 }
 
 pub fn sys_socket(domain: u64, typ: u64, _protocol: u64) -> SyscallResult {
-    logln4!("sys socket AAAAAAAAA {} {}", domain, typ);
     let sock_domain = SockDomain::try_from(domain)?;
     let typ = SockTypeFlags::new(typ);
 

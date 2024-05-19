@@ -82,7 +82,7 @@ pub trait INode: Send + Sync + DowncastSync {
         None
     }
 
-    fn create(&self, _parent: DirEntryItem, _name: &str) -> Result<DirEntryItem> {
+    fn create(&self, _parent: DirEntryItem, _name: &str, _ftype: FileType) -> Result<DirEntryItem> {
         Err(FsError::NotSupported)
     }
 
@@ -92,7 +92,7 @@ pub trait INode: Send + Sync + DowncastSync {
 
     fn close(&self, _flags: OpenFlags) {}
 
-    fn mknode(&self, _name: &str, _devid: usize) -> Result<INodeItem> {
+    fn mknode(&self, _parent: DirEntryItem, _name: &str, _mode: syscall_defs::stat::Mode, _devid: usize) -> Result<INodeItem> {
         return Err(FsError::NotSupported);
     }
 

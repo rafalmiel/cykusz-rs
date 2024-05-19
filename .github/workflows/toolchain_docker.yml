@@ -1,4 +1,4 @@
-name: Docker Image CI
+name: Toolchain docker
 
 on:
   # Allows you to run this workflow manually from the Actions tab
@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Build the Docker image
       run: ./sysroot/make_docker_image.sh
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Build toolchain
       run: ./sysroot/toolchain_docker.sh

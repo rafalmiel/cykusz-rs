@@ -6,6 +6,9 @@
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;
+
+use crate::stat::Mode;
+
 pub mod events;
 pub mod exec;
 pub mod ioctl;
@@ -99,6 +102,7 @@ pub const SYS_GETSOCKOPT: usize = 69;
 pub const SYS_YIELD: usize = 70;
 pub const SYS_CHMOD: usize = 71;
 pub const SYS_UTIME: usize = 72;
+pub const SYS_MKNODE: usize = 73;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]
@@ -358,6 +362,21 @@ pub enum FileType {
 impl Default for FileType {
     fn default() -> FileType {
         FileType::File
+    }
+}
+
+impl From<Mode> for FileType {
+    fn from(value: Mode) -> Self {
+        match value.ftype_bits_truncate() {
+            Mode::IFBLK => FileType::Block,
+            Mode::IFCHR => FileType::Char,
+            Mode::IFLNK => FileType::Symlink,
+            Mode::IFDIR => FileType::Dir,
+            Mode::IFREG => FileType::File,
+            Mode::IFIFO => FileType::Fifo,
+            Mode::IFSOCK => FileType::Socket,
+            _ => panic!("Invalid mode {:?}", value.bits())
+        }
     }
 }
 

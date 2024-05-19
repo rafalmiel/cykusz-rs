@@ -196,10 +196,10 @@ impl INode for LockedRamINode {
         Some(self.0.read().fs.clone())
     }
 
-    fn create(&self, parent: DirEntryItem, name: &str) -> Result<DirEntryItem> {
+    fn create(&self, parent: DirEntryItem, name: &str, ftype: FileType) -> Result<DirEntryItem> {
         Ok(super::dirent::DirEntry::new(
             parent.clone(),
-            self.make_inode(name, FileType::File, |_| Ok(()))?,
+            self.make_inode(name, ftype, |_| Ok(()))?,
             String::from(name),
         ))
     }
@@ -212,8 +212,8 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn mknode(&self, name: &str, devid: usize) -> Result<INodeItem> {
-        self.make_inode(name, FileType::Char, |inode| {
+    fn mknode(&self, _parent: DirEntryItem, name: &str, mode: syscall_defs::stat::Mode, devid: usize) -> Result<INodeItem> {
+        self.make_inode(name, mode.into(), |inode| {
             inode.0.write().content = Content::DevNode(Some(
                 DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
             ));

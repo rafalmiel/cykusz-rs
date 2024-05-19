@@ -6,6 +6,7 @@ use spin::Once;
 use uuid::Uuid;
 
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::stat::Mode;
 
 use crate::kernel::block::{get_blkdev_by_id, get_blkdev_by_name, get_blkdev_by_uuid};
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
@@ -58,7 +59,7 @@ impl DevListener {
 impl DeviceListener for DevListener {
     fn device_added(&self, dev: Arc<dyn Device>) {
         self.dev_inode()
-            .mknode(dev.name().as_str(), dev.id())
+            .mknode(self.root_dentry(), dev.name().as_str(), Mode::IFCHR, dev.id())
             .expect("Failed to mknode for device");
     }
 }
@@ -297,7 +298,7 @@ fn lookup_by_path_from(
                     {
                         let inode = cur.inode();
                         //println!("Creating file with parent {} {:?}", cur.name(), cur.cache_key());
-                        let new = inode.create(cur, s)?;
+                        let new = inode.create(cur, s, FileType::File)?;
 
                         cur = new;
                     }

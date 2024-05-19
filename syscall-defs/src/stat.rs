@@ -1,3 +1,4 @@
+use crate::FileType;
 bitflags! {
     #[derive(Default)]
     pub struct Mode: u32 {
@@ -35,8 +36,27 @@ bitflags! {
 }
 
 impl Mode {
-    pub fn mode_bits_truncate(v: u32) -> Mode {
-        Mode::from_bits_truncate(v & 0o7777)
+    pub fn mode_bits_truncate(&self) -> Mode {
+        Mode::from_bits_truncate(self.bits & 0o7777)
+    }
+
+    pub fn ftype_bits_truncate(&self) -> Mode {
+        Mode::from_bits_truncate(self.bits & 0x0F000)
+    }
+}
+
+impl From<FileType> for Mode {
+    fn from(value: FileType) -> Self {
+        match value {
+            FileType::Unknown => Mode::empty(),
+            FileType::Fifo => Mode::IFIFO,
+            FileType::Char => Mode::IFCHR,
+            FileType::Dir => Mode::IFDIR,
+            FileType::Block => Mode::IFBLK,
+            FileType::File => Mode::IFREG,
+            FileType::Symlink => Mode::IFLNK,
+            FileType::Socket => Mode::IFSOCK,
+        }
     }
 }
 

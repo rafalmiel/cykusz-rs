@@ -23,23 +23,18 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: true
       
       - name: Install Packages
         run: apt-fast -y install nasm meson ninja-build bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo xorriso
-      
-      - name: Install Rust Toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          default: true
-          override: true
 
-      - name: Install `rust-src` Rustup Component
-        run: rustup component add rust-src
+      - name: Install Rust Toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly
+          components: rust-src
 
       # Runs a single command using the runners shell
       - name: Build OS

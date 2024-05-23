@@ -1,7 +1,7 @@
 [build]
 rustc = "../sysroot/cross/usr/local/bin/rustc"
 target = "x86_64-unknown-cykusz"
-rustflags = ["-C", "link-args=-no-pie", "-C", "link-args=-lgcc_s"]
+rustflags = ["-C", "link-args=-no-pie", "-C", "link-args=-lgcc_s", "-Z", "threads=8"]
 
 [target.x86_64-unknown-cykusz]
 linker = "../sysroot/cross/usr/bin/x86_64-cykusz-gcc"

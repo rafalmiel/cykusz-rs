@@ -1,11 +1,12 @@
 use alloc::sync::{Arc, Weak};
 use core::sync::atomic::{AtomicUsize, Ordering};
+
 use hashbrown::HashMap;
 use spin::Once;
 
+use syscall_defs::OpenFlags;
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Stat;
-use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
@@ -25,15 +26,13 @@ pub struct Pipe {
 impl Pipe {
     pub fn new(key: Option<(usize, usize)>) -> Arc<Pipe> {
         logln4!("Created PIPE");
-        Arc::new_cyclic(|me| {
-            Pipe {
-                buf: BufferQueue::new_no_readers_writers(4096 * 4),
-                sref: me.clone(),
-                key,
+        Arc::new_cyclic(|me| Pipe {
+            buf: BufferQueue::new_no_readers_writers(4096 * 4),
+            sref: me.clone(),
+            key,
 
-                readers: AtomicUsize::new(0),
-                writers: AtomicUsize::new(0),
-            }
+            readers: AtomicUsize::new(0),
+            writers: AtomicUsize::new(0),
         })
     }
 
@@ -197,7 +196,10 @@ impl PipeMap {
     }
 
     fn get_key(inode: &Arc<dyn INode>) -> Option<(usize, usize)> {
-        Some((inode.fs()?.as_ptr() as *const () as usize, inode.id().unwrap()))
+        Some((
+            Arc::as_ptr(&inode.fs()?.upgrade()?.device()) as *const () as usize,
+            inode.id().unwrap(),
+        ))
     }
 
     pub fn get_or_insert(&mut self, inode: &Arc<dyn INode>) -> Option<Arc<Pipe>> {
@@ -226,13 +228,9 @@ impl PipeMap {
 static PIPES: Once<Mutex<PipeMap>> = Once::new();
 
 pub fn init() {
-    PIPES.call_once(|| {
-        Mutex::new(PipeMap::new())
-    });
+    PIPES.call_once(|| Mutex::new(PipeMap::new()));
 }
 
 pub fn pipes<'a>() -> MutexGuard<'a, PipeMap> {
-    unsafe {
-        PIPES.get_unchecked().lock()
-    }
+    unsafe { PIPES.get_unchecked().lock() }
 }

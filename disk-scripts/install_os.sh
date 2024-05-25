@@ -14,14 +14,17 @@ sed -i "s/{ROOT_UUID}/$(blkid -s UUID -o value /dev/loop0p2)/g" mnt/grub/grub.cf
 umount mnt
 
 PROGS="test testcpp hello stack nyancat ttytest fork forktest poweroff stat fbdoom doom1.wad"
+RUST_PROGS="init shell mount"
 
 mount /dev/loop0p2 mnt
 mkdir -p mnt/bin
-cp -f userspace/target/x86_64-unknown-cykusz/release/init mnt/bin/init
-cp -f userspace/target/x86_64-unknown-cykusz/release/shell mnt/bin/shell
 
 for prog in $PROGS; do
 	cp -f sysroot/build/$prog mnt/bin/$prog
+done
+
+for prog in $RUST_PROGS; do
+    cp -f userspace/target/x86_64-unknown-cykusz/release/$prog mnt/bin/$prog
 done
 
 rsync -a sysroot/cykusz/usr mnt/

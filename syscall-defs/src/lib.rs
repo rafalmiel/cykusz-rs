@@ -375,7 +375,7 @@ impl From<Mode> for FileType {
             Mode::IFREG => FileType::File,
             Mode::IFIFO => FileType::Fifo,
             Mode::IFSOCK => FileType::Socket,
-            _ => panic!("Invalid mode {:?}", value.bits())
+            _ => panic!("Invalid mode {:?}", value.bits()),
         }
     }
 }

@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use syscall_defs::{
-    FDFlags, FileType, OpenFlags, SeekWhence, SysDirEntry, SyscallError, SyscallResult,
+    FDFlags, FileType, OpenFlags, SeekWhence, SyscallError, SyscallResult, SysDirEntry,
 };
 use syscall_defs::poll::PollEventFlags;
 
@@ -51,11 +51,9 @@ impl FileHandle {
                 } else {
                     fs_inode.inode_arc()
                 }
-            },
-            _ => {
-                fs_inode.inode_arc()
             }
-        }
+            _ => fs_inode.inode_arc(),
+        };
     }
 
     pub fn open(&self, flags: OpenFlags) -> Result<()> {

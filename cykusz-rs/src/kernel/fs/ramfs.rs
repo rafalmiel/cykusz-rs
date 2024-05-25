@@ -7,20 +7,20 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
+use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::poll::PollEventFlags;
 
-use syscall_defs::{FileType, OpenFlags};
-
-use crate::kernel::device::Device;
+use crate::kernel::device::{alloc_id, Device};
 use crate::kernel::fs::devnode::DevNode;
 use crate::kernel::fs::dirent::DirEntryItem;
+use crate::kernel::fs::ext2::FsDevice;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemInt, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::MappedAccess;
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::vfs::Result;
 use crate::kernel::fs::vfs::{FsError, Metadata};
+use crate::kernel::fs::vfs::Result;
 use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::utils::types::CeilDiv;
@@ -212,7 +212,13 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn mknode(&self, _parent: DirEntryItem, name: &str, mode: syscall_defs::stat::Mode, devid: usize) -> Result<INodeItem> {
+    fn mknode(
+        &self,
+        _parent: DirEntryItem,
+        name: &str,
+        mode: syscall_defs::stat::Mode,
+        devid: usize,
+    ) -> Result<INodeItem> {
         self.make_inode(name, mode.into(), |inode| {
             inode.0.write().content = Content::DevNode(Some(
                 DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
@@ -357,6 +363,7 @@ pub struct RamFS {
     root: INodeItem,
     root_dentry: DirEntryItem,
     next_id: AtomicUsize,
+    dev: Arc<dyn FsDevice>,
 }
 
 impl Filesystem for RamFS {
@@ -367,20 +374,59 @@ impl Filesystem for RamFS {
     fn name(&self) -> &'static str {
         "ramfs"
     }
+
+    fn device(&self) -> Arc<dyn FsDevice> {
+        self.dev.clone()
+    }
 }
 
+struct DummyRamDevice {
+    id: usize,
+    self_ref: Weak<DummyRamDevice>,
+}
+
+impl DummyRamDevice {
+    fn new() -> Arc<DummyRamDevice> {
+        Arc::new_cyclic(|me| DummyRamDevice {
+            id: alloc_id(),
+            self_ref: me.clone(),
+        })
+    }
+}
+
+impl INode for DummyRamDevice {}
+
+impl Device for DummyRamDevice {
+    fn id(&self) -> usize {
+        self.id
+    }
+
+    fn name(&self) -> String {
+        alloc::format!("ram_dev {}", self.id)
+    }
+
+    fn inode(&self) -> Arc<dyn INode> {
+        return self.self_ref.upgrade().unwrap();
+    }
+}
+
+impl FsDevice for DummyRamDevice {}
+
 impl RamFS {
-    pub fn new() -> Arc<RamFS> {
+    pub fn new(dev: Option<Arc<dyn FsDevice>>) -> Arc<RamFS> {
         let cache = crate::kernel::fs::icache::cache();
         let root = Arc::new(LockedRamINode(RwSpin::new(RamINode::default())));
         let root = cache.make_item_no_cache(INodeItemStruct::from(root));
 
         let root_de = super::dirent::DirEntry::new_root(root.clone(), String::from("/"));
 
+        let dummy = DummyRamDevice::new();
+
         let fs = Arc::new(RamFS {
             root: root.clone(),
             root_dentry: root_de.clone(),
             next_id: AtomicUsize::new(1),
+            dev: dev.unwrap_or(dummy.clone()),
         });
 
         let cpy: Arc<dyn Filesystem> = fs.clone();

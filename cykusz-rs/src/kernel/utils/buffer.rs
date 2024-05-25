@@ -93,9 +93,9 @@ impl BufferQueue {
 
     pub fn wait_for_readers(&self) -> SignalResult<()> {
         logln!("waiting for readers {}", self.buffer.lock().has_readers);
-        self.writer_queue.wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |b| {
-            b.has_readres()
-        })?.unwrap();
+        self.writer_queue
+            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |b| b.has_readres())?
+            .unwrap();
         logln!("got readers");
 
         Ok(())
@@ -103,9 +103,9 @@ impl BufferQueue {
 
     pub fn wait_for_writers(&self) -> SignalResult<()> {
         logln!("waiting for writers {}", self.buffer.lock().has_writers);
-        self.reader_queue.wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |b| {
-            b.has_writers()
-        })?.unwrap();
+        self.reader_queue
+            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |b| b.has_writers())?
+            .unwrap();
         logln!("got writers");
 
         Ok(())

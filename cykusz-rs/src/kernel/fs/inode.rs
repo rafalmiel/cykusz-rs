@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 
 use downcast_rs::DowncastSync;
 
-use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::poll::PollEventFlags;
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;
@@ -92,7 +92,13 @@ pub trait INode: Send + Sync + DowncastSync {
 
     fn close(&self, _flags: OpenFlags) {}
 
-    fn mknode(&self, _parent: DirEntryItem, _name: &str, _mode: syscall_defs::stat::Mode, _devid: usize) -> Result<INodeItem> {
+    fn mknode(
+        &self,
+        _parent: DirEntryItem,
+        _name: &str,
+        _mode: syscall_defs::stat::Mode,
+        _devid: usize,
+    ) -> Result<INodeItem> {
         return Err(FsError::NotSupported);
     }
 

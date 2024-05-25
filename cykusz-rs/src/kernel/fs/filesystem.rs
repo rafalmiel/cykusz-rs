@@ -1,4 +1,12 @@
+use alloc::sync::Arc;
+
 use crate::kernel::fs::dirent::DirEntryItem;
+use crate::kernel::fs::ext2::FsDevice;
+
+pub enum FilesystemKind {
+    RamFS = 1,
+    Ext2FS = 2,
+}
 
 pub trait Filesystem: Send + Sync {
     fn root_dentry(&self) -> DirEntryItem {
@@ -10,4 +18,8 @@ pub trait Filesystem: Send + Sync {
     fn umount(&self) {}
 
     fn name(&self) -> &'static str;
+
+    fn device(&self) -> Arc<dyn FsDevice> {
+        unimplemented!()
+    }
 }

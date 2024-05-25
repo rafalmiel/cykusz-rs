@@ -169,11 +169,13 @@ fn keyboard() -> &'static Arc<KbdState> {
 
 pub fn init() {
     KEYBOARD.call_once(|| {
-        Arc::new_cyclic(|me| KbdState {
-            state: Spin::new(State::new()),
-            buf: BufferQueue::new(core::mem::size_of::<Event>() * 32),
-            dev_id: crate::kernel::device::alloc_id(),
-            self_ref: me.clone(),
+        Arc::new_cyclic(|me| {
+            KbdState {
+                state: Spin::new(State::new()),
+                buf: BufferQueue::new(core::mem::size_of::<Event>() * 32, false, true),
+                dev_id: crate::kernel::device::alloc_id(),
+                self_ref: me.clone(),
+            }
         })
     });
 

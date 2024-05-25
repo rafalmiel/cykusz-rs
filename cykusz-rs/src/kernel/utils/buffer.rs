@@ -15,7 +15,7 @@ pub struct BufferQueue {
 
 impl Default for BufferQueue {
     fn default() -> Self {
-        BufferQueue::new(4096)
+        BufferQueue::new(4096, true, true)
     }
 }
 
@@ -31,32 +31,23 @@ pub struct Buffer {
 
 impl Default for Buffer {
     fn default() -> Buffer {
-        Buffer::new(4096)
+        Buffer::new(4096, true, true)
     }
 }
 
 impl BufferQueue {
-    pub fn new(init_size: usize) -> BufferQueue {
+    pub fn new(init_size: usize, has_readers: bool, has_writers: bool) -> BufferQueue {
         BufferQueue {
-            buffer: Spin::new(Buffer::new(init_size)),
+            buffer: Spin::new(Buffer::new(init_size, has_readers, has_writers)),
             shutting_down: AtomicBool::new(false),
             writer_queue: WaitQueue::new(),
             reader_queue: WaitQueue::new(),
         }
     }
 
-    pub fn new_no_readers_writers(init_size: usize) -> BufferQueue {
+    pub fn new_empty(has_readers: bool, has_writers: bool) -> BufferQueue {
         BufferQueue {
-            buffer: Spin::new(Buffer::new(init_size)),
-            shutting_down: AtomicBool::new(false),
-            writer_queue: WaitQueue::new(),
-            reader_queue: WaitQueue::new(),
-        }
-    }
-
-    pub fn new_empty() -> BufferQueue {
-        BufferQueue {
-            buffer: Spin::new(Buffer::new_empty()),
+            buffer: Spin::new(Buffer::new_empty(has_readers, has_writers)),
             shutting_down: AtomicBool::new(false),
             writer_queue: WaitQueue::new(),
             reader_queue: WaitQueue::new(),
@@ -252,28 +243,28 @@ impl BufferQueue {
 }
 
 impl Buffer {
-    pub fn new(init_size: usize) -> Buffer {
+    pub fn new(init_size: usize, has_readers: bool, has_writers: bool) -> Buffer {
         let mut buf = Buffer {
             data: Vec::with_capacity(init_size),
             r: 0,
             w: 0,
             full: false,
-            has_writers: false,
-            has_readers: false,
+            has_writers,
+            has_readers,
         };
         buf.data.resize(init_size, 0);
 
         buf
     }
 
-    pub fn new_empty() -> Buffer {
+    pub fn new_empty(has_readers: bool, has_writers: bool) -> Buffer {
         Buffer {
             data: Vec::new(),
             r: 0,
             w: 0,
             full: true,
-            has_writers: false,
-            has_readers: false,
+            has_writers,
+            has_readers,
         }
     }
 

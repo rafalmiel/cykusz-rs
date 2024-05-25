@@ -76,3 +76,11 @@ dependencies = [
  "libc",
  "syscall-defs",
 ]
+
+[[package]]
+name = "umount"
+version = "0.1.0"
+dependencies = [
+ "syscall-defs",
+ "syscall-user",
+]

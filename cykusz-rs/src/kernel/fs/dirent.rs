@@ -7,7 +7,7 @@ use core::sync::atomic::Ordering;
 
 use spin::Once;
 
-use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable};
+use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable, WeakWrap};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
@@ -23,12 +23,19 @@ impl Cacheable<CacheKey> for DirEntry {
 
     fn notify_unused(&self, _new_ref: &Weak<CacheItem<CacheKey, DirEntry>>) {
         let mut data = self.write();
+        logln!("mark unused: {}", data.name);
         data.fs_ref = None;
         data.parent = None;
     }
 
     fn notify_used(&self) {
         let mut data = self.write();
+
+        logln!(
+            "mark used: {}, parent: {}",
+            data.name,
+            data.parent.is_some()
+        );
 
         data.fs_ref = if let Some(fs) = self.fs.get() {
             fs.upgrade()
@@ -37,10 +44,13 @@ impl Cacheable<CacheKey> for DirEntry {
         }
     }
 
-    fn deallocate(&self, _me: &CacheItem<CacheKey, DirEntry>) {}
+    fn deallocate(&self, _me: &CacheItem<CacheKey, DirEntry>) {
+        logln!("deallocate {}", _me.data.lock().name);
+    }
 }
 
 pub type DirEntryItem = ArcWrap<CacheItem<CacheKey, DirEntry>>;
+pub type DirEntryWeakItem = WeakWrap<CacheItem<CacheKey, DirEntry>>;
 
 static CACHE_MARKER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

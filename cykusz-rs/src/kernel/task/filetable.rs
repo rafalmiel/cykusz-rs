@@ -2,10 +2,10 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
-use syscall_defs::{
-    FDFlags, FileType, OpenFlags, SeekWhence, SyscallError, SyscallResult, SysDirEntry,
-};
 use syscall_defs::poll::PollEventFlags;
+use syscall_defs::{
+    FDFlags, FileType, OpenFlags, SeekWhence, SysDirEntry, SyscallError, SyscallResult,
+};
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::inode::INode;

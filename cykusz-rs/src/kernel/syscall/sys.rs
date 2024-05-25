@@ -3,21 +3,21 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
-use syscall_defs::{
-    AtFlags, FcntlCmd, FDFlags, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
-};
-use syscall_defs::{OpenFlags, SyscallError};
 use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockTypeFlags};
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
 use syscall_defs::stat::Mode;
 use syscall_defs::time::Timespec;
+use syscall_defs::{
+    AtFlags, FDFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
+};
+use syscall_defs::{OpenFlags, SyscallError};
 
-use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::filesystem::FilesystemKind;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::poll::PollTable;
+use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::socket::SocketService;
@@ -984,8 +984,7 @@ pub fn sys_select(
         for (fd, flags) in &to_poll {
             logln2!("select: checking fd {}", fd);
             if let Some(handle) = task.get_handle(*fd) {
-                if let Ok(f) = handle
-                    .poll(if first { Some(&mut poll_table) } else { None }, *flags)
+                if let Ok(f) = handle.poll(if first { Some(&mut poll_table) } else { None }, *flags)
                 {
                     logln5!("select found flags {:?}", f);
                     if !f.is_empty() {

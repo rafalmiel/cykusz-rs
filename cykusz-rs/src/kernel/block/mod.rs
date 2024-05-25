@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::kernel::block::mbr::Partition;
 use crate::kernel::device;
-use crate::kernel::device::{alloc_id, Device, register_device};
+use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::cache::{ArcWrap, Cacheable};
 use crate::kernel::fs::ext2::{Ext2Filesystem, FsDevice};
 use crate::kernel::fs::inode::INode;

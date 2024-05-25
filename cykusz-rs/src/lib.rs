@@ -31,8 +31,8 @@ use core::arch::asm;
 
 use syscall_defs::OpenFlags;
 
-use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::fs::path::Path;
+use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 

@@ -4,8 +4,8 @@ use alloc::vec::Vec;
 
 use downcast_rs::DowncastSync;
 
-use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::poll::PollEventFlags;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;

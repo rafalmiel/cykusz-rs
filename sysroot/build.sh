@@ -1053,6 +1053,7 @@ function _cykusz_readline {
 
 function _cykusz_apps {
     $TRIPLE-gcc $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/open_sleep.c -o $BUILD_DIR/open_sleep
     $TRIPLE-gcc  $SRC_DIR/cykusz_apps/stack.c -o $BUILD_DIR/stack
     $TRIPLE-g++ $SRC_DIR/cykusz_apps/hello.cpp -o $BUILD_DIR/hello
     $TRIPLE-g++ $SRC_DIR/cykusz_apps/test.cpp -o $BUILD_DIR/testcpp

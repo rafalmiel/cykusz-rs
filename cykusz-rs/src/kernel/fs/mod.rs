@@ -5,11 +5,11 @@ use alloc::vec::Vec;
 use spin::Once;
 use uuid::Uuid;
 
-use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::stat::Mode;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::block::{get_blkdev_by_name, get_blkdev_by_uuid};
-use crate::kernel::device::{Device, DeviceListener, register_device_listener};
+use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::ext2::{Ext2Filesystem, FsDevice};
 use crate::kernel::fs::filesystem::{Filesystem, FilesystemKind};
@@ -120,7 +120,7 @@ pub fn mount_root() {
     ROOT_MOUNT.call_once(|| root_fs.clone());
     ROOT_DENTRY.call_once(|| root_fs.root_dentry());
 
-    mount::mark_mounted(root_fs.device());
+    mount::mark_mounted(root_fs.clone());
 
     if let Ok(fstab) = lookup_by_path(&Path::new("/etc/fstab"), LookupMode::None) {
         let data = fstab.inode().read_all();

@@ -27,6 +27,12 @@ impl<T: DropHandler> Clone for ArcWrap<T> {
     }
 }
 
+impl<T: DropHandler> Clone for WeakWrap<T> {
+    fn clone(&self) -> Self {
+        WeakWrap(self.0.clone())
+    }
+}
+
 impl<T: DropHandler + ?Sized> Deref for ArcWrap<T> {
     type Target = Arc<T>;
 

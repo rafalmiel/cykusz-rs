@@ -1,9 +1,9 @@
 use alloc::collections::BTreeMap;
 use alloc::string::String;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
-use hashbrown::HashSet;
+use hashbrown::HashMap;
 use spin::Once;
 
 use crate::kernel::fs::cache::Cacheable;
@@ -28,22 +28,32 @@ impl Mountpoint {
     pub fn root_entry(&self) -> DirEntryItem {
         self.root_entry.clone()
     }
+}
 
-    pub fn fs(&self) -> Arc<dyn Filesystem> {
-        return self.fs.clone();
+struct MountedFS {
+    fs: Weak<dyn Filesystem>,
+    ref_count: usize,
+}
+
+impl MountedFS {
+    fn new(fs: &Arc<dyn Filesystem>) -> MountedFS {
+        MountedFS {
+            fs: Arc::downgrade(fs),
+            ref_count: 1,
+        }
     }
 }
 
 struct MountsData {
     mounts: BTreeMap<MountKey, Mountpoint>,
-    mounted_devs: HashSet<usize>,
+    mounted_devs: HashMap<usize, MountedFS>,
 }
 
 impl MountsData {
     fn new() -> MountsData {
         MountsData {
             mounts: BTreeMap::new(),
-            mounted_devs: HashSet::new(),
+            mounted_devs: HashMap::new(),
         }
     }
 }
@@ -77,7 +87,7 @@ impl Mounts {
         &self,
         dir: DirEntryItem,
         mut mounts: MutexGuard<MountsData>,
-        fs_factory: impl FnOnce() -> Arc<dyn Filesystem>,
+        fs_factory: impl FnOnce(&MutexGuard<MountsData>) -> Arc<dyn Filesystem>,
     ) -> Result<()> {
         if dir.is_mountpoint() {
             return Err(FsError::EntryNotFound);
@@ -88,7 +98,7 @@ impl Mounts {
         if mounts.mounts.contains_key(&key) {
             Err(FsError::EntryExists)
         } else {
-            let fs = fs_factory();
+            let fs = fs_factory(&mounts);
 
             let dev_id = fs.device().id();
             let root = fs.root_dentry();
@@ -99,12 +109,14 @@ impl Mounts {
             mounts.mounts.insert(
                 key,
                 Mountpoint {
-                    fs,
-                    root_entry: root,
+                    fs: fs.clone(),
+                    root_entry: root.clone(),
                     orig_entry: dir.clone(),
                 },
             );
-            mounts.mounted_devs.insert(dev_id);
+            if let Err(mut e) = mounts.mounted_devs.try_insert(dev_id, MountedFS::new(&fs)) {
+                e.entry.get_mut().ref_count += 1;
+            }
 
             dir.set_is_mountpont(true);
 
@@ -112,14 +124,19 @@ impl Mounts {
         }
     }
 
-    fn mark_mounted(&self, dev: Arc<dyn FsDevice>) {
+    fn mark_mounted(&self, fs: Arc<dyn Filesystem>) {
         let mut mounts = self.mounts.lock();
 
-        mounts.mounted_devs.insert(dev.id());
+        if let Err(mut e) = mounts
+            .mounted_devs
+            .try_insert(fs.device().id(), MountedFS::new(&fs))
+        {
+            e.entry.get_mut().ref_count += 1;
+        }
     }
 
     fn mount_fs(&self, dir: DirEntryItem, fs: Arc<dyn Filesystem>) -> Result<()> {
-        self.do_mount(dir, self.mounts.lock(), || fs)
+        self.do_mount(dir, self.mounts.lock(), |_| fs)
     }
 
     fn mount(
@@ -130,13 +147,14 @@ impl Mounts {
     ) -> Result<()> {
         let mounts = self.mounts.lock();
 
-        if let Some(d) = &dev {
-            if mounts.mounted_devs.contains(&d.id()) {
-                return Err(FsError::Busy);
+        self.do_mount(dir, mounts, |mnts| {
+            if let Some(d) = &dev {
+                if let Some(fs) = mnts.mounted_devs.get(&d.id()) {
+                    return fs.fs.upgrade().unwrap().clone();
+                }
             }
-        }
-
-        self.do_mount(dir, mounts, || Self::make_fs(dev, typ).unwrap())
+            Self::make_fs(dev, typ).unwrap()
+        })
     }
 
     fn umount(&self, dir: DirEntryItem) -> Result<()> {
@@ -168,19 +186,34 @@ impl Mounts {
         let mut mounts = self.mounts.lock();
         //println!("umount: {:?}", key);
 
-        if let Some(ent) = mounts.mounts.get_mut(&key) {
-            if Arc::strong_count(&ent.fs) > 1 {
+        if let Some(ent) = mounts.mounts.get_mut(&key).cloned() {
+            let id = ent.fs.device().id();
+            let ref_cnt = mounts.mounted_devs.get(&id).unwrap().ref_count;
+
+            logln!(
+                "umount {:?} ref_cnt: {} dev_id: {} mountpoint strong count: {}",
+                key,
+                ref_cnt,
+                id,
+                ent.root_entry.strong_count()
+            );
+
+            if ent.root_entry.strong_count() > 3 {
+                // given currently held pointers, strong count of 3 means the DirEntry is unused
                 return Err(FsError::Busy);
             }
 
             ent.orig_entry.set_is_mountpont(false);
 
-            ent.fs.umount();
-
-            let id = ent.fs.device().id();
-
             mounts.mounts.remove(&key);
-            mounts.mounted_devs.remove(&id);
+
+            if ref_cnt == 1 {
+                ent.fs.umount();
+
+                mounts.mounted_devs.remove(&id);
+            } else {
+                mounts.mounted_devs.get_mut(&id).unwrap().ref_count -= 1;
+            }
 
             Ok(())
         } else {
@@ -205,7 +238,7 @@ impl Mounts {
 
         for key in keys.iter() {
             if let Err(_e) = self.unmount_by_key(key) {
-                println!("Failed to unmount {:?}", key);
+                logln!("Failed to unmount {:?}", key);
             }
         }
 
@@ -230,7 +263,7 @@ pub fn init() {
     MOUNTS.call_once(|| Mounts::new());
 }
 
-pub fn mark_mounted(dev: Arc<dyn FsDevice>) {
+pub fn mark_mounted(dev: Arc<dyn Filesystem>) {
     mounts().mark_mounted(dev);
 }
 

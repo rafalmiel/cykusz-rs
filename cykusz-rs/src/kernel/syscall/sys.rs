@@ -985,8 +985,6 @@ pub fn sys_select(
             logln2!("select: checking fd {}", fd);
             if let Some(handle) = task.get_handle(*fd) {
                 if let Ok(f) = handle
-                    .inode
-                    .inode()
                     .poll(if first { Some(&mut poll_table) } else { None }, *flags)
                 {
                     logln5!("select found flags {:?}", f);
@@ -1276,7 +1274,6 @@ pub fn sys_exit_thread() -> ! {
 }
 
 pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
-    logln5!("ioctl {} 0x{:x}", fd, cmd);
     let current = current_task_ref();
 
     if let Some(handle) = current.get_handle(fd as usize) {

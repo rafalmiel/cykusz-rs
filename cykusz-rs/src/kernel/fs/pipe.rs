@@ -27,7 +27,7 @@ impl Pipe {
     pub fn new(key: Option<(usize, usize)>) -> Arc<Pipe> {
         logln4!("Created PIPE");
         Arc::new_cyclic(|me| Pipe {
-            buf: BufferQueue::new_no_readers_writers(4096 * 4),
+            buf: BufferQueue::new(4096 * 4, false, false),
             sref: me.clone(),
             key,
 

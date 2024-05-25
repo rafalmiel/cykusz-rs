@@ -214,11 +214,13 @@ fn mouse() -> &'static Arc<MouseState> {
 
 pub fn init() {
     MOUSE.call_once(|| {
-        Arc::new_cyclic(|me| MouseState {
-            state: Spin::new(State::new()),
-            buf: BufferQueue::new(4 * 32),
-            dev_id: crate::kernel::device::alloc_id(),
-            self_ref: me.clone(),
+        Arc::new_cyclic(|me| {
+            MouseState {
+                state: Spin::new(State::new()),
+                buf: BufferQueue::new(4 * 32, false, true),
+                dev_id: crate::kernel::device::alloc_id(),
+                self_ref: me.clone(),
+            }
         })
     });
 

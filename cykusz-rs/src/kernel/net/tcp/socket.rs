@@ -138,8 +138,8 @@ impl SocketData {
     pub fn new(port: u16, socket: &Weak<Socket>) -> SocketData {
         SocketData {
             src_port: port,
-            proxy_buffer: BufferQueue::new(4096 * 8),
-            snd_buffer: Buffer::new(4096 * 18),
+            proxy_buffer: BufferQueue::new(4096 * 8, true, true),
+            snd_buffer: Buffer::new(4096 * 18, true, true),
             socket: socket.clone(),
             ..Default::default()
         }
@@ -147,8 +147,8 @@ impl SocketData {
 
     pub fn new_unbound(socket: &Weak<Socket>) -> SocketData {
         SocketData {
-            proxy_buffer: BufferQueue::new_empty(),
-            snd_buffer: Buffer::new_empty(),
+            proxy_buffer: BufferQueue::new_empty(true, true),
+            snd_buffer: Buffer::new_empty(true, true),
             socket: socket.clone(),
             ..Default::default()
         }
@@ -160,8 +160,8 @@ impl SocketData {
         socket: &Weak<Socket>,
     ) -> SocketData {
         let mut data = SocketData {
-            proxy_buffer: BufferQueue::new_empty(),
-            snd_buffer: Buffer::new_empty(),
+            proxy_buffer: BufferQueue::new_empty(true, true),
+            snd_buffer: Buffer::new_empty(true, true),
             ctl: from.ctl,
             socket: socket.clone(),
             ..Default::default()
@@ -815,7 +815,7 @@ impl Socket {
     pub fn new_unbound() -> Arc<Socket> {
         let sock = Arc::new_cyclic(|me| Socket {
             data: Mutex::new(SocketData::new_unbound(me)),
-            in_buffer: BufferQueue::new_empty(),
+            in_buffer: BufferQueue::new_empty(true, true),
             connections: Spin::new(SocketNewConnections::new()),
             connections_wq: WaitQueue::new(),
             self_ref: me.clone(),
@@ -827,7 +827,7 @@ impl Socket {
     fn new_connected(from: &SocketData, packet: Packet<Tcp>) -> Arc<Socket> {
         let sock = Arc::new_cyclic(|me| Socket {
             data: Mutex::new(SocketData::new_connected(from, packet, me)),
-            in_buffer: BufferQueue::new_empty(),
+            in_buffer: BufferQueue::new_empty(true, true),
             connections: Spin::new(SocketNewConnections::new()),
             connections_wq: WaitQueue::new(),
             self_ref: me.clone(),

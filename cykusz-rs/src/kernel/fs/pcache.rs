@@ -5,9 +5,10 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use spin::Once;
 
 use crate::arch::raw::mm::UserAddr;
-use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, CacheItemAdapter, Cacheable, WeakWrap};
+use crate::kernel::fs::cache::{ArcWrap, Cache, Cacheable, CacheItem, CacheItemAdapter, WeakWrap};
+use crate::kernel::fs::ext2::FsDevice;
+use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, PAGE_SIZE, PhysAddr, unmap};
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, unmap, PhysAddr, PAGE_SIZE};
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::types::Align;
@@ -205,7 +206,11 @@ pub trait CachedBlockDev: CachedAccess {
     fn notify_clean_inode(&self, _page: &PageCacheItem);
     fn sync_all(&self);
 
-    fn id(&self) -> usize;
+    fn id(&self) -> usize {
+        self.device().id()
+    }
+
+    fn device(&self) -> Arc<dyn FsDevice>;
 }
 
 pub enum MMapPage {

@@ -8,11 +8,11 @@ use uuid::Uuid;
 use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::stat::Mode;
 
-use crate::kernel::block::{get_blkdev_by_id, get_blkdev_by_name, get_blkdev_by_uuid};
-use crate::kernel::device::{register_device_listener, Device, DeviceListener};
+use crate::kernel::block::{get_blkdev_by_name, get_blkdev_by_uuid};
+use crate::kernel::device::{Device, DeviceListener, register_device_listener};
 use crate::kernel::fs::dirent::DirEntryItem;
-use crate::kernel::fs::ext2::Ext2Filesystem;
-use crate::kernel::fs::filesystem::Filesystem;
+use crate::kernel::fs::ext2::{Ext2Filesystem, FsDevice};
+use crate::kernel::fs::filesystem::{Filesystem, FilesystemKind};
 use crate::kernel::fs::icache::INodeItem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
@@ -43,7 +43,7 @@ pub fn root_dentry() -> Option<&'static DirEntryItem> {
 }
 
 struct DevListener {
-    devfs: Arc<RamFS>,
+    devfs: Arc<dyn Filesystem>,
 }
 
 impl DevListener {
@@ -59,7 +59,12 @@ impl DevListener {
 impl DeviceListener for DevListener {
     fn device_added(&self, dev: Arc<dyn Device>) {
         self.dev_inode()
-            .mknode(self.root_dentry(), dev.name().as_str(), Mode::IFCHR, dev.id())
+            .mknode(
+                self.root_dentry(),
+                dev.name().as_str(),
+                Mode::IFCHR,
+                dev.id(),
+            )
             .expect("Failed to mknode for device");
     }
 }
@@ -68,23 +73,6 @@ static DEV_LISTENER: Once<Arc<DevListener>> = Once::new();
 
 fn dev_listener() -> &'static Arc<DevListener> {
     DEV_LISTENER.get().unwrap()
-}
-
-#[allow(dead_code)]
-fn init_cdboot() {
-    let rootfs = RamFS::new();
-
-    ROOT_MOUNT.call_once(|| rootfs.clone());
-
-    ROOT_DENTRY.call_once(|| rootfs.root_dentry());
-
-    root_dentry().unwrap().inode().mkdir("dev").unwrap();
-
-    crate::kernel::fs::mount::mount(
-        lookup_by_real_path(&Path::new("/dev"), LookupMode::None).unwrap(),
-        dev_listener().devfs.clone(),
-    )
-    .expect("mount failed");
 }
 
 pub fn init() {
@@ -96,7 +84,7 @@ pub fn init() {
 
     DEV_LISTENER.call_once(|| {
         let dev = Arc::new(DevListener {
-            devfs: RamFS::new(),
+            devfs: RamFS::new(None),
         });
 
         register_device_listener(dev.clone());
@@ -105,11 +93,18 @@ pub fn init() {
     });
 }
 
-fn mount_by_path(path: &str, fs: Arc<dyn Filesystem>) {
+fn mount_by_path(path: &str, dev: Option<Arc<dyn FsDevice>>, typ: FilesystemKind) {
     let entry = lookup_by_path(&Path::new(path), LookupMode::None)
         .expect((path.to_string() + " dir not found").as_str());
 
-    mount::mount(entry, fs).expect((path.to_string() + " mount faiiled").as_str());
+    mount::mount(entry, dev, typ).expect((path.to_string() + " mount faiiled").as_str());
+}
+
+fn mount_fs_by_path(path: &str, fs: Arc<dyn Filesystem>) {
+    let entry = lookup_by_path(&Path::new(path), LookupMode::None)
+        .expect((path.to_string() + " dir not found").as_str());
+
+    mount::mount_fs(entry, fs).expect((path.to_string() + " mount faiiled").as_str());
 }
 
 pub fn mount_root() {
@@ -125,6 +120,8 @@ pub fn mount_root() {
     ROOT_MOUNT.call_once(|| root_fs.clone());
     ROOT_DENTRY.call_once(|| root_fs.root_dentry());
 
+    mount::mark_mounted(root_fs.device());
+
     if let Ok(fstab) = lookup_by_path(&Path::new("/etc/fstab"), LookupMode::None) {
         let data = fstab.inode().read_all();
 
@@ -134,7 +131,7 @@ pub fn mount_root() {
                     if let Some(dev) =
                         get_blkdev_by_uuid(Uuid::parse_str(uuid_str).expect("Invalid uuid"))
                     {
-                        mount_by_path(path, Ext2Filesystem::new(dev).expect("not ext2 filesystem"));
+                        mount_by_path(path, Some(dev), FilesystemKind::Ext2FS);
 
                         logln!("mounted uuid: {} at path: {}", uuid_str, path);
                     }
@@ -143,40 +140,7 @@ pub fn mount_root() {
         }
     }
 
-    mount_by_path("/dev", dev_listener().devfs.clone());
-}
-
-pub fn mount_root_old() {
-    let dev_ent = dev_listener().root_dentry();
-
-    let boot = dev_listener()
-        .dev_inode()
-        .lookup(dev_ent.clone(), "disk1.1")
-        .unwrap();
-
-    let root = dev_listener()
-        .dev_inode()
-        .lookup(dev_ent, "disk1.2")
-        .unwrap();
-
-    let boot_dev = get_blkdev_by_id(boot.inode().device().unwrap().id()).unwrap();
-    let root_dev = get_blkdev_by_id(root.inode().device().unwrap().id()).unwrap();
-
-    let boot_fs = Ext2Filesystem::new(boot_dev).expect("Invalid ext2 fs");
-    let root_fs = Ext2Filesystem::new(root_dev).expect("Invalid ext2 fs");
-
-    ROOT_MOUNT.call_once(|| root_fs.clone());
-    ROOT_DENTRY.call_once(|| root_fs.root_dentry());
-
-    let boot_entry =
-        lookup_by_path(&Path::new("/boot"), LookupMode::None).expect("/boot dir not found");
-
-    mount::mount(boot_entry, boot_fs).expect("/boot mount failed");
-
-    let dev_entry =
-        lookup_by_path(&Path::new("/dev"), LookupMode::None).expect("/dev dir not found");
-
-    mount::mount(dev_entry, dev_listener().devfs.clone()).expect("/dev mount faiiled");
+    mount_fs_by_path("/dev", dev_listener().devfs.clone());
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]

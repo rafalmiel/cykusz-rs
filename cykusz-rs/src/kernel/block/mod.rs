@@ -3,15 +3,16 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
+
 use hashbrown::HashSet;
 use spin::Once;
 use uuid::Uuid;
 
 use crate::kernel::block::mbr::Partition;
 use crate::kernel::device;
-use crate::kernel::device::{alloc_id, register_device, Device};
+use crate::kernel::device::{alloc_id, Device, register_device};
 use crate::kernel::fs::cache::{ArcWrap, Cacheable};
-use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::fs::ext2::{Ext2Filesystem, FsDevice};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{
     CachedAccess, CachedBlockDev, PageCacheItem, PageCacheItemArc, PageCacheItemWeak, PageCacheKey,
@@ -55,7 +56,7 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
     Ok(())
 }
 
-pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn CachedBlockDev>> {
+pub fn get_blkdev_by_id(id: usize) -> Option<Arc<BlockDevice>> {
     let devs = BLK_DEVS.lock();
 
     if let Some(d) = devs.get(&id) {
@@ -65,7 +66,7 @@ pub fn get_blkdev_by_id(id: usize) -> Option<Arc<dyn CachedBlockDev>> {
     }
 }
 
-pub fn get_blkdev_by_uuid(uuid: Uuid) -> Option<Arc<dyn CachedBlockDev>> {
+pub fn get_blkdev_by_uuid(uuid: Uuid) -> Option<Arc<BlockDevice>> {
     let devs = BLK_DEVS.lock();
 
     for (_k, v) in devs.iter() {
@@ -79,7 +80,7 @@ pub fn get_blkdev_by_uuid(uuid: Uuid) -> Option<Arc<dyn CachedBlockDev>> {
     None
 }
 
-pub fn get_blkdev_by_name(name: &str) -> Option<Arc<dyn CachedBlockDev>> {
+pub fn get_blkdev_by_name(name: &str) -> Option<Arc<BlockDevice>> {
     let devs = BLK_DEVS.lock();
 
     for (_k, v) in devs.iter() {
@@ -101,6 +102,13 @@ pub struct BlockDevice {
     cleanup_timer: Arc<Timer>,
     sync_all_altive: AtomicBool,
     uuid: Once<Option<Uuid>>,
+}
+
+impl FsDevice for BlockDevice {
+    fn as_cached_device(&self) -> Option<Arc<dyn CachedBlockDev>> {
+        let cd = self.self_ref.upgrade()?;
+        return Some(cd.clone());
+    }
 }
 
 pub struct PartitionBlockDev {
@@ -356,6 +364,10 @@ impl CachedBlockDev for BlockDevice {
 
     fn id(&self) -> usize {
         self.id
+    }
+
+    fn device(&self) -> Arc<dyn FsDevice> {
+        self.self_ref.upgrade().unwrap().clone()
     }
 }
 

@@ -3,20 +3,21 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
+use syscall_defs::{
+    AtFlags, FcntlCmd, FDFlags, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
+};
+use syscall_defs::{OpenFlags, SyscallError};
 use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockTypeFlags};
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
 use syscall_defs::stat::Mode;
 use syscall_defs::time::Timespec;
-use syscall_defs::{
-    AtFlags, FDFlags, FcntlCmd, FileType, MMapFlags, MMapProt, OpenFD, SyscallResult,
-};
-use syscall_defs::{OpenFlags, SyscallError};
 
+use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
+use crate::kernel::fs::filesystem::FilesystemKind;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::socket::SocketService;
@@ -583,7 +584,8 @@ pub fn sys_mknode(at: u64, path: u64, path_len: u64, mode: u64, devid: u64) -> S
     let dir = get_dir_entry(at, Some(dir_path), LookupMode::None, true)?;
 
     if dir.inode().ftype()? == FileType::Dir {
-        dir.inode().mknode(dir, name.str(), mode.ftype_bits_truncate(), devid as usize)?;
+        dir.inode()
+            .mknode(dir, name.str(), mode.ftype_bits_truncate(), devid as usize)?;
 
         Ok(0)
     } else {
@@ -645,7 +647,9 @@ pub fn sys_chmod(at: u64, path: u64, path_len: u64, mode: u64, flags: u64) -> Sy
         flags.contains(AtFlags::SYMLINK_NOFOLLOW),
     )?;
 
-    inode.inode().chmod(Mode::from_bits_truncate(mode as u32).mode_bits_truncate())?;
+    inode
+        .inode()
+        .chmod(Mode::from_bits_truncate(mode as u32).mode_bits_truncate())?;
 
     Ok(0)
 }
@@ -1125,9 +1129,7 @@ pub fn sys_mount(
     let dev =
         crate::kernel::block::get_blkdev_by_id(dev.device()?.id()).ok_or(SyscallError::ENODEV)?;
 
-    let fs = crate::kernel::fs::ext2::Ext2Filesystem::new(dev).ok_or(SyscallError::EINVAL)?;
-
-    crate::kernel::fs::mount::mount(dest, fs)
+    crate::kernel::fs::mount::mount(dest, Some(dev), FilesystemKind::Ext2FS)
         .and(Ok(0))
         .or(Err(SyscallError::EFAULT))
 }

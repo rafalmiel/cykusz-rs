@@ -1,10 +1,11 @@
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 
-use crate::kernel::block::BlockDev;
 use spin::Once;
 use uuid::Uuid;
 
+use crate::kernel::block::BlockDev;
+use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
@@ -32,11 +33,17 @@ pub struct Ext2Filesystem {
     dir_lock: Mutex<()>,
 }
 
+pub trait FsDevice: Device {
+    fn as_cached_device(&self) -> Option<Arc<dyn CachedBlockDev>> {
+        None
+    }
+}
+
 impl Ext2Filesystem {
-    pub fn new(dev: Arc<dyn CachedBlockDev>) -> Option<Arc<dyn Filesystem>> {
+    pub fn new(dev: Arc<dyn FsDevice>) -> Option<Arc<dyn Filesystem>> {
         let a = Arc::new_cyclic(|me| Ext2Filesystem {
             self_ref: me.clone(),
-            dev,
+            dev: dev.as_cached_device().unwrap(),
             sectors_per_block: Once::new(),
             superblock: superblock::Superblock::new(),
             blockgroupdesc: blockgroup::BlockGroupDescriptors::new(),
@@ -266,6 +273,10 @@ impl Filesystem for Ext2Filesystem {
 
     fn name(&self) -> &'static str {
         "ext2"
+    }
+
+    fn device(&self) -> Arc<dyn FsDevice> {
+        self.dev.device()
     }
 }
 

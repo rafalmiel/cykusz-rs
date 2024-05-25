@@ -1,4 +1,5 @@
 use core::ptr::addr_of;
+
 use crate::drivers::multiboot2::Tag;
 use crate::kernel::mm::VirtAddr;
 

@@ -1,4 +1,5 @@
 use core::ptr::addr_of;
+
 use crate::arch::raw::descriptor as dsc;
 use crate::arch::raw::gdt;
 use crate::arch::raw::segmentation as sgm;

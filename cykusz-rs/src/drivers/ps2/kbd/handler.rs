@@ -5,6 +5,7 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use spin::Once;
 
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
@@ -20,13 +21,13 @@ use super::scancode;
 
 struct KbdState {
     state: Spin<State>,
-    dev_id: usize,
+    dev_id: DevId,
     buf: BufferQueue,
     self_ref: Weak<KbdState>,
 }
 
 impl Device for KbdState {
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.dev_id
     }
 

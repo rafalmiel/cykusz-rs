@@ -1,6 +1,7 @@
 use crate::arch::mm::VirtAddr;
 use crate::arch::output::{register_video_driver, Color, ColorCode, ScreenChar, VideoDriver};
 use crate::drivers::multiboot2::framebuffer_info::{FramebufferInfo, FramebufferType};
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, MappedAccess, PageDirectItemStruct};
@@ -635,7 +636,7 @@ impl VideoDriver for Fb {
 }
 
 pub struct FbDevice {
-    dev_id: usize,
+    dev_id: DevId,
     self_ptr: Weak<FbDevice>,
 }
 
@@ -668,7 +669,7 @@ impl INode for FbDevice {
 }
 
 impl Device for FbDevice {
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.dev_id
     }
 

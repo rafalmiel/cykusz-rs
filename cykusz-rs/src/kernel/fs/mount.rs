@@ -3,6 +3,7 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
+use crate::kernel::device::dev_t::DevId;
 use hashbrown::HashMap;
 use spin::Once;
 
@@ -46,7 +47,7 @@ impl MountedFS {
 
 struct MountsData {
     mounts: BTreeMap<MountKey, Mountpoint>,
-    mounted_devs: HashMap<usize, MountedFS>,
+    mounted_devs: HashMap<DevId, MountedFS>,
 }
 
 impl MountsData {

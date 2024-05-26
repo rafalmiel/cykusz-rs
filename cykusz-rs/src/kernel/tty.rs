@@ -1,6 +1,7 @@
 use alloc::collections::BTreeMap;
 use alloc::sync::{Arc, Weak};
 
+use crate::kernel::device::dev_t::DevId;
 use spin::Once;
 
 use crate::kernel::fs::path::Path;
@@ -11,14 +12,14 @@ use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::task::Task;
 
 pub trait TerminalDevice: Send + Sync {
-    fn id(&self) -> usize;
+    fn id(&self) -> DevId;
     fn ctrl_process(&self) -> Option<Arc<Task>>;
     fn attach(&self, task: Arc<Task>) -> bool;
     fn detach(&self, task: Arc<Task>) -> bool;
     fn set_fg_group(&self, group: Arc<Group>) -> bool;
 }
 
-static TTY_DEVS: RwSpin<BTreeMap<usize, Arc<dyn TerminalDevice>>> = RwSpin::new(BTreeMap::new());
+static TTY_DEVS: RwSpin<BTreeMap<DevId, Arc<dyn TerminalDevice>>> = RwSpin::new(BTreeMap::new());
 
 pub fn register_tty(dev: Arc<dyn TerminalDevice>) -> crate::kernel::device::Result<()> {
     let mut devs = TTY_DEVS.write();
@@ -30,7 +31,7 @@ pub fn register_tty(dev: Arc<dyn TerminalDevice>) -> crate::kernel::device::Resu
     Ok(())
 }
 
-pub fn get_tty_by_id(id: usize) -> Option<Arc<dyn TerminalDevice>> {
+pub fn get_tty_by_id(id: DevId) -> Option<Arc<dyn TerminalDevice>> {
     let devs = TTY_DEVS.read();
 
     if let Some(d) = devs.get(&id) {

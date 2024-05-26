@@ -10,6 +10,7 @@ use core::sync::atomic::Ordering;
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
 
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::{alloc_id, Device};
 use crate::kernel::fs::devnode::DevNode;
 use crate::kernel::fs::dirent::DirEntryItem;
@@ -74,7 +75,13 @@ impl INode for LockedRamINode {
         let mut stat = syscall_defs::stat::Stat::default();
 
         stat.st_ino = self.id()? as u64;
-        stat.st_dev = 0;
+        let content = self.0.read();
+
+        stat.st_rdev = if let Content::DevNode(Some(d)) = &content.content {
+            d.device().id()
+        } else {
+            0
+        };
 
         let content = self.0.read();
         if let Content::Bytes(b) = &content.content {
@@ -217,7 +224,7 @@ impl INode for LockedRamINode {
         _parent: DirEntryItem,
         name: &str,
         mode: syscall_defs::stat::Mode,
-        devid: usize,
+        devid: DevId,
     ) -> Result<INodeItem> {
         self.make_inode(name, mode.into(), |inode| {
             inode.0.write().content = Content::DevNode(Some(
@@ -381,7 +388,7 @@ impl Filesystem for RamFS {
 }
 
 struct DummyRamDevice {
-    id: usize,
+    id: DevId,
     self_ref: Weak<DummyRamDevice>,
 }
 
@@ -397,7 +404,7 @@ impl DummyRamDevice {
 impl INode for DummyRamDevice {}
 
 impl Device for DummyRamDevice {
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.id
     }
 

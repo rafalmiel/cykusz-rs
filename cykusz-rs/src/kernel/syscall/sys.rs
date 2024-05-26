@@ -3,6 +3,7 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
+use crate::kernel::device::dev_t::DevId;
 use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockTypeFlags};
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
@@ -585,7 +586,7 @@ pub fn sys_mknode(at: u64, path: u64, path_len: u64, mode: u64, devid: u64) -> S
 
     if dir.inode().ftype()? == FileType::Dir {
         dir.inode()
-            .mknode(dir, name.str(), mode.ftype_bits_truncate(), devid as usize)?;
+            .mknode(dir, name.str(), mode.ftype_bits_truncate(), devid as DevId)?;
 
         Ok(0)
     } else {

@@ -5,6 +5,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use spin::Once;
 
 use crate::arch::raw::mm::UserAddr;
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, CacheItemAdapter, Cacheable, WeakWrap};
 use crate::kernel::fs::ext2::FsDevice;
 use crate::kernel::mm::virt::PageFlags;
@@ -206,7 +207,7 @@ pub trait CachedBlockDev: CachedAccess {
     fn notify_clean_inode(&self, _page: &PageCacheItem);
     fn sync_all(&self);
 
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.device().id()
     }
 

@@ -1,4 +1,5 @@
 use crate::drivers::ps2::{controller, Error};
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
@@ -19,7 +20,7 @@ use syscall_defs::OpenFlags;
 
 struct MouseState {
     state: Spin<State>,
-    dev_id: usize,
+    dev_id: DevId,
     buf: BufferQueue,
     self_ref: Weak<MouseState>,
 }
@@ -125,7 +126,7 @@ impl<'a> Iterator for StateIter<'a> {
 }
 
 impl Device for MouseState {
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.dev_id
     }
 

@@ -1,7 +1,7 @@
-use crate::arch::mm::virt::entry::Entry;
 use bit_field::BitField;
 
-use crate::arch::raw::msr::{rdmsr, wrmsr, IA32_PAT};
+use crate::arch::mm::virt::entry::Entry;
+use crate::arch::raw::msr::{IA32_PAT, rdmsr, wrmsr};
 use crate::kernel::mm::virt;
 
 #[repr(u8)]

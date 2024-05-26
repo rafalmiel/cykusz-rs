@@ -1,8 +1,8 @@
 use core::ops::{Deref, DerefMut};
 
-use crate::kernel;
 use spin::{Mutex as M, MutexGuard as MG};
 
+use crate::kernel;
 use crate::kernel::int;
 use crate::kernel::sync::IrqGuard;
 

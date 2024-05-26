@@ -1,8 +1,8 @@
 use core::ops::{Deref, DerefMut};
 
 use crate::kernel::sched::current_task;
-use crate::kernel::sync::spin_rw_lock::RwSpinUpgradeableGuard;
 use crate::kernel::sync::{IrqGuard, RwSpin, RwSpinReadGuard, RwSpinWriteGuard};
+use crate::kernel::sync::spin_rw_lock::RwSpinUpgradeableGuard;
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub struct RwMutex<T: ?Sized> {

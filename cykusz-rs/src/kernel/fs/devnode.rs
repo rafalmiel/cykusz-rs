@@ -1,16 +1,15 @@
 use alloc::sync::Arc;
 
+use syscall_defs::OpenFlags;
 use syscall_defs::poll::PollEventFlags;
 
-use syscall_defs::OpenFlags;
-
+use crate::kernel::device::{DevError, Device};
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Result as DevResult;
-use crate::kernel::device::{DevError, Device};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::MappedAccess;
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::vfs::{Metadata, Result};
+use crate::kernel::fs::vfs::Result;
 
 pub struct DevNode {
     dev: Arc<dyn Device>,

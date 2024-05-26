@@ -7,11 +7,11 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
-use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::poll::PollEventFlags;
 
-use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::{alloc_id, Device};
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::devnode::DevNode;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::ext2::FsDevice;
@@ -20,8 +20,8 @@ use crate::kernel::fs::icache::{INodeItem, INodeItemInt, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::MappedAccess;
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::vfs::Result;
 use crate::kernel::fs::vfs::{FsError, Metadata};
+use crate::kernel::fs::vfs::Result;
 use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::sync::{RwSpin, Spin};
 use crate::kernel::utils::types::CeilDiv;

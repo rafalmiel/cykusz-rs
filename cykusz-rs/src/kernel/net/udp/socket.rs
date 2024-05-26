@@ -4,20 +4,19 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicU32;
 use core::sync::atomic::Ordering;
-use syscall_defs::net::{MsgFlags, MsgHdr, NetU16, SockAddr, SockOption};
 
-use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
-
+use syscall_defs::net::{MsgFlags, MsgHdr, NetU16, SockAddr, SockOption};
+use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Stat;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
+use crate::kernel::net::{default_driver, Packet, PacketHeader, PacketTrait, PacketUpHierarchy};
 use crate::kernel::net::ip::{Ip, Ip4};
 use crate::kernel::net::socket::SocketService;
 use crate::kernel::net::udp::Udp;
-use crate::kernel::net::{default_driver, Packet, PacketHeader, PacketTrait, PacketUpHierarchy};
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 

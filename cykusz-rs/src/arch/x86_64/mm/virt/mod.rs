@@ -1,8 +1,8 @@
 use crate::arch::raw::ctrlregs;
 use crate::arch::raw::mm;
-use crate::kernel::mm::virt;
-use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::mm::{PhysAddr, VirtAddr};
+use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::virt;
 
 use self::table::*;
 

@@ -3,25 +3,25 @@ use alloc::vec::Vec;
 use core::mem::size_of;
 use core::ptr::Unique;
 
-use syscall_defs::exec::ExeArgs;
 use syscall_defs::{MMapFlags, MMapProt};
+use syscall_defs::exec::ExeArgs;
 
 use crate::arch::gdt;
 use crate::arch::gdt::update_tss_rps0;
 use crate::arch::idt::RegsFrame;
 use crate::arch::mm::phys::{allocate_order, deallocate_order};
+use crate::arch::mm::virt::{activate_table, current_p4_table, p4_table_addr};
 use crate::arch::mm::virt::p4_table;
 use crate::arch::mm::virt::table::P4Table;
-use crate::arch::mm::virt::{activate_table, current_p4_table, p4_table_addr};
 use crate::arch::raw::idt::InterruptFrame;
 use crate::arch::raw::mm::MappedAddr;
 use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::syscall::SyscallFrame;
 use crate::arch::utils::StackHelper;
 use crate::drivers::elf::ElfHeader;
-use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
+use crate::kernel::mm::{allocate, PAGE_SIZE, VirtAddr};
 use crate::kernel::mm::{Frame, PhysAddr};
+use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::task::vm::{TlsVmInfo, VM};
 
 mod args;

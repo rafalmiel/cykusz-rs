@@ -1,7 +1,7 @@
+use crate::kernel::mm::{deallocate_order, virt};
 use crate::kernel::mm::Frame;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
-use crate::kernel::mm::{deallocate_order, virt};
 
 bitflags! {
     pub struct Entry: usize {

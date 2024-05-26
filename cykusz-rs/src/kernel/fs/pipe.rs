@@ -4,9 +4,9 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use hashbrown::HashMap;
 use spin::Once;
 
+use syscall_defs::OpenFlags;
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Stat;
-use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;

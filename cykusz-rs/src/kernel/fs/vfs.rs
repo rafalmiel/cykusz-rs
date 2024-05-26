@@ -1,4 +1,3 @@
-use crate::kernel::device::dev_t::DevId;
 use syscall_defs::{FileType, SyscallError};
 
 use crate::kernel::fs::dirent::DirEntryItem;

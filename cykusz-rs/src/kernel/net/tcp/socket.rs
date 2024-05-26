@@ -1,22 +1,21 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
+use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
 use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockAddrIn, SockOption};
-
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Stat;
-use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::PAGE_SIZE;
-use crate::kernel::net::ip::{Ip, Ip4, IpHeader};
-use crate::kernel::net::socket::SocketService;
-use crate::kernel::net::tcp::{Tcp, TcpHeader};
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketTrait, PacketUpHierarchy,
 };
+use crate::kernel::net::ip::{Ip, Ip4, IpHeader};
+use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::tcp::{Tcp, TcpHeader};
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::{Mutex, Spin};
 use crate::kernel::timer::{create_timer, current_ns, Timer, TimerCallback};

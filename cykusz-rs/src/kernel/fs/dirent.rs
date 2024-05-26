@@ -7,7 +7,7 @@ use core::sync::atomic::Ordering;
 
 use spin::Once;
 
-use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable, WeakWrap};
+use crate::kernel::fs::cache::{ArcWrap, Cache, Cacheable, CacheItem, WeakWrap};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;

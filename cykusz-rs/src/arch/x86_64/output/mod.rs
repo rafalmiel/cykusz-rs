@@ -1,8 +1,8 @@
 use core::fmt::Error;
 
-use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
 use bit_field::BitField;
 
+use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
 use crate::kernel::sync::{Spin, SpinGuard};
 
 #[derive(Copy, Clone)]

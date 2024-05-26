@@ -1,6 +1,7 @@
-use bit_field::BitField;
 use core::ptr::read_volatile;
 use core::ptr::write_volatile;
+
+use bit_field::BitField;
 
 use crate::arch::acpi::apic::MadtHeader;
 use crate::arch::x86_64::acpi::apic::MadtEntryIntSrc;

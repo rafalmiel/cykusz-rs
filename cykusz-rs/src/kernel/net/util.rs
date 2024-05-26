@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
 pub mod checksum {
-    use crate::kernel::net::ip::{Ip4, IpHeader, IpType};
     use syscall_defs::net::NetU16;
+
+    use crate::kernel::net::ip::{Ip4, IpHeader, IpType};
 
     #[repr(packed)]
     pub struct PseudoHeader {

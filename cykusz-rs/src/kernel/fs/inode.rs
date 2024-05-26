@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 
 use downcast_rs::DowncastSync;
 
-use crate::kernel::device::dev_t::DevId;
-use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
+use syscall_defs::poll::PollEventFlags;
 
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;

@@ -1,10 +1,10 @@
 use core::ops::{Deref, DerefMut};
 
-use crate::kernel;
 use spin::{
     RwLock as RW, RwLockReadGuard as RWR, RwLockUpgradableGuard as RWU, RwLockWriteGuard as RWW,
 };
 
+use crate::kernel;
 use crate::kernel::int;
 
 pub struct RwSpin<T: ?Sized> {

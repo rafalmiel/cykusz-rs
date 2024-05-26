@@ -4,8 +4,8 @@ use core::ops::Index;
 
 use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::disk::inode::{FileType, INode};
-use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};

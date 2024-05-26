@@ -1,14 +1,14 @@
 use alloc::collections::btree_map::BTreeMap;
 use alloc::sync::Arc;
+
 use syscall_defs::net::NetU16;
 
-use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
-use crate::kernel::net::socket::SocketService;
-use crate::kernel::net::util::checksum;
 use crate::kernel::net::{
     ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
 };
-
+use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
+use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::util::checksum;
 use crate::kernel::sync::RwSpin;
 
 pub mod socket;

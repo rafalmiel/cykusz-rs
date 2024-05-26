@@ -2,15 +2,16 @@ use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 
 use bit_field::BitField;
+
 use syscall_defs::net::{NetU16, NetU32};
 
+use crate::kernel::net::{
+    Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait, PacketUpHierarchy,
+};
 use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
 use crate::kernel::net::socket::SocketService;
 use crate::kernel::net::tcp::socket::TcpFlags;
 use crate::kernel::net::util::checksum;
-use crate::kernel::net::{
-    Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait, PacketUpHierarchy,
-};
 use crate::kernel::sync::RwSpin;
 
 pub mod socket;

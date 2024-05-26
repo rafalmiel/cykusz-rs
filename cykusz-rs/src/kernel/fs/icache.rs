@@ -4,7 +4,7 @@ use core::ops::Deref;
 
 use spin::Once;
 
-use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable};
+use crate::kernel::fs::cache::{ArcWrap, Cache, Cacheable, CacheItem};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::inode::INode;
 

@@ -4,6 +4,7 @@ use syscall_defs::poll::PollEventFlags;
 
 use syscall_defs::OpenFlags;
 
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Result as DevResult;
 use crate::kernel::device::{DevError, Device};
 use crate::kernel::fs::inode::INode;
@@ -16,7 +17,7 @@ pub struct DevNode {
 }
 
 impl DevNode {
-    pub fn new(devid: usize) -> DevResult<Arc<DevNode>> {
+    pub fn new(devid: DevId) -> DevResult<Arc<DevNode>> {
         let dev = crate::kernel::device::devices().read();
 
         if let Some(d) = dev.get(&devid) {
@@ -32,14 +33,6 @@ impl DevNode {
 }
 
 impl INode for DevNode {
-    fn id(&self) -> Result<usize> {
-        self.dev.inode().id()
-    }
-
-    fn metadata(&self) -> Result<Metadata> {
-        self.dev.inode().metadata()
-    }
-
     fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
         self.dev.inode().read_at(offset, buf)
     }

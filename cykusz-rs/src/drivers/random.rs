@@ -3,12 +3,13 @@ use crate::kernel::fs::inode::INode;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::current_ns;
 use rand::{RngCore, SeedableRng};
 
 struct Random {
-    id: usize,
+    id: DevId,
     name: String,
     sref: Weak<Random>,
     rng: Spin<rand::prelude::StdRng>,
@@ -44,7 +45,7 @@ impl INode for Random {
 }
 
 impl Device for Random {
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.id
     }
 

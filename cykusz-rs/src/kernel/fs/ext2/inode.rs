@@ -10,6 +10,7 @@ use syscall_defs::time::Timespec;
 use syscall_defs::{FileType, OpenFlags};
 
 use crate::arch::mm::PAGE_SIZE;
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::cache::Cacheable;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
@@ -801,7 +802,7 @@ impl INode for LockedExt2INode {
         parent: DirEntryItem,
         name: &str,
         mode: syscall_defs::stat::Mode,
-        _devid: usize,
+        _devid: DevId,
     ) -> Result<INodeItem> {
         Ok(self.create(parent, name, mode.into())?.inode())
     }

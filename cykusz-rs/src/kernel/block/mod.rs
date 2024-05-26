@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 use crate::kernel::block::mbr::Partition;
 use crate::kernel::device;
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::cache::{ArcWrap, Cacheable};
 use crate::kernel::fs::ext2::{Ext2Filesystem, FsDevice};
@@ -34,7 +35,7 @@ pub trait BlockDev: Send + Sync {
     }
 }
 
-static BLK_DEVS: Mutex<BTreeMap<usize, Arc<BlockDevice>>> = Mutex::new(BTreeMap::new());
+static BLK_DEVS: Mutex<BTreeMap<DevId, Arc<BlockDevice>>> = Mutex::new(BTreeMap::new());
 
 pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
     let mut devs = BLK_DEVS.lock();
@@ -56,7 +57,7 @@ pub fn register_blkdev(dev: Arc<BlockDevice>) -> device::Result<()> {
     Ok(())
 }
 
-pub fn get_blkdev_by_id(id: usize) -> Option<Arc<BlockDevice>> {
+pub fn get_blkdev_by_id(id: DevId) -> Option<Arc<BlockDevice>> {
     let devs = BLK_DEVS.lock();
 
     if let Some(d) = devs.get(&id) {
@@ -93,7 +94,7 @@ pub fn get_blkdev_by_name(name: &str) -> Option<Arc<BlockDevice>> {
 }
 
 pub struct BlockDevice {
-    id: usize,
+    id: DevId,
     name: String,
     dev: Arc<dyn BlockDev>,
     self_ref: Weak<BlockDevice>,
@@ -234,7 +235,7 @@ impl BlockDevice {
 impl INode for BlockDevice {}
 
 impl Device for BlockDevice {
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.id
     }
 
@@ -362,7 +363,7 @@ impl CachedBlockDev for BlockDevice {
         logln!("Syncing... finished");
     }
 
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.id
     }
 

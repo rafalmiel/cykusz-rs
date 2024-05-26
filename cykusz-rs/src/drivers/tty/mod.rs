@@ -11,6 +11,7 @@ use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT, SIGTSTP};
 use syscall_defs::OpenFlags;
 
 use crate::arch::output::{video, Color, ConsoleWriter};
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
@@ -56,7 +57,7 @@ impl Debug for State {
 }
 
 struct Tty {
-    dev_id: usize,
+    dev_id: DevId,
     state: Spin<State>,
     buffer: Spin<InputBuffer>,
     output: Spin<OutputBuffer>,
@@ -374,7 +375,7 @@ impl KeyListener for Tty {
 }
 
 impl Device for Tty {
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.dev_id
     }
 
@@ -388,7 +389,7 @@ impl Device for Tty {
 }
 
 impl TerminalDevice for Tty {
-    fn id(&self) -> usize {
+    fn id(&self) -> DevId {
         self.dev_id
     }
 
@@ -461,10 +462,6 @@ impl TerminalDevice for Tty {
 }
 
 impl INode for Tty {
-    fn id(&self) -> crate::kernel::fs::vfs::Result<usize> {
-        Ok(self.dev_id)
-    }
-
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
         logln2!("try tty read");
         let r = self.read(buf.as_mut_ptr(), buf.len());

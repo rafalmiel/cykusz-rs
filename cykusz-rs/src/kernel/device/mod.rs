@@ -1,3 +1,6 @@
+pub mod dev_t;
+
+use crate::kernel::device::dev_t::DevId;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -9,14 +12,14 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::RwSpin;
 
 pub trait Device: Send + Sync {
-    fn id(&self) -> usize;
+    fn id(&self) -> dev_t::DevId;
     fn name(&self) -> String;
     fn inode(&self) -> Arc<dyn INode>;
 }
 
 static FREE_DEV_ID: AtomicUsize = AtomicUsize::new(1);
 
-static DEVICES: RwSpin<BTreeMap<usize, Arc<dyn Device>>> = RwSpin::new(BTreeMap::new());
+static DEVICES: RwSpin<BTreeMap<dev_t::DevId, Arc<dyn Device>>> = RwSpin::new(BTreeMap::new());
 static DEVICE_LISTEMERS: RwSpin<Vec<Arc<dyn DeviceListener>>> = RwSpin::new(Vec::new());
 
 #[derive(Debug)]
@@ -31,8 +34,11 @@ pub trait DeviceListener: Send + Sync {
 
 pub type Result<T> = core::result::Result<T, DevError>;
 
-pub fn alloc_id() -> usize {
-    FREE_DEV_ID.fetch_add(1, Ordering::SeqCst) << 32
+pub fn alloc_id() -> dev_t::DevId {
+    dev_t::makedev(
+        FREE_DEV_ID.fetch_add(1, Ordering::SeqCst) as dev_t::DevId,
+        1,
+    )
 }
 
 pub fn register_device(dev: Arc<dyn Device>) -> Result<()> {
@@ -58,6 +64,6 @@ pub fn register_device_listener(listener: Arc<dyn DeviceListener>) {
     l.push(listener);
 }
 
-pub fn devices() -> &'static RwSpin<BTreeMap<usize, Arc<dyn Device>>> {
+pub fn devices() -> &'static RwSpin<BTreeMap<DevId, Arc<dyn Device>>> {
     &DEVICES
 }

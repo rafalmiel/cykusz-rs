@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 
 use downcast_rs::DowncastSync;
 
+use crate::kernel::device::dev_t::DevId;
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
 
@@ -97,7 +98,7 @@ pub trait INode: Send + Sync + DowncastSync {
         _parent: DirEntryItem,
         _name: &str,
         _mode: syscall_defs::stat::Mode,
-        _devid: usize,
+        _devid: DevId,
     ) -> Result<INodeItem> {
         return Err(FsError::NotSupported);
     }

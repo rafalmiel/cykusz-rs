@@ -1,21 +1,23 @@
-use crate::drivers::ps2::{controller, Error};
-use crate::kernel::sync::Spin;
-use crate::kernel::utils::buffer::BufferQueue;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
+
 use spin::Once;
 
+use syscall_defs::events::{Event, EventType};
+use syscall_defs::poll::PollEventFlags;
+use syscall_defs::time::Timeval;
+use syscall_defs::OpenFlags;
+
+use crate::drivers::ps2::{controller, Error};
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
+use crate::kernel::sync::Spin;
 use crate::kernel::timer::current_ns;
+use crate::kernel::utils::buffer::BufferQueue;
 use crate::kernel::utils::wait_queue::WaitQueueFlags;
-use syscall_defs::events::{Event, EventType};
-use syscall_defs::poll::PollEventFlags;
-use syscall_defs::time::Timeval;
-use syscall_defs::OpenFlags;
 
 use super::scancode;
 

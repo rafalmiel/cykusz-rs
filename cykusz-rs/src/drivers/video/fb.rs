@@ -1,3 +1,10 @@
+use alloc::string::String;
+use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
+
+use bit_field::BitField;
+use spin::Once;
+
 use crate::arch::mm::VirtAddr;
 use crate::arch::output::{register_video_driver, Color, ColorCode, ScreenChar, VideoDriver};
 use crate::drivers::multiboot2::framebuffer_info::{FramebufferInfo, FramebufferType};
@@ -11,11 +18,6 @@ use crate::kernel::mm::{map_to_flags, virt, MappedAddr, PhysAddr, PAGE_SIZE};
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::TimerObject;
 use crate::kernel::utils::types::Align;
-use alloc::string::String;
-use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
-use bit_field::BitField;
-use spin::Once;
 
 static FONT: &'static [u8] = &[
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -8,7 +8,6 @@ use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::poll::PollEventFlags;
 
 use crate::kernel::device::dev_t::DevId;
-use crate::kernel::device::Device;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
@@ -135,8 +134,8 @@ pub trait INode: Send + Sync + DowncastSync {
         None
     }
 
-    fn device(&self) -> Result<Arc<dyn Device>> {
-        return Err(FsError::EntryNotFound);
+    fn device_id(&self) -> Option<DevId> {
+        None
     }
 
     fn ioctl(&self, _cmd: usize, _arg: usize) -> Result<usize> {
@@ -148,10 +147,6 @@ pub trait INode: Send + Sync + DowncastSync {
     }
 
     fn ref_update(&self, _new_ref: Weak<INodeItemInt>) {}
-
-    fn as_inode(&self) -> Option<Arc<dyn INode>> {
-        None
-    }
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {
         None

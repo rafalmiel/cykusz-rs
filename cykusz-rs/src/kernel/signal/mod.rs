@@ -13,7 +13,6 @@ use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
-
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::Task;
 

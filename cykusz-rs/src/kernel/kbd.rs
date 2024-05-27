@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 
-use crate::kernel::sync::RwSpin;
-
 use syscall_defs::events::keys::KeyCode;
+
+use crate::kernel::sync::RwSpin;
 
 pub trait KeyListener: Sync {
     fn on_new_key(&self, key: KeyCode, released: bool);

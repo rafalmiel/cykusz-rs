@@ -815,7 +815,7 @@ impl INode for LockedExt2INode {
         parent: DirEntryItem,
         name: &str,
         mode: Mode,
-        devid: DevId
+        devid: DevId,
     ) -> Result<INodeItem> {
         let inode = self.create(parent, name, mode.into())?.inode();
 
@@ -1044,6 +1044,16 @@ impl INode for LockedExt2INode {
         Some(Arc::new(SysDirEntIter::new(parent, self.self_ref())))
     }
 
+    fn device_id(&self) -> Option<DevId> {
+        if ![FileType::Block, FileType::Char].contains(&self.ftype().ok()?) {
+            return None;
+        }
+
+        let id = self.node.read().d_inode().get_rdevid();
+
+        return if id != 0 { Some(id) } else { None };
+    }
+
     fn sync(&self) -> Result<()> {
         let mut pages = self.dirty_list.lock();
 
@@ -1058,10 +1068,6 @@ impl INode for LockedExt2INode {
         self.read().sync_blocks(&self.ext2_fs());
 
         return Ok(());
-    }
-
-    fn as_inode(&self) -> Option<Arc<dyn INode>> {
-        Some(self.self_ref())
     }
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {

@@ -3,7 +3,6 @@ use mmio::VCell;
 
 use crate::drivers::block::ahci::reg::HbaCmdHeader;
 use crate::kernel::mm::PhysAddr;
-use crate::kernel::mm::VirtAddr;
 
 bitflags! {
     pub struct HbaPortISReg: u32 {

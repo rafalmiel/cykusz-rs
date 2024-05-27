@@ -1,7 +1,6 @@
 #![allow(unused)]
 
 use bit_field::BitField;
-use mmio::VCell;
 
 pub use self::cmd::*;
 pub use self::fis::*;

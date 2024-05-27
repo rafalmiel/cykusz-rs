@@ -1,6 +1,3 @@
-pub mod dev_t;
-
-use crate::kernel::device::dev_t::DevId;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -8,8 +5,11 @@ use alloc::vec::Vec;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::RwSpin;
+
+pub mod dev_t;
 
 pub trait Device: Send + Sync {
     fn id(&self) -> dev_t::DevId;
@@ -66,4 +66,8 @@ pub fn register_device_listener(listener: Arc<dyn DeviceListener>) {
 
 pub fn devices() -> &'static RwSpin<BTreeMap<DevId, Arc<dyn Device>>> {
     &DEVICES
+}
+
+pub fn find_device(id: DevId) -> Option<Arc<dyn Device>> {
+    devices().read().get(&id).cloned()
 }

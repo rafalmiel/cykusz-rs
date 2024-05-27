@@ -108,7 +108,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
     };
 
     if res.is_err() {
-        logln4!("syscall {} result = {:?}", num, res);
+        logln!("syscall {} result = {:?}", num, res);
     }
 
     res

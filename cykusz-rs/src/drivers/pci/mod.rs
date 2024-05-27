@@ -1,12 +1,13 @@
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+
+use bit_field::BitField;
+
 use crate::arch::idt::{add_shared_irq_handler, InterruptFn, SharedInterruptFn};
 use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
 use crate::arch::mm::{PhysAddr, VirtAddr};
 use crate::kernel::mm::map_to_flags;
 use crate::kernel::mm::virt::PageFlags;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use bit_field::BitField;
-
 use crate::kernel::sync::Spin;
 
 mod epci;

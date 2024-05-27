@@ -3,7 +3,6 @@ use mmio::VCell;
 
 use crate::drivers::block::ahci::reg::FisRegH2D;
 use crate::kernel::mm::PhysAddr;
-use crate::kernel::utils::slice::ToBytesMut;
 
 bitflags! {
     pub struct HbaCmdHeaderFlags: u16 {

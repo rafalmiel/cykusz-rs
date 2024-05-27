@@ -1,6 +1,6 @@
 use alloc::sync::{Arc, Weak};
-use hashbrown::HashMap;
 
+use hashbrown::HashMap;
 use spin::Once;
 
 use syscall_defs::{SyscallError, SyscallResult};

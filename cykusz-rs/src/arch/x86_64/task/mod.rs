@@ -1,4 +1,3 @@
-use alloc::string::String;
 use alloc::vec::Vec;
 use core::mem::size_of;
 use core::ptr::Unique;
@@ -19,6 +18,7 @@ use crate::arch::raw::segmentation::SegmentSelector;
 use crate::arch::syscall::SyscallFrame;
 use crate::arch::utils::StackHelper;
 use crate::drivers::elf::ElfHeader;
+use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};
@@ -450,11 +450,13 @@ impl Task {
         hdr: &ElfHeader,
         vm: &VM,
         tls_vm: Option<TlsVmInfo>,
-        path: String,
+        exe: DirEntryItem,
         args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> ! {
         logln!("entry point: {}", entry);
+
+        let path = exe.full_path();
 
         let args = args.map(|a| args::Args::new(a));
         let envs = envs.map(|e| args::Args::new(e));
@@ -538,9 +540,12 @@ impl Task {
             helper.write(argp.len()); // int argc
         }
 
+        // !!! Prevent memory leaks as we are not running destructors here!
         drop(envp);
         drop(argp);
         drop(tls_vm);
+        drop(path);
+        drop(exe);
 
         logln!("exec user stack: {:#x}", helper.current());
         assert_eq!(helper.current() % 16, 0);

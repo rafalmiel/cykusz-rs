@@ -210,6 +210,9 @@ impl Task {
         self.filetable().close_on_exec();
         self.filetable().debug();
 
+        // !!! Prevent memory leak as we are not running destructors here!
+        drop(vm);
+
         unsafe {
             // EXEC!
             self.arch_task_mut().exec(
@@ -218,7 +221,7 @@ impl Task {
                 &elf_hdr,
                 self.vm(),
                 tls_vm,
-                exe.full_path(),
+                exe,
                 Some(args),
                 envs,
             )
@@ -781,6 +784,6 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        logln4!("drop task {}", self.tid());
+        logln!("drop task {}", self.tid());
     }
 }

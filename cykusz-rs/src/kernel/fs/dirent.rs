@@ -27,7 +27,10 @@ impl Cacheable<CacheKey> for DirEntry {
         data.parent = None;
     }
 
-    fn notify_used(&self) {}
+    fn notify_used(&self) {
+        let data = self.write();
+        logln!("mark used: {}", data.name);
+    }
 
     fn deallocate(&self, _me: &CacheItem<CacheKey, DirEntry>) {
         logln!("deallocate {}", _me.data.lock().name);

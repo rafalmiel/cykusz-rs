@@ -70,10 +70,6 @@ impl Cacheable<ICacheKey> for INodeItemStruct {
     fn cache_key(&self) -> (usize, usize) {
         INodeItemStruct::make_key(&self.fs().unwrap(), self.id().unwrap())
     }
-
-    fn notify_unused(&self, new_ref: &Weak<INodeItemInt>) {
-        self.inode.ref_update(new_ref.clone());
-    }
 }
 
 static ICACHE: Once<Arc<ICache>> = Once::new();

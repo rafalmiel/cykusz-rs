@@ -8,7 +8,7 @@ use syscall_defs::{FileType, OpenFlags};
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
+use crate::kernel::fs::icache::INodeItem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{CachedAccess, MappedAccess};
 use crate::kernel::fs::poll::PollTable;
@@ -121,7 +121,6 @@ impl INode for INodeOpsWrap {
     impl_delegate!(device_id, Option<DevId>);
     impl_delegate!(ioctl, vfs::Result<usize>, cmd: usize, arg: usize);
     impl_delegate!(sync, vfs::Result<()>);
-    impl_delegate!(ref_update, (), new_ref: Weak<INodeItemInt>);
     impl_delegate!(as_cacheable, Option<Arc<dyn CachedAccess>>);
     impl_delegate!(as_mappable, Option<Arc<dyn MappedAccess>>);
     impl_delegate!(as_socket, Option<Arc<dyn SocketService>>);

@@ -21,8 +21,6 @@ pub struct FileHandle {
     pub offset: AtomicUsize,
     pub flags: AtomicUsize,
     pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
-    //#[allow(unused)]
-    //fs: Option<Arc<dyn Filesystem>>,
 }
 
 impl FileHandle {
@@ -33,11 +31,6 @@ impl FileHandle {
             offset: AtomicUsize::new(0),
             flags: AtomicUsize::from(flags.bits()),
             dir_iter: Mutex::new((None, None)),
-            //fs: if let Some(fs) = inode.inode().fs() {
-            //    fs.upgrade()
-            //} else {
-            //    None
-            //},
         }
     }
 

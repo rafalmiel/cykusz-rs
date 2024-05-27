@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+use bit_field::BitField;
+use crate::kernel::device::dev_t::DevId;
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum FileType {
     Fifo,
@@ -222,5 +225,15 @@ impl INode {
     }
     pub fn os_specific2(&self) -> &[u8] {
         &self.os_specific2
+    }
+    pub fn set_rdevid(&mut self, id: DevId) {
+        self.data_ptr[0] = id.get_bits(32..64) as u32;
+        self.data_ptr[1] = id.get_bits(0..32) as u32;
+    }
+    pub fn get_rdevid(&self) -> DevId {
+        let mut id: DevId = 0;
+        id.set_bits(32..64, self.data_ptr[0] as DevId);
+        id.set_bits(0..32, self.data_ptr[1] as DevId);
+        id
     }
 }

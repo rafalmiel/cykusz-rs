@@ -389,6 +389,10 @@ impl Ext2INode {
             return;
         }
 
+        if ![FileType::File, FileType::Symlink].contains(&self.ftype()) {
+            return;
+        }
+
         logln!("free inode blocks {} {:?}", self.id, self.d_inode);
 
         for i in 0usize..15 {
@@ -560,6 +564,15 @@ impl INode for LockedExt2INode {
 
         let ftype = inode.ftype();
         stat.st_mode.insert(Mode::from(ftype));
+
+        match ftype {
+            FileType::Block | FileType::Char => {
+                stat.st_rdev = inode.d_inode().get_rdevid();
+            }
+            _ => {
+                stat.st_rdev = 0;
+            }
+        }
 
         stat.st_mode
             .insert(syscall_defs::stat::Mode::from_bits_truncate(
@@ -801,10 +814,16 @@ impl INode for LockedExt2INode {
         &self,
         parent: DirEntryItem,
         name: &str,
-        mode: syscall_defs::stat::Mode,
-        _devid: DevId,
+        mode: Mode,
+        devid: DevId
     ) -> Result<INodeItem> {
-        Ok(self.create(parent, name, mode.into())?.inode())
+        let inode = self.create(parent, name, mode.into())?.inode();
+
+        if mode.intersects(Mode::IFBLK | Mode::IFCHR) {
+            inode.as_ext2_inode().d_inode_writer().set_rdevid(devid);
+        }
+
+        Ok(inode)
     }
 
     fn symlink(&self, name: &str, target: &str) -> Result<()> {

@@ -3,7 +3,6 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
-use crate::kernel::device::dev_t::DevId;
 use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockTypeFlags};
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
@@ -14,8 +13,10 @@ use syscall_defs::{
 };
 use syscall_defs::{OpenFlags, SyscallError};
 
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::filesystem::FilesystemKind;
+use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
@@ -64,7 +65,7 @@ fn get_dir_entry(
     lookup_mode: LookupMode,
     get_symlink_entry: bool,
 ) -> Result<DirEntryItem, SyscallError> {
-    logln4!(
+    logln!(
         "get dir entry: {:?} {:?} {:?} get_symlink_entry: {}",
         fd,
         path,
@@ -75,13 +76,19 @@ fn get_dir_entry(
     let task = current_task_ref();
 
     let file_dir = match fd {
-        OpenFD::Fd(fd) => task
+        OpenFD::Fd(fd) if path.is_some() => task
             .get_handle(fd)
             .ok_or(SyscallError::EBADFD)?
-            .inode
-            .clone(),
+            .get_inode()
+            .get_fs_dir_item(),
+        OpenFD::Fd(fd) if !path.is_some() => {
+            return Ok(task
+                .get_handle(fd)
+                .ok_or(SyscallError::EBADFD)?
+                .get_dir_item());
+        }
         OpenFD::Cwd => task.get_dent().ok_or(SyscallError::EBADFD)?.clone(),
-        OpenFD::None => {
+        _ => {
             return Err(SyscallError::EINVAL);
         }
     };
@@ -99,7 +106,7 @@ fn get_dir_entry(
 }
 
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
-    logln5!("sys_open {} {} {:x}", at, make_str(path, len), mode);
+    logln!("sys_open {} {} {:x}", at, make_str(path, len), mode);
     let mut flags = OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
     if !flags.intersects(OpenFlags::RDONLY | OpenFlags::RDWR | OpenFlags::WRONLY) {
         flags.insert(OpenFlags::RDONLY);
@@ -363,8 +370,7 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
         Some(
             task.get_handle(fd as usize)
                 .ok_or(SyscallError::EBADFD)?
-                .inode
-                .clone(),
+                .get_dir_item(),
         )
     } else {
         None
@@ -783,11 +789,7 @@ fn get_socket(fd: usize) -> Result<Arc<dyn SocketService>, SyscallError> {
 
     let sock = task.get_handle(fd).ok_or(SyscallError::EBADFD)?;
 
-    Ok(sock
-        .inode
-        .inode()
-        .as_socket()
-        .ok_or(SyscallError::ENOTSOCK)?)
+    Ok(sock.get_inode().as_socket().ok_or(SyscallError::ENOTSOCK)?)
 }
 
 pub fn sys_bind(sockfd: u64, addr_ptr: u64, addrlen: u64) -> SyscallResult {
@@ -1124,8 +1126,8 @@ pub fn sys_mount(
     let dev = lookup_by_path(&Path::new(dev_path), LookupMode::None)?.inode();
     let dest = lookup_by_path(&Path::new(dest_path), LookupMode::None)?;
 
-    let dev =
-        crate::kernel::block::get_blkdev_by_id(dev.device()?.id()).ok_or(SyscallError::ENODEV)?;
+    let dev = crate::kernel::block::get_blkdev_by_id(dev.device_id().ok_or(SyscallError::ENODEV)?)
+        .ok_or(SyscallError::ENODEV)?;
 
     crate::kernel::fs::mount::mount(dest, Some(dev), FilesystemKind::Ext2FS)
         .and(Ok(0))
@@ -1458,8 +1460,7 @@ pub fn sys_truncate(fd: u64, size: u64) -> SyscallResult {
     task.filetable()
         .get_handle(fd as usize)
         .ok_or(SyscallError::EBADFD)?
-        .inode
-        .inode()
+        .get_inode()
         .truncate(size as usize)
         .map(|_r| Ok(0))?
 }
@@ -1532,7 +1533,7 @@ pub fn sys_fsync(fd: u64) -> SyscallResult {
         .get_handle(fd as usize)
         .ok_or(SyscallError::EBADFD)?;
 
-    file.inode.inode().sync()?;
+    file.get_inode().sync()?;
 
     Ok(0)
 }

@@ -1,12 +1,13 @@
-use crate::kernel::device::Device;
-use crate::kernel::fs::inode::INode;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 
+use rand::{RngCore, SeedableRng};
+
 use crate::kernel::device::dev_t::DevId;
+use crate::kernel::device::Device;
+use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::Spin;
 use crate::kernel::timer::current_ns;
-use rand::{RngCore, SeedableRng};
 
 struct Random {
     id: DevId,

@@ -1,9 +1,9 @@
 use alloc::collections::BTreeMap;
 use alloc::sync::{Arc, Weak};
 
-use crate::kernel::device::dev_t::DevId;
 use spin::Once;
 
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::fs::{lookup_by_real_path, LookupMode};
@@ -58,9 +58,9 @@ impl Default for Terminal {
 pub fn get_tty_by_path(path: &str) -> Result<Arc<dyn TerminalDevice>, FsError> {
     let entry = lookup_by_real_path(&Path::new(path), LookupMode::None)?;
 
-    let device = entry.inode().device()?;
+    let device = entry.inode().device_id().ok_or(FsError::EntryNotFound)?;
 
-    if let Some(tty) = get_tty_by_id(device.id()) {
+    if let Some(tty) = get_tty_by_id(device) {
         Ok(tty)
     } else {
         Err(FsError::EntryNotFound)

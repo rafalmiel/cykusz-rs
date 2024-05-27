@@ -21,7 +21,6 @@ use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
 
 pub mod cache;
-pub mod devnode;
 pub mod dirent;
 pub mod ext2;
 pub mod filesystem;

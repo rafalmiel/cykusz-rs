@@ -2,8 +2,6 @@ use bit_field::BitField;
 use mmio::VCell;
 
 use crate::drivers::block::ata::AtaCommand;
-use crate::kernel::mm::PhysAddr;
-use crate::kernel::utils::slice::ToBytesMut;
 
 #[repr(u8)]
 #[derive(Copy, Clone)]

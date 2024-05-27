@@ -23,7 +23,6 @@ use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{Spin, SpinGuard};
 use crate::kernel::task::Task;
-
 use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::types::Prefault;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};

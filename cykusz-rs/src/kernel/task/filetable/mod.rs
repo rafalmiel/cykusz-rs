@@ -12,49 +12,45 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
 use crate::kernel::sync::{Mutex, RwMutex};
+use crate::kernel::task::filetable::inode_wrap::INodeOpsWrap;
+
+mod inode_wrap;
 
 const FILE_NUM: usize = 256;
 
 pub struct FileHandle {
-    pub fd: usize,
-    pub inode: DirEntryItem,
-    pub offset: AtomicUsize,
-    pub flags: AtomicUsize,
-    pub dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
+    fd: usize,
+    inode: Arc<INodeOpsWrap>,
+    offset: AtomicUsize,
+    flags: AtomicUsize,
+    dir_iter: Mutex<(Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>)>,
 }
 
 impl FileHandle {
     pub fn new(fd: usize, inode: DirEntryItem, flags: OpenFlags) -> FileHandle {
         FileHandle {
             fd,
-            inode: inode.clone(),
+            inode: INodeOpsWrap::new(inode),
             offset: AtomicUsize::new(0),
             flags: AtomicUsize::from(flags.bits()),
             dir_iter: Mutex::new((None, None)),
         }
     }
 
-    fn get_inode(&self) -> Arc<dyn INode> {
-        let fs_inode = self.inode.inode();
+    pub fn get_dir_item(&self) -> DirEntryItem {
+        self.inode.get_dir_item()
+    }
 
-        return match fs_inode.ftype() {
-            Ok(FileType::Fifo) => {
-                if let Some(ino) = crate::kernel::fs::pipe::pipes().get_or_insert(&fs_inode) {
-                    ino
-                } else {
-                    fs_inode.inode_arc()
-                }
-            }
-            _ => fs_inode.inode_arc(),
-        };
+    pub fn get_inode(&self) -> &Arc<INodeOpsWrap> {
+        &self.inode
     }
 
     pub fn open(&self, flags: OpenFlags) -> Result<()> {
-        self.get_inode().open(flags)
+        self.inode.open(flags)
     }
 
     pub fn close(&self, flags: OpenFlags) {
-        self.get_inode().close(flags)
+        self.inode.close(flags)
     }
 
     pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
@@ -81,11 +77,11 @@ impl FileHandle {
     }
 
     pub fn read_at(&self, buf: &mut [u8], offset: usize) -> Result<usize> {
-        Ok(self.get_inode().read_at(offset, buf)?)
+        Ok(self.inode.read_at(offset, buf)?)
     }
 
     pub fn write_at(&self, buf: &[u8], offset: usize) -> Result<usize> {
-        let inode = self.get_inode();
+        let inode = &self.inode;
         Ok(match inode.as_cacheable() {
             Some(cacheable) => {
                 if let Some(w) = cacheable.write_cached(offset, buf) {
@@ -99,7 +95,7 @@ impl FileHandle {
     }
 
     pub fn seek(&self, off: isize, whence: syscall_defs::SeekWhence) -> Result<usize> {
-        let meta = self.get_inode().metadata().ok().ok_or(FsError::IsPipe)?;
+        let meta = self.inode.metadata().ok().ok_or(FsError::IsPipe)?;
 
         if meta.typ == FileType::File {
             match whence {
@@ -129,7 +125,7 @@ impl FileHandle {
     }
 
     pub fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
-        self.get_inode().ioctl(cmd, arg)
+        self.inode.ioctl(cmd, arg)
     }
 
     pub fn poll(
@@ -137,14 +133,18 @@ impl FileHandle {
         poll_table: Option<&mut PollTable>,
         flags: PollEventFlags,
     ) -> Result<PollEventFlags> {
-        self.get_inode().poll(poll_table, flags)
+        self.inode.poll(poll_table, flags)
     }
 
     fn get_dir_iter(&self) -> (Option<Arc<dyn DirEntIter>>, Option<DirEntryItem>) {
         let mut lock = self.dir_iter.lock();
 
         if self.offset.load(Ordering::SeqCst) == 0 && lock.0.is_none() {
-            let i = self.inode.inode().dir_iter(self.inode.clone());
+            let i = self
+                .inode
+                .get_fs_dir_item()
+                .inode()
+                .dir_iter(self.inode.get_fs_dir_item());
             lock.0 = i;
         };
 
@@ -192,7 +192,11 @@ impl FileHandle {
                     let o = self.offset.load(Ordering::SeqCst);
                     match &iter {
                         Some(i) => i.next(),
-                        None => self.inode.inode().dir_ent(self.inode.clone(), o)?,
+                        None => self
+                            .inode
+                            .get_fs_dir_item()
+                            .inode()
+                            .dir_ent(self.inode.get_fs_dir_item(), o)?,
                     }
                 }
             };
@@ -244,7 +248,7 @@ impl FileHandle {
 
 impl Drop for FileHandle {
     fn drop(&mut self) {
-        self.get_inode().close(self.flags());
+        self.inode.close(self.flags());
     }
 }
 
@@ -320,7 +324,7 @@ impl FileTable {
                     "[{}] fd: {} {} {:?}",
                     i,
                     f.handle.fd,
-                    f.handle.inode.full_path(),
+                    f.handle.inode.get_fs_dir_item().full_path(),
                     f.handle.flags()
                 );
             }
@@ -340,15 +344,10 @@ impl FileTable {
             Some(FileDescriptor::new(
                 Arc::new(FileHandle {
                     fd,
-                    inode: inode.clone(),
+                    inode: INodeOpsWrap::new(inode.clone()),
                     offset: AtomicUsize::new(if append { size as usize } else { 0 }),
                     flags: AtomicUsize::new(flags.bits()),
                     dir_iter: Mutex::new((None, None)),
-                    //fs: if let Some(fs) = inode.inode().fs() {
-                    //    fs.upgrade()
-                    //} else {
-                    //    None
-                    //},
                 }),
                 FDFlags::from(flags),
             ))

@@ -12,7 +12,6 @@ use syscall_defs::poll::PollEventFlags;
 
 use crate::kernel::device::{alloc_id, Device};
 use crate::kernel::device::dev_t::DevId;
-use crate::kernel::fs::devnode::DevNode;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::ext2::FsDevice;
 use crate::kernel::fs::filesystem::Filesystem;
@@ -30,7 +29,7 @@ struct LockedRamINode(RwSpin<RamINode>);
 
 enum Content {
     Bytes(Spin<Vec<u8>>),
-    DevNode(Option<Arc<DevNode>>),
+    DevNode(DevId),
     None,
 }
 
@@ -77,8 +76,8 @@ impl INode for LockedRamINode {
         stat.st_ino = self.id()? as u64;
         let content = self.0.read();
 
-        stat.st_rdev = if let Content::DevNode(Some(d)) = &content.content {
-            d.device().id()
+        stat.st_rdev = if let Content::DevNode(id) = &content.content {
+            *id
         } else {
             0
         };
@@ -144,13 +143,6 @@ impl INode for LockedRamINode {
 
                 Ok(to_copy)
             }
-            Content::DevNode(Some(node)) => {
-                let n = node.clone();
-                drop(i);
-
-                // read_at may sleep, so drop the lock
-                n.read_at(offset, buf)
-            }
             _ => Err(FsError::NotSupported),
         }
     }
@@ -170,13 +162,6 @@ impl INode for LockedRamINode {
 
                 Ok(buf.len())
             }
-            Content::DevNode(Some(node)) => {
-                let n = node.clone();
-                drop(i);
-
-                // write_at may sleep, so drop the lock
-                n.write_at(offset, buf)
-            }
             _ => Err(FsError::NotSupported),
         }
     }
@@ -186,17 +171,7 @@ impl INode for LockedRamINode {
         ptable: Option<&mut PollTable>,
         flags: PollEventFlags,
     ) -> Result<PollEventFlags> {
-        let i = self.0.read();
-
-        match &i.content {
-            Content::DevNode(Some(n)) => {
-                let n = n.clone();
-                drop(i);
-
-                n.poll(ptable, flags)
-            }
-            _ => Err(FsError::NotSupported),
-        }
+        Err(FsError::NotSupported)
     }
 
     fn fs(&self) -> Option<Weak<dyn Filesystem>> {
@@ -212,11 +187,7 @@ impl INode for LockedRamINode {
     }
 
     fn open(&self, flags: OpenFlags) -> Result<()> {
-        if let Content::DevNode(Some(d)) = &self.0.read().content {
-            d.open(flags)
-        } else {
-            Ok(())
-        }
+        Ok(())
     }
 
     fn mknode(
@@ -227,9 +198,7 @@ impl INode for LockedRamINode {
         devid: DevId,
     ) -> Result<INodeItem> {
         self.make_inode(name, mode.into(), |inode| {
-            inode.0.write().content = Content::DevNode(Some(
-                DevNode::new(devid).map_err(|e| FsError::EntryNotFound)?,
-            ));
+            inode.0.write().content = Content::DevNode(devid);
             Ok(())
         })
     }
@@ -237,16 +206,16 @@ impl INode for LockedRamINode {
     fn truncate(&self, size: usize) -> Result<()> {
         let node = self.0.write();
 
-        match &node.content {
+        return match &node.content {
             Content::Bytes(vec) => {
                 let mut v = vec.lock();
 
                 v.resize(size, 0);
 
-                return Ok(());
+                Ok(())
             }
-            _ => return Ok(()),
-        }
+            _ => Ok(()),
+        };
     }
 
     fn dir_ent(&self, parent: DirEntryItem, idx: usize) -> Result<Option<DirEntryItem>> {
@@ -285,31 +254,20 @@ impl INode for LockedRamINode {
         Ok(dir)
     }
 
-    fn device(&self) -> Result<Arc<dyn Device>> {
-        if let Content::DevNode(Some(d)) = &self.0.read().content {
-            Ok(d.device())
+    fn device_id(&self) -> Option<DevId> {
+        if let Content::DevNode(d) = &self.0.read().content {
+            Some(*d)
         } else {
-            Err(FsError::EntryNotFound)
+            None
         }
     }
 
     fn ioctl(&self, cmd: usize, arg: usize) -> Result<usize> {
-        let read = self.0.read();
-        if let Content::DevNode(Some(d)) = &read.content {
-            let dev = d.clone();
-            drop(read);
-            dev.ioctl(cmd, arg)
-        } else {
-            Err(FsError::NotSupported)
-        }
+        Err(FsError::NotSupported)
     }
 
     fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
-        if let Content::DevNode(Some(d)) = &self.0.read().content {
-            d.device().inode().as_mappable()
-        } else {
-            None
-        }
+        None
     }
 }
 
@@ -461,8 +419,8 @@ impl RamFS {
             children: BTreeMap::new(),
             fs: Weak::default(),
             content: match typ {
-                FileType::Char => Content::DevNode(None),
-                FileType::Block => Content::DevNode(None),
+                FileType::Char => Content::DevNode(0),
+                FileType::Block => Content::DevNode(0),
                 FileType::File => Content::Bytes(Spin::new(Vec::new())),
                 FileType::Dir => Content::None,
                 FileType::Symlink => Content::None,

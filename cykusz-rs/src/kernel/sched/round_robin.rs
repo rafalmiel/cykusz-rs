@@ -1,13 +1,12 @@
 use alloc::sync::Arc;
 
-use crate::arch::int;
 use intrusive_collections::LinkedList;
 
+use crate::arch::int;
 use crate::kernel::sched::{SchedulerInterface, SleepFlags};
 use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, Spin, SpinGuard};
 use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
-
 use crate::kernel::utils::PerCpu;
 
 #[thread_local]

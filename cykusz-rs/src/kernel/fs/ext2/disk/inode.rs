@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use bit_field::BitField;
+
 use crate::kernel::device::dev_t::DevId;
 
 #[derive(Copy, Clone, PartialEq)]

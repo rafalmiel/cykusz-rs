@@ -1,4 +1,5 @@
 use core::hint::spin_loop;
+
 use spin::Once;
 
 use crate::kernel::sync::IrqGuard;

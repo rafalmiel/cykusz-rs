@@ -1,7 +1,7 @@
-mod handler;
-
 use crate::arch::int;
 use crate::drivers::ps2::{controller, Command, Error, PS};
+
+mod handler;
 
 #[repr(u8)]
 #[allow(dead_code)]

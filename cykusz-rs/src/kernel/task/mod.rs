@@ -15,7 +15,6 @@ use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::sched::{new_task_tid, SleepFlags};
-
 use crate::kernel::signal::{SignalResult, Signals, KSIGSTOPTHR};
 use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
 use crate::kernel::task::children_events::WaitPidEvents;

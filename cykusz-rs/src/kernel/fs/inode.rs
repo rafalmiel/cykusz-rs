@@ -10,7 +10,7 @@ use syscall_defs::{FileType, OpenFlags};
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
-use crate::kernel::fs::icache::{INodeItem, INodeItemInt};
+use crate::kernel::fs::icache::INodeItem;
 use crate::kernel::fs::pcache::{CachedAccess, MappedAccess};
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Metadata, Result};
@@ -145,8 +145,6 @@ pub trait INode: Send + Sync + DowncastSync {
     fn sync(&self) -> Result<()> {
         return Err(FsError::NotSupported);
     }
-
-    fn ref_update(&self, _new_ref: Weak<INodeItemInt>) {}
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {
         None

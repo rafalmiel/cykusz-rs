@@ -6,12 +6,12 @@ use core::marker::PhantomData;
 
 use syscall_defs::net::{NetU16, NetU32, NetU8};
 
-use crate::kernel::net::{
-    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
-};
 use crate::kernel::net::ip::{Ip, Ip4};
 use crate::kernel::net::socket::SocketService;
 use crate::kernel::net::udp::Udp;
+use crate::kernel::net::{
+    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
+};
 
 const DHCP_XID: u32 = 0x43424140;
 

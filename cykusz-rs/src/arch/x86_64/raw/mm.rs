@@ -3,8 +3,8 @@ use core::ops::*;
 
 use crate::arch::mm::virt::p4_table_addr;
 use crate::arch::mm::virt::table::P4Table;
-use crate::arch::x86_64::mm::PAGE_SIZE;
 use crate::arch::x86_64::mm::phys::PhysPage;
+use crate::arch::x86_64::mm::PAGE_SIZE;
 use crate::kernel::mm::virt::PageFlags;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default, Hash)]
@@ -113,7 +113,7 @@ pub unsafe fn flush_all() {
 }
 
 pub fn enable_nxe_bit() {
-    use crate::arch::raw::msr::{IA32_EFER, rdmsr, wrmsr};
+    use crate::arch::raw::msr::{rdmsr, wrmsr, IA32_EFER};
 
     let nxe_bit = 1 << 11;
     unsafe {
@@ -123,7 +123,7 @@ pub fn enable_nxe_bit() {
 }
 
 pub fn enable_write_protect_bit() {
-    use crate::arch::raw::ctrlregs::{cr0, Cr0, cr0_write};
+    use crate::arch::raw::ctrlregs::{cr0, cr0_write, Cr0};
 
     unsafe { cr0_write(cr0() | Cr0::CR0_WRITE_PROTECT) };
 }

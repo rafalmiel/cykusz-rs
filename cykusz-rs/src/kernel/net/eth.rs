@@ -2,9 +2,9 @@
 
 use syscall_defs::net::NetU16;
 
+use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::{ConstPacketKind, Packet};
 use crate::kernel::net::{PacketHeader, PacketUpHierarchy};
-use crate::kernel::net::ip::Ip4;
 
 #[repr(u16)]
 pub enum EthType {

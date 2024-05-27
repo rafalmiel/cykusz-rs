@@ -1,7 +1,3 @@
-pub use crate::arch::mm::{MappedAddr, PhysAddr, VirtAddr};
-pub use crate::arch::mm::MAX_USER_ADDR;
-pub use crate::arch::mm::MMAP_USER_ADDR;
-pub use crate::arch::mm::PAGE_SIZE;
 pub use crate::arch::mm::phys::allocate;
 pub use crate::arch::mm::phys::allocate_order;
 pub use crate::arch::mm::phys::deallocate;
@@ -16,6 +12,10 @@ pub use crate::arch::mm::virt::map_to_flags;
 pub use crate::arch::mm::virt::to_phys;
 pub use crate::arch::mm::virt::unmap;
 pub use crate::arch::mm::virt::update_flags;
+pub use crate::arch::mm::MAX_USER_ADDR;
+pub use crate::arch::mm::MMAP_USER_ADDR;
+pub use crate::arch::mm::PAGE_SIZE;
+pub use crate::arch::mm::{MappedAddr, PhysAddr, VirtAddr};
 
 pub use self::frame::Frame;
 

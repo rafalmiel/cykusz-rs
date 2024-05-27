@@ -4,10 +4,10 @@ use core::ops::{Deref, DerefMut};
 
 use intrusive_collections::LinkedList;
 
-use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Mode;
 use syscall_defs::time::Timespec;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::arch::mm::PAGE_SIZE;
 use crate::kernel::device::dev_t::DevId;
@@ -15,8 +15,8 @@ use crate::kernel::fs::cache::Cacheable;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
-use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::ext2::idata::INodeData;
+use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
@@ -24,8 +24,8 @@ use crate::kernel::fs::pcache::{
     CachedAccess, MappedAccess, PageCacheItem, PageCacheItemAdapter, PageCacheItemArc, RawAccess,
 };
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::fs::vfs::Metadata;
+use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
 use crate::kernel::sync::{Mutex, RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
 use crate::kernel::time::unix_timestamp;

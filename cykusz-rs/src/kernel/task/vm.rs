@@ -4,21 +4,21 @@ use alloc::collections::LinkedList;
 use alloc::vec::Vec;
 use core::ops::Range;
 
-use syscall_defs::{MMapFlags, MMapProt};
 use syscall_defs::exec::ExeArgs;
+use syscall_defs::{MMapFlags, MMapProt};
 
 use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
-use crate::drivers::elf::ElfHeader;
 use crate::drivers::elf::types::{BinType, ProgramFlags, ProgramType};
-use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::drivers::elf::ElfHeader;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, PageCacheItemArc};
-use crate::kernel::mm::{
-    allocate_order, map_flags, map_to_flags, MAX_USER_ADDR, unmap, update_flags, VirtAddr,
-};
+use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::virt::PageFlags;
+use crate::kernel::mm::{
+    allocate_order, map_flags, map_to_flags, unmap, update_flags, VirtAddr, MAX_USER_ADDR,
+};
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::Mutex;
 use crate::kernel::utils::types::Align;

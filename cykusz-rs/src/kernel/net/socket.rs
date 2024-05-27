@@ -1,10 +1,10 @@
 use alloc::sync::Arc;
 
-use syscall_defs::{SyscallError, SyscallResult};
 use syscall_defs::net::{
     MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockType, SockTypeFlags,
 };
 use syscall_defs::SyscallError::ENOTSUP;
+use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::net::ip::{Ip, Ip4};

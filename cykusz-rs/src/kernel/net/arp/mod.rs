@@ -6,11 +6,11 @@ pub use cache::get as cache_get;
 pub use cache::insert as cache_insert;
 use syscall_defs::net::{NetU16, NetU8};
 
-use crate::kernel::net::{
-    ConstPacketKind, default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
-};
 use crate::kernel::net::eth::{Eth, EthType};
 use crate::kernel::net::ip::Ip4;
+use crate::kernel::net::{
+    default_driver, ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
+};
 
 pub mod cache;
 

@@ -79,7 +79,6 @@ macro_rules! impl_delegate {
     }
 }
 
-#[allow(unused)]
 macro_rules! impl_delegate_fs {
     ($name:tt, $res: ty) => {
         fn $name(&self) -> $res {
@@ -97,7 +96,7 @@ impl INode for INodeOpsWrap {
     impl_delegate!(id, vfs::Result<usize>);
     impl_delegate!(ftype, vfs::Result<FileType>);
     impl_delegate!(metadata, vfs::Result<Metadata>);
-    impl_delegate!(stat, vfs::Result<Stat>);
+    impl_delegate_fs!(stat, vfs::Result<Stat>);
     impl_delegate!(lookup, vfs::Result<DirEntryItem>, parent: DirEntryItem, name: &str);
     impl_delegate!(mkdir, vfs::Result<INodeItem>, name: &str);
     impl_delegate!(rmdir, vfs::Result<()>, name: &str);

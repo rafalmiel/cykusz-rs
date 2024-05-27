@@ -5,7 +5,6 @@ use hashbrown::HashMap;
 use spin::Once;
 
 use syscall_defs::poll::PollEventFlags;
-use syscall_defs::stat::Stat;
 use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
@@ -76,17 +75,6 @@ impl Drop for Pipe {
 }
 
 impl INode for Pipe {
-    fn stat(&self) -> Result<Stat> {
-        let mut stat = Stat::default();
-
-        stat.st_mode.insert(syscall_defs::stat::Mode::IFIFO);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXU);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXG);
-        stat.st_mode.insert(syscall_defs::stat::Mode::IRWXO);
-
-        Ok(stat)
-    }
-
     fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
         Ok(self.buf.read_data(buf)?)
     }

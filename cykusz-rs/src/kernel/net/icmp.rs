@@ -2,14 +2,14 @@ use core::mem::size_of;
 
 use syscall_defs::net::NetU16;
 
-use crate::kernel::net::{
-    Packet, PacketBaseTrait, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
-    PacketUpHierarchy,
-};
 use crate::kernel::net::ip::{Ip, IpHeader, IpType};
 use crate::kernel::net::tcp::TcpHeader;
 use crate::kernel::net::udp::UdpHeader;
 use crate::kernel::net::util::checksum;
+use crate::kernel::net::{
+    Packet, PacketBaseTrait, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
+    PacketUpHierarchy,
+};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Icmp {}

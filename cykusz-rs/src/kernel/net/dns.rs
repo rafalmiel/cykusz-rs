@@ -4,12 +4,12 @@ use core::sync::atomic::{AtomicU16, Ordering};
 use syscall_defs::net::NetU16;
 
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::net::{
-    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
-};
 use crate::kernel::net::ip::{Ip, Ip4};
 use crate::kernel::net::socket::SocketService;
 use crate::kernel::net::udp::Udp;
+use crate::kernel::net::{
+    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
+};
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::Spin;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};

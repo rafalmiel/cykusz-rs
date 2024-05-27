@@ -5,11 +5,11 @@ use alloc::vec::Vec;
 use spin::Once;
 use uuid::Uuid;
 
-use syscall_defs::{FileType, OpenFlags};
 use syscall_defs::stat::Mode;
+use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::block::{get_blkdev_by_name, get_blkdev_by_uuid};
-use crate::kernel::device::{Device, DeviceListener, register_device_listener};
+use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::ext2::{Ext2Filesystem, FsDevice};
 use crate::kernel::fs::filesystem::{Filesystem, FilesystemKind};

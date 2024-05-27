@@ -1,14 +1,14 @@
 use syscall_defs::net::{NetU16, NetU32, NetU8};
 
-use crate::kernel::net::{
-    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
-    PacketUpHierarchy,
-};
 use crate::kernel::net::eth::{Eth, EthType};
 use crate::kernel::net::icmp::Icmp;
 use crate::kernel::net::tcp::Tcp;
 use crate::kernel::net::udp::Udp;
 use crate::kernel::net::util::checksum;
+use crate::kernel::net::{
+    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketTrait,
+    PacketUpHierarchy,
+};
 
 #[derive(Debug, Copy, Clone)]
 #[repr(u8)]

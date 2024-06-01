@@ -6,7 +6,7 @@ pub mod print;
 use std::arch::asm;
 use std::sync::atomic::AtomicU32;
 
-use syscall_defs::net::{MsgHdr, SockAddr, SockDomain, SockTypeFlags};
+use syscall_defs::net::{MsgHdr, SockAddrPtr, SockDomain, SockTypeFlags};
 use syscall_defs::poll::FdSet;
 use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
@@ -291,24 +291,20 @@ pub fn socket(domain: SockDomain, typ: SockTypeFlags) -> SyscallResult {
     unsafe { syscall2(SYS_SOCKET, domain as usize, typ.into()) }
 }
 
-pub fn bind(fd: usize, addr: &SockAddr, addr_len: usize) -> SyscallResult {
-    unsafe { syscall3(SYS_BIND, fd, addr as *const _ as usize, addr_len) }
+pub fn bind(fd: usize, addr: SockAddrPtr, addr_len: usize) -> SyscallResult {
+    unsafe { syscall3(SYS_BIND, fd, addr.addr(), addr_len) }
 }
 
-pub fn connect(fd: usize, addr: &SockAddr, addr_len: usize) -> SyscallResult {
-    unsafe { syscall3(SYS_CONNECT, fd, addr as *const _ as usize, addr_len) }
+pub fn connect(fd: usize, addr: SockAddrPtr, addr_len: usize) -> SyscallResult {
+    unsafe { syscall3(SYS_CONNECT, fd, addr.addr(), addr_len) }
 }
 
-pub fn accept(fd: usize, addr: Option<&mut SockAddr>, len: Option<&mut usize>) -> SyscallResult {
+pub fn accept(fd: usize, addr: SockAddrPtr, len: Option<&mut usize>) -> SyscallResult {
     unsafe {
         syscall3(
             SYS_ACCEPT,
             fd,
-            if let Some(a) = addr {
-                a as *mut SockAddr as usize
-            } else {
-                0
-            },
+            addr.addr(),
             if let Some(l) = len {
                 l as *mut _ as usize
             } else {

@@ -1,7 +1,7 @@
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
-use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockAddrIn, SockOption};
+use syscall_defs::net::{MsgFlags, MsgHdr, SockAddrIn, SockAddrPtr, SockOption};
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Stat;
 use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
@@ -11,7 +11,7 @@ use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::net::ip::{Ip, Ip4, IpHeader};
-use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::socket::{NetSocketService, SocketService};
 use crate::kernel::net::tcp::{Tcp, TcpHeader};
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketTrait, PacketUpHierarchy,
@@ -1061,31 +1061,6 @@ impl INode for Socket {
 }
 
 impl SocketService for Socket {
-    fn process_packet(&self, packet: Packet<Ip>) {
-        logln5!("process packet start");
-        let mut data = self.data.lock();
-        logln5!("process packet locked");
-
-        if !data.is_listening() {
-            data.process(packet.upgrade(), &self.in_buffer);
-
-            if data.state == State::Closed {
-                self.in_buffer.readers_queue().notify_all();
-            }
-        } else {
-            if let Some(sock) = data.process_new_connection(packet.upgrade()) {
-                self.connections.lock().connections.push(sock);
-                self.connections_wq.notify_all();
-            }
-        }
-    }
-
-    fn port_unreachable(&self, _port: u32, dst_port: u32) {
-        println!("Failed to send to port {}", dst_port);
-
-        self.data.lock().finalize();
-    }
-
     fn listen(&self, backlog: i32) -> SyscallResult {
         self.init(true);
 
@@ -1098,7 +1073,7 @@ impl SocketService for Socket {
 
     fn accept(
         &self,
-        sock_addr: Option<&mut SockAddr>,
+        mut sock_addr: SockAddrPtr,
         _addrlen: Option<&mut u32>,
     ) -> core::result::Result<Arc<dyn SocketService>, SyscallError> {
         let mut lock = self
@@ -1108,33 +1083,34 @@ impl SocketService for Socket {
             })?
             .unwrap();
 
-        if let Some(addr) = sock_addr {
-            *addr = SockAddrIn::new(self.dst_port(), self.target().into()).into_sock_addr();
+        if !sock_addr.is_null() {
+            let addr = sock_addr.as_sock_addr_in_mut();
+            *addr = SockAddrIn::new(self.dst_port(), self.target().into());
         }
 
         Ok(lock.connections.pop().unwrap())
     }
 
-    fn bind(&self, sock_addr: &SockAddr, addrlen: u32) -> SyscallResult {
+    fn bind(&self, sock_addr: SockAddrPtr, addrlen: u32) -> SyscallResult {
         logln5!("tcp bind");
-        if addrlen as usize != core::mem::size_of::<SockAddr>() {
+        let sock_addr = sock_addr.as_sock_addr_in();
+        if addrlen as usize != core::mem::size_of::<SockAddrIn>() {
             return Err(SyscallError::EINVAL);
         }
-        self.set_src_port(sock_addr.as_sock_addr_in().port());
+        self.set_src_port(sock_addr.port());
 
         Ok(0)
     }
 
-    fn connect(&self, sock_addr: &SockAddr, addrlen: u32) -> SyscallResult {
+    fn connect(&self, sock_addr: SockAddrPtr, addrlen: u32) -> SyscallResult {
         logln5!("tcp connect");
-        if addrlen as usize != core::mem::size_of::<SockAddr>() {
+        let sock_addr = sock_addr.as_sock_addr_in();
+        if addrlen as usize != core::mem::size_of::<SockAddrIn>() {
             return Err(SyscallError::EINVAL);
         }
 
-        let addr_in = sock_addr.as_sock_addr_in();
-
-        self.set_dst_port(addr_in.port());
-        self.set_target(addr_in.sin_addr.s_addr.into());
+        self.set_dst_port(sock_addr.port());
+        self.set_target(sock_addr.sin_addr.s_addr.into());
 
         self.in_buffer.init_size(PAGE_SIZE * 18);
         self.init(false);
@@ -1191,18 +1167,6 @@ impl SocketService for Socket {
         return Ok(total);
     }
 
-    fn src_port(&self) -> u32 {
-        self.src_port() as u32
-    }
-
-    fn target(&self) -> Ip4 {
-        self.target()
-    }
-
-    fn set_src_port(&self, src_port: u32) {
-        self.set_src_port(src_port as u16);
-    }
-
     fn get_socket_option(
         &self,
         _layer: i32,
@@ -1216,6 +1180,45 @@ impl SocketService for Socket {
 
     fn as_inode(&self) -> Option<Arc<dyn INode>> {
         Some(self.self_ref.upgrade()?)
+    }
+}
+
+impl NetSocketService for Socket {
+    fn process_packet(&self, packet: Packet<Ip>) {
+        logln5!("process packet start");
+        let mut data = self.data.lock();
+        logln5!("process packet locked");
+
+        if !data.is_listening() {
+            data.process(packet.upgrade(), &self.in_buffer);
+
+            if data.state == State::Closed {
+                self.in_buffer.readers_queue().notify_all();
+            }
+        } else {
+            if let Some(sock) = data.process_new_connection(packet.upgrade()) {
+                self.connections.lock().connections.push(sock);
+                self.connections_wq.notify_all();
+            }
+        }
+    }
+
+    fn port_unreachable(&self, _port: u32, dst_port: u32) {
+        println!("Failed to send to port {}", dst_port);
+
+        self.data.lock().finalize();
+    }
+
+    fn src_port(&self) -> u32 {
+        self.src_port() as u32
+    }
+
+    fn target(&self) -> Ip4 {
+        self.target()
+    }
+
+    fn set_src_port(&self, src_port: u32) {
+        self.set_src_port(src_port as u16);
     }
 }
 

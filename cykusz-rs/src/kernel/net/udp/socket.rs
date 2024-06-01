@@ -5,7 +5,7 @@ use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicU32;
 use core::sync::atomic::Ordering;
 
-use syscall_defs::net::{MsgFlags, MsgHdr, NetU16, SockAddr, SockOption};
+use syscall_defs::net::{MsgFlags, MsgHdr, NetU16, SockAddrIn, SockAddrPtr, SockOption};
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::Stat;
 use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
@@ -14,7 +14,7 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::net::ip::{Ip, Ip4};
-use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::socket::{NetSocketService, SocketService};
 use crate::kernel::net::udp::Udp;
 use crate::kernel::net::{default_driver, Packet, PacketHeader, PacketTrait, PacketUpHierarchy};
 use crate::kernel::sync::Spin;
@@ -214,48 +214,29 @@ impl INode for Socket {
 }
 
 impl SocketService for Socket {
-    fn process_packet(&self, ip: Packet<Ip>) {
-        let packet: Packet<Udp> = ip.upgrade();
+    fn bind(&self, sock_addr: SockAddrPtr, addrlen: u32) -> SyscallResult {
+        let sock_addr = sock_addr.as_sock_addr_in();
 
-        let ip_header = ip.header();
-        let udp_header = packet.header();
-
-        let recv = RecvPacket::new(
-            udp_header.src_port.value() as u32,
-            ip_header.src_ip,
-            Vec::from(packet.data()),
-        );
-
-        self.buffer.lock().push_back(recv);
-
-        self.buffer_wq.notify_all();
-    }
-
-    fn port_unreachable(&self, _port: u32, dst_port: u32) {
-        logln4!("UDP: Failed to send to port {}", dst_port);
-    }
-
-    fn bind(&self, sock_addr: &SockAddr, addrlen: u32) -> SyscallResult {
-        if addrlen as usize != core::mem::size_of::<SockAddr>() {
+        if addrlen as usize != core::mem::size_of::<SockAddrIn>() {
             return Err(SyscallError::EINVAL);
         }
 
-        self.set_src_port(sock_addr.as_sock_addr_in().port() as u32);
+        self.set_src_port(sock_addr.port() as u32);
 
         crate::kernel::net::udp::register_handler(self.me());
 
         return Ok(0);
     }
 
-    fn connect(&self, sock_addr: &SockAddr, addrlen: u32) -> SyscallResult {
-        if addrlen as usize != core::mem::size_of::<SockAddr>() {
+    fn connect(&self, sock_addr: SockAddrPtr, addrlen: u32) -> SyscallResult {
+        let sock_addr = sock_addr.as_sock_addr_in();
+
+        if addrlen as usize != core::mem::size_of::<SockAddrIn>() {
             return Err(SyscallError::EINVAL);
         }
 
-        let addr_in = sock_addr.as_sock_addr_in();
-
-        self.set_dst_port(addr_in.port() as u32);
-        self.set_dst_ip(addr_in.sin_addr.s_addr.into());
+        self.set_dst_port(sock_addr.port() as u32);
+        self.set_dst_ip(sock_addr.sin_addr.s_addr.into());
 
         if self.src_port() == 0 {
             crate::kernel::net::udp::register_handler(self.me());
@@ -266,9 +247,8 @@ impl SocketService for Socket {
 
     fn msg_send(&self, hdr: &MsgHdr, _flags: MsgFlags) -> SyscallResult {
         logln5!("UDP msg_send???");
-        let dest = if let Some(addr) = hdr.sock_addr() {
-            let addr_in = addr.as_sock_addr_in();
-            Some((addr_in.port() as u32, addr_in.sin_addr.s_addr.into()))
+        let dest = if let Some(addr) = hdr.sock_addr_in() {
+            Some((addr.port() as u32, addr.sin_addr.s_addr.into()))
         } else {
             None
         };
@@ -300,8 +280,7 @@ impl SocketService for Socket {
 
         drop(data);
 
-        if let Some(addr) = hdr.sock_addr_mut() {
-            let addr = addr.as_sock_addr_in_mut();
+        if let Some(addr) = hdr.sock_addr_in_mut() {
             addr.sin_port = NetU16::new(packet.src_port() as u16);
             addr.sin_addr.s_addr = packet.src_ip().into();
         }
@@ -321,18 +300,6 @@ impl SocketService for Socket {
             .sum::<usize>())
     }
 
-    fn src_port(&self) -> u32 {
-        self.src_port()
-    }
-
-    fn target(&self) -> Ip4 {
-        self.dst_ip().unwrap()
-    }
-
-    fn set_src_port(&self, src_port: u32) {
-        self.set_src_port(src_port);
-    }
-
     fn set_socket_option(
         &self,
         _layer: i32,
@@ -345,5 +312,40 @@ impl SocketService for Socket {
 
     fn as_inode(&self) -> Option<Arc<dyn INode>> {
         Some(self.self_ref.upgrade()?)
+    }
+}
+
+impl NetSocketService for Socket {
+    fn process_packet(&self, ip: Packet<Ip>) {
+        let packet: Packet<Udp> = ip.upgrade();
+
+        let ip_header = ip.header();
+        let udp_header = packet.header();
+
+        let recv = RecvPacket::new(
+            udp_header.src_port.value() as u32,
+            ip_header.src_ip,
+            Vec::from(packet.data()),
+        );
+
+        self.buffer.lock().push_back(recv);
+
+        self.buffer_wq.notify_all();
+    }
+
+    fn port_unreachable(&self, _port: u32, dst_port: u32) {
+        logln4!("UDP: Failed to send to port {}", dst_port);
+    }
+
+    fn src_port(&self) -> u32 {
+        self.src_port()
+    }
+
+    fn target(&self) -> Ip4 {
+        self.dst_ip().unwrap()
+    }
+
+    fn set_src_port(&self, src_port: u32) {
+        self.set_src_port(src_port);
     }
 }

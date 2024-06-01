@@ -36,6 +36,7 @@ bitflags! {
     }
 }
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub union IfReqU {
     pub ifr_addr: SockAddr,
     pub ifr_dstaddr: SockAddr,

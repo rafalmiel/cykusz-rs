@@ -1,18 +1,18 @@
 use alloc::sync::{Arc, Weak};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-use hashbrown::HashMap;
 use spin::Once;
 
 use syscall_defs::poll::PollEventFlags;
-use syscall_defs::OpenFlags;
 use syscall_defs::stat::{Mode, Stat};
+use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::{Mutex, MutexGuard};
 use crate::kernel::utils::buffer::BufferQueue;
+use crate::kernel::utils::node_map::{NodeMap, NodeMapItem};
 
 pub struct Pipe {
     buf: BufferQueue,
@@ -24,24 +24,8 @@ pub struct Pipe {
 }
 
 impl Pipe {
-    pub fn new(key: Option<(usize, usize)>) -> Arc<Pipe> {
-        logln4!("Created PIPE");
-        Arc::new_cyclic(|me| Pipe {
-            buf: BufferQueue::new(4096 * 4, false, false),
-            sref: me.clone(),
-            key,
-
-            readers: AtomicUsize::new(0),
-            writers: AtomicUsize::new(0),
-        })
-    }
-
     pub fn sref(&self) -> Arc<Pipe> {
         self.sref.upgrade().unwrap()
-    }
-
-    fn key(&self) -> Option<(usize, usize)> {
-        self.key
     }
 
     fn inc_readers(&self) -> usize {
@@ -66,6 +50,24 @@ impl Pipe {
 
     fn has_readers(&self) -> bool {
         self.readers.load(Ordering::Relaxed) > 0
+    }
+}
+
+impl NodeMapItem for Pipe {
+    fn new(key: Option<(usize, usize)>) -> Arc<Pipe> {
+        logln4!("Created PIPE");
+        Arc::new_cyclic(|me| Pipe {
+            buf: BufferQueue::new(4096 * 4, false, false),
+            sref: me.clone(),
+            key,
+
+            readers: AtomicUsize::new(0),
+            writers: AtomicUsize::new(0),
+        })
+    }
+
+    fn key(&self) -> Option<(usize, usize)> {
+        self.key
     }
 }
 
@@ -182,53 +184,12 @@ impl INode for Pipe {
     }
 }
 
-pub struct PipeMap {
-    map: HashMap<(usize, usize), Arc<Pipe>>,
-}
-
-impl PipeMap {
-    pub fn new() -> PipeMap {
-        PipeMap {
-            map: HashMap::new(),
-        }
-    }
-
-    fn get_key(inode: &Arc<dyn INode>) -> Option<(usize, usize)> {
-        Some((
-            Arc::as_ptr(&inode.fs()?.upgrade()?.device()) as *const () as usize,
-            inode.id().unwrap(),
-        ))
-    }
-
-    pub fn get_or_insert(&mut self, inode: &Arc<dyn INode>) -> Option<Arc<Pipe>> {
-        let key = Self::get_key(inode)?;
-
-        match self.map.try_insert(key, Pipe::new(Some(key))) {
-            Ok(v) => {
-                logln!("getting new pipe -> created: {:?}", key);
-                Some(v.clone())
-            }
-            Err(e) => {
-                logln!("getting new pipe -> returned: {:?}", key);
-                Some(e.entry.get().clone())
-            }
-        }
-    }
-
-    pub fn remove(&mut self, inode: &Arc<Pipe>) {
-        if let Some(k) = inode.key() {
-            logln!("remove pipe {:?}", k);
-            self.map.remove(&k);
-        }
-    }
-}
-
-static PIPES: Once<Mutex<PipeMap>> = Once::new();
+static PIPES: Once<Mutex<NodeMap<Pipe>>> = Once::new();
 
 pub fn init() {
-    PIPES.call_once(|| Mutex::new(PipeMap::new()));
+    PIPES.call_once(|| Mutex::new(NodeMap::new()));
 }
 
-pub fn pipes<'a>() -> MutexGuard<'a, PipeMap> {
+pub fn pipes<'a>() -> MutexGuard<'a, NodeMap<Pipe>> {
     unsafe { PIPES.get_unchecked().lock() }
 }

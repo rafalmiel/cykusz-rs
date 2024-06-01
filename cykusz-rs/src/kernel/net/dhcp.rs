@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use syscall_defs::net::{NetU16, NetU32, NetU8};
 
 use crate::kernel::net::ip::{Ip, Ip4};
-use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::socket::{NetSocketService, SocketService};
 use crate::kernel::net::udp::Udp;
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
@@ -433,7 +433,9 @@ fn process_packet_udp(packet: Packet<Udp>) {
 
 struct DhcpService {}
 
-impl SocketService for DhcpService {
+impl SocketService for DhcpService {}
+
+impl NetSocketService for DhcpService {
     fn process_packet(&self, packet: Packet<Ip>) {
         process_packet_udp(packet.upgrade());
     }

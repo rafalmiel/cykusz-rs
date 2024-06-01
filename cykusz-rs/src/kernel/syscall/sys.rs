@@ -3,7 +3,7 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 
-use syscall_defs::net::{MsgFlags, MsgHdr, SockAddr, SockDomain, SockOption, SockTypeFlags};
+use syscall_defs::net::{MsgFlags, MsgHdr, SockAddrPtr, SockDomain, SockOption, SockTypeFlags};
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
 use syscall_defs::stat::Mode;
@@ -795,7 +795,7 @@ fn get_socket(fd: usize) -> Result<Arc<dyn SocketService>, SyscallError> {
 pub fn sys_bind(sockfd: u64, addr_ptr: u64, addrlen: u64) -> SyscallResult {
     let sock = get_socket(sockfd as usize)?;
 
-    let addr = unsafe { VirtAddr(addr_ptr as usize).read_ref::<SockAddr>() };
+    let addr = SockAddrPtr::new(addr_ptr as *mut ());
 
     sock.bind(addr, addrlen as u32)
 }
@@ -803,7 +803,7 @@ pub fn sys_bind(sockfd: u64, addr_ptr: u64, addrlen: u64) -> SyscallResult {
 pub fn sys_connect(sockfd: u64, addr_ptr: u64, addrlen: u64) -> SyscallResult {
     let sock = get_socket(sockfd as usize)?;
 
-    let addr = unsafe { VirtAddr(addr_ptr as usize).read_ref::<SockAddr>() };
+    let addr = SockAddrPtr::new(addr_ptr as *mut ());
 
     sock.connect(addr, addrlen as u32)
 }
@@ -814,12 +814,12 @@ pub fn sys_accept(fd: u64, addr_ptr: u64, addr_len: u64) -> SyscallResult {
     let (ptr, len) = if addr_ptr != 0 && addr_len != 0 {
         unsafe {
             (
-                Some(VirtAddr(addr_ptr as usize).read_mut::<SockAddr>()),
+                SockAddrPtr::new(addr_ptr as *mut ()),
                 Some(VirtAddr(addr_len as usize).read_mut::<u32>()),
             )
         }
     } else {
-        (None, None)
+        (SockAddrPtr::new(core::ptr::null_mut()), None)
     };
 
     let sock = sock.accept(ptr, len)?;

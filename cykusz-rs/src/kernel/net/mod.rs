@@ -27,6 +27,7 @@ pub mod packet;
 pub mod socket;
 pub mod tcp;
 pub mod udp;
+pub mod unix;
 pub mod util;
 
 pub trait NetDriver: Sync + Send {

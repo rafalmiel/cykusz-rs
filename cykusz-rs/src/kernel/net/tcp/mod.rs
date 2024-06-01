@@ -6,7 +6,7 @@ use bit_field::BitField;
 use syscall_defs::net::{NetU16, NetU32};
 
 use crate::kernel::net::ip::{Ip, Ip4, IpHeader, IpType};
-use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::socket::NetSocketService;
 use crate::kernel::net::tcp::socket::TcpFlags;
 use crate::kernel::net::util::checksum;
 use crate::kernel::net::{
@@ -272,10 +272,10 @@ pub fn port_unreachable(port: u32, dst_port: u32, _dst_ip: Ip4) {
     }
 }
 
-static HANDLERS: RwSpin<BTreeMap<(u32, Ip4), Arc<dyn SocketService>>> =
+static HANDLERS: RwSpin<BTreeMap<(u32, Ip4), Arc<dyn NetSocketService>>> =
     RwSpin::new(BTreeMap::new());
 
-pub fn register_handler(handler: Arc<dyn SocketService>) -> Option<u32> {
+pub fn register_handler(handler: Arc<dyn NetSocketService>) -> Option<u32> {
     let port = handler.src_port();
     if port == 0 {
         let port = register_ephemeral_handler(handler)?;
@@ -296,7 +296,7 @@ pub fn register_handler(handler: Arc<dyn SocketService>) -> Option<u32> {
     None
 }
 
-pub fn register_ephemeral_handler(handler: Arc<dyn SocketService>) -> Option<u32> {
+pub fn register_ephemeral_handler(handler: Arc<dyn NetSocketService>) -> Option<u32> {
     let target = handler.target();
     let mut handlers = HANDLERS.write();
 

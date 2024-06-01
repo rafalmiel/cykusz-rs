@@ -124,21 +124,44 @@ impl TryFrom<u64> for SockDomain {
         }
     }
 }
+pub struct SockAddrPtr(*mut ());
 
 #[repr(C)]
-#[derive(Default, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct SockAddr {
     pub sa_family: SockDomain,
     pub sa_data: [u8; 14],
 }
 
-impl SockAddr {
+impl SockAddrPtr {
+    pub fn new(addr: *mut ()) -> SockAddrPtr {
+        SockAddrPtr(addr)
+    }
+
     pub fn as_sock_addr_in(&self) -> &SockAddrIn {
-        unsafe { core::mem::transmute::<&SockAddr, &SockAddrIn>(self) }
+        unsafe { &*(self.0 as *const SockAddrIn) }
     }
 
     pub fn as_sock_addr_in_mut(&mut self) -> &mut SockAddrIn {
-        unsafe { core::mem::transmute::<&mut SockAddr, &mut SockAddrIn>(self) }
+        unsafe { &mut *(self.0 as *mut SockAddrIn) }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.0 == core::ptr::null_mut()
+    }
+
+    pub fn addr(&self) -> usize {
+        self.0 as usize
+    }
+}
+
+impl SockAddr {
+    pub fn as_sock_addr_in(&self) -> &SockAddrIn {
+        unsafe { &*(self as *const _ as *const SockAddrIn) }
+    }
+
+    pub fn as_sock_addr_in_mut(&mut self) -> &mut SockAddrIn {
+        unsafe { &mut *(self as *mut _ as *mut SockAddrIn) }
     }
 }
 
@@ -179,15 +202,33 @@ impl SockAddrIn {
             ..Default::default()
         }
     }
-
-    pub fn into_sock_addr(self) -> SockAddr {
-        unsafe { core::mem::transmute::<SockAddrIn, SockAddr>(self) }
-    }
 }
 
 impl SockAddrIn {
     pub fn port(&self) -> u16 {
         self.sin_port.value()
+    }
+}
+
+#[repr(C)]
+pub struct SockAddrUn {
+    pub sin_family: SockDomain,
+    pub sun_path: [u8; 108],
+}
+
+impl SockAddrUn {
+    pub fn new(path: &str) -> Result<SockAddrUn, SyscallError> {
+        let mut addr = SockAddrUn {
+            sin_family: SockDomain::AfUnix,
+            sun_path: [0u8; 108],
+        };
+        let path = path.as_bytes();
+        if path.len() >= 108 {
+            return Err(SyscallError::EACCES);
+        }
+        addr.sun_path[..path.len()].copy_from_slice(path);
+
+        Ok(addr)
     }
 }
 
@@ -256,7 +297,7 @@ impl IoVec {
 
 #[repr(C)]
 pub struct MsgHdr {
-    pub msg_name: *const (),
+    pub msg_name: SockAddrPtr,
     pub msg_namelen: u32,
     pub msg_iov: *const IoVec,
     pub msg_iovlen: i32,
@@ -276,21 +317,21 @@ impl MsgHdr {
         unsafe { core::slice::from_raw_parts(self.msg_iov, self.msg_iovlen as usize) }
     }
 
-    pub fn sock_addr(&self) -> Option<&SockAddr> {
-        if self.msg_name != core::ptr::null()
-            && self.msg_namelen as usize == core::mem::size_of::<SockAddr>()
+    pub fn sock_addr_in(&self) -> Option<&SockAddrIn> {
+        if !self.msg_name.is_null()
+            && self.msg_namelen as usize == core::mem::size_of::<SockAddrIn>()
         {
-            unsafe { (self.msg_name as *const SockAddr).as_ref() }
+            Some(self.msg_name.as_sock_addr_in())
         } else {
             None
         }
     }
 
-    pub fn sock_addr_mut(&mut self) -> Option<&mut SockAddr> {
-        if self.msg_name != core::ptr::null()
-            && self.msg_namelen as usize == core::mem::size_of::<SockAddr>()
+    pub fn sock_addr_in_mut(&mut self) -> Option<&mut SockAddrIn> {
+        if !self.msg_name.is_null()
+            && self.msg_namelen as usize == core::mem::size_of::<SockAddrIn>()
         {
-            unsafe { (self.msg_name as *mut SockAddr).as_mut() }
+            Some(self.msg_name.as_sock_addr_in_mut())
         } else {
             None
         }

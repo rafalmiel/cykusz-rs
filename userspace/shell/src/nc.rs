@@ -1,5 +1,5 @@
 use std::ptr::addr_of_mut;
-use syscall_defs::net::{SockAddr, SockAddrIn, SockDomain, SockType, SockTypeFlags};
+use syscall_defs::net::{SockAddrPtr, SockAddrIn, SockDomain, SockType, SockTypeFlags};
 use syscall_defs::poll::FdSet;
 
 use syscall_user as syscall;
@@ -104,12 +104,12 @@ pub fn connect(port: u32, ip: &[u8]) {
     )
     .unwrap();
 
-    let addr = SockAddrIn::from_array(port as u16, ip);
+    let mut addr = SockAddrIn::from_array(port as u16, ip);
 
     if let Ok(_) = syscall::connect(
         sock,
-        &addr.into_sock_addr(),
-        core::mem::size_of::<SockAddr>(),
+        SockAddrPtr::new(&mut addr as *mut _ as *mut ()),
+        core::mem::size_of::<SockAddrIn>(),
     ) {
         start(sock);
     } else {
@@ -124,18 +124,18 @@ pub fn bind(src_port: u32) {
     )
     .unwrap();
 
-    let addr = SockAddrIn::from_array(src_port as u16, &[0, 0, 0, 0]);
+    let mut addr = SockAddrIn::from_array(src_port as u16, &[0, 0, 0, 0]);
 
     if let Ok(_) = syscall::bind(
         sock,
-        &addr.into_sock_addr(),
-        core::mem::size_of::<SockAddr>(),
+        SockAddrPtr::new(&mut addr as *mut _ as *mut ()),
+        core::mem::size_of::<SockAddrIn>(),
     ) {
         if syscall::listen(sock, 5).is_err() {
             println!("Listen failed");
             return;
         };
-        if let Ok(new_fd) = syscall::accept(sock, None, None) {
+        if let Ok(new_fd) = syscall::accept(sock, SockAddrPtr::new(core::ptr::null_mut()), None) {
             println!("new fd: {}", new_fd);
             start(new_fd);
         }

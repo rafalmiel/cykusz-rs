@@ -5,7 +5,7 @@ use syscall_defs::net::NetU16;
 
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::{Ip, Ip4};
-use crate::kernel::net::socket::SocketService;
+use crate::kernel::net::socket::{NetSocketService, SocketService};
 use crate::kernel::net::udp::Udp;
 use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
@@ -275,7 +275,9 @@ impl DnsService {
     }
 }
 
-impl SocketService for DnsService {
+impl SocketService for DnsService {}
+
+impl NetSocketService for DnsService {
     fn process_packet(&self, packet: Packet<Ip>) {
         let udp_packet: Packet<Udp> = packet.upgrade();
         let mut packet: Packet<Dns> = udp_packet.upgrade();

@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use crate::kernel::sched::{current_task, SleepFlags};
 use crate::kernel::signal::{SignalError, SignalResult};
-use crate::kernel::sync::{IrqGuard, MutexGuard, Spin, SpinGuard};
+use crate::kernel::sync::{IrqGuard, LockApi, LockGuard, Spin};
 use crate::kernel::task::Task;
 
 pub struct WaitQueue {
@@ -73,15 +73,7 @@ impl WaitQueue {
         self.tasks.lock_irq().is_empty()
     }
 
-    pub fn wait_lock<T>(lock: SpinGuard<T>) -> SignalResult<()> {
-        let task = current_task();
-
-        core::mem::drop(lock);
-
-        task.await_io(SleepFlags::empty())
-    }
-
-    pub fn wait_mutex<T>(lock: MutexGuard<T>) -> SignalResult<()> {
+    pub fn wait_lock<G: LockGuard>(lock: G) -> SignalResult<()> {
         let task = current_task();
 
         core::mem::drop(lock);
@@ -105,12 +97,12 @@ impl WaitQueue {
         Self::do_await_io(flags, &task)
     }
 
-    pub fn wait_lock_for<'a, T, F: FnMut(&mut SpinGuard<T>) -> bool>(
+    pub fn wait_lock_for<'a, T, G: LockApi<'a, T>, F: FnMut(&mut G::Guard) -> bool>(
         &self,
         flags: WaitQueueFlags,
-        mtx: &'a Spin<T>,
+        mtx: &'a G,
         mut cond: F,
-    ) -> SignalResult<Option<SpinGuard<'a, T>>> {
+    ) -> SignalResult<Option<G::Guard>> {
         let irq = flags.contains(WaitQueueFlags::IRQ_DISABLE);
         let mut lock = if irq { mtx.lock_irq() } else { mtx.lock() };
 

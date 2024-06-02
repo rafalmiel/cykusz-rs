@@ -11,7 +11,7 @@ use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{DirEntIter, FsError, Result};
-use crate::kernel::sync::{Mutex, RwMutex};
+use crate::kernel::sync::{LockApi, Mutex, RwMutex};
 use crate::kernel::task::filetable::inode_wrap::INodeOpsWrap;
 
 mod inode_wrap;

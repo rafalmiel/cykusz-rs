@@ -5,7 +5,7 @@ use core::sync::atomic::Ordering;
 use intrusive_collections::{LinkedList, LinkedListLink};
 
 use crate::kernel::sched::current_task;
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 pub trait TimerObject: Send + Sync {
@@ -113,7 +113,7 @@ fn check_timers() {
     let time = current_ns();
 
     let mut timers = TIMERS_WQ
-        .wait_lock_for(WaitQueueFlags::NON_INTERRUPTIBLE, &TIMERS, |lck| {
+        .wait_lock_for(WaitQueueFlags::NON_INTERRUPTIBLE, &*TIMERS, |lck| {
             !lck.is_empty()
         })
         .expect("Timers thread should not be signalled")

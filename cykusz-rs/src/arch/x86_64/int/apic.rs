@@ -2,6 +2,7 @@ use crate::arch::dev::ioapic::IOAPIC;
 use crate::arch::dev::lapic::LAPIC;
 use crate::arch::int::InterruptController;
 use crate::arch::x86_64::acpi::ACPI;
+use crate::kernel::sync::LockApi;
 
 pub struct Controller {}
 

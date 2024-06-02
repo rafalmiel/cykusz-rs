@@ -6,7 +6,7 @@ use rand::{RngCore, SeedableRng};
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::current_ns;
 
 struct Random {

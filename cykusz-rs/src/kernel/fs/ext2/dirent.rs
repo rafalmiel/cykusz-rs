@@ -12,7 +12,7 @@ use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task_ref;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::{LockApi, Mutex};
 use crate::kernel::utils::types::Align;
 
 pub struct SysDirEntIter<'a> {

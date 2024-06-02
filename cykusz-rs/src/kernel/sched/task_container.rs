@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::task::Task;
 
 pub struct TaskContainer {

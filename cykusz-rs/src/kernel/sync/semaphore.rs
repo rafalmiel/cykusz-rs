@@ -1,6 +1,6 @@
 use crate::kernel::sched::current_task;
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub struct Semaphore {

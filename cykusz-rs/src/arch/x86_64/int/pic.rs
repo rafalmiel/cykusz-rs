@@ -1,5 +1,6 @@
 use crate::arch::dev::pic::PIC;
 use crate::arch::int::InterruptController;
+use crate::kernel::sync::LockApi;
 
 pub struct Controller {}
 

@@ -4,7 +4,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use spin::Once;
 
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 use crate::kernel::utils::PerCpu;
 

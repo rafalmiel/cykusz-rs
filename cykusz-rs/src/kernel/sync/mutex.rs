@@ -2,6 +2,7 @@ use core::ops::{Deref, DerefMut};
 
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::spin_lock::{Spin, SpinGuard};
+use crate::kernel::sync::{LockApi, LockGuard};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 pub struct Mutex<T: ?Sized> {
@@ -14,21 +15,18 @@ pub struct MutexGuard<'a, T: ?Sized + 'a> {
     m: &'a Mutex<T>,
 }
 
+impl<'a, T: ?Sized + 'a> LockGuard for MutexGuard<'a, T> {}
+
 impl<T: Default> Default for Mutex<T> {
     fn default() -> Self {
         Mutex::new(T::default())
     }
 }
 
-impl<T> Mutex<T> {
-    pub const fn new(user_data: T) -> Mutex<T> {
-        Mutex {
-            wait_queue: WaitQueue::new(),
-            mutex: Spin::new_no_notify(user_data),
-        }
-    }
+impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
+    type Guard = MutexGuard<'a, T>;
 
-    pub fn lock(&self) -> MutexGuard<T> {
+    fn lock(&self) -> MutexGuard<T> {
         let task = current_task();
 
         self.wait_queue.add_task(task.clone());
@@ -46,7 +44,7 @@ impl<T> Mutex<T> {
         }
     }
 
-    pub fn lock_irq(&self) -> MutexGuard<T> {
+    fn lock_irq(&self) -> MutexGuard<T> {
         let task = current_task();
 
         self.wait_queue.add_task(task.clone());
@@ -64,18 +62,42 @@ impl<T> Mutex<T> {
         }
     }
 
-    pub fn try_lock(&self) -> Option<MutexGuard<T>> {
+    fn try_lock(&self) -> Option<MutexGuard<T>> {
         loop {
-            if let Some(g) = self.mutex.try_lock() {
-                return Some(MutexGuard {
+            return if let Some(g) = self.mutex.try_lock() {
+                Some(MutexGuard {
                     g: Some(g),
                     m: &self,
-                });
+                })
             } else {
-                return None;
+                None
             }
         }
     }
+
+    fn try_lock_irq(&'a self) -> Option<Self::Guard> {
+        loop {
+            return if let Some(g) = self.mutex.try_lock_irq() {
+                Some(MutexGuard {
+                    g: Some(g),
+                    m: &self,
+                })
+            } else {
+                None
+            }
+        }
+    }
+}
+
+
+impl<T> Mutex<T> {
+    pub const fn new(user_data: T) -> Mutex<T> {
+        Mutex {
+            wait_queue: WaitQueue::new(),
+            mutex: Spin::new_no_notify(user_data),
+        }
+    }
+
 }
 
 impl<'a, T: ?Sized> Deref for MutexGuard<'a, T> {

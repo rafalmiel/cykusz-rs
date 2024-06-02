@@ -17,7 +17,7 @@ use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketTrait, PacketUpHierarchy,
 };
 use crate::kernel::sched::current_task;
-use crate::kernel::sync::{Mutex, Spin};
+use crate::kernel::sync::{LockApi, Mutex, Spin};
 use crate::kernel::timer::{create_timer, current_ns, Timer, TimerCallback};
 use crate::kernel::utils::buffer::{Buffer, BufferQueue};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
@@ -961,7 +961,7 @@ impl INode for Socket {
                 //println!("[ TCP ] Proxy Buffer avail: {}", data.proxy_buffer.available_size());
 
                 while data.proxy_buffer.available_size() < buf.len() {
-                    if let Err(e) = WaitQueue::wait_mutex(data) {
+                    if let Err(e) = WaitQueue::wait_lock(data) {
                         data = self.data.lock();
 
                         data.proxy_buffer.writers_queue().remove_task(task);
@@ -1123,7 +1123,6 @@ impl SocketService for Socket {
     }
 
     fn msg_send(&self, hdr: &MsgHdr, _flags: MsgFlags) -> SyscallResult {
-        logln5!("sock msg send!!");
         let iovecs = hdr.iovecs();
 
         let mut total = 0;

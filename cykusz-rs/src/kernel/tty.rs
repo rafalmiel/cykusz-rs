@@ -8,7 +8,7 @@ use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::fs::{lookup_by_real_path, LookupMode};
 use crate::kernel::session::Group;
-use crate::kernel::sync::{RwSpin, Spin};
+use crate::kernel::sync::{LockApi, RwSpin, Spin};
 use crate::kernel::task::Task;
 
 pub trait TerminalDevice: Send + Sync {

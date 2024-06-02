@@ -17,7 +17,7 @@ use crate::kernel::net::ip::{Ip, Ip4};
 use crate::kernel::net::socket::{NetSocketService, SocketService};
 use crate::kernel::net::udp::Udp;
 use crate::kernel::net::{default_driver, Packet, PacketHeader, PacketTrait, PacketUpHierarchy};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 struct RecvPacket {

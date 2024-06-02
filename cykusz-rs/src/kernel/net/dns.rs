@@ -11,7 +11,7 @@ use crate::kernel::net::{
     default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketKind, PacketUpHierarchy,
 };
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 #[derive(Debug, Copy, Clone)]

@@ -6,8 +6,8 @@ use crate::arch::tls::restore_user_fs;
 use crate::arch::x86_64::int::end_of_int;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::{current_task, current_task_ref};
-use crate::kernel::sync::RwSpin;
 use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, RwSpin};
 use crate::kernel::task::vm::PageFaultReason;
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());

@@ -20,7 +20,7 @@ use crate::kernel::mm::{
     allocate_order, map_flags, map_to_flags, unmap, update_flags, VirtAddr, MAX_USER_ADDR,
 };
 use crate::kernel::sched::current_task_ref;
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::{LockApi, Mutex};
 use crate::kernel::utils::types::Align;
 
 impl From<MMapProt> for PageFlags {

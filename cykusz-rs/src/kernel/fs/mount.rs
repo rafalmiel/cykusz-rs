@@ -14,7 +14,7 @@ use crate::kernel::fs::filesystem::{Filesystem, FilesystemKind};
 use crate::kernel::fs::ramfs::RamFS;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::fs::vfs::{FsError, Result};
-use crate::kernel::sync::{Mutex, MutexGuard};
+use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 
 #[derive(Clone)]
 pub struct Mountpoint {

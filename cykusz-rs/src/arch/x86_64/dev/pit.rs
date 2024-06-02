@@ -3,7 +3,7 @@ use core::arch::asm;
 use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::raw::cpuio::UnsafePort;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 static PIT: Spin<Pit> = Spin::new(Pit::new());
 

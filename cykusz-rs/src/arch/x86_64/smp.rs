@@ -1,6 +1,7 @@
 use core::arch::asm;
 
 use crate::kernel::mm::PhysAddr;
+use crate::kernel::sync::LockApi;
 
 pub const TRAMPOLINE: PhysAddr = PhysAddr(0xE00);
 pub const AP_INIT: PhysAddr = PhysAddr(0x1000);

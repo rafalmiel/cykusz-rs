@@ -1,5 +1,5 @@
 use crate::arch::raw::cpuio::{Port, UnsafePort};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 pub static PIC: Spin<ChainedPics> = Spin::new(unsafe { ChainedPics::new(0x20, 0x28) });
 

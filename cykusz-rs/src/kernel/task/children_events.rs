@@ -8,7 +8,7 @@ use syscall_defs::{SyscallError, SyscallResult};
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::session::sessions;
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::task::{Task, WaitPidTaskAdapter};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 

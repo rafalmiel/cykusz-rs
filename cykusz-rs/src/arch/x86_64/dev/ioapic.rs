@@ -6,7 +6,7 @@ use bit_field::BitField;
 use crate::arch::acpi::apic::MadtHeader;
 use crate::arch::x86_64::acpi::apic::MadtEntryIntSrc;
 use crate::kernel::mm::*;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 pub static IOAPIC: Spin<IOApic> = Spin::new(IOApic::new());
 

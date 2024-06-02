@@ -10,7 +10,7 @@ use spin::Once;
 use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::sched::current_task_ref;
-use crate::kernel::sync::{Mutex, MutexGuard};
+use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
 use crate::kernel::utils::types::Align;
 

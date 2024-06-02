@@ -8,7 +8,7 @@ use spin::Once;
 
 use crate::arch::mm::heap::{HEAP_END, HEAP_SIZE, HEAP_START};
 use crate::kernel::mm::*;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::types::Align;
 
 pub fn init() {

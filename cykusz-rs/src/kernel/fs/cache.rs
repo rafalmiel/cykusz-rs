@@ -10,7 +10,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use intrusive_collections::{LinkedList, LinkedListLink};
 use lru::LruCache;
 
-use crate::kernel::sync::{Mutex, Spin};
+use crate::kernel::sync::{LockApi, Mutex, Spin};
 
 pub trait DropHandler {
     fn handle_drop(&self, arc: Arc<Self>);

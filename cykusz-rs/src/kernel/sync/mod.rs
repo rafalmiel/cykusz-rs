@@ -1,3 +1,4 @@
+use crate::kernel;
 pub use irq_lock::{IrqGuard, IrqLock, IrqLockGuard};
 pub use mutex::{Mutex, MutexGuard};
 pub use mutex_rw::{RwMutex, RwMutexReadGuard, RwMutexUpgradeableGuard, RwMutexWriteGuard};
@@ -11,3 +12,22 @@ mod mutex_rw;
 mod semaphore;
 mod spin_lock;
 mod spin_rw_lock;
+
+fn maybe_preempt_disable() -> bool {
+    let notify = if kernel::int::is_enabled() {
+        crate::kernel::sched::preempt_disable()
+    } else {
+        false
+    };
+    notify
+}
+
+pub trait LockGuard {}
+pub trait LockApi<'a, T: ?Sized + 'a> {
+    type Guard : LockGuard;
+
+    fn lock(&'a self) -> Self::Guard;
+    fn try_lock(&'a self) -> Option<Self::Guard>;
+    fn lock_irq(&'a self) -> Self::Guard;
+    fn try_lock_irq(&'a self) -> Option<Self::Guard>;
+}

@@ -8,7 +8,7 @@ use spin::Once;
 
 use acpica::*;
 
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 fn call_pic1() {
     let mut arg = ACPI_OBJECT {

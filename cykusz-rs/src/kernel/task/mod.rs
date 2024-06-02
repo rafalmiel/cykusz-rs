@@ -16,7 +16,7 @@ use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
 use crate::kernel::sched::{new_task_tid, SleepFlags};
 use crate::kernel::signal::{SignalResult, Signals, KSIGSTOPTHR};
-use crate::kernel::sync::{RwSpin, Spin, SpinGuard};
+use crate::kernel::sync::{LockApi, RwSpin, Spin, SpinGuard};
 use crate::kernel::task::children_events::WaitPidEvents;
 use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;

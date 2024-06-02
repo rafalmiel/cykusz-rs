@@ -1,6 +1,6 @@
 use crate::drivers::pci::PciAccess;
 use crate::kernel::mm::{MappedAddr, PhysAddr};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 struct Mcfg(Option<&'static acpica::acpi_table_mcfg>);
 

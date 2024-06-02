@@ -5,7 +5,7 @@ use crate::drivers::multiboot2;
 use crate::drivers::multiboot2::memory::MemoryIter;
 use crate::kernel::mm::{Frame, PAGE_SIZE};
 use crate::kernel::mm::{MappedAddr, PhysAddr};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 use super::buddy::BuddyAlloc;
 use super::iter::RangeMemIterator;

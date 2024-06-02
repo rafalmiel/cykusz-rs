@@ -1,6 +1,6 @@
 use crate::arch::raw::cpuio::Port;
 use crate::drivers::pci::PciAccess;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 struct Ports {
     addr: Port<u32>,

@@ -10,7 +10,7 @@ use crate::drivers::block::ata::request::{DmaBuf, DmaRequest};
 use crate::drivers::block::ata::AtaCommand;
 use crate::drivers::block::ide::ata_handler;
 use crate::kernel::mm::{allocate_order, PhysAddr};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::busy_sleep;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 

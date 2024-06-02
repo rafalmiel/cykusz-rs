@@ -13,7 +13,7 @@ use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::pcache::CachedBlockDev;
 use crate::kernel::sched::current_task_ref;
-use crate::kernel::sync::{Mutex, MutexGuard};
+use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 use crate::kernel::utils::slice::ToBytesMut;
 
 mod blockgroup;

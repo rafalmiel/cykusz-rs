@@ -6,7 +6,7 @@ use crate::arch::mm::PhysAddr;
 use crate::arch::output::{Color, ColorCode, ScreenChar, VideoDriver};
 use crate::arch::raw::cpuio::Port;
 use crate::kernel::mm::MappedAddr;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 const VGA_BUFFER: MappedAddr = PhysAddr(0xb8000).to_mapped();
 

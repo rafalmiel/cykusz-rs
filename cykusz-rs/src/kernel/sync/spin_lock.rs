@@ -2,9 +2,8 @@ use core::ops::{Deref, DerefMut};
 
 use spin::{Mutex as M, MutexGuard as MG};
 
-use crate::kernel;
 use crate::kernel::int;
-use crate::kernel::sync::IrqGuard;
+use crate::kernel::sync::{IrqGuard, LockApi, LockGuard};
 
 pub struct Spin<T: ?Sized> {
     notify: bool,
@@ -17,12 +16,14 @@ impl<T: Default> Default for Spin<T> {
     }
 }
 
-pub struct SpinGuard<'a, T: ?Sized + 'a> {
+pub struct SpinGuard<'a, T: 'a + ?Sized> {
     g: Option<MG<'a, T>>,
     irq: bool,
     notify: bool,
     debug: usize,
 }
+
+impl<'a, T: 'a + ?Sized> LockGuard for SpinGuard<'a, T> {}
 
 impl<T> Spin<T> {
     pub const fn new(user_data: T) -> Spin<T> {
@@ -39,30 +40,8 @@ impl<T> Spin<T> {
         }
     }
 
-    fn maybe_preempt_disable(&self) -> bool {
-        let notify = if self.notify && kernel::int::is_enabled() {
-            crate::kernel::sched::preempt_disable()
-        } else {
-            false
-        };
-        notify
-    }
-
-    pub fn lock(&self) -> SpinGuard<T> {
-        let notify = self.maybe_preempt_disable();
-
-        let lock = self.l.lock();
-
-        SpinGuard {
-            g: Some(lock),
-            irq: false,
-            notify,
-            debug: 0,
-        }
-    }
-
     pub fn lock_debug(&self, id: usize) -> SpinGuard<T> {
-        let notify = self.maybe_preempt_disable();
+        let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
 
         logln!("l: - {}", id);
         let lock = self.l.lock();
@@ -76,8 +55,39 @@ impl<T> Spin<T> {
         }
     }
 
-    pub fn try_lock(&self) -> Option<SpinGuard<T>> {
-        let notify = self.maybe_preempt_disable();
+    pub fn lock_irq_debug(&self, id: usize) -> SpinGuard<T> {
+        let int_enabled = crate::kernel::int::is_enabled();
+        crate::kernel::int::disable();
+
+        let lock = self.l.lock();
+
+        SpinGuard {
+            g: Some(lock),
+            irq: int_enabled,
+            notify: false,
+            debug: id,
+        }
+    }
+}
+
+impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
+    type Guard = SpinGuard<'a, T>;
+
+    fn lock(&'a self) -> Self::Guard {
+        let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
+
+        let lock = self.l.lock();
+
+        Self::Guard {
+            g: Some(lock),
+            irq: false,
+            notify,
+            debug: 0,
+        }
+    }
+
+    fn try_lock(&'a self) -> Option<Self::Guard> {
+        let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
 
         let lock = match self.l.try_lock() {
             Some(l) => Some(l),
@@ -91,7 +101,7 @@ impl<T> Spin<T> {
         };
 
         if let Some(g) = lock {
-            Some(SpinGuard {
+            Some(Self::Guard {
                 g: Some(g),
                 irq: false,
                 notify,
@@ -102,7 +112,21 @@ impl<T> Spin<T> {
         }
     }
 
-    pub fn try_lock_irq(&self) -> Option<SpinGuard<T>> {
+    fn lock_irq(&'a self) -> Self::Guard {
+        let int_enabled = crate::kernel::int::is_enabled();
+        crate::kernel::int::disable();
+
+        let lock = self.l.lock();
+
+        Self::Guard {
+            g: Some(lock),
+            irq: int_enabled,
+            notify: false,
+            debug: 0,
+        }
+    }
+
+    fn try_lock_irq(&'a self) -> Option<Self::Guard> {
         let int_enabled = crate::kernel::int::is_enabled();
         crate::kernel::int::disable();
 
@@ -118,7 +142,7 @@ impl<T> Spin<T> {
         };
 
         if let Some(g) = lock {
-            Some(SpinGuard {
+            Some(Self::Guard {
                 g: Some(g),
                 irq: int_enabled,
                 notify: false,
@@ -126,34 +150,6 @@ impl<T> Spin<T> {
             })
         } else {
             None
-        }
-    }
-
-    pub fn lock_irq(&self) -> SpinGuard<T> {
-        let int_enabled = crate::kernel::int::is_enabled();
-        crate::kernel::int::disable();
-
-        let lock = self.l.lock();
-
-        SpinGuard {
-            g: Some(lock),
-            irq: int_enabled,
-            notify: false,
-            debug: 0,
-        }
-    }
-
-    pub fn lock_irq_debug(&self, id: usize) -> SpinGuard<T> {
-        let int_enabled = crate::kernel::int::is_enabled();
-        crate::kernel::int::disable();
-
-        let lock = self.l.lock();
-
-        SpinGuard {
-            g: Some(lock),
-            irq: int_enabled,
-            notify: false,
-            debug: id,
         }
     }
 }

@@ -11,7 +11,7 @@ use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable, WeakWrap};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
-use crate::kernel::sync::{Mutex, MutexGuard};
+use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 
 type CacheKey = (usize, String);
 

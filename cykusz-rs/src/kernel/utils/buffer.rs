@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 pub struct BufferQueue {
@@ -169,11 +169,7 @@ impl BufferQueue {
     }
 
     pub fn available_size(&self) -> usize {
-        let a = self.buffer.lock().available_size();
-
-        //println!(" {}", a);
-
-        a
+        self.buffer.lock().available_size()
     }
 
     pub fn size(&self) -> usize {

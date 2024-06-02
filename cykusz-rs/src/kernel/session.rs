@@ -6,7 +6,7 @@ use spin::Once;
 use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::sched::{current_task, get_task};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::task::Task;
 
 pub struct Group {

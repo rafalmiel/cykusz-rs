@@ -1,5 +1,5 @@
 use crate::arch::x86_64::acpi::apic::MadtEntryIntSrc;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 use self::rsdp::Address;
 use self::rsdt::Rsdt;

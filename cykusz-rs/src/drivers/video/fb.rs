@@ -15,7 +15,7 @@ use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, MappedAccess, PageDire
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{map_to_flags, virt, MappedAddr, PhysAddr, PAGE_SIZE};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::TimerObject;
 use crate::kernel::utils::types::Align;
 

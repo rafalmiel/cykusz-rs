@@ -6,7 +6,7 @@ use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::mm::MappedAddr;
 use crate::arch::raw::msr;
-use crate::kernel::sync::IrqLock;
+use crate::kernel::sync::{IrqLock, LockApi};
 
 pub static LAPIC: IrqLock<LApic> = IrqLock::new(LApic::new());
 

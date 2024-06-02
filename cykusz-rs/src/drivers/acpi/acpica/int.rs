@@ -4,7 +4,7 @@
 use acpica::*;
 
 use crate::arch::int::{mask_int, set_irq_dest};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 fn acpi_irq() -> bool {
     let c = CTX.lock_irq();

@@ -27,7 +27,7 @@ use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
-use crate::kernel::sync::{Mutex, RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
+use crate::kernel::sync::{LockApi, Mutex, RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
 use crate::kernel::time::unix_timestamp;
 use crate::kernel::utils::slice::ToBytes;
 

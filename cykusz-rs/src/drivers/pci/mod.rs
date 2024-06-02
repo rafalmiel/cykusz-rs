@@ -8,7 +8,7 @@ use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
 use crate::arch::mm::{PhysAddr, VirtAddr};
 use crate::kernel::mm::map_to_flags;
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 mod epci;
 mod pci;

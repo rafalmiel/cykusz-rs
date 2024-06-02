@@ -5,7 +5,7 @@ use bit_field::BitField;
 use crate::arch::acpi::hpet::HpetHeader;
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 pub struct Hpet {
     hpet_base: Option<MappedAddr>,

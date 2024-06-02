@@ -14,7 +14,7 @@ use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::current_ns;
 use crate::kernel::utils::buffer::BufferQueue;
 use crate::kernel::utils::wait_queue::WaitQueueFlags;

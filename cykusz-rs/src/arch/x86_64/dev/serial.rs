@@ -1,7 +1,7 @@
 use spin::Once;
 
 use crate::arch::x86_64::raw::cpuio::Port;
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 struct Serial {
     data: Port<u8>,

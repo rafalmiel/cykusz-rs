@@ -21,7 +21,7 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::session::{sessions, Group};
 use crate::kernel::signal::{SignalError, SignalResult};
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 use crate::kernel::task::Task;
 use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::types::Prefault;

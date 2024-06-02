@@ -6,7 +6,7 @@ use spin::Once;
 use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::mm::{PhysAddr, VirtAddr};
-use crate::kernel::sync::Mutex;
+use crate::kernel::sync::{LockApi, Mutex};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 pub struct Futex {

@@ -14,7 +14,7 @@ use crate::kernel::net::eth::Eth;
 use crate::kernel::net::{NetDriver, Packet, RecvPacket};
 use crate::kernel::sched::current_task;
 use crate::kernel::signal::SignalResult;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::wait_queue::WaitQueue;
 
 mod addr;

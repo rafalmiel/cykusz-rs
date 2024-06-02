@@ -6,7 +6,7 @@ use spin::Once;
 
 use crate::drivers::block::ide::drive::IdeDevice;
 use crate::drivers::pci::{register_pci_device, PciDeviceHandle, PciHeader};
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 mod channel;
 mod drive;

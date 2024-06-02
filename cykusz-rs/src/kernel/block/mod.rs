@@ -20,7 +20,7 @@ use crate::kernel::fs::pcache::{
     RawAccess,
 };
 use crate::kernel::params::params;
-use crate::kernel::sync::{IrqGuard, Mutex, MutexGuard};
+use crate::kernel::sync::{IrqGuard, LockApi, Mutex, MutexGuard};
 use crate::kernel::timer::{create_timer, Timer, TimerCallback};
 use crate::kernel::utils::types::CeilDiv;
 

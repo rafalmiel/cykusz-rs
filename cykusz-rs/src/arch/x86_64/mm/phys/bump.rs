@@ -1,5 +1,5 @@
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::sync::Spin;
+use crate::kernel::sync::{LockApi, Spin};
 
 const CAPACITY: usize = 4096 * 128;
 

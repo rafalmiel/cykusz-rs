@@ -1,3 +1,5 @@
+use crate::kernel::sync::LockApi;
+
 pub mod cpu;
 pub mod hpet;
 pub mod ioapic;

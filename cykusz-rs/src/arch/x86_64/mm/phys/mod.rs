@@ -8,7 +8,7 @@ use crate::drivers::multiboot2;
 use crate::kernel::fs::cache::{ArcWrap, WeakWrap};
 use crate::kernel::fs::pcache::{PageCacheItemArc, PageCacheItemWeak};
 use crate::kernel::mm::{PhysAddr, PAGE_SIZE};
-use crate::kernel::sync::{Spin, SpinGuard};
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 pub use self::alloc::allocate;
 pub use self::alloc::allocate_order;

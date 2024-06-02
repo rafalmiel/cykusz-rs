@@ -22,7 +22,7 @@ use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::fs::vfs::{FsError, Metadata};
 use crate::kernel::mm::PAGE_SIZE;
-use crate::kernel::sync::{RwSpin, Spin};
+use crate::kernel::sync::{LockApi, RwSpin, Spin};
 use crate::kernel::utils::types::CeilDiv;
 
 struct LockedRamINode(RwSpin<RamINode>);

@@ -108,7 +108,7 @@ function _prepare_gcc {
 function _prepare_rust {
     if [ ! -d $RUST_SRC_DIR ]; then
         mkdir -p $SRC_DIR
-        git clone --depth 1 -b cykusz https://github.com/rafalmiel/rust.git $RUST_SRC_DIR
+        git clone -b cykusz https://github.com/rafalmiel/rust.git $RUST_SRC_DIR
 
         pushd .
 

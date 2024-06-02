@@ -24,7 +24,7 @@ fn maybe_preempt_disable() -> bool {
 
 pub trait LockGuard {}
 pub trait LockApi<'a, T: ?Sized + 'a> {
-    type Guard : LockGuard;
+    type Guard: LockGuard;
 
     fn lock(&'a self) -> Self::Guard;
     fn try_lock(&'a self) -> Option<Self::Guard>;

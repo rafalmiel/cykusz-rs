@@ -138,7 +138,7 @@ impl SocketData {
         SocketData {
             src_port: port,
             proxy_buffer: BufferQueue::new(4096 * 8, true, true),
-            snd_buffer: Buffer::new(4096 * 18, true, true),
+            snd_buffer: Buffer::new(4096 * 18),
             socket: socket.clone(),
             ..Default::default()
         }
@@ -147,7 +147,7 @@ impl SocketData {
     pub fn new_unbound(socket: &Weak<Socket>) -> SocketData {
         SocketData {
             proxy_buffer: BufferQueue::new_empty(true, true),
-            snd_buffer: Buffer::new_empty(true, true),
+            snd_buffer: Buffer::new_empty(),
             socket: socket.clone(),
             ..Default::default()
         }
@@ -160,7 +160,7 @@ impl SocketData {
     ) -> SocketData {
         let mut data = SocketData {
             proxy_buffer: BufferQueue::new_empty(true, true),
-            snd_buffer: Buffer::new_empty(true, true),
+            snd_buffer: Buffer::new_empty(),
             ctl: from.ctl,
             socket: socket.clone(),
             ..Default::default()
@@ -1123,6 +1123,7 @@ impl SocketService for Socket {
     }
 
     fn msg_send(&self, hdr: &MsgHdr, _flags: MsgFlags) -> SyscallResult {
+        logln!("tcp msg_send");
         let iovecs = hdr.iovecs();
 
         let mut total = 0;

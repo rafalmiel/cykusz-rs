@@ -71,7 +71,7 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
                 })
             } else {
                 None
-            }
+            };
         }
     }
 
@@ -84,11 +84,10 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
                 })
             } else {
                 None
-            }
+            };
         }
     }
 }
-
 
 impl<T> Mutex<T> {
     pub const fn new(user_data: T) -> Mutex<T> {
@@ -97,7 +96,6 @@ impl<T> Mutex<T> {
             mutex: Spin::new_no_notify(user_data),
         }
     }
-
 }
 
 impl<'a, T: ?Sized> Deref for MutexGuard<'a, T> {

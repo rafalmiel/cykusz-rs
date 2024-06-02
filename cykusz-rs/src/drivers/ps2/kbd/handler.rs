@@ -72,7 +72,7 @@ impl INode for KbdState {
     }
 
     fn open(&self, flags: OpenFlags) -> crate::kernel::fs::vfs::Result<()> {
-        if flags == OpenFlags::RDONLY {
+        if flags.is_open_mode(OpenFlags::RDONLY) {
             self.state.lock_irq().opened = true;
             Ok(())
         } else {

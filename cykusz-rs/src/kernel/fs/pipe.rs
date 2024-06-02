@@ -129,16 +129,18 @@ impl INode for Pipe {
             }
         }
 
+        logln!("pipe poll result: {:?}", res_flags);
+
         Ok(res_flags)
     }
 
     fn open(&self, flags: OpenFlags) -> Result<()> {
         logln!("pipe open: {:?}", flags);
-        if flags.contains(OpenFlags::RDWR) {
+        if flags.is_open_mode(OpenFlags::RDWR) {
             return Err(FsError::InvalidParam);
         }
 
-        if flags.contains(OpenFlags::RDONLY) {
+        if flags.is_open_mode(OpenFlags::RDONLY) {
             self.inc_readers();
 
             self.buf.set_has_readers(true);
@@ -148,7 +150,7 @@ impl INode for Pipe {
             }
         }
 
-        if flags.contains(OpenFlags::WRONLY) {
+        if flags.is_open_mode(OpenFlags::WRONLY) {
             if flags.contains(OpenFlags::NONBLOCK) && !self.has_readers() {
                 return Err(FsError::NoSuchDevice);
             }
@@ -166,13 +168,13 @@ impl INode for Pipe {
     }
 
     fn close(&self, flags: OpenFlags) {
-        if flags.contains(OpenFlags::RDONLY) {
+        if flags.is_open_mode(OpenFlags::RDONLY) {
             if self.dec_readers() == 0 {
                 self.buf.set_has_readers(false);
             }
         }
 
-        if flags.contains(OpenFlags::WRONLY) {
+        if flags.is_open_mode(OpenFlags::WRONLY) {
             if self.dec_writers() == 0 {
                 self.buf.set_has_writers(false);
             }

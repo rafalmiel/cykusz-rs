@@ -240,6 +240,8 @@ impl Mounts {
         for key in keys.iter() {
             if let Err(_e) = self.unmount_by_key(key) {
                 logln!("Failed to unmount {:?}", key);
+            } else {
+                logln!("Unmounted {:?}", key);
             }
         }
 

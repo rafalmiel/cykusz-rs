@@ -235,34 +235,48 @@ impl From<OpenFD> for usize {
 
 bitflags! {
     pub struct OpenFlags: usize {
-        const EXEC        = 1;
-        const RDONLY      = 2;
-        const RDWR        = 3;
-        const WRONLY      = 5;
-        const APPEND      = 0x08;
-        const CREAT       = 0x10;
-        const DIRECTORY   = 0x20;
-        const EXCL        = 0x40;
-        const NOCTTY      = 0x80;
-        const NOFOLLOW    = 0x0100;
-        const TRUNC       = 0x0200;
-        const NONBLOCK    = 0x0400;
-        const DSYNC       = 0x0800;
-        const RSYNC       = 0x1000;
-        const SYNC        = 0x2000;
-        const CLOEXEC     = 0x4000;
-        const PATH        = 0x8000;
-        const LARGEFILE   = 0x10000;
-        const NOATIME     = 0x20000;
-        const ASYNC       = 0x40000;
-        const TMPFILE     = 0x80000;
-        const DIRECT      = 0x100000;
+        const EXEC = 0o10000000;
+        const RDONLY = 0o0;
+        const WRONLY = 0o1;
+        const RDWR = 0o2;
+        const CREAT = 0o100;
+        const EXCL = 0o200;
+        const NOCTTY = 0o400;
+        const TRUNC = 0o1000;
+        const APPEND = 0o2000;
+        const NONBLOCK = 0o4000;
+        const DSYNC = 0o10000;
+        const ASYNC = 0o20000;
+        const DIRECT = 0o40000;
+        const DIRECTORY = 0o200000;
+        const NOFOLLOW = 0o400000;
+        const CLOEXEC = 0o2000000;
+        const SYNC = 0o4010000;
+        const RSYNC = 0o4010000;
+        const LARGEFILE = 0o100000;
+        const NOATIME = 0o1000000;
+        const TMPFILE = 0o20000000;
     }
 }
 
 impl OpenFlags {
     pub fn set_fd_flags_mask() -> usize {
         (OpenFlags::APPEND | OpenFlags::ASYNC | OpenFlags::DIRECT | OpenFlags::NOATIME).bits()
+    }
+
+    pub fn is_open_mode(&self, open_mode: OpenFlags) -> bool {
+        let mode_bits = self.bits() & 0b111usize;
+        let req_bits = open_mode.bits() & 0b111usize;
+
+        mode_bits == req_bits
+    }
+
+    pub fn is_readable(&self) -> bool {
+        self.is_open_mode(OpenFlags::RDONLY) || self.is_open_mode(OpenFlags::RDWR)
+    }
+
+    pub fn is_writable(&self) -> bool {
+        self.is_open_mode(OpenFlags::WRONLY) || self.is_open_mode(OpenFlags::RDWR)
     }
 }
 
@@ -294,12 +308,12 @@ impl From<SeekWhence> for usize {
 #[repr(i64)]
 #[derive(Debug)]
 pub enum FcntlCmd {
-    DupFD = 1,
-    DupFDCloexec = 2,
-    GetFD = 3,
-    SetFD = 4,
-    GetFL = 5,
-    SetFL = 6,
+    DupFD = 0,
+    GetFD = 1,
+    SetFD = 2,
+    DupFDCloexec = 1030,
+    GetFL = 3,
+    SetFL = 4,
     Inval = -1,
 }
 
@@ -335,12 +349,12 @@ impl From<OpenFlags> for FDFlags {
 impl From<u64> for FcntlCmd {
     fn from(v: u64) -> Self {
         match v {
-            1 => FcntlCmd::DupFD,
-            2 => FcntlCmd::DupFDCloexec,
-            3 => FcntlCmd::GetFD,
-            4 => FcntlCmd::SetFD,
-            5 => FcntlCmd::GetFL,
-            6 => FcntlCmd::SetFL,
+            0 => FcntlCmd::DupFD,
+            1030 => FcntlCmd::DupFDCloexec,
+            1 => FcntlCmd::GetFD,
+            2 => FcntlCmd::SetFD,
+            3 => FcntlCmd::GetFL,
+            4 => FcntlCmd::SetFL,
             _ => FcntlCmd::Inval,
         }
     }
@@ -409,11 +423,11 @@ bitflags! {
 
 bitflags! {
     pub struct AtFlags: u64 {
-        const EMPTY_PATH = 1;
-        const SYMLINK_FOLLOW = 2;
-        const SYMLINK_NOFOLLOW = 4;
-        const REMOVEDIR = 8;
-        const EACCESS = 512;
+        const EMPTY_PATH = 0x1000;
+        const SYMLINK_FOLLOW = 0x400;
+        const SYMLINK_NOFOLLOW = 0x100;
+        const REMOVEDIR = 0x200;
+        const EACCESS = 0x200;
     }
 }
 

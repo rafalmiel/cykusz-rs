@@ -171,6 +171,7 @@ pub fn register_net_driver(driver: Arc<dyn NetDriver>) {
 }
 
 pub fn init() {
+    unix::init();
     let def = DEFAULT_DRIVER.write();
     if let Some(dev) = &*def {
         arp::init();

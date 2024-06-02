@@ -44,7 +44,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_SOCKET => sys::sys_socket(a, b, c),
         SYS_BIND => sys::sys_bind(a, b, c),
         SYS_CONNECT => sys::sys_connect(a, b, c).maybe_into_erestartsys(),
-        SYS_ACCEPT => sys::sys_accept(a, b, c).maybe_into_erestartsys(),
+        SYS_ACCEPT => sys::sys_accept(a, b, c, d).maybe_into_erestartsys(),
         SYS_LISTEN => sys::sys_listen(a, b),
         SYS_MSGRECV => sys::sys_msg_recv(a, b, c).maybe_into_erestartsys(),
         SYS_MSGSEND => sys::sys_msg_send(a, b, c).maybe_into_erestartsys(),

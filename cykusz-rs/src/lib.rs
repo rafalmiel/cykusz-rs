@@ -151,7 +151,7 @@ fn init_task() {
     current_task_ref()
         .open_file(
             lookup_by_path(&Path::new("/dev/tty"), LookupMode::None).unwrap(),
-            OpenFlags::WRONLY,
+            OpenFlags::RDONLY,
         )
         .expect("Failed to open tty");
     current_task_ref()

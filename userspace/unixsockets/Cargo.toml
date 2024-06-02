@@ -1,0 +1,16 @@
+[package]
+name = "unixsockets"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "unixsocket-server"
+test = false
+bench = false
+path = "src/server/bin/main.rs"
+
+[[bin]]
+name = "unixsocket-client"
+test = false
+bench = false
+path = "src/client/bin/main.rs"

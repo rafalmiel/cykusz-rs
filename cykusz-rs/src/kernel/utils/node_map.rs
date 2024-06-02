@@ -1,6 +1,7 @@
 use crate::kernel::fs::inode::INode;
 use alloc::sync::Arc;
 use hashbrown::HashMap;
+use syscall_defs::SyscallError;
 
 pub trait NodeMapItem: INode {
     fn new(_key: Option<(usize, usize)>) -> Arc<Self>;
@@ -25,7 +26,21 @@ impl<T: NodeMapItem> NodeMap<T> {
         ))
     }
 
-    pub fn get_or_insert(&mut self, inode: &Arc<dyn INode>) -> Option<Arc<T>> {
+    pub fn insert(&mut self, inode: &Arc<dyn INode>, node: &Arc<T>) -> Result<(), SyscallError> {
+        let key = Self::get_key(inode).ok_or(SyscallError::EINVAL)?;
+
+        self.map.insert(key, node.clone());
+
+        Ok(())
+    }
+
+    pub fn get(&mut self, inode: &Arc<dyn INode>) -> Option<Arc<T>> {
+        let key = Self::get_key(inode)?;
+
+        self.map.get(&key).cloned()
+    }
+
+    pub fn get_or_insert_default(&mut self, inode: &Arc<dyn INode>) -> Option<Arc<T>> {
         let key = Self::get_key(inode)?;
 
         match self.map.try_insert(key, T::new(Some(key))) {

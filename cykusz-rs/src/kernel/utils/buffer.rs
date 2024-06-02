@@ -11,6 +11,8 @@ pub struct BufferQueue {
     shutting_down: AtomicBool,
     writer_queue: WaitQueue,
     reader_queue: WaitQueue,
+    has_writers: AtomicBool,
+    has_readers: AtomicBool,
 }
 
 impl Default for BufferQueue {
@@ -25,32 +27,34 @@ pub struct Buffer {
     w: usize,
     full: bool,
     // r == w may indicate both empty and full buffer, full boolean disambiguate that
-    has_writers: bool,
-    has_readers: bool,
 }
 
 impl Default for Buffer {
     fn default() -> Buffer {
-        Buffer::new(4096, true, true)
+        Buffer::new(4096)
     }
 }
 
 impl BufferQueue {
     pub fn new(init_size: usize, has_readers: bool, has_writers: bool) -> BufferQueue {
         BufferQueue {
-            buffer: Spin::new(Buffer::new(init_size, has_readers, has_writers)),
+            buffer: Spin::new(Buffer::new(init_size)),
             shutting_down: AtomicBool::new(false),
             writer_queue: WaitQueue::new(),
             reader_queue: WaitQueue::new(),
+            has_writers: AtomicBool::new(has_writers),
+            has_readers: AtomicBool::new(has_readers),
         }
     }
 
     pub fn new_empty(has_readers: bool, has_writers: bool) -> BufferQueue {
         BufferQueue {
-            buffer: Spin::new(Buffer::new_empty(has_readers, has_writers)),
+            buffer: Spin::new(Buffer::new_empty()),
             shutting_down: AtomicBool::new(false),
             writer_queue: WaitQueue::new(),
             reader_queue: WaitQueue::new(),
+            has_writers: AtomicBool::new(has_writers),
+            has_readers: AtomicBool::new(has_readers),
         }
     }
 
@@ -67,7 +71,7 @@ impl BufferQueue {
     }
 
     pub fn set_has_readers(&self, has: bool) {
-        self.buffer.lock().has_readers = has;
+        self.has_readers.store(has, Ordering::Relaxed);
 
         if !has {
             self.writer_queue.signal_all(syscall_defs::signal::SIGPIPE);
@@ -77,15 +81,23 @@ impl BufferQueue {
     }
 
     pub fn set_has_writers(&self, has: bool) {
-        self.buffer.lock().has_writers = has;
+        self.has_writers.store(has, Ordering::Relaxed);
 
         self.reader_queue.notify_all();
     }
 
+    pub fn has_readers(&self) -> bool {
+        self.has_readers.load(Ordering::Relaxed)
+    }
+
+    pub fn has_writers(&self) -> bool {
+        self.has_writers.load(Ordering::Relaxed)
+    }
+
     pub fn wait_for_readers(&self) -> SignalResult<()> {
-        logln!("waiting for readers {}", self.buffer.lock().has_readers);
+        logln!("waiting for readers {}", self.has_readers());
         self.writer_queue
-            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |b| b.has_readres())?
+            .wait_for(WaitQueueFlags::empty(), || self.has_readers())?
             .unwrap();
         logln!("got readers");
 
@@ -93,9 +105,9 @@ impl BufferQueue {
     }
 
     pub fn wait_for_writers(&self) -> SignalResult<()> {
-        logln!("waiting for writers {}", self.buffer.lock().has_writers);
+        logln!("waiting for writers {}", self.has_writers());
         self.reader_queue
-            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |b| b.has_writers())?
+            .wait_for(WaitQueueFlags::empty(), || self.has_writers())?
             .unwrap();
         logln!("got writers");
 
@@ -103,7 +115,11 @@ impl BufferQueue {
     }
 
     pub fn has_data(&self) -> bool {
-        self.buffer.lock().has_data()
+        self.has_data_locked(&self.buffer.lock())
+    }
+
+    fn has_data_locked(&self, lock: &SpinGuard<Buffer>) -> bool {
+        lock.has_data() || !self.has_writers()
     }
 
     pub fn try_append_data(&self, data: &[u8]) -> usize {
@@ -149,11 +165,12 @@ impl BufferQueue {
             .writer_queue
             .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| {
                 let _ = &lck;
-                !lck.has_readres() || lck.available_size() > 0
+                !self.has_readers() || lck.available_size() > 0
             })?
             .unwrap();
 
-        if !buffer.has_readres() {
+        if !self.has_readers() {
+            logln!("no readers......");
             return Err(FsError::Pipe);
         }
 
@@ -187,13 +204,16 @@ impl BufferQueue {
             return Ok(0);
         }
 
+        logln!("READ DATA WAIT");
         let mut buffer = self
             .reader_queue
-            .wait_lock_for(wg_flags, &self.buffer, |lck| {
-                lck.has_data() || self.shutting_down() || offset > 0
+            .wait_lock_for(wg_flags, &self.buffer, |l| {
+                self.has_data_locked(l) || self.shutting_down() || offset > 0
             })?
             .unwrap();
 
+
+        logln!("READ DATA STARTING");
         let read = if transient {
             buffer.read_data_transient_from(offset, buf)
         } else {
@@ -201,6 +221,8 @@ impl BufferQueue {
         };
 
         drop(buffer);
+
+        logln!("READ DATA DONE {}", read);
 
         if !transient && read > 0 {
             self.writer_queue.notify_one();
@@ -239,42 +261,30 @@ impl BufferQueue {
 }
 
 impl Buffer {
-    pub fn new(init_size: usize, has_readers: bool, has_writers: bool) -> Buffer {
+    pub fn new(init_size: usize) -> Buffer {
         let mut buf = Buffer {
             data: Vec::with_capacity(init_size),
             r: 0,
             w: 0,
             full: false,
-            has_writers,
-            has_readers,
         };
         buf.data.resize(init_size, 0);
 
         buf
     }
 
-    pub fn new_empty(has_readers: bool, has_writers: bool) -> Buffer {
+    pub fn new_empty() -> Buffer {
         Buffer {
             data: Vec::new(),
             r: 0,
             w: 0,
             full: true,
-            has_writers,
-            has_readers,
         }
     }
 
     pub fn init_size(&mut self, size: usize) {
         self.data.resize(size, 0);
         self.full = false;
-    }
-
-    pub fn has_readres(&self) -> bool {
-        self.has_readers
-    }
-
-    pub fn has_writers(&self) -> bool {
-        self.has_writers
     }
 
     pub fn available_size(&self) -> usize {
@@ -321,7 +331,7 @@ impl Buffer {
     }
 
     pub fn has_data(&self) -> bool {
-        self.r != self.w || self.full || !self.has_writers
+        self.r != self.w || self.full
     }
 
     pub fn read_data(&mut self, buf: &mut [u8]) -> usize {
@@ -352,6 +362,10 @@ impl Buffer {
     }
 
     pub fn mark_as_read(&mut self, amount: usize) -> usize {
+        if amount == 0 {
+            return amount;
+        }
+
         let avail = self.size();
 
         if avail < amount {

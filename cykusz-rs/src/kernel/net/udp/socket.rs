@@ -109,6 +109,8 @@ impl Socket {
             )
         };
 
+        logln!("send buf size: {} {:?} : {}", buf.len(), dst_ip, dst_port);
+
         if self.src_port() == 0 {
             crate::kernel::net::udp::register_handler(self.me());
         }
@@ -230,8 +232,10 @@ impl SocketService for Socket {
 
     fn connect(&self, sock_addr: SockAddrPtr, addrlen: u32) -> SyscallResult {
         let sock_addr = sock_addr.as_sock_addr_in();
+        logln!("udp connect sock addr: {:?}", sock_addr);
 
         if addrlen as usize != core::mem::size_of::<SockAddrIn>() {
+            logln!("udp connect fail");
             return Err(SyscallError::EINVAL);
         }
 
@@ -246,7 +250,7 @@ impl SocketService for Socket {
     }
 
     fn msg_send(&self, hdr: &MsgHdr, _flags: MsgFlags) -> SyscallResult {
-        logln5!("UDP msg_send???");
+        logln!("UDP msg_send???");
         let dest = if let Some(addr) = hdr.sock_addr_in() {
             Some((addr.port() as u32, addr.sin_addr.s_addr.into()))
         } else {
@@ -256,6 +260,7 @@ impl SocketService for Socket {
         let buf = hdr.iovecs();
 
         if buf.len() == 1 {
+            logln!("send buf 1");
             Ok(self.send(buf[0].get_bytes(), dest)?)
         } else {
             let data = hdr
@@ -265,6 +270,7 @@ impl SocketService for Socket {
                 .copied()
                 .collect::<Vec<_>>();
 
+            logln!("send iovec");
             Ok(self.send(data.as_slice(), dest)?)
         }
     }

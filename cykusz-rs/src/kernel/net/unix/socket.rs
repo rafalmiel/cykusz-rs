@@ -379,7 +379,7 @@ impl INode for Socket {
                 res_flags.insert(PollEventFlags::WRITE);
             }
 
-            if !self.has_readers() {
+            if !target.clone().unwrap().buffer.has_readers() {
                 res_flags.insert(PollEventFlags::ERR);
             }
         }

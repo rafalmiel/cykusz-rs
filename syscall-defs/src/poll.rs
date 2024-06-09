@@ -43,3 +43,11 @@ impl FdSet {
         self.fds[fd / 8] |= 1 << (fd % 8);
     }
 }
+
+impl PollFd {
+    pub fn new(fd: i32, events: PollEventFlags) -> PollFd {
+        PollFd {
+            fd, events, revents: PollEventFlags::empty()
+        }
+    }
+}

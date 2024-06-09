@@ -2,6 +2,7 @@
 #![feature(asm_const)]
 
 pub mod print;
+pub mod util;
 
 use std::arch::asm;
 use std::sync::atomic::AtomicU32;
@@ -355,6 +356,12 @@ pub fn select(
             },
             0,
         )
+    }
+}
+
+pub fn poll(fds: &mut [poll::PollFd], timeout: i32) -> SyscallResult {
+    unsafe {
+        syscall3(SYS_POLL, fds.as_ptr() as usize, fds.len(), timeout as usize)
     }
 }
 

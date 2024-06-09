@@ -10,31 +10,27 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 
 ## Kernel
 
-- [x] 64bit higher-half kernel
-- [x] VESA fb output
-- [x] Physical memory allocator
-- [x] Paging
-- [x] Kernel heap
-- [x] Interrupt handlers
-- [x] ACPI support (ioapic, lapic, acpica)
-- [x] SMP
-- [x] Per-CPU-Storage using thread_local
+### Core features
+- [x] x86_64 monolithic kernel
+- [x] 4-level paging
 - [x] Preemptive per-cpu scheduler
-- [x] PS2/Keyboard driver
-- [x] Tty with ansi escape codes
-- [x] Virtual File System
-- [x] Page/Inode/Directory cache
-- [x] Memory mapped files (mmap interface)
-- [x] Pipes
-- [x] Storage (ide, ahci)
+- [x] ACPI (ioapic, lapic, acpica)
+- [x] VM (elf loader, shared memory, COW)
 - [x] Filesystem (ext2)
+- [x] Page / Inode / Directory cache
+- [x] TTY with ansi escape codes
 - [x] Network Stack (e1000, ETH, ARP, IP, UDP, TCP, ICMP, DHCP, DNS)
+- [x] IPC: Pipes / Unix Sockets / SHM
+
+### Drivers
+- [x] VESA framebuffer
+- [x] PS/2: Keyboard / Mouse
+- [x] Storage: IDE / AHCI
+- [x] Networking: e1000
 
 ## Userspace
-
-- [x] Bash shell
 - [x] libc (mlibc port)
-- [x] Exec/fork
+- [x] Exec / fork
 - [x] Threads
 - [x] Thread local storage
 - [x] Fs mount/umount
@@ -83,7 +79,7 @@ You will need following packages to compile and run the os:
 * parted
 * docker (for userspace docker build)
 
-Building:
+### Building:
 ```bash
 git clone https://github.com/rafalmiel/cykusz-rs.git
 git submodule update --init --recursive

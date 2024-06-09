@@ -783,6 +783,29 @@ pub fn sys_socket(domain: u64, typ: u64, _protocol: u64) -> SyscallResult {
     res
 }
 
+pub fn sys_socketpair(domain: u64, typ: u64, _protocol: u64, fds: u64) -> SyscallResult {
+    let sock_domain = SockDomain::try_from(domain)?;
+    let typ = SockTypeFlags::new(typ);
+
+    if sock_domain != SockDomain::AfUnix {
+        return Err(SyscallError::ENOTSUP);
+    }
+
+    let (s1, s2) = crate::kernel::net::unix::socket::Socket::new_connected(typ);
+
+    let task = current_task_ref();
+
+    let fd1 = task.open_file(DirEntry::inode_wrap(s1.clone()), OpenFlags::RDWR)?;
+    let fd2 = task.open_file(DirEntry::inode_wrap(s2.clone()), OpenFlags::RDWR)?;
+
+    let fds = unsafe { VirtAddr(fds as usize).read_mut::<[i32; 2]>() };
+
+    fds[0] = fd1 as i32;
+    fds[1] = fd2 as i32;
+
+    Ok(0)
+}
+
 fn get_socket(fd: usize) -> Result<Arc<dyn SocketService>, SyscallError> {
     let task = current_task_ref();
 
@@ -868,7 +891,11 @@ pub fn sys_msg_send(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
 
     let hdr = unsafe { VirtAddr(hdr as usize).read_ref::<MsgHdr>() };
 
-    logln!("hdr name len {} name addr {:#X}", hdr.msg_namelen, hdr.msg_name.addr());
+    logln!(
+        "hdr name len {} name addr {:#X}",
+        hdr.msg_namelen,
+        hdr.msg_name.addr()
+    );
 
     let sock = get_socket(sockfd as usize)?;
 

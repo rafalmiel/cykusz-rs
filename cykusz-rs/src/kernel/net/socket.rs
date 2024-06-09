@@ -1,6 +1,8 @@
 use alloc::sync::Arc;
 
-use syscall_defs::net::{MsgFlags, MsgHdr, SockAddrPtr, SockDomain, SockFlags, SockOption, SockType, SockTypeFlags};
+use syscall_defs::net::{
+    MsgFlags, MsgHdr, SockAddrPtr, SockDomain, SockFlags, SockOption, SockType, SockTypeFlags,
+};
 use syscall_defs::SyscallError::ENOTSUP;
 use syscall_defs::{SyscallError, SyscallResult};
 
@@ -9,7 +11,12 @@ use crate::kernel::net::ip::{Ip, Ip4};
 use crate::kernel::net::Packet;
 
 pub fn new(domain: SockDomain, typ: SockTypeFlags) -> Result<Arc<dyn INode>, SyscallError> {
-    logln!("new socket: {:?} {:?} {:?}", domain, SockType::from(typ), SockFlags::from(typ));
+    logln!(
+        "new socket: {:?} {:?} {:?}",
+        domain,
+        SockType::from(typ),
+        SockFlags::from(typ)
+    );
 
     match (domain, SockType::from(typ)) {
         (SockDomain::AfInet, SockType::Stream) => {

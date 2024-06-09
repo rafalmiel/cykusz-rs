@@ -212,7 +212,6 @@ impl BufferQueue {
             })?
             .unwrap();
 
-
         logln!("READ DATA STARTING");
         let read = if transient {
             buffer.read_data_transient_from(offset, buf)

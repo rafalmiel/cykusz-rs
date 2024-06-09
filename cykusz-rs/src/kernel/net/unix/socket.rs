@@ -11,7 +11,7 @@ use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use syscall_defs::net::{MsgFlags, MsgHdr, SockAddrPtr, SockAddrUn};
+use syscall_defs::net::{MsgFlags, MsgHdr, SockAddrPtr, SockAddrUn, SockTypeFlags};
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::{Mode, Stat};
 use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
@@ -23,7 +23,10 @@ struct ConnectionQueue {
 
 impl ConnectionQueue {
     fn new(addr: SockAddrUn) -> ConnectionQueue {
-        ConnectionQueue { queue: Vec::new(), addr }
+        ConnectionQueue {
+            queue: Vec::new(),
+            addr,
+        }
     }
 
     fn addr(&self) -> &SockAddrUn {
@@ -61,6 +64,24 @@ impl Socket {
             readers: AtomicUsize::new(0),
             writers: AtomicUsize::new(0),
         })
+    }
+
+    pub fn new_connected(_flags: SockTypeFlags) -> (Arc<Socket>, Arc<Socket>) {
+        let s1 = Socket::new_unbound(None);
+        let s2 = Socket::new_unbound(None);
+
+        s1.buffer.init_size(4096 * 4);
+        s2.buffer.init_size(4096 * 4);
+
+        *s1.data.lock() = SocketState::Connected(s2.clone());
+        *s2.data.lock() = SocketState::Connected(s1.clone());
+
+        s1.inc_readers();
+        s1.inc_writers();
+        s2.inc_readers();
+        s2.inc_writers();
+
+        (s1, s2)
     }
 
     fn target(&self) -> Arc<Socket> {

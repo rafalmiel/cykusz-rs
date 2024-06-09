@@ -34,6 +34,8 @@ pub const SYS_SLEEP: usize = 9;
 pub const SYS_POWEROFF: usize = 10;
 pub const SYS_REBOOT: usize = 11;
 pub const SYS_GETADDRINFO: usize = 12;
+pub const SYS_BIND: usize = 13;
+pub const SYS_CONNECT: usize = 14;
 pub const SYS_SELECT: usize = 15;
 pub const SYS_MOUNT: usize = 16;
 pub const SYS_UMOUNT: usize = 17;
@@ -91,8 +93,6 @@ pub const SYS_TRUNCATE: usize = 61;
 pub const SYS_POLL: usize = 62;
 
 pub const SYS_SOCKET: usize = 63;
-pub const SYS_BIND: usize = 13;
-pub const SYS_CONNECT: usize = 14;
 pub const SYS_ACCEPT: usize = 64;
 pub const SYS_LISTEN: usize = 65;
 pub const SYS_MSGRECV: usize = 66;
@@ -103,6 +103,7 @@ pub const SYS_YIELD: usize = 70;
 pub const SYS_CHMOD: usize = 71;
 pub const SYS_UTIME: usize = 72;
 pub const SYS_MKNODE: usize = 73;
+pub const SYS_SOCKETPAIR: usize = 74;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 #[repr(u64)]

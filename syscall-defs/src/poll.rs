@@ -47,7 +47,9 @@ impl FdSet {
 impl PollFd {
     pub fn new(fd: i32, events: PollEventFlags) -> PollFd {
         PollFd {
-            fd, events, revents: PollEventFlags::empty()
+            fd,
+            events,
+            revents: PollEventFlags::empty(),
         }
     }
 }

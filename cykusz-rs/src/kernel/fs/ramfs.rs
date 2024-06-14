@@ -126,7 +126,7 @@ impl INode for LockedRamINode {
         self.make_inode(name, FileType::Dir, |_| Ok(()))
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, offset: usize, buf: &mut [u8], _flags: OpenFlags) -> Result<usize> {
         let i = self.0.read();
 
         match &i.content {
@@ -147,7 +147,7 @@ impl INode for LockedRamINode {
         }
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+    fn write_at(&self, offset: usize, buf: &[u8], _flags: OpenFlags) -> Result<usize> {
         let i = self.0.read();
 
         match &i.content {

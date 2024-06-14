@@ -1,4 +1,4 @@
-use crate::SyscallError;
+use crate::{OpenFlags, SyscallError};
 
 #[derive(Debug, Copy, Clone)]
 pub struct SockTypeFlags(u64);
@@ -34,6 +34,16 @@ bitflags! {
         const MSG_MORE = 0x8000;
         const MSG_FASTOPEN = 0x20000000;
         const MSG_CMSG_CLOEXEC = 0x40000000;
+    }
+}
+
+impl From<OpenFlags> for MsgFlags {
+    fn from(value: OpenFlags) -> Self {
+        if value.contains(OpenFlags::NONBLOCK) {
+            MsgFlags::MSG_DONTWAIT
+        } else {
+            MsgFlags::empty()
+        }
     }
 }
 

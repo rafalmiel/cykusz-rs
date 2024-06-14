@@ -3,7 +3,7 @@ use core::mem::size_of;
 use core::ptr::Unique;
 
 use syscall_defs::exec::ExeArgs;
-use syscall_defs::{MMapFlags, MMapProt};
+use syscall_defs::{MMapFlags, MMapProt, OpenFlags};
 
 use crate::arch::gdt;
 use crate::arch::gdt::update_tss_rps0;
@@ -124,7 +124,7 @@ fn prepare_tls(vm: &VM, p_table: &mut P4Table, tls: &TlsVmInfo) -> VirtAddr {
 
             if let Ok(r) = tls.file.inode().read_at(tls.file_offset + offset, unsafe {
                 frame.address_mapped().as_bytes_mut(to_read)
-            }) {
+            }, OpenFlags::empty()) {
                 if r != to_read {
                     panic!("Failed to read tls data");
                 }

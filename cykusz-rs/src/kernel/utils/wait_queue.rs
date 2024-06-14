@@ -1,5 +1,7 @@
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use syscall_defs::net::MsgFlags;
+use syscall_defs::OpenFlags;
 
 use crate::kernel::sched::{current_task, SleepFlags};
 use crate::kernel::signal::{SignalError, SignalResult};
@@ -31,6 +33,26 @@ impl From<WaitQueueFlags> for SleepFlags {
         }
 
         flags
+    }
+}
+
+impl From<OpenFlags> for WaitQueueFlags {
+    fn from(value: OpenFlags) -> Self {
+        if value.contains(OpenFlags::NONBLOCK) {
+            WaitQueueFlags::NO_HANG
+        } else {
+            WaitQueueFlags::empty()
+        }
+    }
+}
+
+impl From<MsgFlags> for WaitQueueFlags {
+    fn from(value: MsgFlags) -> Self {
+        if value.contains(MsgFlags::MSG_DONTWAIT) {
+            WaitQueueFlags::NO_HANG
+        } else {
+            WaitQueueFlags::empty()
+        }
     }
 }
 

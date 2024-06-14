@@ -122,7 +122,7 @@ pub fn mount_root() {
     mount::mark_mounted(root_fs.clone());
 
     if let Ok(fstab) = lookup_by_path(&Path::new("/etc/fstab"), LookupMode::None) {
-        let data = fstab.inode().read_all();
+        let data = fstab.inode().read_all().expect("/etc/fstab read failed");
 
         if let Ok(content) = core::str::from_utf8(data.as_slice()) {
             for line in content.split("\n") {
@@ -165,7 +165,7 @@ pub fn read_link(inode: &Arc<dyn INode>) -> Result<String> {
     let mut offset = 0;
 
     loop {
-        offset += inode.read_at(offset, &mut path.as_mut_slice()[offset..])?;
+        offset += inode.read_at(offset, &mut path.as_mut_slice()[offset..], OpenFlags::empty())?;
 
         if offset == path.len() {
             path.resize(offset + 128, 0);

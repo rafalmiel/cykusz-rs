@@ -13,6 +13,7 @@ use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 use crate::kernel::utils::buffer::BufferQueue;
 use crate::kernel::utils::node_map::{NodeMap, NodeMapItem};
+use crate::kernel::utils::wait_queue::WaitQueueFlags;
 
 pub struct Pipe {
     buf: BufferQueue,
@@ -87,12 +88,12 @@ impl INode for Pipe {
 
         Ok(stat)
     }
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
-        Ok(self.buf.read_data(buf)?)
+    fn read_at(&self, _offset: usize, buf: &mut [u8], flags: OpenFlags) -> Result<usize> {
+        Ok(self.buf.read_data_flags(buf, WaitQueueFlags::from(flags))?)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
-        self.buf.append_data(buf)
+    fn write_at(&self, _offset: usize, buf: &[u8], flags: OpenFlags) -> Result<usize> {
+        self.buf.append_data_flags(buf, WaitQueueFlags::from(flags))
     }
 
     fn poll(

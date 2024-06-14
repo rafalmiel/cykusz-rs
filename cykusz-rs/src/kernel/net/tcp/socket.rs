@@ -907,7 +907,7 @@ impl Socket {
             offset,
             buf,
             flags.contains(MsgFlags::MSG_PEEK),
-            WaitQueueFlags::empty(),
+            WaitQueueFlags::from(flags),
         )?)
     }
 
@@ -928,13 +928,13 @@ impl INode for Socket {
         Ok(stat)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8], flags: OpenFlags) -> Result<usize> {
         //let data = self.data.lock();
         //if data.is_listening() {
         //    return Err(FsError::NotSupported);
         //}
         //drop(data);
-        let r = self.read(0, buf, MsgFlags::empty())?;
+        let r = self.read(0, buf, MsgFlags::from(flags))?;
 
         if r > 0 {
             self.update_window();
@@ -943,7 +943,7 @@ impl INode for Socket {
         Ok(r)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
+    fn write_at(&self, _offset: usize, buf: &[u8], flags: OpenFlags) -> Result<usize> {
         logln5!("write_at socket, len: {}", buf.len());
         let mut data = self.data.lock();
 
@@ -960,7 +960,7 @@ impl INode for Socket {
 
                 //println!("[ TCP ] Proxy Buffer avail: {}", data.proxy_buffer.available_size());
 
-                while data.proxy_buffer.available_size() < buf.len() {
+                while data.proxy_buffer.available_size() < buf.len() && !flags.contains(OpenFlags::NONBLOCK) {
                     if let Err(e) = WaitQueue::wait_lock(data) {
                         data = self.data.lock();
 
@@ -1122,14 +1122,14 @@ impl SocketService for Socket {
         Ok(0)
     }
 
-    fn msg_send(&self, hdr: &MsgHdr, _flags: MsgFlags) -> SyscallResult {
+    fn msg_send(&self, hdr: &MsgHdr, flags: MsgFlags) -> SyscallResult {
         logln!("tcp msg_send");
         let iovecs = hdr.iovecs();
 
         let mut total = 0;
 
         for iovec in iovecs {
-            total += self.write_at(0, iovec.get_bytes())?;
+            total += self.write_at(0, iovec.get_bytes(), OpenFlags::from(flags))?;
         }
 
         Ok(total)

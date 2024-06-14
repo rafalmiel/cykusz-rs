@@ -53,20 +53,19 @@ pub trait INode: Send + Sync + DowncastSync {
         Err(FsError::NotSupported)
     }
 
-    fn read_at(&self, _offset: usize, _buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, _buf: &mut [u8], _flags: OpenFlags) -> Result<usize> {
         Err(FsError::NotSupported)
     }
 
-    fn read_all(&self) -> Vec<u8> {
+    fn read_all(&self) -> Result<Vec<u8>> {
         let meta = self.metadata().unwrap();
         let mut data = Vec::<u8>::new();
         data.resize(meta.size, 0);
-        self.read_at(0, data.as_mut_slice())
-            .expect("fstab read failed");
-        data
+        self.read_at(0, data.as_mut_slice(), OpenFlags::empty())?;
+        Ok(data)
     }
 
-    fn write_at(&self, _offset: usize, _buf: &[u8]) -> Result<usize> {
+    fn write_at(&self, _offset: usize, _buf: &[u8], _flags: OpenFlags) -> Result<usize> {
         Err(FsError::NotSupported)
     }
 

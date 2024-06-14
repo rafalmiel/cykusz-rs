@@ -300,13 +300,13 @@ impl SocketService for Socket {
         Ok(0)
     }
 
-    fn msg_send(&self, hdr: &MsgHdr, _flags: MsgFlags) -> SyscallResult {
+    fn msg_send(&self, hdr: &MsgHdr, flags: MsgFlags) -> SyscallResult {
         let iovecs = hdr.iovecs();
 
         let mut total = 0;
 
         for iovec in iovecs {
-            total += self.write_at(0, iovec.get_bytes())?;
+            total += self.write_at(0, iovec.get_bytes(), OpenFlags::from(flags))?;
         }
 
         Ok(total)
@@ -328,7 +328,7 @@ impl SocketService for Socket {
                 0
             };
 
-            let read = self.read_at(offset, iovec.get_bytes_mut())?;
+            let read = self.read_at(offset, iovec.get_bytes_mut(), OpenFlags::from(flags))?;
 
             if read == 0 {
                 return Ok(total);
@@ -357,18 +357,18 @@ impl INode for Socket {
         Ok(stat)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> crate::kernel::fs::vfs::Result<usize> {
-        Ok(self.buffer.read_data(buf)?)
+    fn read_at(&self, _offset: usize, buf: &mut [u8], flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
+        Ok(self.buffer.read_data_flags(buf, WaitQueueFlags::from(flags))?)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> crate::kernel::fs::vfs::Result<usize> {
+    fn write_at(&self, _offset: usize, buf: &[u8], flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
         let target = if let SocketState::Connected(target) = &*self.data.lock() {
             target.clone()
         } else {
             return Err(FsError::NotSupported);
         };
 
-        Ok(target.buffer.append_data(buf)?)
+        Ok(target.buffer.append_data_flags(buf, WaitQueueFlags::from(flags))?)
     }
 
     fn poll(

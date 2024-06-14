@@ -150,12 +150,12 @@ impl INode for Socket {
         Ok(stat)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8], flags: OpenFlags) -> Result<usize> {
         logln4!("udp read {}", buf.len());
         let mut data = self
             .buffer_wq
-            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |l| !l.is_empty())?
-            .unwrap();
+            .wait_lock_for(WaitQueueFlags::from(flags), &self.buffer, |l| !l.is_empty())?
+            .ok_or(FsError::WouldBlock)?;
 
         let packet = data.pop_front().unwrap();
 
@@ -168,7 +168,7 @@ impl INode for Socket {
         Ok(size)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize> {
+    fn write_at(&self, _offset: usize, buf: &[u8], _flags: OpenFlags) -> Result<usize> {
         self.send(buf, None)
     }
 

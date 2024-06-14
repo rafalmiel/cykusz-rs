@@ -77,7 +77,7 @@ impl FileHandle {
     }
 
     pub fn read_at(&self, buf: &mut [u8], offset: usize) -> Result<usize> {
-        Ok(self.inode.read_at(offset, buf)?)
+        Ok(self.inode.read_at(offset, buf, self.flags())?)
     }
 
     pub fn write_at(&self, buf: &[u8], offset: usize) -> Result<usize> {
@@ -90,7 +90,7 @@ impl FileHandle {
                     return Err(FsError::NotSupported);
                 }
             }
-            None => inode.write_at(offset, buf)?,
+            None => inode.write_at(offset, buf, self.flags())?,
         })
     }
 

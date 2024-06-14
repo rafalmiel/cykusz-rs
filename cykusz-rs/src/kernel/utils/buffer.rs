@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
+use crate::kernel::fs::vfs;
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::signal::SignalResult;
@@ -154,7 +155,7 @@ impl BufferQueue {
         written
     }
 
-    pub fn append_data(&self, data: &[u8]) -> crate::kernel::fs::vfs::Result<usize> {
+    pub fn append_data_flags(&self, data: &[u8], flags: WaitQueueFlags) -> crate::kernel::fs::vfs::Result<usize> {
         if data.is_empty() {
             return Ok(0);
         }
@@ -163,11 +164,11 @@ impl BufferQueue {
 
         let mut buffer = self
             .writer_queue
-            .wait_lock_for(WaitQueueFlags::empty(), &self.buffer, |lck| {
+            .wait_lock_for(flags, &self.buffer, |lck| {
                 let _ = &lck;
                 !self.has_readers() || lck.available_size() > 0
             })?
-            .unwrap();
+            .ok_or(vfs::FsError::WouldBlock)?;
 
         if !self.has_readers() {
             logln!("no readers......");
@@ -183,6 +184,11 @@ impl BufferQueue {
         self.reader_queue.notify_one();
 
         Ok(written)
+
+    }
+
+    pub fn append_data(&self, data: &[u8]) -> crate::kernel::fs::vfs::Result<usize> {
+        self.append_data_flags(data, WaitQueueFlags::empty())
     }
 
     pub fn available_size(&self) -> usize {
@@ -199,7 +205,7 @@ impl BufferQueue {
         buf: &mut [u8],
         transient: bool,
         wg_flags: WaitQueueFlags,
-    ) -> SignalResult<usize> {
+    ) -> vfs::Result<usize> {
         if offset > 0 && !transient {
             return Ok(0);
         }
@@ -210,7 +216,7 @@ impl BufferQueue {
             .wait_lock_for(wg_flags, &self.buffer, |l| {
                 self.has_data_locked(l) || self.shutting_down() || offset > 0
             })?
-            .unwrap();
+            .ok_or(vfs::FsError::WouldBlock)?;
 
         logln!("READ DATA STARTING");
         let read = if transient {
@@ -230,11 +236,11 @@ impl BufferQueue {
         Ok(read)
     }
 
-    pub fn read_data(&self, buf: &mut [u8]) -> SignalResult<usize> {
+    pub fn read_data(&self, buf: &mut [u8]) -> vfs::Result<usize> {
         self.read_data_from(0, buf, false, WaitQueueFlags::empty())
     }
 
-    pub fn read_data_flags(&self, buf: &mut [u8], wg_flags: WaitQueueFlags) -> SignalResult<usize> {
+    pub fn read_data_flags(&self, buf: &mut [u8], wg_flags: WaitQueueFlags) -> vfs::Result<usize> {
         self.read_data_from(0, buf, false, wg_flags)
     }
 

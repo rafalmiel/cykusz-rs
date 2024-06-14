@@ -15,12 +15,12 @@ use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
+use crate::kernel::fs::vfs;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::kbd::KeyListener;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::session::{sessions, Group};
-use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 use crate::kernel::task::Task;
 use crate::kernel::tty::TerminalDevice;
@@ -133,21 +133,21 @@ impl Tty {
         })
     }
 
-    fn read(&self, buf: *mut u8, len: usize) -> SignalResult<usize> {
+    fn read(&self, buf: *mut u8, len: usize, flags: OpenFlags) -> vfs::Result<usize> {
         if let Some(fg) = &*self.fg_group.lock_irq() {
             let task = current_task_ref();
 
             if !fg.has_process(task.pid()) {
                 task.signal(syscall_defs::signal::SIGTTIN);
-                return Err(SignalError::Interrupted);
+                return Err(FsError::Interrupted);
             }
         }
         let mut buffer = self
             .wait_queue
-            .wait_lock_for(WaitQueueFlags::IRQ_DISABLE, &self.buffer, |lck| {
+            .wait_lock_for(WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::from(flags), &self.buffer, |lck| {
                 lck.has_data()
             })?
-            .unwrap();
+            .ok_or(FsError::WouldBlock)?;
 
         Ok(buffer.read(buf, len))
     }
@@ -461,21 +461,21 @@ impl TerminalDevice for Tty {
 }
 
 impl INode for Tty {
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> Result<usize, FsError> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8], flags: OpenFlags) -> Result<usize, FsError> {
         logln2!("try tty read");
-        let r = self.read(buf.as_mut_ptr(), buf.len());
+        let r = self.read(buf.as_mut_ptr(), buf.len(), flags);
         logln2!("tty read {:?} {:?}", r, buf);
 
         match r {
             Ok(s) => Ok(s),
             Err(e) => {
-                logln2!("tty signal error");
+                logln2!("tty error {:?}", e);
                 Err(e.into())
             }
         }
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8]) -> Result<usize, FsError> {
+    fn write_at(&self, _offset: usize, buf: &[u8], _flags: OpenFlags) -> Result<usize, FsError> {
         if let Err(_) = self.write_str(unsafe { core::str::from_utf8_unchecked(buf) }) {
             Err(FsError::InvalidParam)
         } else {

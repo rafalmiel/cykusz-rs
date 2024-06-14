@@ -143,11 +143,11 @@ impl Device for MouseState {
 }
 
 impl INode for MouseState {
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> crate::kernel::fs::vfs::Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8], flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
         if buf.len() % core::mem::size_of::<Event>() != 0 {
             Err(FsError::InvalidParam)
         } else {
-            Ok(self.buf.read_data_flags(buf, WaitQueueFlags::IRQ_DISABLE)?)
+            Ok(self.buf.read_data_flags(buf, WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::from(flags))?)
         }
     }
 

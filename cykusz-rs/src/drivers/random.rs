@@ -2,6 +2,7 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 
 use rand::{RngCore, SeedableRng};
+use syscall_defs::OpenFlags;
 
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
@@ -38,7 +39,7 @@ impl Random {
 }
 
 impl INode for Random {
-    fn read_at(&self, _offset: usize, buf: &mut [u8]) -> crate::kernel::fs::vfs::Result<usize> {
+    fn read_at(&self, _offset: usize, buf: &mut [u8], _flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
         self.rng.lock().fill_bytes(buf);
 
         Ok(buf.len())

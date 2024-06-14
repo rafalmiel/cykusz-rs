@@ -467,7 +467,7 @@ impl Ext2INode {
 
 impl RawAccess for LockedExt2INode {
     fn read_direct(&self, addr: usize, dest: &mut [u8]) -> Option<usize> {
-        if let Ok(read) = self.read_at(addr, dest) {
+        if let Ok(read) = self.read_at(addr, dest, OpenFlags::empty()) {
             Some(read)
         } else {
             None
@@ -729,7 +729,7 @@ impl INode for LockedExt2INode {
         Ok(())
     }
 
-    fn read_at(&self, offset: usize, buf: &mut [u8]) -> Result<usize> {
+    fn read_at(&self, offset: usize, buf: &mut [u8], _flags: OpenFlags) -> Result<usize> {
         if self.ftype()? != FileType::File && self.ftype()? != FileType::Symlink {
             return Err(FsError::NotFile);
         }
@@ -739,7 +739,7 @@ impl INode for LockedExt2INode {
         Ok(reader.read(buf))
     }
 
-    fn write_at(&self, offset: usize, buf: &[u8]) -> Result<usize> {
+    fn write_at(&self, offset: usize, buf: &[u8], _flags: OpenFlags) -> Result<usize> {
         if self.ftype()? != FileType::File && self.ftype()? != FileType::Symlink {
             return Err(FsError::NotFile);
         }
@@ -846,7 +846,7 @@ impl INode for LockedExt2INode {
 
         let new_inode = self.mk_inode(FileType::Symlink)?;
 
-        if let Err(e) = new_inode.write_at(0, target.as_bytes()) {
+        if let Err(e) = new_inode.write_at(0, target.as_bytes(), OpenFlags::empty()) {
             self.ext2_fs().free_inode(&new_inode.as_ext2_inode());
 
             return Err(e);

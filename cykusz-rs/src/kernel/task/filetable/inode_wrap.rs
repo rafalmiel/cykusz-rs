@@ -102,9 +102,9 @@ impl INode for INodeOpsWrap {
     impl_delegate!(mkdir, vfs::Result<INodeItem>, name: &str);
     impl_delegate!(rmdir, vfs::Result<()>, name: &str);
     impl_delegate!(unlink, vfs::Result<()>, name: &str);
-    impl_delegate!(read_at, vfs::Result<usize>, offset: usize, buf: &mut [u8]);
-    impl_delegate!(read_all, Vec<u8>);
-    impl_delegate!(write_at, vfs::Result<usize>, offset: usize, buf: &[u8]);
+    impl_delegate!(read_at, vfs::Result<usize>, offset: usize, buf: &mut [u8], flags: OpenFlags);
+    impl_delegate!(read_all, vfs::Result<Vec<u8>>);
+    impl_delegate!(write_at, vfs::Result<usize>, offset: usize, buf: &[u8], flags: OpenFlags);
     impl_delegate!(poll, vfs::Result<PollEventFlags>, poll_table: Option<&mut PollTable>, flags: PollEventFlags);
     impl_delegate!(fs, Option<Weak<dyn Filesystem>>);
     impl_delegate!(create, vfs::Result<DirEntryItem>, parent: DirEntryItem,name: &str, ftype: FileType);

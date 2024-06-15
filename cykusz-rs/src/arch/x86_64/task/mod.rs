@@ -122,9 +122,11 @@ fn prepare_tls(vm: &VM, p_table: &mut P4Table, tls: &TlsVmInfo) -> VirtAddr {
             let rem = tls.file_size - offset;
             let to_read = core::cmp::min(PAGE_SIZE, rem);
 
-            if let Ok(r) = tls.file.inode().read_at(tls.file_offset + offset, unsafe {
-                frame.address_mapped().as_bytes_mut(to_read)
-            }, OpenFlags::empty()) {
+            if let Ok(r) = tls.file.inode().read_at(
+                tls.file_offset + offset,
+                unsafe { frame.address_mapped().as_bytes_mut(to_read) },
+                OpenFlags::empty(),
+            ) {
                 if r != to_read {
                     panic!("Failed to read tls data");
                 }

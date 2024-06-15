@@ -357,18 +357,32 @@ impl INode for Socket {
         Ok(stat)
     }
 
-    fn read_at(&self, _offset: usize, buf: &mut [u8], flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
-        Ok(self.buffer.read_data_flags(buf, WaitQueueFlags::from(flags))?)
+    fn read_at(
+        &self,
+        _offset: usize,
+        buf: &mut [u8],
+        flags: OpenFlags,
+    ) -> crate::kernel::fs::vfs::Result<usize> {
+        Ok(self
+            .buffer
+            .read_data_flags(buf, WaitQueueFlags::from(flags))?)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8], flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
+    fn write_at(
+        &self,
+        _offset: usize,
+        buf: &[u8],
+        flags: OpenFlags,
+    ) -> crate::kernel::fs::vfs::Result<usize> {
         let target = if let SocketState::Connected(target) = &*self.data.lock() {
             target.clone()
         } else {
             return Err(FsError::NotSupported);
         };
 
-        Ok(target.buffer.append_data_flags(buf, WaitQueueFlags::from(flags))?)
+        Ok(target
+            .buffer
+            .append_data_flags(buf, WaitQueueFlags::from(flags))?)
     }
 
     fn poll(

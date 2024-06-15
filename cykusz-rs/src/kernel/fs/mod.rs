@@ -165,7 +165,11 @@ pub fn read_link(inode: &Arc<dyn INode>) -> Result<String> {
     let mut offset = 0;
 
     loop {
-        offset += inode.read_at(offset, &mut path.as_mut_slice()[offset..], OpenFlags::empty())?;
+        offset += inode.read_at(
+            offset,
+            &mut path.as_mut_slice()[offset..],
+            OpenFlags::empty(),
+        )?;
 
         if offset == path.len() {
             path.resize(offset + 128, 0);

@@ -2,6 +2,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
+use syscall_defs::net::{MsgFlags, MsgHdr};
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{
     FDFlags, FileType, OpenFlags, SeekWhence, SysDirEntry, SyscallError, SyscallResult,
@@ -92,6 +93,22 @@ impl FileHandle {
             }
             None => inode.write_at(offset, buf, self.flags())?,
         })
+    }
+
+    pub fn msg_recv(&self, hdr: &mut MsgHdr, flags: MsgFlags) -> SyscallResult {
+        let sock = self.get_inode().as_socket().ok_or(SyscallError::EINVAL)?;
+
+        sock.msg_recv(hdr, flags | MsgFlags::from(self.flags()))
+            .map_err(|e| match e {
+                SyscallError::EAGAIN => SyscallError::ENOMSG,
+                e => e,
+            })
+    }
+
+    pub fn msg_send(&self, hdr: &MsgHdr, flags: MsgFlags) -> SyscallResult {
+        let sock = self.get_inode().as_socket().ok_or(SyscallError::EINVAL)?;
+
+        sock.msg_send(hdr, flags | MsgFlags::from(self.flags()))
     }
 
     pub fn seek(&self, off: isize, whence: syscall_defs::SeekWhence) -> Result<usize> {

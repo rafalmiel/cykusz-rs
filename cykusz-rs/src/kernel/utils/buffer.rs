@@ -1,6 +1,6 @@
+use crate::kernel::fs::vfs;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicBool, Ordering};
-use crate::kernel::fs::vfs;
 
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::signal::SignalResult;
@@ -155,7 +155,11 @@ impl BufferQueue {
         written
     }
 
-    pub fn append_data_flags(&self, data: &[u8], flags: WaitQueueFlags) -> crate::kernel::fs::vfs::Result<usize> {
+    pub fn append_data_flags(
+        &self,
+        data: &[u8],
+        flags: WaitQueueFlags,
+    ) -> crate::kernel::fs::vfs::Result<usize> {
         if data.is_empty() {
             return Ok(0);
         }
@@ -184,7 +188,6 @@ impl BufferQueue {
         self.reader_queue.notify_one();
 
         Ok(written)
-
     }
 
     pub fn append_data(&self, data: &[u8]) -> crate::kernel::fs::vfs::Result<usize> {

@@ -876,7 +876,11 @@ pub fn sys_msg_recv(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
 
     let hdr = unsafe { VirtAddr(hdr as usize).read_mut::<MsgHdr>() };
 
-    let sock = get_socket(sockfd as usize)?;
+    let task = current_task_ref();
+
+    let sock = task
+        .get_handle(sockfd as usize)
+        .ok_or(SyscallError::EBADFD)?;
 
     logln5!("msg_recv got socket!");
 
@@ -897,7 +901,11 @@ pub fn sys_msg_send(sockfd: u64, hdr: u64, flags: u64) -> SyscallResult {
         hdr.msg_name.addr()
     );
 
-    let sock = get_socket(sockfd as usize)?;
+    let task = current_task_ref();
+
+    let sock = task
+        .get_handle(sockfd as usize)
+        .ok_or(SyscallError::EBADFD)?;
 
     logln!("sys_msg_send got socket!");
 

@@ -960,7 +960,9 @@ impl INode for Socket {
 
                 //println!("[ TCP ] Proxy Buffer avail: {}", data.proxy_buffer.available_size());
 
-                while data.proxy_buffer.available_size() < buf.len() && !flags.contains(OpenFlags::NONBLOCK) {
+                while data.proxy_buffer.available_size() < buf.len()
+                    && !flags.contains(OpenFlags::NONBLOCK)
+                {
                     if let Err(e) = WaitQueue::wait_lock(data) {
                         data = self.data.lock();
 

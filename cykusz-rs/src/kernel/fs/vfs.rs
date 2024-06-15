@@ -18,7 +18,7 @@ pub enum FsError {
     IsPipe,
     Interrupted,
     NoSuchDevice,
-    WouldBlock
+    WouldBlock,
 }
 
 impl From<FsError> for syscall_defs::SyscallError {

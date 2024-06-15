@@ -144,9 +144,11 @@ impl Tty {
         }
         let mut buffer = self
             .wait_queue
-            .wait_lock_for(WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::from(flags), &self.buffer, |lck| {
-                lck.has_data()
-            })?
+            .wait_lock_for(
+                WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::from(flags),
+                &self.buffer,
+                |lck| lck.has_data(),
+            )?
             .ok_or(FsError::WouldBlock)?;
 
         Ok(buffer.read(buf, len))

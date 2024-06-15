@@ -273,7 +273,12 @@ impl From<MsgFlags> for OpenFlags {
 
 impl OpenFlags {
     pub fn set_fd_flags_mask() -> usize {
-        (OpenFlags::APPEND | OpenFlags::ASYNC | OpenFlags::DIRECT | OpenFlags::NOATIME | OpenFlags::NONBLOCK).bits()
+        (OpenFlags::APPEND
+            | OpenFlags::ASYNC
+            | OpenFlags::DIRECT
+            | OpenFlags::NOATIME
+            | OpenFlags::NONBLOCK)
+            .bits()
     }
 
     pub fn is_open_mode(&self, open_mode: OpenFlags) -> bool {

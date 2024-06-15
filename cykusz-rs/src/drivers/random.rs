@@ -39,7 +39,12 @@ impl Random {
 }
 
 impl INode for Random {
-    fn read_at(&self, _offset: usize, buf: &mut [u8], _flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
+    fn read_at(
+        &self,
+        _offset: usize,
+        buf: &mut [u8],
+        _flags: OpenFlags,
+    ) -> crate::kernel::fs::vfs::Result<usize> {
         self.rng.lock().fill_bytes(buf);
 
         Ok(buf.len())

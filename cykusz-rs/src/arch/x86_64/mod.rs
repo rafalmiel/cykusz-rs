@@ -63,6 +63,8 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
         crate::kernel::params::init(mo.command_line());
     }
 
+    output::debug::init();
+
     acpi::init();
 
     dev::init();

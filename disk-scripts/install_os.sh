@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -x
+
 losetup -D
 losetup -P /dev/loop0 disk.img
 
@@ -10,6 +12,8 @@ cp -f build/isofiles/boot/kernel.bin mnt/
 cp -f build/isofiles/boot/grub/grub.cfg mnt/grub/
 
 sed -i "s/{ROOT_UUID}/$(blkid -s UUID -o value /dev/loop0p2)/g" mnt/grub/grub.cfg
+sed -i "s/{LOGS}/$CYKUSZ_LOGS/g" mnt/grub/grub.cfg
+
 
 umount mnt
 

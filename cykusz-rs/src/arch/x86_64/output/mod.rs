@@ -1,3 +1,14 @@
+#[cfg(feature = "logs")]
+#[macro_use]
+pub mod debug;
+
+#[cfg(not(feature = "logs"))]
+#[macro_use]
+pub mod debug_disabled;
+
+#[cfg(not(feature = "logs"))]
+pub use debug_disabled as debug;
+
 use core::fmt::Error;
 
 use bit_field::BitField;

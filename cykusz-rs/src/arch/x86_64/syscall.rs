@@ -1,4 +1,4 @@
-use syscall_defs::{SyscallError, SyscallInto, SyscallResult};
+use syscall_defs::{SYSCALL_STRING, SyscallError, SyscallInto, SyscallResult};
 
 use crate::arch::idt::RegsFrame;
 use crate::arch::signal::arch_sys_check_signals;
@@ -50,13 +50,13 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
         }
     } else {
         //logln!("syscall {:?} {:?}", regs, sys_frame);
-        logln!("syscall {}, ret: 0x{:x}", regs.rax, sys_frame.rip);
+        dbgln!(syscall, "syscall {} {}, ret: 0x{:x}", regs.rax, SYSCALL_STRING[regs.rax as usize], sys_frame.rip);
 
         let res = crate::kernel::syscall::syscall_handler(
             regs.rax, regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9,
         );
 
-        logln!("done syscall {} = {:?}", regs.rax, res);
+        dbgln!(syscall, "done syscall {} = {:?}", regs.rax, res);
 
         crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs);
     }

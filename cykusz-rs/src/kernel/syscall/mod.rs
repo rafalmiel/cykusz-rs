@@ -103,14 +103,10 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_UTIME => sys::sys_utime(a, b, c, d, e),
         SYS_MKNODE => sys::sys_mknode(a, b, c, d, e),
         a => {
-            logln!("NO SYS????? {}", a);
+            dbgln!(syscall, "NO SYS????? {}", a);
             Err(SyscallError::ENOSYS)
         }
     };
-
-    if res.is_err() {
-        logln!("syscall {} result = {:?}", num, res);
-    }
 
     res
 }

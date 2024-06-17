@@ -80,7 +80,7 @@ $(iso): $(kernel) $(grub_cfg) $(rust_shell)
 
 $(disk): $(kernel) cargo_user $(cross_cpp)
 	#echo fake install_os
-	sudo disk-scripts/install_os.sh
+	sudo CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh
 
 $(vdi): $(disk)
 	disk-scripts/make_vdi.sh
@@ -94,9 +94,17 @@ usb: $(kernel)
 
 cargo_kernel:
 ifdef dev
-	cd cykusz-rs && cargo build  --verbose && cd ../
+ifdef logs
+	cd cykusz-rs && cargo build --verbose -F logs && cd ../
+else
+	cd cykusz-rs && cargo build --verbose && cd ../
+endif
+else
+ifdef logs
+	cd cykusz-rs && cargo build --release --verbose -F logs && cd ../
 else
 	cd cykusz-rs && cargo build --release --verbose && cd ../
+endif
 endif
 
 cargo_user:

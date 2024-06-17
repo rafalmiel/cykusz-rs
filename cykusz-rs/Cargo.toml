@@ -7,6 +7,10 @@ version = "0.1.0"
 [lib]
 crate-type = ["staticlib"]
 
+[features]
+logs = []
+default = []
+
 [dependencies]
 bitflags = "1.*"
 raw-cpuid = "*"

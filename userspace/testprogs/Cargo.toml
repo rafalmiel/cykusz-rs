@@ -1,0 +1,16 @@
+[package]
+name = "testprogs"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "forktest"
+test = false
+bench = false
+path = "src/forktest/bin/main.rs"
+
+[dependencies.syscall-defs]
+path = "../../syscall-defs"
+
+[dependencies.syscall-user]
+path = "../syscall-user"

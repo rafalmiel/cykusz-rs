@@ -13,8 +13,8 @@ sed -i "s/{ROOT_UUID}/$(blkid -s UUID -o value /dev/loop0p2)/g" mnt/grub/grub.cf
 
 umount mnt
 
-PROGS="test testcpp hello stack nyancat ttytest fork forktest poweroff stat fbdoom doom1.wad open_sleep"
-RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client"
+PROGS="test testcpp hello stack nyancat ttytest fork poweroff stat fbdoom doom1.wad open_sleep"
+RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client forktest"
 
 mount /dev/loop0p2 mnt
 mkdir -p mnt/bin

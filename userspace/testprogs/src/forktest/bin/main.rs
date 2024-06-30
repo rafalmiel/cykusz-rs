@@ -9,8 +9,12 @@ fn main() {
             println!("test_var after change: {}", test_var);
         } else {
             let mut status = 0;
-            let estatus = syscall_user::waitpid(new_pid as isize, &mut status, WaitPidFlags::EXITED);
-            println!("child completed {:?} status: {:?}, test_var {}", estatus, status, test_var);
+            let estatus =
+                syscall_user::waitpid(new_pid as isize, &mut status, WaitPidFlags::EXITED);
+            println!(
+                "child completed {:?} status: {:?}, test_var {}",
+                estatus, status, test_var
+            );
         }
     }
 }

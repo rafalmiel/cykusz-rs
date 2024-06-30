@@ -5,9 +5,9 @@ use bit_field::BitField;
 
 use crate::arch::idt::{add_shared_irq_handler, InterruptFn, SharedInterruptFn};
 use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
-use crate::arch::mm::{PhysAddr, VirtAddr};
 use crate::kernel::mm::map_to_flags;
 use crate::kernel::mm::virt::PageFlags;
+use crate::kernel::mm::{PhysAddr, VirtAddr};
 use crate::kernel::sync::{LockApi, Spin};
 
 mod epci;
@@ -100,7 +100,7 @@ impl PciHeader {
         }
     }
 
-    fn try_hdr0(&self) -> Option<&PciHeader0> {
+    pub fn try_hdr0(&self) -> Option<&PciHeader0> {
         if let PciHeader::Type0(hdr) = self {
             Some(hdr)
         } else {
@@ -669,6 +669,7 @@ impl Pci {
     fn check_devices(&mut self, pci_data: &PciHeader) {
         let vendor_id = pci_data.hdr().vendor_id();
         let dev_id = pci_data.hdr().device_id();
+        dbgln!(pci, "vendor: {:#X}, dev_id: {:#X}", vendor_id, dev_id);
 
         for dev in &mut self.devices {
             if dev.handle.handles(vendor_id as u64, dev_id as u64) {
@@ -676,6 +677,7 @@ impl Pci {
 
                 dev.data = *pci_data;
 
+                dbgln!(pci, "start");
                 dev.handle.start(&dev.data);
             }
         }

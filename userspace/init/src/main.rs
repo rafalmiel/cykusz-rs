@@ -14,7 +14,7 @@ fn spawn_shell() -> usize {
                 syscall_defs::ioctl::tty::TIOCSPGRP,
                 core::ptr::addr_of!(pid) as usize,
             )
-                .expect("Failed to attach tty");
+            .expect("Failed to attach tty");
 
             if let Err(e) = syscall::exec(
                 "/usr/bin/sh",

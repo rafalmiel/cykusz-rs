@@ -1,11 +1,11 @@
-use core::sync::atomic::AtomicU64;
-use core::sync::atomic::Ordering;
-
+use crate::arch::mm::phys::buddy;
 use crate::drivers::multiboot2;
 use crate::drivers::multiboot2::memory::MemoryIter;
 use crate::kernel::mm::{Frame, PAGE_SIZE};
 use crate::kernel::mm::{MappedAddr, PhysAddr};
 use crate::kernel::sync::{LockApi, Spin};
+use core::sync::atomic::AtomicU64;
+use core::sync::atomic::Ordering;
 
 use super::buddy::BuddyAlloc;
 use super::iter::RangeMemIterator;
@@ -25,6 +25,24 @@ pub fn allocate_order(order: usize) -> Option<Frame> {
         Some(Frame::new(addr))
     } else {
         None
+    }
+}
+
+pub fn order_for_size(size: usize) -> Option<usize> {
+    let max_order = buddy::BUDDY_COUNT;
+
+    let mut order = 0;
+    let mut current_size = PAGE_SIZE;
+
+    while order < max_order && size > current_size {
+        current_size <<= 1;
+        order += 1;
+    }
+
+    if order >= max_order {
+        None
+    } else {
+        Some(order)
     }
 }
 

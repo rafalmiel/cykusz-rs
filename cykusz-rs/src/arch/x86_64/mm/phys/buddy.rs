@@ -6,7 +6,7 @@ use super::bump;
 
 type BMType = u64;
 const BMTYPE_BITS: usize = core::mem::size_of::<BMType>() * 8;
-const BUDDY_COUNT: usize = 7;
+pub const BUDDY_COUNT: usize = 7;
 
 pub struct BuddyAlloc {
     start: PhysAddr,

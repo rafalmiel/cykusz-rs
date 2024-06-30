@@ -318,7 +318,7 @@ impl<'a> Iterator for OptionsIter<'a> {
 }
 
 pub fn send_discovery() {
-    logln!("DHCP: send_discovery");
+    dbgln!(net, "DHCP: send_discovery");
     let total_len = core::mem::size_of::<DhcpHeader>();
 
     let mut packet = crate::kernel::net::udp::create_packet(
@@ -348,13 +348,13 @@ pub fn send_discovery() {
         .set_parameter_request_list()
         .finish();
 
-    logln!("[ DHCP ] Sending DHCP Discovery");
+    dbgln!(net, "[ DHCP ] Sending DHCP Discovery");
 
     crate::kernel::net::udp::send_packet(packet.downgrade());
 }
 
 fn process_offer(requested_ip: Ip4) {
-    logln!("DHCP: process_offer");
+    dbgln!(net, "DHCP: process_offer");
 
     let total_len = core::mem::size_of::<DhcpHeader>();
 
@@ -390,7 +390,7 @@ fn process_offer(requested_ip: Ip4) {
 }
 
 fn process_ack(packet: Packet<Dhcp>) {
-    logln!("DHCP: process_ack");
+    dbgln!(net, "DHCP: process_ack");
 
     let header = packet.header();
 
@@ -404,16 +404,16 @@ fn process_ack(packet: Packet<Dhcp>) {
 
         drv.configure(my_ip, dg, sb, dns);
 
-        logln4!("[ DHCP ] Interface configured:");
-        logln4!("[ DHCP ] IP:              {:?}", my_ip);
-        logln4!("[ DHCP ] Default Gateway: {:?}", dg);
-        logln4!("[ DHCP ] Subnet:          {:?}", sb);
-        logln4!("[ DHCP ] DNS:             {:?}", dns);
+        dbgln!(net, "[ DHCP ] Interface configured:");
+        dbgln!(net, "[ DHCP ] IP:              {:?}", my_ip);
+        dbgln!(net, "[ DHCP ] Default Gateway: {:?}", dg);
+        dbgln!(net, "[ DHCP ] Subnet:          {:?}", sb);
+        dbgln!(net, "[ DHCP ] DNS:             {:?}", dns);
     }
 }
 
 pub fn process_packet(packet: Packet<Dhcp>) {
-    logln!("DHCP: process packet");
+    dbgln!(net, "DHCP: process packet");
     let header = packet.header();
 
     if let Some(mtype) = header.opt_message_type() {
@@ -456,5 +456,6 @@ impl NetSocketService for DhcpService {
 pub fn init() {
     crate::kernel::net::udp::register_handler(Arc::new(DhcpService {}));
 
+    dbgln!(net, "DHCP: send discovery");
     send_discovery();
 }

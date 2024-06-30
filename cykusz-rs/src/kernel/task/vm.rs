@@ -332,15 +332,15 @@ impl Mapping {
 
         if !reason.contains(PageFaultReason::PRESENT) {
             // Page not present so just make it available
-            logln_disabled!("map: private read");
+            dbgln!(vm, "private read");
             map_flags(addr_aligned, PageFlags::USER | self.prot.into());
 
             true
         } else if reason.contains(PageFaultReason::WRITE) {
-            logln_disabled!("map: handle cow anon");
+            dbgln!(vm, "handle cow anon");
             return self.handle_cow(addr_aligned, false, PAGE_SIZE);
         } else {
-            logln_disabled!("map: present read fail");
+            dbgln!(vm, "present read fail");
             false
         }
     }
@@ -355,7 +355,8 @@ impl Mapping {
             let bytes = core::cmp::min(PAGE_SIZE, f.len - addr_offset);
 
             if current_task_ref().locks() > 0 {
-                logln!(
+                dbgln!(
+                    vm,
                     "handle_pf_private_file: locks > 0 f: {}",
                     f.file.get_fs_dir_item().full_path()
                 );
@@ -372,14 +373,14 @@ impl Mapping {
                         // Page is not present and we are reading from it, so map it readable
                         f.active_mappings.insert(addr_aligned, p.clone());
 
-                        logln_disabled!("map read {}", addr_aligned);
+                        dbgln!(vm, "map read {}", addr_aligned);
 
                         let mut flags: PageFlags = PageFlags::USER | self.prot.into();
                         flags.remove(PageFlags::WRITABLE);
 
                         map_to_flags(addr_aligned, p.page(), flags);
                     } else {
-                        logln_disabled!("map read copy {} {}", addr_aligned, bytes);
+                        dbgln!(vm, "map read copy {} {}", addr_aligned, bytes);
 
                         Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
 
@@ -391,7 +392,7 @@ impl Mapping {
                     // We are writing to private file mapping so copy the content of the page.
                     // Changes made to private mapping should not be persistent
 
-                    logln_disabled!("map copy {} {}", addr_aligned, bytes);
+                    dbgln!(vm, "map copy {} {}", addr_aligned, bytes);
 
                     Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
 
@@ -399,7 +400,7 @@ impl Mapping {
                 } else if reason.contains(PageFaultReason::PRESENT)
                     && reason.contains(PageFaultReason::WRITE)
                 {
-                    logln_disabled!("map: handle cow priv file");
+                    dbgln!(vm, "map: handle cow priv file");
 
                     return if self.handle_cow(addr_aligned, true, PAGE_SIZE) {
                         self.mmaped_file
@@ -479,10 +480,14 @@ impl Mapping {
                         // We want to write so make the page writable and send notify
                         map_to_flags(addr_aligned, p.page(), flags);
 
+                        dbgln!(vm, "map writable");
+
                         p.notify_dirty(&p, Some(addr_aligned.into()));
                     } else {
                         // Page is not present and we are reading, so map it readable
                         flags.remove(PageFlags::WRITABLE);
+
+                        dbgln!(vm, "map readonly");
 
                         map_to_flags(addr_aligned, p.page(), flags);
                     }
@@ -490,6 +495,7 @@ impl Mapping {
                     true
                 }
                 Some(MMapPageStruct(MMapPage::Direct(p))) => {
+                    dbgln!(vm, "map direct");
                     map_to_flags(addr_aligned, p.page(), flags | p.flags());
                     true
                 }
@@ -953,7 +959,8 @@ impl VMData {
             let is_private = map.flags.contains(MMapFlags::MAP_PRIVATE);
             let is_anonymous = map.flags.contains(MMapFlags::MAP_ANONYOMUS);
 
-            logln_disabled!(
+            dbgln!(
+                vm,
                 "page fault {} p {} a {} {:?} pid {}",
                 addr.align_down(PAGE_SIZE),
                 is_private,

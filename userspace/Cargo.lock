@@ -54,6 +54,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "playwav"
+version = "0.1.0"
+dependencies = [
+ "syscall-defs",
+ "syscall-user",
+]
+
+[[package]]
 name = "shell"
 version = "0.1.0"
 dependencies = [

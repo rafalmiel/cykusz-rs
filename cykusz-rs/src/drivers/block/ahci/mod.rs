@@ -41,6 +41,7 @@ impl PciDeviceHandle for Ahci {
     }
 
     fn start(&self, pci_data: &PciHeader) -> bool {
+        dbgln!(ahci, "Found AHCI");
         device().dev.lock_irq().start(pci_data)
     }
 }

@@ -15,6 +15,7 @@ pub use self::alloc::allocate_order;
 pub use self::alloc::deallocate;
 pub use self::alloc::deallocate_order;
 pub use self::alloc::free_mem;
+pub use self::alloc::order_for_size;
 pub use self::alloc::used_mem;
 
 mod alloc;

@@ -210,7 +210,7 @@ impl E1000Data {
     }
 
     pub fn wait_link_up(&self) {
-        println!("[ E1000 ] Waiting for link up...");
+        dbgln!(net, "[ E1000 ] Waiting for link up...");
         while self.addr.read(Regs::Status) & 2 != 2 {}
     }
 
@@ -272,7 +272,7 @@ impl E1000Data {
             panic!("EEPROM Does not exists");
         }
 
-        return (tmp >> 16) & 0xffff;
+        (tmp >> 16) & 0xffff
     }
 
     pub fn init_mac(&mut self) {

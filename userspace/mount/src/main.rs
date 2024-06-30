@@ -15,11 +15,7 @@ fn main() -> Result<(), ExitCode> {
 
     println!("mounting {source} to {dest}");
 
-    syscall_user::mount(
-        source.as_str(), dest.as_str(), "ext2"
-    ).map_err(|_e| {
-        ExitCode::from(1)
-    })?;
+    syscall_user::mount(source.as_str(), dest.as_str(), "ext2").map_err(|_e| ExitCode::from(1))?;
 
     return Ok(());
 }

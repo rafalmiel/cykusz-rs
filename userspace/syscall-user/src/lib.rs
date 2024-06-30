@@ -274,7 +274,14 @@ pub fn unlink(path: &str) -> SyscallResult {
 
 pub fn mknod(path: &str, typ: syscall_defs::stat::Mode) -> SyscallResult {
     unsafe {
-        syscall5(SYS_MKNODE, OpenFD::Cwd.into(), path.as_ptr() as usize, path.len(), typ.bits() as usize, 0usize)
+        syscall5(
+            SYS_MKNODE,
+            OpenFD::Cwd.into(),
+            path.as_ptr() as usize,
+            path.len(),
+            typ.bits() as usize,
+            0usize,
+        )
     }
 }
 
@@ -364,9 +371,7 @@ pub fn select(
 }
 
 pub fn poll(fds: &mut [poll::PollFd], timeout: i32) -> SyscallResult {
-    unsafe {
-        syscall3(SYS_POLL, fds.as_ptr() as usize, fds.len(), timeout as usize)
-    }
+    unsafe { syscall3(SYS_POLL, fds.as_ptr() as usize, fds.len(), timeout as usize) }
 }
 
 pub fn getdents(fd: usize, buf: &mut [u8]) -> SyscallResult {

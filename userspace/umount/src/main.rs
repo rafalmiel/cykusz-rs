@@ -14,11 +14,7 @@ fn main() -> Result<(), ExitCode> {
 
     println!("unmounting {dest}");
 
-    syscall_user::umount(
-        dest.as_str()
-    ).map_err(|_e| {
-        ExitCode::from(1)
-    })?;
+    syscall_user::umount(dest.as_str()).map_err(|_e| ExitCode::from(1))?;
 
     return Ok(());
 }

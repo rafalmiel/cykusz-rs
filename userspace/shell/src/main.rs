@@ -482,7 +482,6 @@ fn exec(cmd: &str) {
         } else {
             println!("Expected path");
         }
-
     } else if cmd == "fork" {
         let tty = Tty::new();
         tty.detach();
@@ -844,9 +843,7 @@ fn main_old() -> ! {
         print!("[root {}]# ", make_str(&pwd[0..pwd_r]));
 
         // Read some data from stdin
-        let r = syscall::read(1, &mut unsafe {
-            *addr_of_mut!(buf)
-        }).unwrap();
+        let r = syscall::read(1, &mut unsafe { *addr_of_mut!(buf) }).unwrap();
 
         {
             // Write data from stdin into the file

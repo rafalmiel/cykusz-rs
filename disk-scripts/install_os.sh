@@ -32,7 +32,7 @@ fi
 sudo umount mnt
 
 PROGS="test testcpp hello stack nyancat ttytest fork poweroff stat fbdoom doom1.wad open_sleep"
-RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client forktest mprotecttest"
+RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client forktest mprotecttest, playwav"
 
 sudo mount /dev/loop0p2 mnt
 sudo chown -R $USER:$USER mnt
@@ -45,6 +45,8 @@ done
 for prog in $RUST_PROGS; do
     cp -f userspace/target/x86_64-unknown-cykusz/$RUST_PROG_MODE/$prog mnt/bin/$prog
 done
+
+cp sysroot/assets/imperial.wav mnt/
 
 rsync -a sysroot/cykusz/usr mnt/
 rsync -a sysroot/cykusz/etc mnt/

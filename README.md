@@ -27,6 +27,7 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 - [x] PS/2: Keyboard / Mouse
 - [x] Storage: IDE / AHCI
 - [x] Networking: e1000
+- [x] Sound: Intel HDA
 
 ## Userspace
 - [x] libc (mlibc port)

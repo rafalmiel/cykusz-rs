@@ -32,12 +32,12 @@ pub fn read_all<const BYTES: usize, T: Read + AsRawFd>(s: &mut T) -> std::io::Re
     }
 }
 
-pub fn read_all_to_string<const BYTES: usize, T: Read + AsRawFd>(s: &mut T) -> std::io::Result<String> {
+pub fn read_all_to_string<const BYTES: usize, T: Read + AsRawFd>(
+    s: &mut T,
+) -> std::io::Result<String> {
     let mut str = String::new();
     let bytes = read_all::<BYTES, T>(s)?;
-    str.push_str(unsafe {
-        std::str::from_utf8_unchecked(bytes.as_slice())
-    });
+    str.push_str(unsafe { std::str::from_utf8_unchecked(bytes.as_slice()) });
 
     Ok(str)
 }

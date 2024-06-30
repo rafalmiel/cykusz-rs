@@ -129,6 +129,7 @@ impl PciDeviceHandle for E1000 {
         data.init_tx();
         data.init_rx();
 
+        dbgln!(net, "Register e1000 net driver {:?}", data.get_mac());
         crate::kernel::net::register_net_driver(device().clone());
 
         true

@@ -1,4 +1,5 @@
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct PollEventFlags: u16 {
         const READ          = 1 << 0;
         const WRITE         = 1 << 1;

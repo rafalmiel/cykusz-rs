@@ -5,4 +5,4 @@ authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-bitflags = "1.*"
+bitflags = "*"

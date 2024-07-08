@@ -5,6 +5,7 @@ use crate::drivers::block::ahci::reg::HbaCmdHeader;
 use crate::kernel::mm::PhysAddr;
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaPortISReg: u32 {
         const DHRS = 1 << 0; // Device to Host Register FIS Interrupt
         const PSS = 1 << 1; // PIO Setup FIS Interrupt
@@ -27,6 +28,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaPortIEReg: u32 {
         const DHRE = 1 << 0; // Device to Host Register FIS Interrupt
         const PSE = 1 << 1; // PIO Setup FIS Interrupt
@@ -49,6 +51,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaPortCmdReg: u32 {
         const ST = 1 << 0; // Start
         const SUD = 1 << 1; // Spin-Up Device
@@ -100,7 +103,7 @@ impl HbaPortCmdReg {
     }
 
     pub fn set_interface_communication_control(&mut self, v: HbaPortCmdRegIcc) {
-        self.bits.set_bits(28..=31, v as u32);
+        *self = HbaPortCmdReg::from_bits_retain(*self.bits().set_bits(28..=31, 0).set_bits(28..=31, v as u32));
     }
 }
 
@@ -109,6 +112,7 @@ impl HbaPortCmdReg {
 pub struct HbaPortTfdReg(pub u32);
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaPortTfdRegStatus: u8 {
         const BSY = 1 << 7;
         const DRQ = 1 << 3;
@@ -234,6 +238,7 @@ impl HbaPortSstsReg {
 pub struct HbaPortSctlReg(u32);
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaPortSctlRegIpm: u32 {
         const NO_PARTIAL = 1;
         const NO_SLUMBER = 2;
@@ -302,6 +307,7 @@ impl HbaPortSctlReg {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaPortSerrErr: u16 {
         const I = 1 << 0;  // Recovered Data Integrity Error
         const M = 1 << 1;  // Recovered Communications Error
@@ -313,6 +319,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaPortSerrDiag: u16 {
         const N = 1 << 0;  // PhyRdy Change
         const I = 1 << 1;  // Phy Internal Error

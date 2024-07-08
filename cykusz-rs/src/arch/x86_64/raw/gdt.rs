@@ -1,6 +1,7 @@
 use crate::arch::raw::descriptor as dsc;
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct GdtFlags: u8 {
         const MISSING = 0;
 
@@ -12,7 +13,7 @@ bitflags! {
 
 impl GdtFlags {
     pub const fn cbits(&self) -> u8 {
-        return self.bits;
+        self.bits()
     }
 }
 

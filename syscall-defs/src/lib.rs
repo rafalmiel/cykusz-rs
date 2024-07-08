@@ -314,6 +314,7 @@ impl From<OpenFD> for usize {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct OpenFlags: usize {
         const EXEC = 0o10000000;
         const RDONLY = 0o0;
@@ -413,6 +414,7 @@ pub enum FcntlCmd {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct FDFlags: u64 {
         const FD_CLOEXEC = 1;
     }
@@ -499,6 +501,7 @@ pub struct SysDirEntry {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, Debug, PartialEq)]
     pub struct MMapProt: usize {
         const PROT_READ = 0x1;
         const PROT_WRITE = 0x2;
@@ -508,6 +511,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, Debug, PartialEq)]
     pub struct MMapFlags: usize {
         const MAP_PRIVATE = 0x1;
         const MAP_SHARED = 0x2;
@@ -517,6 +521,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct AtFlags: u64 {
         const EMPTY_PATH = 0x1000;
         const SYMLINK_FOLLOW = 0x400;

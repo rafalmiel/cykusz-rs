@@ -4,6 +4,7 @@ use crate::arch::acpi::rsdt::AcpiStdHeader;
 use crate::kernel::mm::{MappedAddr, PhysAddr};
 
 bitflags! {
+    #[derive(Copy, Clone, PartialEq)]
     pub struct MatdEntryType : u8{
         const PROC_LOCAL_APIC = 0x0;
         const PROC_IO_APIC = 0x1;

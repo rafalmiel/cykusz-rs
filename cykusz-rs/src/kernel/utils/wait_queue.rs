@@ -18,6 +18,7 @@ pub struct WaitQueueGuard<'a> {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct WaitQueueFlags: u64 {
         const IRQ_DISABLE = (1u64 << 0);
         const NON_INTERRUPTIBLE = (1u64 << 1);

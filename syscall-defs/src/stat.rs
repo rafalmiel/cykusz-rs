@@ -1,6 +1,6 @@
 use crate::FileType;
 bitflags! {
-    #[derive(Default)]
+    #[derive(Copy, Clone, Debug, Default, PartialEq)]
     pub struct Mode: u32 {
         const IFBLK = 0x06000;
         const IFCHR = 0x02000;
@@ -37,11 +37,11 @@ bitflags! {
 
 impl Mode {
     pub fn mode_bits_truncate(&self) -> Mode {
-        Mode::from_bits_truncate(self.bits & 0o7777)
+        Mode::from_bits_truncate(self.bits() & 0o7777)
     }
 
     pub fn ftype_bits_truncate(&self) -> Mode {
-        Mode::from_bits_truncate(self.bits & 0x0F000)
+        Mode::from_bits_truncate(self.bits() & 0x0F000)
     }
 }
 

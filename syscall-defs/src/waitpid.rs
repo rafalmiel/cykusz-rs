@@ -1,4 +1,5 @@
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct WaitPidFlags: usize {
         const NOHANG        = 1 << 0;
         const UNTRACED      = 1 << 1;

@@ -933,6 +933,7 @@ impl Default for VM {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct PageFaultReason: usize {
         const PRESENT = 0b1;
         const WRITE = 0b10;

@@ -2,6 +2,7 @@ use crate::drivers::elf::types::ProgramFlags;
 use crate::drivers::multiboot2::tags::elf::ElfSectionFlags;
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct PageFlags: usize {
         const WRITABLE      = 1 << 0;
         const USER          = 1 << 1;

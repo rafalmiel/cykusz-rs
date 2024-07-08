@@ -27,6 +27,7 @@ pub struct IfMap {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct IfrFlags: u16 {
         const IFF_UP = 0x1;
         const IFF_BROADCAST = 0x2;

@@ -4,6 +4,7 @@ use crate::drivers::block::ata::request::DmaBuf;
 use crate::drivers::block::ata::AtaCommand;
 use crate::kernel::mm::allocate_order;
 use crate::kernel::mm::virt::PageFlags;
+use tock_registers::interfaces::Readable;
 
 impl HbaPort {
     pub fn run_command(
@@ -16,14 +17,16 @@ impl HbaPort {
     ) -> bool {
         let hdr = self.cmd_header_at(slot);
 
-        let mut flags = HbaCmdHeaderFlags::empty();
+        let mut flags = hdr.flags.extract();
         if cmd == AtaCommand::AtaCommandWriteDmaExt || cmd == AtaCommand::AtaCommandWriteDma {
-            flags.insert(HbaCmdHeaderFlags::W);
+            flags.modify(HbaCmdHeaderFlags::W::SET);
         } else {
-            flags.remove(HbaCmdHeaderFlags::W);
+            flags.modify(HbaCmdHeaderFlags::W::CLEAR);
         }
         //flags.insert(HbaCmdHeaderFlags::C);
-        flags.set_command_fis_length((core::mem::size_of::<FisRegH2D>() / 4) as u8);
+        flags.modify(
+            HbaCmdHeaderFlags::FIS_LENGTH.val((core::mem::size_of::<FisRegH2D>() / 4) as u16),
+        );
 
         hdr.set_flags(flags);
 
@@ -46,7 +49,7 @@ impl HbaPort {
         let fis = tbl.cfis_as_h2d_mut();
         fis.reset();
 
-        fis.set_fis_type(FisType::RegH2D);
+        fis.set_fis_type(FisType::TYPE::RegH2D);
         fis.set_c(true);
         fis.set_command(cmd);
         fis.set_lba(sector, 1 << 6);
@@ -95,7 +98,7 @@ impl HbaPort {
             cmd_hdr.set_cmd_tbl_base_addr(addr + 256 * i);
         }
 
-        self.set_ie(HbaPortIEReg::DHRE | HbaPortIEReg::INFE);
+        self.set_ie(HbaPortIEReg::DHRE::SET + HbaPortIEReg::INFE::SET);
 
         self.start_cmd();
     }
@@ -106,7 +109,11 @@ impl HbaPort {
         let ipm = sts.interface_power_management();
         let dev = sts.device_detection();
 
-        if let (HbaPortSstsRegDet::PresentAndE, HbaPortSstsRegIpm::Active) = (dev, ipm) {
+        if let (
+            HbaPortSstsRegDef::DEVICE_DETECTION::Value::PresentAndE,
+            HbaPortSstsRegDef::INTERFACE_POWER_MANAGEMENT::Value::Active,
+        ) = (dev, ipm)
+        {
             println!("[ AHCI ] Enabling Ahci port {}", num);
 
             self.start();

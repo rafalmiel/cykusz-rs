@@ -1,7 +1,7 @@
-use core::arch::asm;
-use core::mem;
 use crate::arch::raw::gdt;
 use crate::arch::raw::idt;
+use core::arch::asm;
+use core::mem;
 
 bitflags! {
     #[derive(Copy, Clone, Debug, PartialEq)]

@@ -23,7 +23,7 @@ pub fn loggers() -> Option<&'static HashSet<String>> {
     ENABLED_LOGGERS.get()
 }
 
-#[cfg(feature="logs")]
+#[cfg(feature = "logs")]
 #[macro_export]
 macro_rules! dbg {
     ($log:ident, $($arg:tt)*) => ({

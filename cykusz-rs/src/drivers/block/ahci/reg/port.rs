@@ -1,138 +1,129 @@
-use bit_field::BitField;
-use mmio::VCell;
-
 use crate::drivers::block::ahci::reg::HbaCmdHeader;
+use crate::kernel::block::BlockDev;
 use crate::kernel::mm::PhysAddr;
+use bit_field::BitField;
+use tock_registers::fields::FieldValue;
+use tock_registers::interfaces::{Readable, Writeable};
+use tock_registers::registers::{InMemoryRegister, ReadWrite};
+use tock_registers::{register_bitfields, LocalRegisterCopy, register_structs};
 
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct HbaPortISReg: u32 {
-        const DHRS = 1 << 0; // Device to Host Register FIS Interrupt
-        const PSS = 1 << 1; // PIO Setup FIS Interrupt
-        const DSS = 1 << 2; // DMA Setup FIS Interrupt
-        const SDBS = 1 << 3; // Set Device Bits Interrupt
-        const UFS = 1 << 4; // Unknown FIS Interrupt
-        const DPS = 1 << 5; // Descriptor Processed
-        const PCS = 1 << 6; // Port Connect Change Status
-        const DMPS = 1 << 7; // Device Mechanical Presence Status
-        const PRCS = 1 << 22; // PhyRdy Change Status
-        const IPMS = 1 << 23; // Incorrect Port Multiplier Status
-        const OFS = 1 << 24; // Overflow Status
-        const INFS = 1 << 26; // Interface Not-fatal Error Status
-        const IFS = 1 << 27; // Interface Fatal Error Status
-        const HBDS = 1 << 28; // Host Bus Data Error Status
-        const HBFS = 1 << 29; // Host Bus Fatal Error Status
-        const TFES = 1 << 30; // Task File Error Status
-        const CPDS = 1 << 31; // Cold Port Detect Status
-    }
-}
+register_bitfields! [
+    u32,
 
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct HbaPortIEReg: u32 {
-        const DHRE = 1 << 0; // Device to Host Register FIS Interrupt
-        const PSE = 1 << 1; // PIO Setup FIS Interrupt
-        const DSE = 1 << 2; // DMA Setup FIS Interrupt
-        const SDBE = 1 << 3; // Set Device Bits Interrupt
-        const UFE = 1 << 4; // Unknown FIS Interrupt
-        const DPE = 1 << 5; // Descriptor Processed
-        const PCE = 1 << 6; // Port Connect Change Status
-        const DMPE = 1 << 7; // Device Mechanical Presence Status
-        const PRCE = 1 << 22; // PhyRdy Change Status
-        const IPME = 1 << 23; // Incorrect Port Multiplier Status
-        const OFE= 1 << 24; // Overflow Status
-        const INFE = 1 << 26; // Interface Not-fatal Error Status
-        const IFE = 1 << 27; // Interface Fatal Error Status
-        const HBDE = 1 << 28; // Host Bus Data Error Status
-        const HBFE = 1 << 29; // Host Bus Fatal Error Status
-        const TFEE = 1 << 30; // Task File Error Status
-        const CPDE = 1 << 31; // Cold Port Detect Status
-    }
-}
+    pub HbaPortISReg [
+        DHRS 0, // Device to Host Register FIS Interrupt
+        PSS  1, // PIO Setup FIS Interrupt
+        DSS  2, // DMA Setup FIS Interrupt
+        SDBS 3, // Set Device Bits Interrupt
+        UFS  4, // Unknown FIS Interrupt
+        DPS  5, // Descriptor Processed
+        PCS  6, // Port Connect Change Status
+        DMPS 7, // Device Mechanical Presence Status
+        PRCS 22, // PhyRdy Change Status
+        IPMS 23, // Incorrect Port Multiplier Status
+        OFS  24, // Overflow Status
+        INFS 26, // Interface Not-fatal Error Status
+        IFS  27, // Interface Fatal Error Status
+        HBDS 28, // Host Bus Data Error Status
+        HBFS 29, // Host Bus Fatal Error Status
+        TFES 30, // Task File Error Status
+        CPDS 31, // Cold Port Detect Status
+    ]
+];
 
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct HbaPortCmdReg: u32 {
-        const ST = 1 << 0; // Start
-        const SUD = 1 << 1; // Spin-Up Device
-        const POD = 1 << 2; // Power On Device
-        const CLO = 1 << 3; // Command List Override
-        const FRE = 1 << 4; // FIS Receive Enable
-        const MPSS = 1 << 13; // Mechanical Presence Switch State
-        const FR = 1 << 14; // FIS Receive Running
-        const CR = 1 << 15; // Command List Running
-        const CPS = 1 << 16; // Cold Presence State
-        const PMA = 1 << 17; // Port Multiplier Attached
-        const HPCP = 1 << 18; // Hot Plug Capable Port
-        const MSPC = 1 << 19; // Mechanical Presence Switch Attached to Port
-        const CPD = 1 << 20; // Cold Presence Detection
-        const ESP = 1 << 21; // External SATA Port
-        const FBSCP = 1 << 22; // FIS-based Switching Capable Port
-        const APSTE = 1 << 23; // Automatic Partial to Slumber Transition Enabled
-        const ATAPI = 1 << 24; // Device is ATAPI
-        const DLAE = 1 << 25; // Drive LED on ATAPI Enable
-        const ALPE = 1 << 26; // Aggressive Link Power Management Enable
-        const ASP = 1 << 27; // Aggressive Slumber / Partial
-    }
-}
+register_bitfields! [
+    u32,
 
-#[repr(u32)]
-#[derive(Copy, Clone)]
-pub enum HbaPortCmdRegIcc {
-    Idle = 0,
-    Active = 1,
-    Partial = 2,
-    Slumber = 6,
-    DevSleep = 8,
-}
+    pub HbaPortIEReg [
+        DHRE 0, // Device to Host Register FIS Interrupt
+        PSE  1, // PIO Setup FIS Interrupt
+        DSE  2, // DMA Setup FIS Interrupt
+        SDBE 3, // Set Device Bits Interrupt
+        UFE  4, // Unknown FIS Interrupt
+        DPE  5, // Descriptor Processed
+        PCE  6, // Port Connect Change Status
+        DMPE 7, // Device Mechanical Presence Status
+        PRCE 22, // PhyRdy Change Status
+        IPME 23, // Incorrect Port Multiplier Status
+        OFE  24, // Overflow Status
+        INFE 26, // Interface Not-fatal Error Status
+        IFE  27, // Interface Fatal Error Status
+        HBDE 28, // Host Bus Data Error Status
+        HBFE 29, // Host Bus Fatal Error Status
+        TFEE 30, // Task File Error Status
+        CPDE 31, // Cold Port Detect Status
+    ]
+];
+
+register_bitfields! [
+    u32,
+
+    pub HbaPortCmdRegDef [
+        ST    OFFSET(0) NUMBITS(1) [], // Start
+        SUD   OFFSET(1) NUMBITS(1) [], // Spin-Up Device
+        POD   OFFSET(2) NUMBITS(1) [], // Power On Device
+        CLO   OFFSET(3) NUMBITS(1) [], // Command List Override
+        FRE   OFFSET(4) NUMBITS(1) [], // FIS Receive Enable
+        CURRENT_COMMAND_SLOT OFFSET(8) NUMBITS(5) [],
+        MPSS  OFFSET(13) NUMBITS(1) [], // Mechanical Presence Switch State
+        FR    OFFSET(14) NUMBITS(1) [], // FIS Receive Running
+        CR    OFFSET(15) NUMBITS(1) [], // Command List Running
+        CPS   OFFSET(16) NUMBITS(1) [], // Cold Presence State
+        PMA   OFFSET(17) NUMBITS(1) [], // Port Multiplier Attached
+        HPCP  OFFSET(18) NUMBITS(1) [], // Hot Plug Capable Port
+        MSPC  OFFSET(19) NUMBITS(1) [], // Mechanical Presence Switch Attached to Port
+        CPD   OFFSET(20) NUMBITS(1) [], // Cold Presence Detection
+        ESP   OFFSET(21) NUMBITS(1) [], // External SATA Port
+        FBSCP OFFSET(22) NUMBITS(1) [], // FIS-based Switching Capable Port
+        APSTE OFFSET(23) NUMBITS(1) [], // Automatic Partial to Slumber Transition Enabled
+        ATAPI OFFSET(24) NUMBITS(1) [], // Device is ATAPI
+        DLAE  OFFSET(25) NUMBITS(1) [], // Drive LED on ATAPI Enable
+        ALPE  OFFSET(26) NUMBITS(1) [], // Aggressive Link Power Management Enable
+        ASP   OFFSET(27) NUMBITS(1) [], // Aggressive Slumber / Partial
+        INTERFACE_COMMUNICATION_CONTROL OFFSET(28) NUMBITS(4) [
+            Idle = 0,
+            Active = 1,
+            Partial = 2,
+            Slumber = 6,
+            DevSleep = 8
+        ]
+    ]
+];
+
+pub struct HbaPortCmdReg(LocalRegisterCopy<u32, HbaPortCmdRegDef::Register>);
 
 impl HbaPortCmdReg {
     pub fn current_command_slot(&self) -> usize {
-        self.bits().get_bits(8..=12) as usize
+        self.0.read(HbaPortCmdRegDef::CURRENT_COMMAND_SLOT) as usize
     }
 
-    pub fn interface_communication_control(&self) -> HbaPortCmdRegIcc {
-        match self.bits().get_bits(28..=31) {
-            0 => HbaPortCmdRegIcc::Idle,
-            1 => HbaPortCmdRegIcc::Active,
-            2 => HbaPortCmdRegIcc::Partial,
-            6 => HbaPortCmdRegIcc::Slumber,
-            8 => HbaPortCmdRegIcc::DevSleep,
-            v => panic!("Invalid HbaPortCmdRegIcc {}", v),
-        }
+    pub fn interface_communication_control(
+        &self,
+    ) -> HbaPortCmdRegDef::INTERFACE_COMMUNICATION_CONTROL::Value {
+        self.0
+            .read_as_enum(HbaPortCmdRegDef::INTERFACE_COMMUNICATION_CONTROL)
+            .expect("Invalid interface_communication_control")
     }
 
-    pub fn set_interface_communication_control(&mut self, v: HbaPortCmdRegIcc) {
-        *self = HbaPortCmdReg::from_bits_retain(*self.bits().set_bits(28..=31, 0).set_bits(28..=31, v as u32));
-    }
-}
-
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct HbaPortTfdReg(pub u32);
-
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct HbaPortTfdRegStatus: u8 {
-        const BSY = 1 << 7;
-        const DRQ = 1 << 3;
-        const ERR = 1 << 0;
+    pub fn set_interface_communication_control(
+        &mut self,
+        v: HbaPortCmdRegDef::INTERFACE_COMMUNICATION_CONTROL::Value,
+    ) {
+        self.0
+            .modify(HbaPortCmdRegDef::INTERFACE_COMMUNICATION_CONTROL.val(v as u32))
     }
 }
 
-impl HbaPortTfdReg {
-    pub fn error(&self) -> usize {
-        self.0.get_bits(8..=15) as usize
-    }
+register_bitfields! [
+    u32,
 
-    pub fn status(&self) -> HbaPortTfdRegStatus {
-        HbaPortTfdRegStatus::from_bits_truncate(self.0.get_bits(0..=7) as u8)
-    }
-
-    pub fn status_val(&self) -> u32 {
-        self.0.get_bits(0..=7)
-    }
-}
+    HbaPortTfdReg [
+        ERR OFFSET(0) NUMBITS(1),
+        DRQ OFFSET(3) NUMBITS(1),
+        BSY OFFSET(7) NUMBITS(1),
+        ERROR OFFSET(8) NUMBITS(8),
+    ]
+];
 
 #[derive(Debug)]
 pub enum HbaPortSigRegDev {
@@ -143,359 +134,391 @@ pub enum HbaPortSigRegDev {
     AhciDevSatapi,
 }
 
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct HbaPortSigReg(u32);
+register_bitfields! [
+    u32,
+
+    HbaPortSigRegDef [
+        SECTOR_COUNT OFFSET(0) NUMBITS(8) [],
+        LBA_LOW OFFSET(8) NUMBITS(8) [],
+        LBA_MID OFFSET(16) NUMBITS(8) [],
+        LBA_HIGH OFFSET(24) NUMBITS(8) [],
+        DEV OFFSET(0) NUMBITS(32) [
+            AhciDevSatapi = 0xEB140101,
+            AhciDevSemb = 0xC33C0101,
+            AhciDevPm = 0x96690101,
+        ],
+    ]
+];
+
+pub struct HbaPortSigReg(LocalRegisterCopy<u32, HbaPortSigRegDef::Register>);
 
 impl HbaPortSigReg {
     pub fn sector_count_reg(&self) -> usize {
-        self.0.get_bits(0..=7) as usize
+        self.0.read(HbaPortSigRegDef::SECTOR_COUNT) as usize
     }
 
     pub fn lba_low_reg(&self) -> usize {
-        self.0.get_bits(8..=15) as usize
+        self.0.read(HbaPortSigRegDef::LBA_LOW) as usize
     }
 
     pub fn lba_mid_reg(&self) -> usize {
-        self.0.get_bits(16..=23) as usize
+        self.0.read(HbaPortSigRegDef::LBA_MID) as usize
     }
 
     pub fn lba_high_reg(&self) -> usize {
-        self.0.get_bits(24..=31) as usize
+        self.0.read(HbaPortSigRegDef::LBA_HIGH) as usize
     }
 
     pub fn dev(&self) -> HbaPortSigRegDev {
-        match self.0 {
-            0xEB140101 => HbaPortSigRegDev::AhciDevSatapi,
-            0xC33C0101 => HbaPortSigRegDev::AhciDevSemb,
-            0x96690101 => HbaPortSigRegDev::AhciDevPm,
+        match self.0.read_as_enum(HbaPortSigRegDef::DEV) {
+            Some(HbaPortSigRegDef::DEV::Value::AhciDevSatapi) => HbaPortSigRegDev::AhciDevSemb,
+            Some(HbaPortSigRegDef::DEV::Value::AhciDevSatapi) => HbaPortSigRegDev::AhciDevSatapi,
+            Some(HbaPortSigRegDef::DEV::Value::AhciDevPm) => HbaPortSigRegDev::AhciDevPm,
             _ => HbaPortSigRegDev::AhciDevSata,
         }
     }
 }
 
+register_bitfields! [
+    u32,
+
+    pub HbaPortSstsRegDef [
+        DEVICE_DETECTION OFFSET(0) NUMBITS(4) [
+            None = 0,
+            PresentNotE = 1,
+            PresentAndE = 3,
+            Offline = 4,
+        ],
+        CURRENT_SPEED OFFSET(4) NUMBITS(4) [
+            None = 0,
+            Gen1 = 1,
+            Gen2 = 2,
+            Gen3 = 3,
+        ],
+        INTERFACE_POWER_MANAGEMENT OFFSET(8) NUMBITS(4) [
+            None = 0,
+            Active = 1,
+            Partial = 2,
+            Slumber = 6,
+            DevSleep = 8,
+        ]
+    ]
+];
+
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub struct HbaPortSstsReg(u32);
-
-pub enum HbaPortSstsRegDet {
-    None = 0,
-    PresentNotE = 1,
-    PresentAndE = 3,
-    Offline = 4,
-}
-
-pub enum HbaPortSstsRegSpd {
-    None = 0,
-    Gen1 = 1,
-    Gen2 = 2,
-    Gen3 = 3,
-}
-
-pub enum HbaPortSstsRegIpm {
-    None = 0,
-    Active = 1,
-    Partial = 2,
-    Slumber = 6,
-    DevSleep = 8,
-}
+pub struct HbaPortSstsReg(LocalRegisterCopy<u32, HbaPortSstsRegDef::Register>);
 
 impl HbaPortSstsReg {
-    pub fn device_detection(&self) -> HbaPortSstsRegDet {
-        match self.0.get_bits(0..=3) {
-            0 => HbaPortSstsRegDet::None,
-            1 => HbaPortSstsRegDet::PresentNotE,
-            3 => HbaPortSstsRegDet::PresentAndE,
-            4 => HbaPortSstsRegDet::Offline,
-            v => panic!("Invalid HbaPortSstsRegDet {}", v),
-        }
+    pub fn device_detection(&self) -> HbaPortSstsRegDef::DEVICE_DETECTION::Value {
+        self.0
+            .read_as_enum(HbaPortSstsRegDef::DEVICE_DETECTION)
+            .expect("Invalid Ssts device_detection")
     }
 
-    pub fn current_speed(&self) -> HbaPortSstsRegSpd {
-        match self.0.get_bits(4..=7) {
-            0 => HbaPortSstsRegSpd::None,
-            1 => HbaPortSstsRegSpd::Gen1,
-            2 => HbaPortSstsRegSpd::Gen2,
-            3 => HbaPortSstsRegSpd::Gen3,
-            v => panic!("Invalid HbaPortSstsRegSpd {}", v),
-        }
+    pub fn current_speed(&self) -> HbaPortSstsRegDef::CURRENT_SPEED::Value {
+        self.0
+            .read_as_enum(HbaPortSstsRegDef::CURRENT_SPEED)
+            .expect("Invalid Ssts current_speed")
     }
 
-    pub fn interface_power_management(&self) -> HbaPortSstsRegIpm {
-        match self.0.get_bits(8..=11) {
-            0 => HbaPortSstsRegIpm::None,
-            1 => HbaPortSstsRegIpm::Active,
-            2 => HbaPortSstsRegIpm::Partial,
-            6 => HbaPortSstsRegIpm::Slumber,
-            8 => HbaPortSstsRegIpm::DevSleep,
-            v => panic!("Invalid HbaPortSstsRegIpm {}", v),
-        }
+    pub fn interface_power_management(
+        &self,
+    ) -> HbaPortSstsRegDef::INTERFACE_POWER_MANAGEMENT::Value {
+        self.0
+            .read_as_enum(HbaPortSstsRegDef::INTERFACE_POWER_MANAGEMENT)
+            .expect("Invalid Ssts interface_power_management")
     }
 }
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub struct HbaPortSctlReg(u32);
+pub struct HbaPortSctlReg(LocalRegisterCopy<u32, HbaPortSctlRegDef::Register>);
 
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct HbaPortSctlRegIpm: u32 {
-        const NO_PARTIAL = 1;
-        const NO_SLUMBER = 2;
-        const NO_DEVSLEEP = 4;
-    }
-}
+register_bitfields! [
+    u32,
 
-#[repr(u32)]
-pub enum HbaPortSctlRegSpd {
-    NoRestriction = 0,
-    LimitToGen1 = 1,
-    LimitToGen2 = 2,
-    LimitToGen3 = 3,
-}
-
-#[repr(u32)]
-pub enum HbaPortSctlRegDet {
-    NoDetection = 0,
-    InitInterface = 1,
-    Disable = 4,
-}
+    HbaPortSctlRegDef [
+        DEVICE_DETECTION OFFSET(0) NUMBITS(4) [
+            NoDetection = 0,
+            InitInterface = 1,
+            Disablee = 4,
+        ],
+        SPEED_ALLOWED OFFSET(4) NUMBITS(4) [
+            NoRestriction = 0,
+            LimitToGen1 = 1,
+            LimitToGen2 = 2,
+            LimitToGen3 = 3,
+        ],
+        IPM OFFSET(8) NUMBITS(4) [
+            NoPartial = 1,
+            NoSlumber = 2,
+            NoDevsleep = 4,
+        ],
+        SELECT_POWER_MANAGEMENT OFFSET(12) NUMBITS(4) [],
+        PORT_MULTIPLIER_PORT OFFSET(16) NUMBITS(4) [],
+    ]
+];
 
 impl HbaPortSctlReg {
     pub fn select_power_management(&self) -> usize {
-        self.0.get_bits(12..=15) as usize
+        self.0.read(HbaPortSctlRegDef::SELECT_POWER_MANAGEMENT) as usize
     }
 
     pub fn port_multiplier_port(&self) -> usize {
-        self.0.get_bits(16..=19) as usize
+        self.0.read(HbaPortSctlRegDef::PORT_MULTIPLIER_PORT) as usize
     }
 
-    pub fn interface_power_mgmt_trans_allowed(&self) -> HbaPortSctlRegIpm {
-        HbaPortSctlRegIpm::from_bits(self.0.get_bits(8..=11)).expect("Invalid HbaPortSctlRegIpm")
+    pub fn interface_power_mgmt_trans_allowed(&self) -> HbaPortSctlRegDef::IPM::Value {
+        self.0
+            .read_as_enum(HbaPortSctlRegDef::IPM)
+            .expect("Invalid Sctl ipm")
     }
 
-    pub fn set_interface_power_mgmt_trans_allowed(&mut self, r: HbaPortSctlRegIpm) {
-        self.0.set_bits(8..=11, r.bits());
+    pub fn set_interface_power_mgmt_trans_allowed(&mut self, r: HbaPortSctlRegDef::IPM::Value) {
+        self.0.modify(HbaPortSctlRegDef::IPM.val(r as u32))
     }
 
-    pub fn speed_allowed(&self) -> HbaPortSctlRegSpd {
-        match self.0.get_bits(4..=7) {
-            0 => HbaPortSctlRegSpd::NoRestriction,
-            1 => HbaPortSctlRegSpd::LimitToGen1,
-            2 => HbaPortSctlRegSpd::LimitToGen2,
-            3 => HbaPortSctlRegSpd::LimitToGen3,
-            v => panic!("Invalid HbaPortSctlRegSpd {}", v),
-        }
+    pub fn speed_allowed(&self) -> HbaPortSctlRegDef::SPEED_ALLOWED::Value {
+        self.0
+            .read_as_enum(HbaPortSctlRegDef::SPEED_ALLOWED)
+            .expect("Invalid Sctl speed_allowed")
     }
 
-    pub fn set_speed_allowed(&mut self, v: HbaPortSctlRegSpd) {
-        self.0.set_bits(4..=7, v as u32);
+    pub fn set_speed_allowed(&mut self, v: HbaPortSctlRegDef::SPEED_ALLOWED::Value) {
+        self.0
+            .modify(HbaPortSctlRegDef::SPEED_ALLOWED.val(v as u32))
     }
 
-    pub fn device_detection(&self) -> HbaPortSctlRegDet {
-        match self.0.get_bits(0..=3) {
-            0 => HbaPortSctlRegDet::NoDetection,
-            1 => HbaPortSctlRegDet::InitInterface,
-            4 => HbaPortSctlRegDet::Disable,
-            v => panic!("Invalid HbaPortSctlRegDet {}", v),
-        }
+    pub fn device_detection(&self) -> HbaPortSctlRegDef::DEVICE_DETECTION::Value {
+        self.0
+            .read_as_enum(HbaPortSctlRegDef::DEVICE_DETECTION)
+            .expect("Invalid Sctl device_detection")
     }
 
-    pub fn set_device_detection(&mut self, v: HbaPortSctlRegDet) {
-        self.0.set_bits(0..=3, v as u32);
+    pub fn set_device_detection(&mut self, v: HbaPortSctlRegDef::DEVICE_DETECTION::Value) {
+        self.0
+            .modify(HbaPortSctlRegDef::DEVICE_DETECTION.val(v as u32))
     }
 }
 
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct HbaPortSerrErr: u16 {
-        const I = 1 << 0;  // Recovered Data Integrity Error
-        const M = 1 << 1;  // Recovered Communications Error
-        const T = 1 << 8;  // Transient Data Integrity Error
-        const C = 1 << 9;  // Persistent Communication or Data Integrity Error
-        const P = 1 << 10; // Protocol Error
-        const E = 1 << 11; // Internal Error
-    }
-}
+register_bitfields! [
+    u32,
 
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct HbaPortSerrDiag: u16 {
-        const N = 1 << 0;  // PhyRdy Change
-        const I = 1 << 1;  // Phy Internal Error
-        const W = 1 << 2;  // Comm Wake
-        const B = 1 << 3;  // 10B to 8B Decode Error
-        const D = 1 << 4;  // Disparity Error
-        const C = 1 << 5;  // CRC Error
-        const H = 1 << 6;  // Handshake Error
-        const S = 1 << 7;  // Link Sequence Error
-        const T = 1 << 8;  // Transport state transition error
-        const F = 1 << 9;  // Unknown FIS Type
-        const X = 1 << 10; // Exchanged
-    }
-}
+    pub HbaPortSerr [
+        ERR_I 0,  // Recovered Data Integrity Error
+        ERR_M 1,  // Recovered Communications Error
+        ERR_T 8,  // Transient Data Integrity Error
+        ERR_C 9,  // Persistent Communication or Data Integrity Error
+        ERR_P 10, // Protocol Error
+        ERR_E 11, // Internal Error
+
+        DIAG_N 16,  // PhyRdy Change
+        DIAG_I 17,  // Phy Internal Error
+        DIAG_W 18,  // Comm Wake
+        DIAG_B 19,  // 10B to 8B Decode Error
+        DIAG_D 20,  // Disparity Error
+        DIAG_C 21,  // CRC Error
+        DIAG_H 22,  // Handshake Error
+        DIAG_S 23,  // Link Sequence Error
+        DIAG_T 24,  // Transport state transition error
+        DIAG_F 25,  // Unknown FIS Type
+        DIAG_X 26, // Exchanged
+    ]
+];
+
+register_bitfields! [
+    u32,
+
+    HbaPortFbsDef [
+        ENABLE OFFSET(0) NUMBITS(1),
+        DEVICE_ERROR_CLEAR OFFSET(1) NUMBITS(1),
+        SINGLE_DEVICE_ERROR OFFSET(2) NUMBITS(1),
+        DEVICE_TO_ISSUE OFFSET(8) NUMBITS(4),
+        ACTIVE_DEVICE_OPTIMIZATION OFFSET(12) NUMBITS(4),
+        DEVICE_WITH_ERROR OFFSET(16) NUMBITS(4),
+    ]
+];
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub struct HbaPortSerrReg(u32);
-
-impl HbaPortSerrReg {
-    pub fn error(&self) -> HbaPortSerrErr {
-        HbaPortSerrErr::from_bits_truncate(self.0.get_bits(0..=15) as u16)
-    }
-
-    pub fn set_error(&mut self, reg: HbaPortSerrErr) {
-        self.0.set_bits(0..=15, reg.bits() as u32);
-    }
-
-    pub fn diagnostics(&self) -> HbaPortSerrDiag {
-        HbaPortSerrDiag::from_bits_truncate(self.0.get_bits(16..=31) as u16)
-    }
-
-    pub fn set_diagnostics(&mut self, reg: HbaPortSerrDiag) {
-        self.0.set_bits(16..=31, reg.bits() as u32);
-    }
-}
-
-#[repr(transparent)]
-#[derive(Copy, Clone)]
-pub struct HbaPortFbs(u32);
+pub struct HbaPortFbs(LocalRegisterCopy<u32, HbaPortFbsDef::Register>);
 
 impl HbaPortFbs {
     pub fn enable(&self) -> bool {
-        self.0.get_bit(0)
+        self.0.is_set(HbaPortFbsDef::ENABLE)
     }
 
     pub fn set_enable(&mut self, v: bool) {
-        self.0.set_bit(0, v);
+        self.0.modify(if v {
+            HbaPortFbsDef::ENABLE::SET
+        } else {
+            HbaPortFbsDef::ENABLE::CLEAR
+        });
     }
 
     pub fn device_error_clear(&self) -> bool {
-        self.0.get_bit(1)
+        self.0.is_set(HbaPortFbsDef::DEVICE_ERROR_CLEAR)
     }
 
     pub fn set_device_error_clear(&mut self, v: bool) {
-        self.0.set_bit(1, v);
+        self.0.modify(if v {
+            HbaPortFbsDef::DEVICE_ERROR_CLEAR::SET
+        } else {
+            HbaPortFbsDef::DEVICE_ERROR_CLEAR::CLEAR
+        });
     }
 
     pub fn single_device_error(&self) -> bool {
-        self.0.get_bit(2)
+        self.0.is_set(HbaPortFbsDef::SINGLE_DEVICE_ERROR)
     }
 
     pub fn device_to_issue(&self) -> usize {
-        self.0.get_bits(8..=11) as usize
+        self.0.read(HbaPortFbsDef::DEVICE_TO_ISSUE) as usize
     }
 
     pub fn set_device_to_issue(&mut self, v: usize) {
-        self.0.set_bits(8..=11, v as u32);
+        self.0.modify(HbaPortFbsDef::DEVICE_TO_ISSUE.val(v as u32))
     }
 
     pub fn active_device_optimization(&self) -> usize {
-        self.0.get_bits(12..=15) as usize
+        self.0.read(HbaPortFbsDef::ACTIVE_DEVICE_OPTIMIZATION) as usize
     }
 
     pub fn device_with_error(&self) -> usize {
-        self.0.get_bits(16..=19) as usize
+        self.0.read(HbaPortFbsDef::DEVICE_WITH_ERROR) as usize
     }
 }
 
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-pub struct HbaPortDevslp(u32);
+pub struct HbaPortDevslp(LocalRegisterCopy<u32, HbaPortDevslpDef::Register>);
+
+register_bitfields! [
+    u32,
+
+    HbaPortDevslpDef [
+        AGGRESSIVE_DEV_SLEEP_ENABLE OFFSET(0) NUMBITS(1),
+        DEVICE_SLEEP_PRESENT OFFSET(1) NUMBITS(1),
+        DEVICE_SLEEP_EXIT_TIMEOUT OFFSET(2) NUMBITS(8),
+        DEVICE_SLEEP_ASSERTION_TIME OFFSET(10) NUMBITS(5),
+        DEVICE_SLEEP_IDLE_TIMEOUT OFFSET(15) NUMBITS(10),
+        DITO_MULTIPLIER OFFSET(25) NUMBITS(4),
+    ]
+];
 
 impl HbaPortDevslp {
     pub fn aggressive_device_sleep_enable(&self) -> bool {
-        self.0.get_bit(0)
+        self.0.is_set(HbaPortDevslpDef::AGGRESSIVE_DEV_SLEEP_ENABLE)
     }
 
     pub fn set_aggressive_device_sleep_enable(&mut self, v: bool) {
-        self.0.set_bit(0, v);
+        self.0.modify(if v {
+            HbaPortDevslpDef::AGGRESSIVE_DEV_SLEEP_ENABLE::SET
+        } else {
+            HbaPortDevslpDef::AGGRESSIVE_DEV_SLEEP_ENABLE::CLEAR
+        });
     }
 
     pub fn device_sleep_present(&self) -> bool {
-        self.0.get_bit(1)
+        self.0.is_set(HbaPortDevslpDef::DEVICE_SLEEP_PRESENT)
     }
 
     pub fn set_device_sleep_present(&mut self, v: bool) {
-        self.0.set_bit(1, v);
+        self.0.modify(if v {
+            HbaPortDevslpDef::DEVICE_SLEEP_PRESENT::SET
+        } else {
+            HbaPortDevslpDef::DEVICE_SLEEP_PRESENT::CLEAR
+        });
     }
 
     pub fn device_sleep_exit_timeout(&self) -> usize {
-        self.0.get_bits(2..=9) as usize
+        self.0.read(HbaPortDevslpDef::DEVICE_SLEEP_EXIT_TIMEOUT) as usize
     }
 
     pub fn set_device_sleep_exit_timeout(&mut self, v: usize) {
-        self.0.set_bits(2..=9, v as u32);
+        self.0
+            .modify(HbaPortDevslpDef::DEVICE_SLEEP_EXIT_TIMEOUT.val(v as u32))
     }
 
     pub fn minimum_device_sleep_assertion_time(&self) -> usize {
-        self.0.get_bits(10..=14) as usize
+        self.0.read(HbaPortDevslpDef::DEVICE_SLEEP_ASSERTION_TIME) as usize
     }
 
     pub fn set_minimum_device_sleep_assertion_time(&mut self, v: usize) {
-        self.0.set_bits(10..=14, v as u32);
+        self.0
+            .modify(HbaPortDevslpDef::DEVICE_SLEEP_ASSERTION_TIME.val(v as u32))
     }
 
     pub fn device_sleep_idle_timeout(&self) -> usize {
-        self.0.get_bits(15..=24) as usize
+        self.0.read(HbaPortDevslpDef::DEVICE_SLEEP_IDLE_TIMEOUT) as usize
     }
 
     pub fn set_device_sleep_idle_timeout(&mut self, v: usize) {
-        self.0.set_bits(15..=14, v as u32);
+        self.0
+            .modify(HbaPortDevslpDef::DEVICE_SLEEP_IDLE_TIMEOUT.val(v as u32))
     }
 
     pub fn dito_multiplier(&self) -> usize {
-        self.0.get_bits(25..=28) as usize
+        self.0.read(HbaPortDevslpDef::DITO_MULTIPLIER) as usize
     }
 }
 
-#[repr(C)]
-pub struct HbaPort {
-    clb: VCell<PhysAddr>,
-    fb: VCell<PhysAddr>,
-    is: VCell<HbaPortISReg>,
-    ie: VCell<HbaPortIEReg>,
-    cmd: VCell<HbaPortCmdReg>,
-    _rsv: u32,
-    tfd: VCell<HbaPortTfdReg>,
-    sig: VCell<HbaPortSigReg>,
-    ssts: VCell<HbaPortSstsReg>,
-    sctl: VCell<HbaPortSctlReg>,
-    serr: VCell<HbaPortSerrReg>,
-    sact: VCell<u32>,
-    ci: VCell<u32>,
-    sntf: VCell<u32>,
-    fbs: VCell<HbaPortFbs>,
-    devslp: VCell<HbaPortDevslp>,
-    _rsv1: [u32; 10],
-    vendor: [u32; 4],
+register_structs! {
+    pub HbaPort {
+        (0x0000 => clb: ReadWrite<u64>),
+        (0x0008 => fb: ReadWrite<u64>),
+        (0x0010 => is: ReadWrite<u32, HbaPortISReg::Register>),
+        (0x0014 => ie: ReadWrite<u32, HbaPortIEReg::Register>),
+        (0x0018 => cmd: ReadWrite<u32, HbaPortCmdRegDef::Register>),
+        (0x001C => _rsv), // 4
+        (0x0020 => tfd: ReadWrite<u32, HbaPortTfdReg::Register>),
+        (0x0024 => sig: ReadWrite<u32, HbaPortSigRegDef::Register>),
+        (0x0028 => ssts: ReadWrite<u32, HbaPortSstsRegDef::Register>),
+        (0x002C => sctl: ReadWrite<u32, HbaPortSctlRegDef::Register>),
+        (0x0030 => serr: ReadWrite<u32, HbaPortSerr::Register>),
+        (0x0034 => sact: ReadWrite<u32>),
+        (0x0038 => ci: ReadWrite<u32>),
+        (0x003C => sntf: ReadWrite<u32>),
+        (0x0040 => fbs: ReadWrite<u32, HbaPortFbsDef::Register>),
+        (0x0044 => devslp: ReadWrite<u32, HbaPortDevslpDef::Register>),
+        (0x0048 => _rsv1), // 40
+        (0x0070 => vendor: [u32; 4]),
+        (0x0080 => @END),
+    }
 }
 
 impl HbaPort {
     pub fn start_cmd(&mut self) {
-        while self.cmd().contains(HbaPortCmdReg::CR) {}
+        while self.cmd().0.is_set(HbaPortCmdRegDef::CR) {}
 
-        self.set_cmd(self.cmd() | (HbaPortCmdReg::FRE | HbaPortCmdReg::ST));
+        let mut cmd = self.cmd();
+        cmd.0
+            .modify(HbaPortCmdRegDef::FRE::SET + HbaPortCmdRegDef::ST::SET);
+
+        self.set_cmd(cmd)
     }
 
     pub fn stop_cmd(&mut self) {
         let mut cmd = self.cmd();
 
-        cmd.remove(HbaPortCmdReg::FRE | HbaPortCmdReg::ST);
-
+        cmd.0
+            .modify(HbaPortCmdRegDef::FRE::CLEAR + HbaPortCmdRegDef::ST::CLEAR);
         self.set_cmd(cmd);
 
-        while self.cmd().intersects(HbaPortCmdReg::FR | HbaPortCmdReg::CR) {}
+        while self
+            .cmd()
+            .0
+            .matches_any(&[HbaPortCmdRegDef::FR::SET, HbaPortCmdRegDef::CR::SET])
+        {}
     }
 
     pub fn clb(&self) -> PhysAddr {
-        unsafe { self.clb.get() }
+        PhysAddr(self.clb.get() as usize)
     }
 
     pub fn set_clb(&mut self, addr: PhysAddr) {
-        unsafe {
-            self.clb.set(addr);
-        }
+        self.clb.set(addr.0 as u64);
     }
 
     pub fn cmd_header_at(&self, idx: usize) -> &mut HbaCmdHeader {
@@ -506,105 +529,103 @@ impl HbaPort {
     }
 
     pub fn fb(&self) -> PhysAddr {
-        unsafe { self.fb.get() }
+        PhysAddr(self.fb.get() as usize)
     }
 
     pub fn set_fb(&mut self, addr: PhysAddr) {
-        unsafe {
-            self.fb.set(addr);
-        }
+        self.fb.set(addr.0 as u64);
     }
 
-    pub fn is(&self) -> HbaPortISReg {
-        unsafe { self.is.get() }
+    pub fn is(&self) -> LocalRegisterCopy<u32, HbaPortISReg::Register> {
+        self.is.extract()
     }
 
-    pub fn set_is(&mut self, reg: HbaPortISReg) {
-        unsafe { self.is.set(reg) }
+    pub fn set_is(&mut self, reg: LocalRegisterCopy<u32, HbaPortISReg::Register>) {
+        self.is.set(reg.get())
     }
 
-    pub fn ie(&self) -> HbaPortIEReg {
-        unsafe { self.ie.get() }
+    pub fn ie(&self) -> LocalRegisterCopy<u32, HbaPortIEReg::Register> {
+        self.ie.extract()
     }
 
-    pub fn set_ie(&mut self, reg: HbaPortIEReg) {
-        unsafe { self.ie.set(reg) }
+    pub fn set_ie(&mut self, reg: FieldValue<u32, HbaPortIEReg::Register>) {
+        self.ie.write(reg)
     }
 
     pub fn cmd(&self) -> HbaPortCmdReg {
-        unsafe { self.cmd.get() }
+        HbaPortCmdReg(self.cmd.extract())
     }
 
     pub fn set_cmd(&mut self, reg: HbaPortCmdReg) {
-        unsafe { self.cmd.set(reg) }
+        self.cmd.set(reg.0.get())
     }
 
-    pub fn tfd(&self) -> HbaPortTfdReg {
-        unsafe { self.tfd.get() }
+    pub fn tfd(&self) -> LocalRegisterCopy<u32, HbaPortTfdReg::Register> {
+        self.tfd.extract()
     }
 
     pub fn sig(&self) -> HbaPortSigReg {
-        unsafe { self.sig.get() }
+        HbaPortSigReg(self.sig.extract())
     }
 
     pub fn ssts(&self) -> HbaPortSstsReg {
-        unsafe { self.ssts.get() }
+        HbaPortSstsReg(self.ssts.extract())
     }
 
     pub fn sctl(&self) -> HbaPortSctlReg {
-        unsafe { self.sctl.get() }
+        HbaPortSctlReg(self.sctl.extract())
     }
 
     pub fn set_sctl(&mut self, reg: HbaPortSctlReg) {
-        unsafe { self.sctl.set(reg) }
+        self.sctl.set(reg.0.get())
     }
 
-    pub fn serr(&self) -> HbaPortSerrReg {
-        unsafe { self.serr.get() }
+    pub fn serr(&self) -> LocalRegisterCopy<u32, HbaPortSerr::Register> {
+        self.serr.extract()
     }
 
-    pub fn set_serr(&mut self, reg: HbaPortSerrReg) {
-        unsafe { self.serr.set(reg) }
+    pub fn set_serr(&mut self, reg: LocalRegisterCopy<u32, HbaPortSerr::Register>) {
+        self.serr.set(reg.get())
     }
 
     pub fn sact(&self) -> u32 {
-        unsafe { self.sact.get() }
+        self.sact.get()
     }
 
     pub fn set_sact(&mut self, v: u32) {
-        unsafe { self.sact.set(v) }
+        self.sact.set(v)
     }
 
     pub fn ci(&self) -> u32 {
-        unsafe { self.ci.get() }
+        self.ci.get()
     }
 
     pub fn set_ci(&mut self, v: u32) {
-        unsafe { self.ci.set(v) }
+        self.ci.set(v)
     }
 
     pub fn sntf(&self) -> u32 {
-        unsafe { self.sntf.get() }
+        self.sntf.get()
     }
 
     pub fn set_sntf(&mut self, v: u32) {
-        unsafe { self.sntf.set(v) }
+        self.sntf.set(v)
     }
 
     pub fn fbs(&self) -> HbaPortFbs {
-        unsafe { self.fbs.get() }
+        HbaPortFbs(self.fbs.extract())
     }
 
     pub fn set_fbs(&mut self, reg: HbaPortFbs) {
-        unsafe { self.fbs.set(reg) }
+        self.fbs.set(reg.0.get())
     }
 
     pub fn devslp(&self) -> HbaPortDevslp {
-        unsafe { self.devslp.get() }
+        HbaPortDevslp(self.devslp.extract())
     }
 
     pub fn set_devslp(&mut self, reg: HbaPortDevslp) {
-        unsafe { self.devslp.set(reg) }
+        self.devslp.set(reg.0.get())
     }
 
     pub fn vendor(&self) -> &[u32] {

@@ -1,6 +1,5 @@
 use alloc::string::String;
 use alloc::sync::Arc;
-
 use bit_field::BitField;
 
 use crate::drivers::block::ahci::port::Port;
@@ -57,7 +56,7 @@ impl AhciDevice {
         //println!("{:?}", hba.cap2());
         //println!("{}", hba.cap().num_cmd_ports());
 
-        hba.set_ghc(hba.ghc() | HbaMemGhcReg::IE | HbaMemGhcReg::AE);
+        hba.modify_ghc(HbaMemGhcReg::IE::SET + HbaMemGhcReg::AE::SET);
 
         let pi = hba.pi();
 

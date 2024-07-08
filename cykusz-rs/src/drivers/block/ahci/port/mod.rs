@@ -1,7 +1,5 @@
 use alloc::sync::Arc;
 
-use bit_field::BitField;
-
 use crate::drivers::block::ahci::reg::{HbaPort, HbaPortISReg};
 use crate::drivers::block::ata::request::DmaRequest;
 use crate::kernel::block::BlockDev;
@@ -9,6 +7,7 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::types::CeilDiv;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
+use bit_field::BitField;
 
 mod hba;
 
@@ -46,8 +45,7 @@ impl PortData {
 
         let ci = port.ci() | port.sact();
 
-        if !is.contains(HbaPortISReg::DHRS) {
-            let port = self.hba_port();
+        if !is.is_set(HbaPortISReg::DHRS) {
             port.set_is(is);
             return;
         }

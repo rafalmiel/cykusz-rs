@@ -1,82 +1,76 @@
-use bit_field::BitField;
-use mmio::VCell;
-
 use crate::drivers::block::ahci::reg::FisRegH2D;
 use crate::kernel::mm::PhysAddr;
+use bit_field::BitField;
+use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
+use tock_registers::registers::ReadWrite;
+use tock_registers::{register_bitfields, register_structs, LocalRegisterCopy};
 
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct HbaCmdHeaderFlags: u16 {
-        const A = 1 << 5; // ATAPI
-        const W = 1 << 6; // Write
-        const P = 1 << 7; // Prefetchable
-        const R = 1 << 8; // Reset
-        const B = 1 << 9; // Bist
-        const C = 1 << 10; // Clear Busy upon R_OK
+register_bitfields! [
+    u16,
+
+    pub HbaCmdHeaderFlags [
+        FIS_LENGTH OFFSET(0) NUMBITS(4),
+        A OFFSET(5) NUMBITS(1),
+        W OFFSET(6) NUMBITS(1),
+        P OFFSET(7) NUMBITS(1),
+        R OFFSET(8) NUMBITS(1),
+        B OFFSET(9) NUMBITS(1),
+        C OFFSET(10) NUMBITS(1),
+        PORT_MULTIPLIER OFFSET(12) NUMBITS(4),
+    ],
+];
+
+register_bitfields! [
+    u32,
+
+    pub HbaPrdtEntryFlags [
+        DATA_BYTE_COUNT OFFSET(0) NUMBITS(22),
+        INTERRUPT_ENABLED OFFSET(31) NUMBITS(1),
+    ]
+];
+
+register_structs! {
+    pub HbaCmdHeader {
+        (0x000 => pub flags: ReadWrite<u16, HbaCmdHeaderFlags::Register>),
+        (0x002 => pub prdtl: ReadWrite<u16>),
+        (0x004 => pub prdbc: ReadWrite<u32>),
+        (0x008 => pub ctb: ReadWrite<u64>),
+        (0x010 => _reserved),
+        (0x020 => @END),
     }
-}
-
-impl HbaCmdHeaderFlags {
-    pub fn command_fis_length(&self) -> usize {
-        self.bits().get_bits(0..=4) as usize
-    }
-
-    pub fn set_command_fis_length(&mut self, v: u8) {
-        *self = HbaCmdHeaderFlags::from_bits_retain(*self.bits().set_bits(0..=4, v as u16));
-    }
-
-    pub fn port_multiplier(&self) -> usize {
-        self.bits().get_bits(12..=15) as usize
-    }
-
-    pub fn set_port_multiplier(&mut self, m: usize) {
-        *self = HbaCmdHeaderFlags::from_bits_retain(*self.bits().set_bits(12..=15, m as u16));
-    }
-}
-
-#[repr(C)]
-pub struct HbaCmdHeader {
-    flags: VCell<HbaCmdHeaderFlags>,
-
-    prdtl: VCell<u16>,
-    prdbc: VCell<u32>,
-
-    ctb: VCell<PhysAddr>,
-
-    _rsv1: [VCell<u32>; 4],
 }
 
 impl HbaCmdHeader {
-    pub fn flags(&self) -> HbaCmdHeaderFlags {
-        unsafe { self.flags.get() }
+    pub fn flags(&self) -> LocalRegisterCopy<u16, HbaCmdHeaderFlags::Register> {
+        self.flags.extract()
     }
 
-    pub fn set_flags(&mut self, f: HbaCmdHeaderFlags) {
-        unsafe { self.flags.set(f) };
+    pub fn set_flags(&mut self, f: LocalRegisterCopy<u16, HbaCmdHeaderFlags::Register>) {
+        self.flags.set(f.get())
     }
 
     pub fn prdtl(&self) -> usize {
-        unsafe { self.prdtl.get() as usize }
+        self.prdtl.get() as usize
     }
 
     pub fn set_prdtl(&mut self, v: usize) {
-        unsafe { self.prdtl.set(v as u16) };
+        self.prdtl.set(v as u16)
     }
 
     pub fn prd_byte_count(&self) -> usize {
-        unsafe { self.prdbc.get() as usize }
+        self.prdbc.get() as usize
     }
 
     pub fn set_prd_byte_count(&mut self, v: usize) {
-        unsafe { self.prdbc.set(v as u32) };
+        self.prdbc.set(v as u32)
     }
 
     pub fn cmd_tbl_base_addr(&self) -> PhysAddr {
-        unsafe { self.ctb.get() }
+        PhysAddr(self.ctb.get() as usize)
     }
 
     pub fn set_cmd_tbl_base_addr(&mut self, a: PhysAddr) {
-        unsafe { self.ctb.set(a) }
+        self.ctb.set(a.0 as u64)
     }
 
     pub fn cmd_tbl(&self) -> &mut HbaCmdTbl {
@@ -84,15 +78,14 @@ impl HbaCmdHeader {
     }
 }
 
-#[repr(C)]
-pub struct HbaCmdTbl {
-    cfis: [u8; 64],
-
-    acmd: [u8; 16],
-
-    _rsv1: [u8; 48],
-
-    prdt_entry: [HbaPrdtEntry; 1],
+register_structs! {
+    pub HbaCmdTbl {
+        (0x000 => cfis: [ReadWrite<u8>; 64]),
+        (0x040 => acmd: [ReadWrite<u8>; 16]),
+        (0x050 => _reserved),
+        (0x080 => prdt_entry: [HbaPrdtEntry; 1]),
+        (0x090 => @END),
+    }
 }
 
 impl HbaCmdTbl {
@@ -105,20 +98,24 @@ impl HbaCmdTbl {
     }
 
     pub fn reset(&mut self) {
-        self.cfis.fill(0);
-        self.acmd.fill(0);
-        self._rsv1.fill(0);
+        self.cfis.iter().for_each(|e| {
+            e.set(0);
+        });
+        self.acmd.iter().for_each(|e| {
+            e.set(0);
+        });
+        self._reserved.fill(0);
     }
 }
 
-#[repr(C)]
-pub struct HbaPrdtEntry {
-    dba: VCell<u32>,
-    dbau: VCell<u32>,
-
-    _rsv1: VCell<u32>,
-
-    flags: VCell<u32>,
+register_structs! {
+    pub HbaPrdtEntry {
+        (0x000 => dba: ReadWrite<u32>),
+        (0x004 => dbau: ReadWrite<u32>),
+        (0x008 => _reserved),
+        (0x00C => flags: ReadWrite<u32, HbaPrdtEntryFlags::Register>),
+        (0x010 => @END),
+    }
 }
 
 impl HbaPrdtEntry {
@@ -134,26 +131,30 @@ impl HbaPrdtEntry {
     }
 
     pub fn data_byte_count(&self) -> usize {
-        unsafe { self.flags.get().get_bits(0..=21) as usize }
+        self.flags.read(HbaPrdtEntryFlags::DATA_BYTE_COUNT) as usize
     }
 
     pub fn set_data_byte_count(&mut self, b: usize) {
-        unsafe {
-            self.flags.set(*self.flags.get().set_bits(0..=21, b as u32));
-        }
+        self.flags
+            .modify(HbaPrdtEntryFlags::DATA_BYTE_COUNT.val(b as u32));
     }
 
     pub fn interrupt_on_completion(&self) -> bool {
-        unsafe { self.flags.get().get_bit(31) }
+        self.flags.is_set(HbaPrdtEntryFlags::INTERRUPT_ENABLED)
     }
 
     pub fn set_interrupt_on_completion(&mut self, i: bool) {
-        unsafe { self.flags.set(*self.flags.get().set_bit(31, i)) }
+        let v = if i {
+            HbaPrdtEntryFlags::INTERRUPT_ENABLED::SET
+        } else {
+            HbaPrdtEntryFlags::INTERRUPT_ENABLED::CLEAR
+        };
+        self.flags.modify(v);
     }
 
     pub fn reset(&mut self) {
         self.set_database_address(PhysAddr(0));
-        self._rsv1.set(0);
+        self._reserved.fill(0);
         self.flags.set(0);
     }
 }

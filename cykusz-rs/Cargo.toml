@@ -12,6 +12,7 @@ logs = []
 default = []
 
 [dependencies]
+tock-registers = "*"
 bitflags = "*"
 raw-cpuid = "*"
 spin = "*"
@@ -22,7 +23,6 @@ downcast-rs = { version = "*", default-features = false }
 hashbrown = "*"
 lru = "*"
 vte = "*"
-mmio = "0.1.0"
 linked_list_allocator = "*"
 
 [dependencies.uuid]

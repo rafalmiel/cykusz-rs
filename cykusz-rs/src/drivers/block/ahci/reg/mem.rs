@@ -4,6 +4,7 @@ use mmio::VCell;
 use super::HbaPort;
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaMemCapReg: u32 {
         const SXS           = 1 << 5;  // Supports External SATA
         const EMS           = 1 << 6;  // Enclosure Management Supported
@@ -33,15 +34,15 @@ pub enum HbaMemCapRegISpeed {
 
 impl HbaMemCapReg {
     pub fn num_ports(&self) -> usize {
-        self.bits.get_bits(0..=4) as usize
+        self.bits().get_bits(0..=4) as usize
     }
 
     pub fn num_cmd_ports(&self) -> usize {
-        self.bits.get_bits(8..=12) as usize
+        self.bits().get_bits(8..=12) as usize
     }
 
     pub fn ispeed(&self) -> HbaMemCapRegISpeed {
-        match self.bits.get_bits(20..=23) {
+        match self.bits().get_bits(20..=23) {
             0b0001 => HbaMemCapRegISpeed::Gen1,
             0b0010 => HbaMemCapRegISpeed::Gen2,
             0b0011 => HbaMemCapRegISpeed::Gen3,
@@ -51,6 +52,7 @@ impl HbaMemCapReg {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaMemGhcReg: u32 {
         const HR =   1 << 0;  // HBA Reset
         const IE =   1 << 1;  // Interrupt Enable
@@ -108,6 +110,7 @@ impl HbaMemEmLocReg {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaMemEmlCtlReg: u32 {
         const STS_MR =      1 << 0;  // Message Received
         const CTL_TM =      1 << 8;  // Transmit Message
@@ -124,6 +127,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaMemCap2Reg: u32 {
         const BOH   = 1 << 0; // BIOS/OS Handoff
         const NVMP  = 1 << 1; // NVMHCI Present
@@ -135,6 +139,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaMemBohcReg: u32 {
         const BOS =     1 << 0; // BIOS Owned Semaphore
         const OOS =     1 << 1; // OS Owned Semaphore

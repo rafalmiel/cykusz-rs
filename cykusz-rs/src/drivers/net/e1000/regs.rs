@@ -43,6 +43,7 @@ pub enum Regs {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct ECtl: u32 {
         const LRST          = (1 << 3);
         const ASDE          = (1 << 5);
@@ -55,6 +56,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct RCtl: u32 {
         const EN            = (1 << 1);     // Receiver Enable
         const SBP           = (1 << 2);     // Store Bad Packets
@@ -89,6 +91,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct TCmd: u8 {
         const EOP           = (1 << 0);     // End of Packet
         const IFCS          = (1 << 1);     // Insert FCS
@@ -101,6 +104,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct TCtl : u32 {
         const EN            = (1 << 1);     // Transmit Enable
         const PSP           = (1 << 3);     // Pad Short Packets
@@ -110,6 +114,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct TStatus: u8 {
         const DD            = (1 << 0);     // Descriptor Done
         const EC            = (1 << 1);     // Excess Collisions
@@ -119,6 +124,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct IntFlags: u32 {
         const TXDW          = (1 << 0);     // Transmit Descriptor Written Back
         const TXQE          = (1 << 1);     // Transmit Queue Empty
@@ -144,23 +150,23 @@ bitflags! {
 
 impl Default for TStatus {
     fn default() -> Self {
-        TStatus { bits: 0 }
+        TStatus::empty()
     }
 }
 
 impl TCtl {
     pub fn set_collision_threshold(&mut self, val: u8) {
-        self.bits |= (val as u32) << 4;
+        *self |= TCtl::from_bits_retain((val as u32) << 4)
     }
 
     pub fn set_collision_distance(&mut self, val: u8) {
-        self.bits |= (val as u32) << 12;
+        *self |= TCtl::from_bits_retain((val as u32) << 12)
     }
 }
 
 impl Default for TCtl {
     fn default() -> Self {
-        TCtl { bits: 1u32 << 28 }
+        TCtl::from_bits_retain(1u32 << 28)
     }
 }
 

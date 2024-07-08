@@ -18,6 +18,7 @@ pub enum ErrorAction {
 }
 
 bitflags! {
+    #[derive(Debug, Copy, Clone)]
     pub struct OptFeatures: u32 {
         const PREALLOCATE_DIR_BLOCKS = 0x0001;
         const AFS_INODES = 0x0002;
@@ -29,6 +30,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Debug, Copy, Clone)]
     pub struct ReqFeatures: u32 {
         const COMPRESSION_USED = 0x0001;
         const DIRENT_TYPE_FIELD = 0x0002;
@@ -38,6 +40,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Debug, Copy, Clone)]
     pub struct RoFeatures: u32 {
         const SPARSE_SUPERBLOCKS = 0x0001;
         const FS_64BIT_FILESIZE = 0x0002;

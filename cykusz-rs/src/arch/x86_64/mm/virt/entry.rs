@@ -4,6 +4,7 @@ use crate::kernel::mm::PhysAddr;
 use crate::kernel::mm::{deallocate_order, virt};
 
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct Entry: usize {
         const PRESENT       = 1 << 0;
         const WRITABLE      = 1 << 1;
@@ -25,7 +26,7 @@ pub const FLAG_MASK: usize = 0x80000000000001FF;
 
 impl Entry {
     pub fn new_empty() -> Entry {
-        Entry { bits: 0 }
+        Entry::empty()
     }
 
     pub fn from_kernel_flags(flags: virt::PageFlags) -> Entry {
@@ -47,29 +48,27 @@ impl Entry {
     }
 
     pub unsafe fn from_addr(addr: MappedAddr) -> Entry {
-        Entry {
-            bits: addr.read::<usize>(),
-        }
+        Entry::from_bits_retain(addr.read::<usize>())
     }
 
     pub fn clear(&mut self) {
-        self.bits = 0;
+        *self = Entry::empty();
     }
 
     pub fn raw(&self) -> usize {
-        self.bits
+        self.bits()
     }
 
     pub fn set_raw(&mut self, bits: usize) {
-        self.bits = bits;
+        *self = Entry::from_bits_retain(bits);
     }
 
     pub fn is_unused(&self) -> bool {
-        self.bits == 0
+        self.bits() == 0
     }
 
     pub fn address(&self) -> PhysAddr {
-        PhysAddr(self.bits & ADDRESS_MASK)
+        PhysAddr(self.bits() & ADDRESS_MASK)
     }
 
     pub fn frame(&self) -> Option<Frame> {
@@ -117,8 +116,8 @@ impl Entry {
 
         let mut bits = *self;
 
-        bits.bits &= !ADDRESS_MASK;
-        bits.bits |= frame.address().0;
+        bits &= Entry::from_bits_retain(!ADDRESS_MASK);
+        bits |= Entry::from_bits_retain(frame.address().0);
 
         *self = bits;
 
@@ -129,18 +128,18 @@ impl Entry {
 
     pub fn set_flags(&mut self, flags: Entry) {
         let mut bits = *self;
-        bits.bits &= !FLAG_MASK;
-        bits.insert(Entry::from_bits(flags.bits & FLAG_MASK).unwrap());
+        bits &= Entry::from_bits_retain(!FLAG_MASK);
+        bits.insert(Entry::from_bits_retain(flags.bits() & FLAG_MASK));
 
         *self = bits;
     }
 
     pub fn get_entry_count(&self) -> usize {
-        (self.bits & COUNTER_MASK) >> 52
+        (self.bits() & COUNTER_MASK) >> 52
     }
 
     pub fn set_entry_count(&mut self, count: usize) {
-        self.bits = (self.bits & !COUNTER_MASK) | (count << 52);
+        *self = Entry::from_bits_retain((self.bits() & !COUNTER_MASK) | count << 52);
     }
 
     pub fn inc_entry_count(&mut self) {

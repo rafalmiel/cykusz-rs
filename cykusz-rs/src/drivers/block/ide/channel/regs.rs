@@ -25,6 +25,7 @@ const BMIDE_STATUS: u16 = 2;
 const BMIDE_PRDT: u16 = 4;
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct BaseErrorReg: u8 {
         const AMNF = 0b00000001; // Address mark not found
         const TKZNF = 0b00000010; // Track zero not found
@@ -74,6 +75,7 @@ impl BaseDriveSelReg {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, PartialEq)]
     pub struct BaseStatusReg: u8 {
         const ERR = 0b00000001; // Error occured
         const IDX = 0b00000010; // Index. Always set to zero
@@ -87,6 +89,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct CtrlDevCtrlReg: u8 {
         const NIEN = 0b00000010; // Disable interrupts
         const SRST = 0b00000100; // Software reset
@@ -95,6 +98,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct CtrlDriveAddrReg: u8 {
         const DS0 = 0b00000001; // Drive 0 select. Clears when drive 0 selected
         const DS1 = 0b00000010; // Drive 1 select. Clears when drive 1 selected
@@ -104,11 +108,12 @@ bitflags! {
 
 impl CtrlDriveAddrReg {
     pub fn selected_head(&self) -> usize {
-        self.bits.get_bits(2..=5) as usize
+        self.bits().get_bits(2..=5) as usize
     }
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct BMIdeCmd: u8 {
         const DMA_START = 0b00000001;
         const DMA_READ = 0b00001000;
@@ -116,6 +121,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct BMIdeStatus: u8 {
         const DMA_ACTIVE = 0b0000_0001;
         const DMA_FAILED = 0b0000_0010;
@@ -254,7 +260,7 @@ impl DevCtrlReg {
 
     pub fn disable_interrupts(&mut self) {
         self.base
-            .write_offset(CTRL_DEV_CTRL, CtrlDevCtrlReg::NIEN.bits);
+            .write_offset(CTRL_DEV_CTRL, CtrlDevCtrlReg::NIEN.bits());
     }
 }
 

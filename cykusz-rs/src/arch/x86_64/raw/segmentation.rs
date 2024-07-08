@@ -6,6 +6,7 @@ use core::arch::asm;
 //
 // See Intel 3a, Section 3.4.2 "Segment Selectors"
 bitflags! {
+    #[derive(Copy, Clone, PartialEq, Debug)]
     pub struct SegmentSelector: u16 {
         /// Requestor Privilege Level
         const RPL_0 = 0b00;
@@ -27,17 +28,15 @@ impl SegmentSelector {
     ///  * `index` index in GDT or LDT array.
     ///
     pub const fn new(index: u16, rpl: SegmentSelector) -> SegmentSelector {
-        SegmentSelector {
-            bits: index << 3 | rpl.cbits(),
-        }
+        SegmentSelector::from_bits_retain(index << 3 | rpl.cbits())
     }
 
     pub const fn cbits(&self) -> u16 {
-        self.bits
+        self.bits()
     }
 
     pub const fn from_raw(bits: u16) -> SegmentSelector {
-        SegmentSelector { bits }
+        SegmentSelector::from_bits_retain(bits)
     }
 }
 

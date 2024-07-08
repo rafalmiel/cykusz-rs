@@ -44,7 +44,7 @@ impl SigAction {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, Copy, Clone, Debug)]
     pub struct SignalFlags: u32 {
         const RESTART = 0x10000000;
     }

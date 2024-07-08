@@ -99,6 +99,7 @@ impl Default for AuxvType {
 }
 
 bitflags!(
+    #[derive(Copy, Clone, Debug)]
     pub struct ProgramFlags: u32 {
         const EXECUTABLE = 1;
         const WRITABLE = 2;

@@ -1,10 +1,10 @@
 use core::arch::asm;
 use core::mem;
-
 use crate::arch::raw::gdt;
 use crate::arch::raw::idt;
 
 bitflags! {
+    #[derive(Copy, Clone, Debug, PartialEq)]
     pub struct Flags: u8 {
         const MISSING = 0;
 
@@ -23,14 +23,14 @@ bitflags! {
         const SYS_TYPE_32_INTERRUPT_GATE = 0b1110;
         const SYS_TYPE_32_TRAP_GATE = 0b1111;
 
-        const SYS_RING0_INTERRUPT_GATE = Self::PRESENT.bits |
-                                         Self::PRIV_RING0.bits |
-                                         Self::SYSTEM.bits |
-                                         Self::SYS_TYPE_32_INTERRUPT_GATE.bits;
-        const SYS_RING3_INTERRUPT_GATE = Self::PRESENT.bits |
-                                         Self::PRIV_RING3.bits |
-                                         Self::SYSTEM.bits |
-                                         Self::SYS_TYPE_32_INTERRUPT_GATE.bits;
+        const SYS_RING0_INTERRUPT_GATE = Self::PRESENT.bits() |
+                                         Self::PRIV_RING0.bits() |
+                                         Self::SYSTEM.bits() |
+                                         Self::SYS_TYPE_32_INTERRUPT_GATE.bits();
+        const SYS_RING3_INTERRUPT_GATE = Self::PRESENT.bits() |
+                                         Self::PRIV_RING3.bits() |
+                                         Self::SYSTEM.bits() |
+                                         Self::SYS_TYPE_32_INTERRUPT_GATE.bits();
 
         // Executable bit
         const SEG_C_EXECUTABLE = 1 << 3;
@@ -46,33 +46,33 @@ bitflags! {
         // Accessed bit
         const SEG_ACCESSED = 1;
 
-        const SEG_RING0_CODE = Self::PRESENT.bits |
-                               Self::PRIV_RING0.bits |
-                               Self::SEGMENT.bits |
-                               Self::SEG_C_EXECUTABLE.bits |
-                               Self::SEG_C_READABLE.bits;
-        const SEG_RING0_DATA = Self::PRESENT.bits |
-                               Self::PRIV_RING0.bits |
-                               Self::SEGMENT.bits |
-                               Self::SEG_D_WRITABLE.bits;
-        const SEG_RING3_CODE = Self::PRESENT.bits |
-                               Self::PRIV_RING3.bits |
-                               Self::SEGMENT.bits |
-                               Self::SEG_C_EXECUTABLE.bits |
-                               Self::SEG_C_READABLE.bits;
-        const SEG_RING3_DATA = Self::PRESENT.bits |
-                               Self::PRIV_RING3.bits |
-                               Self::SEGMENT.bits |
-                               Self::SEG_D_WRITABLE.bits;
-        const SEG_RING3_TASK = Self::PRESENT.bits |
-                               Self::SYS_TYPE_32_TSS_AVAILABLE.bits |
-                               Self::PRIV_RING3.bits;
+        const SEG_RING0_CODE = Self::PRESENT.bits() |
+                               Self::PRIV_RING0.bits() |
+                               Self::SEGMENT.bits() |
+                               Self::SEG_C_EXECUTABLE.bits() |
+                               Self::SEG_C_READABLE.bits();
+        const SEG_RING0_DATA = Self::PRESENT.bits() |
+                               Self::PRIV_RING0.bits() |
+                               Self::SEGMENT.bits() |
+                               Self::SEG_D_WRITABLE.bits();
+        const SEG_RING3_CODE = Self::PRESENT.bits() |
+                               Self::PRIV_RING3.bits() |
+                               Self::SEGMENT.bits() |
+                               Self::SEG_C_EXECUTABLE.bits() |
+                               Self::SEG_C_READABLE.bits();
+        const SEG_RING3_DATA = Self::PRESENT.bits() |
+                               Self::PRIV_RING3.bits() |
+                               Self::SEGMENT.bits() |
+                               Self::SEG_D_WRITABLE.bits();
+        const SEG_RING3_TASK = Self::PRESENT.bits() |
+                               Self::SYS_TYPE_32_TSS_AVAILABLE.bits() |
+                               Self::PRIV_RING3.bits();
     }
 }
 
 impl Flags {
     pub const fn cbits(&self) -> u8 {
-        self.bits
+        self.bits()
     }
 }
 

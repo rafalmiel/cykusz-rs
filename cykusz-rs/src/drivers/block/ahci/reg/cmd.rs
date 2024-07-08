@@ -5,6 +5,7 @@ use crate::drivers::block::ahci::reg::FisRegH2D;
 use crate::kernel::mm::PhysAddr;
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct HbaCmdHeaderFlags: u16 {
         const A = 1 << 5; // ATAPI
         const W = 1 << 6; // Write
@@ -21,7 +22,7 @@ impl HbaCmdHeaderFlags {
     }
 
     pub fn set_command_fis_length(&mut self, v: u8) {
-        self.bits.set_bits(0..=4, v as u16);
+        *self = HbaCmdHeaderFlags::from_bits_retain(*self.bits().set_bits(0..=4, v as u16));
     }
 
     pub fn port_multiplier(&self) -> usize {
@@ -29,7 +30,7 @@ impl HbaCmdHeaderFlags {
     }
 
     pub fn set_port_multiplier(&mut self, m: usize) {
-        self.bits.set_bits(12..=15, m as u16);
+        *self = HbaCmdHeaderFlags::from_bits_retain(*self.bits().set_bits(12..=15, m as u16));
     }
 }
 

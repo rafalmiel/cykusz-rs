@@ -6,4 +6,3 @@ pub mod percpu;
 pub mod slice;
 pub mod types;
 pub mod wait_queue;
-//pub mod vcell;

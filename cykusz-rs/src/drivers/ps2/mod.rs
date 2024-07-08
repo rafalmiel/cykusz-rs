@@ -44,6 +44,7 @@ pub fn register_controller(ctrl: &'static dyn PS2Controller) {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct StatusFlags: u8 {
         const OUTPUT_FULL = 1;
         const INPUT_FULL = 1 << 1;
@@ -57,6 +58,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct ConfigFlags: u8 {
         const FIRST_INTERRUPT = 1;
         const SECOND_INTERRUPT = 1 << 1;

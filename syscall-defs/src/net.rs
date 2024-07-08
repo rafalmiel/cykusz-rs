@@ -10,6 +10,7 @@ impl SockTypeFlags {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct SockFlags: u64 {
         const NONBLOCK = 0o4000;
         const CLOEXEC = 0o2000000;
@@ -17,6 +18,7 @@ bitflags! {
 }
 
 bitflags! {
+    #[derive(Copy, Clone, Debug)]
     pub struct MsgFlags: u64 {
         const MSG_OOB = 0x1;
         const MSG_PEEK = 0x2;
@@ -94,7 +96,7 @@ impl TryFrom<u64> for SockOption {
 
 impl From<SockTypeFlags> for SockType {
     fn from(value: SockTypeFlags) -> Self {
-        match value.0 & !(SockFlags::all().bits) {
+        match value.0 & !(SockFlags::all().bits()) {
             1 => SockType::Stream,
             2 => SockType::Dgram,
             3 => SockType::Raw,

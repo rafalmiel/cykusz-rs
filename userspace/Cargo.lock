@@ -34,7 +34,7 @@ dependencies = [
 [[package]]
 name = "libc"
 version = "0.2.153"
-source = "git+https://github.com/rafalmiel/libc.git?branch=cykusz#dcd7bda5ed7544cd803e0a37cd8897d2a1dc5d3c"
+source = "git+https://github.com/rafalmiel/libc.git?branch=cykusz#f91748534aab9330921acc12dc143a3041cb6ac7"
 
 [[package]]
 name = "mount"

@@ -309,6 +309,7 @@ impl BarAddress {
     }
 
     pub fn address_map_virt_num(&self, num_pages: usize) -> VirtAddr {
+        assert!(!self.is_io());
         let addr = self.address();
 
         let mut flags = PageFlags::WRITABLE;

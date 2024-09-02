@@ -63,7 +63,10 @@ impl INodeOpsWrap {
     }
 
     pub fn get_dir_item(&self) -> DirEntryItem {
-        return DirEntry::inode_wrap(self.self_ref.upgrade().unwrap().clone());
+        let e = DirEntry::inode_wrap(self.self_ref.upgrade().unwrap().clone());
+        e.update_name(self.fs_inode.name());
+        e.update_parent(self.fs_inode.parent());
+        e
     }
 }
 

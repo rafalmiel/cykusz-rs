@@ -65,6 +65,7 @@ pub fn syscall_handler(num: u64, a: u64, b: u64, c: u64, d: u64, e: u64, f: u64)
         SYS_EXEC => sys::sys_exec(a, b, c, d, e, f),
         SYS_FCNTL => sys::sys_fcntl(a, b, c),
         SYS_MMAP => sys::sys_mmap(a, b, c, d, e, f),
+        SYS_MPROTECT => sys::sys_mprotect(a, b, c),
         SYS_MUNMAP => sys::sys_munmap(a, b),
         SYS_MAPS => sys::sys_maps(),
         SYS_SEEK => sys::sys_seek(a, b, c),

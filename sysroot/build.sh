@@ -764,7 +764,7 @@ function _cykusz_coreutils {
 
     cd $COREUTILS_CYKUSZ_BUILD_DIR
 
-    CFLAGS="-DSLOW_BUT_NO_HACKS -Wno-error" $COREUTILS_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr
+    CFLAGS="-Wno-error" $COREUTILS_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr
 
     popd
 

@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
@@ -137,7 +137,7 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
 
     let res = Ok(task.open_file(inode.clone(), flags)?);
 
-    logln5!(
+    dbgln!(sys_open,
         "sys_open: {} flags: {:?} = {}",
         inode.full_path(),
         flags,
@@ -375,8 +375,12 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
     };
     let offset = offset as usize;
 
-    if let Some(res) = task.vm().mmap_vm(addr, len, prot, flags, file, offset) {
-        //logln!("mmap at {} len: 0x{:X} | {:?}", res, len, flags);
+    if let Some(res) = task.vm().mmap_vm(addr, len, prot, flags, file.clone(), offset) {
+        dbgln!(map|map_call, "mmap at {} len: 0x{:X} | {:?} {}, fd: {}", res, len, flags, if let Some(f) = &file {
+            f.full_path()
+        } else {
+            "no_file".to_string()
+        }, fd);
         task.vm().log_vm();
         Ok(res.0)
     } else {
@@ -384,12 +388,23 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
     }
 }
 
+pub fn sys_mprotect(addr: u64, size: u64, prot: u64) -> SyscallResult {
+    let addr = VirtAddr(addr as usize);
+    let size = size as usize;
+    let prot = MMapProt::from_bits(prot as usize).ok_or(SyscallError::EINVAL)?;
+    dbgln!(map_call, "mprotect {} {} {:?}", addr, size, prot);
+
+    let task = current_task_ref();
+
+    task.vm().mprotect(addr, size, prot)
+}
+
 pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
     let addr = VirtAddr(addr as usize);
 
     let task = current_task_ref();
 
-    if task.vm().munmap_vm(addr, len as usize) {
+    if task.vm().munmap(addr, len as usize) {
         logln!("munmap at {} len: 0x{:X}", addr, len);
         //task.vm().log_vm();
         Ok(0)
@@ -1559,7 +1574,7 @@ pub fn sys_getrlimit(resource: u64, rlimit: u64) -> SyscallResult {
 }
 
 pub fn sys_debug(str: u64, str_len: u64) -> SyscallResult {
-    logln5!("{}", make_str(str, str_len));
+    dbgln!(debug, "{}", make_str(str, str_len));
 
     Ok(0)
 }

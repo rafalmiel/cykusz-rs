@@ -3,9 +3,8 @@ use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
 use alloc::vec::Vec;
 use core::ops::Range;
-
 use syscall_defs::exec::ExeArgs;
-use syscall_defs::{MMapFlags, MMapProt};
+use syscall_defs::{MMapFlags, MMapProt, SyscallError, SyscallResult};
 
 use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
@@ -121,6 +120,14 @@ enum UnmapResult {
     Begin,
     Mid(Mapping),
     End,
+}
+
+enum MProtectResult {
+    None,
+    Full,
+    Begin(Mapping),
+    Mid(Mapping, Mapping),
+    End(Mapping),
 }
 
 #[derive(Clone)]
@@ -360,6 +367,8 @@ impl Mapping {
             None
         };
 
+        self.update_end(addr);
+
         Mapping::new_split(addr, (self.end - addr).0, self.prot, self.flags, new_f)
     }
 
@@ -406,7 +415,6 @@ impl Mapping {
 
             let split = self.split_from(end);
             //MID
-            self.update_end(start);
 
             return UnmapResult::Mid(split);
         }
@@ -436,6 +444,55 @@ impl Mapping {
             self.update_end(start);
 
             return UnmapResult::End;
+            //END
+        }
+
+        unreachable!()
+    }
+
+    fn mprotect(&mut self, start: VirtAddr, end: VirtAddr, prot: MMapProt) -> Result<MProtectResult, SyscallError> {
+        assert_eq!(start.0 % PAGE_SIZE, 0);
+        assert_eq!(end.0 % PAGE_SIZE, 0);
+
+        //....>--<..############..>--<
+        if end <= self.start || start >= self.end {
+            return Ok(MProtectResult::None);
+        }
+
+        //..........###>----<###......
+        if start > self.start && end < self.end {
+            let mut split1 = self.split_from(start);
+            let split2 = split1.split_from(end);
+
+            split1.prot = prot;
+            //MID
+
+            return Ok(MProtectResult::Mid(split1, split2));
+        }
+
+        //..........>----------<.....
+        if start <= self.start && end >= self.end {
+            //FULL
+            self.prot = prot;
+
+            return Ok(MProtectResult::Full);
+        }
+
+        //..........>--------<###......
+        if start <= self.start && end < self.end {
+            //BEGIN
+            self.prot = prot;
+            let split = self.split_from(end);
+
+            return Ok(MProtectResult::Begin(split));
+        }
+
+        //..........###>--------<......
+        if start > self.start && end >= self.end {
+            let mut split = self.split_from(start);
+            split.prot = prot;
+
+            return Ok(MProtectResult::End(split));
             //END
         }
 
@@ -576,6 +633,10 @@ impl VMData {
                 return None;
             }
 
+            if !flags.intersects(MMapFlags::MAP_SHARED | MMapFlags::MAP_PRIVATE) {
+                return None;
+            }
+
             // Check whether file supports mmaped access
             if f.inode().as_mappable().is_none() {
                 return None;
@@ -657,7 +718,7 @@ impl VMData {
                 current_task_ref().tid(),
             );
 
-            return match (is_private, is_anonymous) {
+            match (is_private, is_anonymous) {
                 (false, _) => {
                     if is_anonymous {
                         panic!("Invalid mapping? shared and anonymous");
@@ -667,7 +728,7 @@ impl VMData {
                 }
                 (true, false) => map.handle_pf_private_file(reason, addr),
                 (true, true) => map.handle_pf_private_anon(reason, addr),
-            };
+            }
         } else {
             logln_disabled!("task {}: mmap not found", current_task_ref().tid());
             //self.print_vm();
@@ -858,7 +919,8 @@ impl VMData {
     fn log_vm(&self) {
         for e in self.maps.iter() {
             if let Some(f) = &e.mmaped_file {
-                logln4!(
+                dbgln!(
+                    map,
                     "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
                     e.start,
                     e.end,
@@ -869,7 +931,7 @@ impl VMData {
                     f.len,
                 );
             } else {
-                logln4!("{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
+                dbgln!(map, "{} {}: {:?}, {:?}", e.start, e.end, e.prot, e.flags,);
             }
         }
     }
@@ -881,7 +943,10 @@ impl VMData {
     }
 
     fn unmap(&mut self, addr: VirtAddr, len: usize) -> bool {
-        let start = addr.align_up(PAGE_SIZE);
+        if addr.0 % PAGE_SIZE != 0 {
+            return false;
+        }
+        let start = addr;
         let end = (addr + len).align_up(PAGE_SIZE);
 
         let mut cursor = self.maps.cursor_front_mut();
@@ -919,6 +984,49 @@ impl VMData {
         }
 
         success
+    }
+
+    fn mprotect(&mut self, addr: VirtAddr, len: usize, prot: MMapProt) -> SyscallResult {
+        dbgln!(map_call, "mprotect");
+
+        let start = addr;
+        let end = (addr + len).align_up(PAGE_SIZE);
+
+        let mut cursor = self.maps.cursor_front_mut();
+
+        while let Some(c) = cursor.current() {
+            if c.end <= start {
+                cursor.move_next();
+            } else {
+                match c.mprotect(start, end, prot)? {
+                    MProtectResult::None => {
+                        return Ok(0);
+                    }
+                    MProtectResult::Full => {
+                        cursor.move_next();
+                    }
+                    MProtectResult::Begin(split) => {
+                        cursor.insert_after(split);
+
+                        return Ok(0);
+                    }
+                    MProtectResult::Mid(split1, split2) => {
+                        cursor.insert_after(split1);
+                        cursor.move_next();
+                        cursor.insert_after(split2);
+
+                        return Ok(0);
+                    }
+                    MProtectResult::End(split) => {
+                        cursor.insert_after(split);
+                        cursor.move_next();
+                        cursor.move_next();
+                    }
+                }
+            }
+        }
+
+        Ok(0)
     }
 }
 
@@ -968,10 +1076,16 @@ impl VM {
         data.mmap_vm(addr, len, prot, flags, file, offset)
     }
 
-    pub fn munmap_vm(&self, addr: VirtAddr, len: usize) -> bool {
+    pub fn munmap(&self, addr: VirtAddr, len: usize) -> bool {
         let mut data = self.data.lock();
 
         data.unmap(addr, len)
+    }
+
+    pub fn mprotect(&self, addr: VirtAddr, len: usize, prot: MMapProt) -> SyscallResult {
+        let mut data = self.data.lock();
+
+        data.mprotect(addr, len, prot)
     }
 
     pub fn handle_pagefault(&self, reason: PageFaultReason, addr: VirtAddr) -> bool {

@@ -9,7 +9,7 @@ crate-type = ["staticlib"]
 
 [features]
 logs = []
-default = []
+default = ["logs"]
 
 [dependencies]
 tock-registers = "*"

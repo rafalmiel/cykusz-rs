@@ -8,7 +8,7 @@ log:             bochslog.txt
 clock:           sync=realtime, rtc_sync=1, time0=local
 cpu:             count=1, reset_on_triple_fault=0, model=corei7_haswell_4770, ips=10000000
 cpuid:           1g_pages=0, apic=x2apic
-debug:           action=report
+debug:           action=ignore
 ata0-master:     type=disk, path="disk.img", mode=flat
 plugin_ctrl:     e1000=1
 e1000:           enabled=0, mac=fe:fd:de:ad:be:ef, ethmod=null

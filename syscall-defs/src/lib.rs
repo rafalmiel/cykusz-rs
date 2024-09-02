@@ -105,8 +105,9 @@ pub const SYS_CHMOD: usize = 71;
 pub const SYS_UTIME: usize = 72;
 pub const SYS_MKNODE: usize = 73;
 pub const SYS_SOCKETPAIR: usize = 74;
+pub const SYS_MPROTECT: usize = 75;
 
-pub const SYSCALL_STRING: [&'static str; 75] = [
+pub const SYSCALL_STRING: [&'static str; 76] = [
     "SYS_READ",
     "SYS_WRITE",
     "SYS_OPEN",
@@ -182,6 +183,7 @@ pub const SYSCALL_STRING: [&'static str; 75] = [
     "SYS_UTIME",
     "SYS_MKNODE",
     "SYS_SOCKETPAIR",
+    "SYS_MPROTECT",
 ];
 
 #[derive(Copy, Clone, PartialEq, Debug)]

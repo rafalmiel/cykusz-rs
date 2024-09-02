@@ -26,9 +26,9 @@ pub fn loggers() -> Option<&'static HashSet<String>> {
 #[cfg(feature = "logs")]
 #[macro_export]
 macro_rules! dbg {
-    ($log:ident, $($arg:tt)*) => ({
+    ($($log:ident)|*, $($arg:tt)*) => ({
         if let Some(loggers) = crate::arch::output::debug::loggers() {
-            if loggers.contains(stringify!($log)) {
+            if stringify!($($log)|*).split('|').any(|e| { loggers.contains(e.trim()) }) {
                 crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
             }
         }
@@ -37,6 +37,6 @@ macro_rules! dbg {
 
 #[macro_export]
 macro_rules! dbgln {
-    ($log:ident, $fmt:expr) => (dbg!($log, concat!(stringify!($log), ": ", $fmt, "\n")));
-    ($log:ident, $fmt:expr, $($arg:tt)*) => (dbg!($log, concat!(stringify!($log), ": ", $fmt, "\n"), $($arg)*));
+    ($($log:ident)|+, $fmt:expr) => (dbg!($($log)|+, concat!(stringify!($($log)|+), ": ", $fmt, "\n")));
+    ($($log:ident)|+, $fmt:expr, $($arg:tt)*) => (dbg!($($log)|+, concat!(stringify!($($log)|+), ": ", $fmt, "\n"), $($arg)*));
 }

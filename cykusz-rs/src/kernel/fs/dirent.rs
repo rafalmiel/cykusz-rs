@@ -23,13 +23,13 @@ impl Cacheable<CacheKey> for DirEntry {
 
     fn notify_unused(&self, _new_ref: &Weak<CacheItem<CacheKey, DirEntry>>) {
         let mut data = self.write();
-        logln!("mark unused: {}", data.name);
+        dbgln!(cache, "mark unused: {}", data.name);
         data.parent = None;
     }
 
     fn notify_used(&self) {
         let data = self.write();
-        logln!("mark used: {}", data.name);
+        dbgln!(cache, "mark used: {}", data.name);
     }
 
     fn deallocate(&self, _me: &CacheItem<CacheKey, DirEntry>) {
@@ -68,11 +68,13 @@ pub struct DirEntry {
 
 impl DirEntryItem {
     pub fn full_path(&self) -> String {
+        dbgln!(dir, "full_path");
         let mut stack = Vec::<String>::new();
 
         let mut e = Some(self.clone());
 
         while let Some(el) = e {
+            dbgln!(dir, "got entry: {}", el.name());
             stack.push(el.name());
 
             e = el.read().parent.clone();

@@ -137,7 +137,8 @@ pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
 
     let res = Ok(task.open_file(inode.clone(), flags)?);
 
-    dbgln!(sys_open,
+    dbgln!(
+        sys_open,
         "sys_open: {} flags: {:?} = {}",
         inode.full_path(),
         flags,
@@ -240,7 +241,7 @@ pub fn sys_pread(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    return if let Some(f) = task.get_handle(fd) {
+    if let Some(f) = task.get_handle(fd) {
         if f.flags().is_readable() {
             Ok(f.read_at(make_buf_mut(buf, len), offset as usize)?)
         } else {
@@ -248,14 +249,14 @@ pub fn sys_pread(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
         }
     } else {
         Err(SyscallError::EBADFD)
-    };
+    }
 }
 
 pub fn sys_pwrite(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
-    return if let Some(f) = task.get_handle(fd) {
+    if let Some(f) = task.get_handle(fd) {
         if f.flags().is_writable() {
             logln4!("pwrite fd {}", fd);
             Ok(f.write_at(make_buf(buf, len), offset as usize)?)
@@ -266,7 +267,7 @@ pub fn sys_pwrite(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
     } else {
         logln4!("pwrite fd {} = EBADFD", fd);
         Err(SyscallError::EBADFD)
-    };
+    }
 }
 
 pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
@@ -274,11 +275,11 @@ pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
     let off = off as isize;
 
     let task = current_task_ref();
-    return if let Some(f) = task.get_handle(fd) {
+    if let Some(f) = task.get_handle(fd) {
         Ok(f.seek(off, syscall_defs::SeekWhence::from(whence))?)
     } else {
         Err(SyscallError::EBADFD)
-    };
+    }
 }
 
 pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) -> SyscallResult {
@@ -365,22 +366,29 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
     let prot = MMapProt::from_bits(prot as usize).ok_or(SyscallError::EINVAL)?;
     let flags = MMapFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)?;
     let file = if !flags.contains(MMapFlags::MAP_ANONYOMUS) {
-        Some(
-            task.get_handle(fd as usize)
-                .ok_or(SyscallError::EBADFD)?
-                .get_dir_item(),
-        )
+        Some(task.get_handle(fd as usize).ok_or(SyscallError::EBADFD)?)
     } else {
         None
     };
     let offset = offset as usize;
 
-    if let Some(res) = task.vm().mmap_vm(addr, len, prot, flags, file.clone(), offset) {
-        dbgln!(map|map_call, "mmap at {} len: 0x{:X} | {:?} {}, fd: {}", res, len, flags, if let Some(f) = &file {
-            f.full_path()
-        } else {
-            "no_file".to_string()
-        }, fd);
+    if let Some(res) = task
+        .vm()
+        .mmap_vm(addr, len, prot, flags, file.clone(), offset)
+    {
+        dbgln!(
+            map | map_call,
+            "mmap at {} len: 0x{:X} | {:?} {}, fd: {}",
+            res,
+            len,
+            flags,
+            if let Some(f) = &file {
+                f.get_fs_dir_item().full_path()
+            } else {
+                "no_file".to_string()
+            },
+            fd
+        );
         task.vm().log_vm();
         Ok(res.0)
     } else {
@@ -396,7 +404,7 @@ pub fn sys_mprotect(addr: u64, size: u64, prot: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    task.vm().mprotect(addr, size, prot)
+    task.vm().mprotect_vm(addr, size, prot)
 }
 
 pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
@@ -440,13 +448,13 @@ pub fn sys_chdir(at: u64, path: u64, len: u64) -> SyscallResult {
 
     let inode = dir.inode();
 
-    return if inode.ftype()? == FileType::Dir {
+    if inode.ftype()? == FileType::Dir {
         let task = current_task_ref();
         task.set_cwd(dir);
         Ok(0)
     } else {
         Err(SyscallError::ENOTDIR)
-    };
+    }
 }
 
 pub fn sys_getcwd(buf: u64, len: u64) -> SyscallResult {
@@ -497,11 +505,11 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
-    return if let Some(f) = task.get_handle(fd) {
+    if let Some(f) = task.get_handle(fd) {
         Ok(f.get_dents(make_buf_mut(buf, len))?)
     } else {
         Err(SyscallError::EBADFD)
-    };
+    }
 }
 
 pub fn sys_symlink(
@@ -544,7 +552,7 @@ fn remove_dir(file: &DirEntryItem, path: &Path) -> SyscallResult {
 
     file.drop_from_cache();
 
-    return Ok(0);
+    Ok(0)
 }
 
 pub fn sys_rmdir(path: u64, path_len: u64) -> SyscallResult {
@@ -586,7 +594,7 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
 
         Ok(0)
     } else {
-        return Err(SyscallError::EFAULT);
+        Err(SyscallError::EFAULT)
     }
 }
 
@@ -1099,7 +1107,7 @@ pub fn sys_select(
 
     logln!("select found {}", found);
 
-    return Ok(found);
+    Ok(found)
 }
 
 pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
@@ -1508,7 +1516,7 @@ pub fn sys_dup2(fd: u64, new_fd: u64, flags: u64) -> SyscallResult {
     logln5!("dup2 {} {} {:?} = {:?}", fd, new_fd, flags, res);
     task.filetable().debug();
 
-    return res;
+    res
 }
 
 pub fn sys_truncate(fd: u64, size: u64) -> SyscallResult {

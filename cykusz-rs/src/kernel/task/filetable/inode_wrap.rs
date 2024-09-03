@@ -25,7 +25,7 @@ pub struct INodeOpsWrap {
 fn get_dev_inode(inode: &DirEntryItem) -> Option<Arc<dyn INode>> {
     let fs_inode = inode.inode();
 
-    return match fs_inode.ftype() {
+    match fs_inode.ftype() {
         Ok(FileType::Fifo) => {
             if let Some(ino) = crate::kernel::fs::pipe::pipes().get_or_insert_default(&fs_inode) {
                 Some(ino)
@@ -38,7 +38,7 @@ fn get_dev_inode(inode: &DirEntryItem) -> Option<Arc<dyn INode>> {
             crate::kernel::device::find_device(fs_inode.device_id()?).and_then(|d| Some(d.inode()))
         }
         _ => None,
-    };
+    }
 }
 
 impl INodeOpsWrap {
@@ -59,7 +59,7 @@ impl INodeOpsWrap {
     }
 
     pub fn get_fs_dir_item(&self) -> DirEntryItem {
-        return self.fs_inode.clone();
+        self.fs_inode.clone()
     }
 
     pub fn get_dir_item(&self) -> DirEntryItem {
@@ -71,12 +71,12 @@ impl INodeOpsWrap {
 }
 
 macro_rules! impl_delegate {
-    ($name:tt, $res: ty) => {
+    ($name:ident, $res: ty) => {
         fn $name(&self) -> $res {
             self.get_inode().$name()
         }
     };
-    ($name:tt, $res: ty, $($v:tt: $t:ty),*) => {
+    ($name:ident, $res: ty, $($v:ident: $t:ty),*) => {
         fn $name(&self, $($v: $t),+) -> $res {
             self.get_inode().$name($($v,)*)
         }
@@ -84,12 +84,12 @@ macro_rules! impl_delegate {
 }
 
 macro_rules! impl_delegate_fs {
-    ($name:tt, $res: ty) => {
+    ($name:ident, $res: ty) => {
         fn $name(&self) -> $res {
             self.fs_inode.inode().$name()
         }
     };
-    ($name:tt, $res: ty, $($v:tt: $t:ty),*) => {
+    ($name:ident, $res: ty, $($v:ident: $t:ty),*) => {
         fn $name(&self, $($v: $t),+) -> $res {
             self.fs_inode.inode().$name($($v,)*)
         }

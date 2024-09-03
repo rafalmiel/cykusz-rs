@@ -28,18 +28,22 @@ pub struct FileHandle {
 }
 
 impl FileHandle {
-    pub fn new(fd: usize, inode: DirEntryItem, flags: OpenFlags) -> FileHandle {
-        FileHandle {
+    pub fn new(fd: usize, inode: DirEntryItem, flags: OpenFlags, offset: usize) -> Arc<FileHandle> {
+        Arc::new(FileHandle {
             fd,
             inode: INodeOpsWrap::new(inode),
-            offset: AtomicUsize::new(0),
+            offset: AtomicUsize::new(offset),
             flags: AtomicUsize::from(flags.bits()),
             dir_iter: Mutex::new((None, None)),
-        }
+        })
     }
 
     pub fn get_dir_item(&self) -> DirEntryItem {
         self.inode.get_dir_item()
+    }
+
+    pub fn get_fs_dir_item(&self) -> DirEntryItem {
+        self.inode.get_fs_dir_item()
     }
 
     pub fn get_inode(&self) -> &Arc<INodeOpsWrap> {
@@ -359,13 +363,12 @@ impl FileTable {
 
         let mk_handle = |fd: usize, inode: DirEntryItem| {
             Some(FileDescriptor::new(
-                Arc::new(FileHandle {
+                FileHandle::new(
                     fd,
-                    inode: INodeOpsWrap::new(inode.clone()),
-                    offset: AtomicUsize::new(if append { size as usize } else { 0 }),
-                    flags: AtomicUsize::new(flags.bits()),
-                    dir_iter: Mutex::new((None, None)),
-                }),
+                    inode.clone(),
+                    flags,
+                    if append { size as usize } else { 0 },
+                ),
                 FDFlags::from(flags),
             ))
         };

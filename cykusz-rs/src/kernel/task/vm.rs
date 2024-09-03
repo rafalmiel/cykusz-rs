@@ -1,10 +1,11 @@
 use alloc::boxed::Box;
 use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::ops::Range;
 use syscall_defs::exec::ExeArgs;
-use syscall_defs::{MMapFlags, MMapProt, SyscallError, SyscallResult};
+use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SyscallError, SyscallResult};
 
 use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
@@ -20,6 +21,7 @@ use crate::kernel::mm::{
 };
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, Mutex};
+use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::utils::types::Align;
 
 impl From<MMapProt> for PageFlags {
@@ -60,14 +62,14 @@ impl From<ProgramFlags> for MMapProt {
 
 #[derive(Clone)]
 struct MMapedFile {
-    file: DirEntryItem,
+    file: Arc<FileHandle>,
     starting_offset: usize,
     len: usize,
     active_mappings: hashbrown::HashMap<VirtAddr, PageCacheItemArc>,
 }
 
 impl MMapedFile {
-    fn new(file: DirEntryItem, len: usize, offset: usize) -> MMapedFile {
+    fn new(file: Arc<FileHandle>, len: usize, offset: usize) -> MMapedFile {
         MMapedFile {
             file,
             starting_offset: offset,
@@ -145,7 +147,7 @@ impl Mapping {
         len: usize,
         prot: MMapProt,
         flags: MMapFlags,
-        file: Option<DirEntryItem>,
+        file: Option<Arc<FileHandle>>,
         offset: usize,
     ) -> Mapping {
         Mapping {
@@ -217,11 +219,11 @@ impl Mapping {
             if current_task_ref().locks() > 0 {
                 logln!(
                     "handle_pf_private_file: locks > 0 f: {}",
-                    f.file.full_path()
+                    f.file.get_fs_dir_item().full_path()
                 );
             }
 
-            let mappable = f.file.inode().as_mappable().unwrap();
+            let mappable = f.file.get_dir_item().inode().as_mappable().unwrap();
 
             if let Some(MMapPageStruct(MMapPage::Cached(p))) = mappable.get_mmap_page(offset) {
                 if !reason.contains(PageFaultReason::WRITE)
@@ -325,7 +327,7 @@ impl Mapping {
 
             let addr_aligned = addr.align_down(PAGE_SIZE);
 
-            let mappable = f.file.inode().as_mappable().unwrap();
+            let mappable = f.file.get_dir_item().inode().as_mappable().unwrap();
 
             match mappable.get_mmap_page(offset) {
                 Some(MMapPageStruct(MMapPage::Cached(p))) => {
@@ -454,6 +456,20 @@ impl Mapping {
         assert_eq!(start.0 % PAGE_SIZE, 0);
         assert_eq!(end.0 % PAGE_SIZE, 0);
 
+        if let Some(f) = &self.mmaped_file {
+            if self.flags.contains(MMapFlags::MAP_SHARED)
+                && prot.contains(MMapProt::PROT_WRITE)
+                && !f.file.flags().is_writable()
+            {
+                return Err(SyscallError::EACCES);
+            }
+        }
+
+        if self.prot == prot {
+            dbgln!(map_call, "mprotect full 1");
+            return Ok(MProtectResult::Full);
+        }
+
         //....>--<..############..>--<
         if end <= self.start || start >= self.end {
             return Ok(MProtectResult::None);
@@ -537,7 +553,7 @@ impl VMData {
             }
         }
 
-        return Some((addr, cur));
+        Some((addr, cur))
     }
 
     fn find_any_above(
@@ -595,13 +611,13 @@ impl VMData {
         None
     }
 
-    fn mmap_vm(
+    fn mmap(
         &mut self,
         addr: Option<VirtAddr>,
         len: usize,
         prot: MMapProt,
         flags: MMapFlags,
-        file: Option<DirEntryItem>,
+        file: Option<Arc<FileHandle>>,
         offset: usize,
     ) -> Option<VirtAddr> {
         // Offset should be multiple of PAGE_SIZE
@@ -638,7 +654,7 @@ impl VMData {
             }
 
             // Check whether file supports mmaped access
-            if f.inode().as_mappable().is_none() {
+            if f.get_dir_item().inode().as_mappable().is_none() {
                 return None;
             }
         } else {
@@ -842,12 +858,12 @@ impl VMData {
                     );
 
                     last_mmap_end = self
-                        .mmap_vm(
+                        .mmap(
                             Some(virt_begin),
                             len,
                             p.p_flags.into(),
                             MMapFlags::MAP_PRIVATE | MMapFlags::MAP_FIXED,
-                            Some(exe.clone()),
+                            Some(FileHandle::new(0, exe.clone(), OpenFlags::RDONLY, 0)),
                             file_offset as usize,
                         )
                         .expect("Failed to mmap")
@@ -860,7 +876,7 @@ impl VMData {
                         let len = (virt_end - virt_fend).0;
 
                         last_mmap_end = self
-                            .mmap_vm(
+                            .mmap(
                                 Some(virt_fend),
                                 virt_end.0 - virt_fend.0,
                                 p.p_flags.into(),
@@ -906,7 +922,7 @@ impl VMData {
                     e.end,
                     e.prot,
                     e.flags,
-                    f.file.full_path(),
+                    f.file.get_fs_dir_item().full_path(),
                     f.starting_offset,
                     f.len,
                 );
@@ -926,7 +942,7 @@ impl VMData {
                     e.end,
                     e.prot,
                     e.flags,
-                    f.file.full_path(),
+                    f.file.get_fs_dir_item().full_path(),
                     f.starting_offset,
                     f.len,
                 );
@@ -987,7 +1003,9 @@ impl VMData {
     }
 
     fn mprotect(&mut self, addr: VirtAddr, len: usize, prot: MMapProt) -> SyscallResult {
-        dbgln!(map_call, "mprotect");
+        if addr.0 % PAGE_SIZE != 0 {
+            return Err(SyscallError::EINVAL);
+        }
 
         let start = addr;
         let end = (addr + len).align_up(PAGE_SIZE);
@@ -1068,12 +1086,12 @@ impl VM {
         len: usize,
         prot: MMapProt,
         flags: MMapFlags,
-        file: Option<DirEntryItem>,
+        file: Option<Arc<FileHandle>>,
         offset: usize,
     ) -> Option<VirtAddr> {
         let mut data = self.data.lock();
 
-        data.mmap_vm(addr, len, prot, flags, file, offset)
+        data.mmap(addr, len, prot, flags, file, offset)
     }
 
     pub fn munmap(&self, addr: VirtAddr, len: usize) -> bool {
@@ -1082,7 +1100,7 @@ impl VM {
         data.unmap(addr, len)
     }
 
-    pub fn mprotect(&self, addr: VirtAddr, len: usize, prot: MMapProt) -> SyscallResult {
+    pub fn mprotect_vm(&self, addr: VirtAddr, len: usize, prot: MMapProt) -> SyscallResult {
         let mut data = self.data.lock();
 
         data.mprotect(addr, len, prot)

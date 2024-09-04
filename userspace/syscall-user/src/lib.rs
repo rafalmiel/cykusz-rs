@@ -203,6 +203,10 @@ pub fn mmap(
     }
 }
 
+pub fn mprotect(addr: usize, size: usize, prot: MMapProt) -> SyscallResult {
+    unsafe { syscall3(SYS_MPROTECT, addr, size, prot.bits()) }
+}
+
 pub fn munmap(addr: usize, len: usize) -> SyscallResult {
     unsafe { syscall2(SYS_MUNMAP, addr, len) }
 }

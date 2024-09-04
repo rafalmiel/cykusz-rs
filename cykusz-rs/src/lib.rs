@@ -16,7 +16,8 @@
 #![feature(new_uninit)]
 #![feature(never_type)]
 #![feature(linked_list_cursors)]
-
+#![feature(trace_macros)]
+#![feature(unsigned_is_multiple_of)]
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;

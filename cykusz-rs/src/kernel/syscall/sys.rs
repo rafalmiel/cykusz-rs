@@ -413,8 +413,8 @@ pub fn sys_munmap(addr: u64, len: u64) -> SyscallResult {
     let task = current_task_ref();
 
     if task.vm().munmap(addr, len as usize) {
-        logln!("munmap at {} len: 0x{:X}", addr, len);
-        //task.vm().log_vm();
+        dbgln!(map_call, "munmap at {} len: 0x{:X}", addr, len);
+        task.vm().log_vm();
         Ok(0)
     } else {
         Err(SyscallError::EFAULT)

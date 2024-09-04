@@ -18,7 +18,7 @@ sed -i "s/{LOGS}/$CYKUSZ_LOGS/g" mnt/grub/grub.cfg
 umount mnt
 
 PROGS="test testcpp hello stack nyancat ttytest fork poweroff stat fbdoom doom1.wad open_sleep"
-RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client forktest"
+RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client forktest mprotecttest"
 
 mount /dev/loop0p2 mnt
 mkdir -p mnt/bin

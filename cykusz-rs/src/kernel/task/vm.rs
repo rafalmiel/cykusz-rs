@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::ops::Range;
 use syscall_defs::exec::ExeArgs;
@@ -11,13 +11,16 @@ use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
 use crate::drivers::elf::types::{BinType, ProgramFlags, ProgramType};
 use crate::drivers::elf::ElfHeader;
-use crate::kernel::fs::dirent::DirEntryItem;
+use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
+use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
-use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, PageCacheItemArc};
+use crate::kernel::fs::pcache::{
+    MMapPage, MMapPageStruct, MappedAccess, PageCacheItemArc, PageDirectItemStruct,
+};
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{
-    allocate_order, map_flags, map_to_flags, unmap, update_flags, VirtAddr, MAX_USER_ADDR,
+    allocate_order, map_flags, map_to_flags, unmap, update_flags, PhysAddr, VirtAddr, MAX_USER_ADDR,
 };
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, Mutex};
@@ -57,6 +60,69 @@ impl From<ProgramFlags> for MMapProt {
         }
 
         prot
+    }
+}
+
+struct AnonymousSharedMem {
+    pages: Mutex<hashbrown::HashMap<usize, PhysAddr>>,
+    len: usize,
+    flags: PageFlags,
+    sref: Weak<AnonymousSharedMem>,
+}
+
+impl AnonymousSharedMem {
+    fn get_file_handle(len: usize, flags: PageFlags) -> Arc<FileHandle> {
+        let inode = Arc::<AnonymousSharedMem>::new_cyclic(|me| AnonymousSharedMem {
+            pages: Mutex::new(hashbrown::HashMap::new()),
+            len,
+            flags,
+            sref: me.clone(),
+        });
+
+        FileHandle::new(0, DirEntry::inode_wrap(inode.clone()), OpenFlags::RDWR, 0)
+    }
+}
+
+impl MappedAccess for AnonymousSharedMem {
+    fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct> {
+        let mut pages = self.pages.lock();
+
+        let offset = offset.align_down(PAGE_SIZE);
+
+        if offset >= self.len {
+            return None;
+        }
+
+        let phys_page = if pages.contains_key(&offset) {
+            let p = pages.get(&offset).unwrap();
+
+            *p
+        } else {
+            let mut page = allocate_order(0).expect("Failed to alloc page");
+            page.clear();
+
+            pages.insert(offset, page.address());
+
+            page.address()
+        };
+
+        dbgln!(
+            vm,
+            "AnonSharedMem got page {} offset {} flags {:?}",
+            phys_page,
+            offset,
+            self.flags
+        );
+
+        Some(MMapPageStruct(MMapPage::Direct(PageDirectItemStruct::new(
+            phys_page, offset, self.flags,
+        ))))
+    }
+}
+
+impl INode for AnonymousSharedMem {
+    fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
+        Some(self.sref.upgrade().unwrap())
     }
 }
 
@@ -398,8 +464,8 @@ impl Mapping {
     }
 
     fn unmap(&mut self, start: VirtAddr, end: VirtAddr) -> UnmapResult {
-        assert_eq!(start.0 % PAGE_SIZE, 0);
-        assert_eq!(end.0 % PAGE_SIZE, 0);
+        assert_eq!(start.0.is_multiple_of(PAGE_SIZE), true);
+        assert_eq!(end.0.is_multiple_of(PAGE_SIZE), true);
 
         dbgln!(unmap, "unmapping region {} - {}", self.start, self.end);
 
@@ -467,8 +533,8 @@ impl Mapping {
         end: VirtAddr,
         prot: MMapProt,
     ) -> Result<MProtectResult, SyscallError> {
-        assert_eq!(start.0 % PAGE_SIZE, 0);
-        assert_eq!(end.0 % PAGE_SIZE, 0);
+        assert!(start.0.is_multiple_of(PAGE_SIZE));
+        assert!(end.0.is_multiple_of(PAGE_SIZE));
 
         if let Some(f) = &self.mmaped_file {
             if self.flags.contains(MMapFlags::MAP_SHARED)
@@ -605,10 +671,10 @@ impl VMData {
 
                     let hole = c_start.0 - addr.0;
 
-                    return if len <= hole {
-                        Some((start, cur))
+                    if len <= hole {
+                        return Some((start, cur));
                     } else {
-                        None
+                        cur.move_next();
                     };
                 }
             }
@@ -633,11 +699,11 @@ impl VMData {
         len: usize,
         prot: MMapProt,
         flags: MMapFlags,
-        file: Option<Arc<FileHandle>>,
+        mut file: Option<Arc<FileHandle>>,
         offset: usize,
     ) -> Option<VirtAddr> {
         // Offset should be multiple of PAGE_SIZE
-        if offset % PAGE_SIZE != 0 {
+        if !offset.is_multiple_of(PAGE_SIZE) {
             return None;
         }
 
@@ -649,7 +715,7 @@ impl VMData {
             // Address should be multiple of PAGE_SIZE if we request fixed mapping
             // and should not extend beyond max user addr
             if flags.contains(MMapFlags::MAP_FIXED)
-                && (a.0 % PAGE_SIZE != 0 || a + len > MAX_USER_ADDR)
+                && (!a.0.is_multiple_of(PAGE_SIZE) || a + len > MAX_USER_ADDR)
             {
                 return None;
             }
@@ -678,11 +744,14 @@ impl VMData {
             if !flags.contains(MMapFlags::MAP_ANONYOMUS) {
                 return None;
             }
+        }
 
-            // Can't have shared anonymous mapping
-            if flags.contains(MMapFlags::MAP_SHARED) {
-                return None;
-            }
+        if file.is_none() && flags.contains(MMapFlags::MAP_ANONYOMUS | MMapFlags::MAP_SHARED) {
+            dbgln!(map_call, "Alloc anon file");
+            file = Some(AnonymousSharedMem::get_file_handle(
+                len,
+                PageFlags::USER | prot.into(),
+            ));
         }
 
         match addr {
@@ -703,6 +772,8 @@ impl VMData {
             None => self.find_any_above(MMAP_USER_ADDR, len.align_up(PAGE_SIZE)),
         }
         .and_then(|(addr, mut cur)| {
+            let mapping = Mapping::new(addr, len, prot, flags, file, offset);
+
             if let Some(prev) = cur.peek_prev() {
                 if prev.end == addr
                     && prev.flags == flags
@@ -715,7 +786,7 @@ impl VMData {
                 }
             }
 
-            cur.insert_before(Mapping::new(addr, len, prot, flags, file, offset));
+            cur.insert_before(mapping);
 
             Some(addr)
         })
@@ -751,13 +822,8 @@ impl VMData {
             );
 
             match (is_private, is_anonymous) {
-                (false, _) => {
-                    if is_anonymous {
-                        panic!("Invalid mapping? shared and anonymous");
-                    }
-
-                    map.handle_pf_shared_file(reason, addr)
-                }
+                (false, false) => map.handle_pf_shared_file(reason, addr),
+                (false, true) => map.handle_pf_shared_file(reason, addr),
                 (true, false) => map.handle_pf_private_file(reason, addr),
                 (true, true) => map.handle_pf_private_anon(reason, addr),
             }

@@ -9,6 +9,12 @@ test = false
 bench = false
 path = "src/forktest/bin/main.rs"
 
+[[bin]]
+name = "mprotecttest"
+test = false
+bench = false
+path = "src/mprotect/bin/main.rs"
+
 [dependencies.syscall-defs]
 path = "../../syscall-defs"
 

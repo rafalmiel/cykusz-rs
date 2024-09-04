@@ -362,6 +362,7 @@ impl Mapping {
     }
 
     fn split_from(&mut self, addr: VirtAddr) -> Mapping {
+        dbgln!(map_v, "split_from {} [{} {}]", addr, self.start, self.end);
         assert!(addr > self.start && addr < self.end);
         let new_f = if let Some(f) = &mut self.mmaped_file {
             Some(f.split_from(addr, self.end, f.starting_offset + (addr - self.start).0))
@@ -369,9 +370,13 @@ impl Mapping {
             None
         };
 
+        let new_split = Mapping::new_split(addr, (self.end - addr).0, self.prot, self.flags, new_f);
+        dbgln!(map_v, "self [{} {}]", self.start, addr);
+        dbgln!(map_v, "new  [{} {}]", addr, addr + (self.end - addr));
+
         self.update_end(addr);
 
-        Mapping::new_split(addr, (self.end - addr).0, self.prot, self.flags, new_f)
+        new_split
     }
 
     fn update_start(&mut self, new_start: VirtAddr) {
@@ -396,6 +401,8 @@ impl Mapping {
         assert_eq!(start.0 % PAGE_SIZE, 0);
         assert_eq!(end.0 % PAGE_SIZE, 0);
 
+        dbgln!(unmap, "unmapping region {} - {}", self.start, self.end);
+
         let unmap_range = |range: Range<VirtAddr>, f: &mut Option<MMapedFile>| {
             for v in range.step_by(PAGE_SIZE) {
                 if let Some(f) = f {
@@ -413,12 +420,14 @@ impl Mapping {
 
         //..........###>----<###......
         if start > self.start && end < self.end {
+            dbgln!(unmap, "MID");
             unmap_range(start..end, &mut self.mmaped_file);
 
-            let split = self.split_from(end);
+            //let _split1 = self.split_from(start);
+            let split2 = self.split_from(start).split_from(end);
             //MID
 
-            return UnmapResult::Mid(split);
+            return UnmapResult::Mid(split2);
         }
 
         //..........>----------<.....
@@ -452,7 +461,12 @@ impl Mapping {
         unreachable!()
     }
 
-    fn mprotect(&mut self, start: VirtAddr, end: VirtAddr, prot: MMapProt) -> Result<MProtectResult, SyscallError> {
+    fn mprotect(
+        &mut self,
+        start: VirtAddr,
+        end: VirtAddr,
+        prot: MMapProt,
+    ) -> Result<MProtectResult, SyscallError> {
         assert_eq!(start.0 % PAGE_SIZE, 0);
         assert_eq!(end.0 % PAGE_SIZE, 0);
 
@@ -562,6 +576,8 @@ impl VMData {
         len: usize,
     ) -> Option<(VirtAddr, CursorMut<Mapping>)> {
         use core::cmp::max;
+
+        dbgln!(map_v, "find_any_above {} {}", addr, len);
 
         if self.maps.is_empty() {
             return Some((addr, self.maps.cursor_front_mut()));
@@ -959,11 +975,13 @@ impl VMData {
     }
 
     fn unmap(&mut self, addr: VirtAddr, len: usize) -> bool {
-        if addr.0 % PAGE_SIZE != 0 {
+        if !addr.0.is_multiple_of(PAGE_SIZE) {
             return false;
         }
         let start = addr;
         let end = (addr + len).align_up(PAGE_SIZE);
+
+        dbgln!(unmap, "start: {}, end: {}", start, end);
 
         let mut cursor = self.maps.cursor_front_mut();
 
@@ -1003,7 +1021,7 @@ impl VMData {
     }
 
     fn mprotect(&mut self, addr: VirtAddr, len: usize, prot: MMapProt) -> SyscallResult {
-        if addr.0 % PAGE_SIZE != 0 {
+        if !addr.0.is_multiple_of(PAGE_SIZE) {
             return Err(SyscallError::EINVAL);
         }
 

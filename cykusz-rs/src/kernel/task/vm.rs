@@ -70,6 +70,12 @@ struct AnonymousSharedMem {
     sref: Weak<AnonymousSharedMem>,
 }
 
+impl Drop for AnonymousSharedMem {
+    fn drop(&mut self) {
+        dbgln!(map_call, "Drop AnonymousSharedMem");
+    }
+}
+
 impl AnonymousSharedMem {
     fn get_file_handle(len: usize, flags: PageFlags) -> Arc<FileHandle> {
         let inode = Arc::<AnonymousSharedMem>::new_cyclic(|me| AnonymousSharedMem {
@@ -79,7 +85,7 @@ impl AnonymousSharedMem {
             sref: me.clone(),
         });
 
-        FileHandle::new(0, DirEntry::inode_wrap(inode.clone()), OpenFlags::RDWR, 0)
+        FileHandle::new(0, DirEntry::inode_wrap(inode), OpenFlags::RDWR, 0)
     }
 }
 
@@ -136,6 +142,7 @@ struct MMapedFile {
 
 impl MMapedFile {
     fn new(file: Arc<FileHandle>, len: usize, offset: usize) -> MMapedFile {
+        dbgln!(map_call, "mapped file: {}", Arc::strong_count(&file));
         MMapedFile {
             file,
             starting_offset: offset,
@@ -174,6 +181,12 @@ impl MMapedFile {
 
 impl Drop for MMapedFile {
     fn drop(&mut self) {
+        dbgln!(
+            map_call,
+            "drop mapped file rc {} {}",
+            Arc::strong_count(&self.file),
+            self.file.get_fs_dir_item().full_path()
+        );
         for (&addr, mapping) in self.active_mappings.iter() {
             let uaddr: UserAddr = addr.into();
 
@@ -746,7 +759,7 @@ impl VMData {
             }
         }
 
-        if file.is_none() && flags.contains(MMapFlags::MAP_ANONYOMUS | MMapFlags::MAP_SHARED) {
+        if flags.contains(MMapFlags::MAP_ANONYOMUS | MMapFlags::MAP_SHARED) {
             dbgln!(map_call, "Alloc anon file");
             file = Some(AnonymousSharedMem::get_file_handle(
                 len,
@@ -1132,8 +1145,20 @@ impl VMData {
     }
 }
 
+impl Drop for VMData {
+    fn drop(&mut self) {
+        dbgln!(map_call, "Drop VMData");
+    }
+}
+
 pub struct VM {
     data: Mutex<VMData>,
+}
+
+impl Drop for VM {
+    fn drop(&mut self) {
+        dbgln!(map_call, "Drop VM");
+    }
 }
 
 impl Default for VM {

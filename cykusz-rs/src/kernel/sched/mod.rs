@@ -237,7 +237,8 @@ impl Scheduler {
     pub fn exit(&self, status: syscall_defs::waitpid::Status) -> ! {
         let current = current_task_ref();
 
-        logln2!(
+        dbgln!(
+            task,
             "exit tid {} is pl: {}, sc: {}, wc: {}",
             current.tid(),
             current.is_process_leader(),

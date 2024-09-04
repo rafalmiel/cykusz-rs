@@ -269,6 +269,11 @@ impl FileHandle {
 
 impl Drop for FileHandle {
     fn drop(&mut self) {
+        dbgln!(
+            map_call,
+            "Drop file handle {}",
+            self.get_fs_dir_item().full_path()
+        );
         self.inode.close(self.flags());
     }
 }

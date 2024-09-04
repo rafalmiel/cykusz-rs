@@ -324,11 +324,16 @@ impl Task {
             if child.is_process_leader() {
                 let task = cursor.remove().unwrap();
 
+                dbgln!(task, "Move task {} to init", task.tid());
+
                 parent.add_child(task);
             } else {
                 cursor.move_next();
             }
         }
+
+        // Migrate already dead child processes not waited for by the parent
+        parent.children_events.migrate(&self.children_events);
     }
 
     pub fn get_handle(&self, fd: usize) -> Option<Arc<FileHandle>> {

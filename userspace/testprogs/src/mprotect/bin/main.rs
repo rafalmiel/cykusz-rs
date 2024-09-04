@@ -1,5 +1,6 @@
 use syscall_defs::{MMapFlags, MMapProt};
-use syscall_user::{fork, mmap, mprotect, munmap, sleep};
+use syscall_defs::waitpid::WaitPidFlags;
+use syscall_user::{fork, mmap, mprotect, munmap, sleep, waitpid};
 
 fn main() {
     let addr =
@@ -49,5 +50,12 @@ fn main() {
     }
 
     println!("finished {pid}");
+
+    //if pid != 0 {
+    //    let mut status = 0;
+    //    waitpid(pid as isize, &mut status, WaitPidFlags::EXITED);
+    //    println!("exit status: {status}");
+
+    //}
 
 }

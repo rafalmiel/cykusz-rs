@@ -24,6 +24,19 @@ pub struct WaitPidEvents {
 }
 
 impl WaitPidEvents {
+    pub fn migrate(&self, other: &WaitPidEvents) {
+        {
+            let mut this_tasks = self.tasks.lock();
+            let mut other_tasks = other.tasks.lock();
+
+            while let Some(t) = other_tasks.tasks.pop_front() {
+                this_tasks.tasks.push_back(t);
+            }
+        }
+
+        self.wq.notify_all();
+    }
+
     pub fn add_zombie(&self, zombie: Arc<Task>) {
         if !zombie.waitpid.is_linked() {
             let mut list = self.tasks.lock();

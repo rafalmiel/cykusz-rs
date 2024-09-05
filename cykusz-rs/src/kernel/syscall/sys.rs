@@ -355,7 +355,7 @@ pub fn sys_fcntl(fd: u64, cmd: u64, flags: u64) -> SyscallResult {
 pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) -> SyscallResult {
     let task = current_task_ref();
 
-    //logln!("mmap: {:#x}", addr);
+    dbgln!(map_call|map, "mmap: {:#x}", addr);
 
     let addr = if addr != 0 {
         Some(VirtAddr(addr as usize))
@@ -376,8 +376,7 @@ pub fn sys_mmap(addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64
         .vm()
         .mmap_vm(addr, len, prot, flags, file.clone(), offset)
     {
-        dbgln!(
-            map | map_call,
+        dbgln!(map|map_call,
             "mmap at {} len: 0x{:X} | {:?} {}, fd: {}",
             res,
             len,

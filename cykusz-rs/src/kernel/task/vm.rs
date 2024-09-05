@@ -1246,7 +1246,6 @@ impl VMData {
                     }
                     MProtectResult::Full => {
                         cursor = cursor.merge_prev_next();
-
                         cursor.move_next();
                     }
                     MProtectResult::Begin(split) => {
@@ -1262,6 +1261,7 @@ impl VMData {
                     }
                     MProtectResult::End(split) => {
                         cursor = cursor.insert_merge_after(split);
+                        cursor.move_next();
                     }
                 }
             }

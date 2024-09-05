@@ -845,8 +845,8 @@ impl INode for LockedExt2INode {
         }
 
         let new_inode = self.mk_inode(FileType::Symlink)?;
-        self.ext2_fs().free_inode(&new_inode.as_ext2_inode());
         if let Err(e) = new_inode.write_at(0, target.as_bytes(), OpenFlags::empty()) {
+            self.ext2_fs().free_inode(&new_inode.as_ext2_inode());
             return Err(e);
         }
 
@@ -854,7 +854,6 @@ impl INode for LockedExt2INode {
 
         if let Err(e) = iter.add_dir_entry(&new_inode.as_ext2_inode(), name) {
             self.ext2_fs().free_inode(&new_inode.as_ext2_inode());
-
             Err(e)
         } else {
             Ok(())

@@ -170,7 +170,7 @@ impl<'a> DirEntIter<'a> {
             let file_size = { self.inode.read_debug(19).d_inode().size_lower() } as usize;
 
             if self.offset >= file_size {
-                return if let Some(new_block) =
+                if let Some(new_block) =
                     self.reader.append_block(fs.superblock().block_size())
                 {
                     let entry = unsafe {
@@ -186,7 +186,7 @@ impl<'a> DirEntIter<'a> {
                     self.add_dir_entry(target, name)
                 } else {
                     Err(FsError::NotSupported)
-                };
+                }
             } else {
                 println!(
                     "Unreachable? offset {} filesize {} inode: {}",

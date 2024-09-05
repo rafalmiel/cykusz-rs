@@ -14,11 +14,8 @@ impl Frame {
     }
 
     pub fn clear(&mut self) {
-        for a in (self.address_mapped()..self.address_mapped() + MappedAddr(PAGE_SIZE)).step_by(8) {
-            unsafe {
-                a.store(0u64);
-            }
-        }
+        type Slice = [u8; PAGE_SIZE];
+        unsafe { self.address_mapped().read_mut::<Slice>() }.fill(0)
     }
 
     pub fn address(&self) -> PhysAddr {

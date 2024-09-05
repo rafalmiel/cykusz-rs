@@ -338,7 +338,8 @@ impl Queues {
         assert_eq!(current.sched.is_linked(), false);
         assert!(current.is_process_leader());
 
-        logln!(
+        dbgln!(
+            mem,
             "FREE MEM h:{} p:{}",
             crate::kernel::mm::heap::heap_mem(),
             crate::arch::mm::phys::used_mem()

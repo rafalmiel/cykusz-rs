@@ -177,6 +177,24 @@ impl MMapedFile {
 
         new
     }
+
+    fn file(&self) -> &Arc<FileHandle> {
+        &self.file
+    }
+
+    fn merge(&mut self, other: &mut MMapedFile, start: VirtAddr, end: VirtAddr) {
+        assert!(Arc::ptr_eq(&self.file, &other.file));
+
+        self.starting_offset = core::cmp::min(self.starting_offset, other.starting_offset);
+
+        self.len += other.len;
+
+        for a in (start..end).step_by(PAGE_SIZE) {
+            if let Some(pg) = other.active_mappings.remove(&a) {
+                self.active_mappings.insert(a, pg);
+            }
+        }
+    }
 }
 
 impl Drop for MMapedFile {
@@ -267,6 +285,48 @@ impl Mapping {
 
         map_to_flags(addr, new_page.address(), PageFlags::USER | prot.into());
     }
+
+    fn try_merge(&mut self, other: &mut Mapping) -> bool {
+        if let (Some(mf), Some(omf)) = (&self.mmaped_file, &other.mmaped_file) {
+            if !Arc::ptr_eq(mf.file(), omf.file()) {
+                return false;
+            } else if (mf.starting_offset + mf.len != omf.starting_offset)
+                && (omf.starting_offset + omf.len != mf.starting_offset)
+            {
+                return false;
+            }
+        }
+
+        if self.mmaped_file.is_none() != other.mmaped_file.is_none()
+            || self.flags != other.flags
+            || self.prot != other.prot
+        {
+            return false;
+        }
+
+        let res = if self.start == other.end {
+            self.start = other.start;
+
+            true
+        } else if self.end == other.start {
+            self.end = other.end;
+
+            true
+        } else {
+            false
+        };
+
+        if res && self.mmaped_file.is_some() {
+            self.mmaped_file.as_mut().unwrap().merge(
+                other.mmaped_file.as_mut().unwrap(),
+                other.start,
+                other.end,
+            );
+        }
+
+        res
+    }
+
 
     fn handle_pf_private_anon(&mut self, reason: PageFaultReason, addr: VirtAddr) -> bool {
         let addr_aligned = addr.align_down(PAGE_SIZE);
@@ -622,6 +682,88 @@ pub struct TlsVmInfo {
     pub mmap_addr_hint: VirtAddr,
 }
 
+trait InsertMergeAfter {
+    fn insert_merge_after<'a>(self, mapping: Mapping) -> Self;
+    fn insert_merge_before<'a>(self, mapping: Mapping) -> Self;
+
+    fn merge_prev_next<'a>(self) -> Self;
+}
+
+impl<'a> InsertMergeAfter for CursorMut<'a, Mapping> {
+    fn insert_merge_after(mut self, mut mapping: Mapping) -> Self {
+        if if let Some(current) = self.current() {
+            mapping.try_merge(current)
+        } else {
+            false
+        } {
+            // merged
+            self.remove_current();
+        } else {
+            self.move_next();
+        }
+
+        if let Some(next) = self.current() {
+            if !next.try_merge(&mut mapping) {
+                self.insert_before(mapping);
+                self.move_prev();
+            }
+        } else {
+            self.insert_before(mapping);
+            self.move_prev();
+
+        }
+
+        self
+    }
+
+    fn insert_merge_before(mut self, mapping: Mapping) -> Self {
+        self.move_prev();
+
+        self.insert_merge_after(mapping)
+    }
+
+    fn merge_prev_next(mut self) -> Self {
+        dbgln!(map_call, "merge prev next");
+        let current = self.remove_current();
+
+        if let Some(mut current) = current {
+            if if let Some(prev) = self.peek_prev() {
+                current.try_merge(prev)
+            } else {
+                false
+            } {
+                self.move_prev();
+                self.insert_after(current);
+                self.remove_current();
+            } else {
+                self.insert_before(current);
+                self.move_prev();
+            }
+        }
+
+        let current = self.remove_current();
+
+        if let Some(mut current) = current {
+            if if let Some(next) = self.current() {
+                current.try_merge(next)
+            } else {
+                false
+            } {
+                self.remove_current();
+                self.move_prev();
+                self.insert_after(current);
+            } else {
+                self.insert_before(current);
+                self.move_prev();
+            }
+        }
+
+        dbgln!(map_call, "merge prev next fin");
+
+        self
+    }
+}
+
 impl VMData {
     fn new() -> VMData {
         VMData {
@@ -784,22 +926,9 @@ impl VMData {
             }
             None => self.find_any_above(MMAP_USER_ADDR, len.align_up(PAGE_SIZE)),
         }
-        .and_then(|(addr, mut cur)| {
+        .and_then(|(addr, cur)| {
             let mapping = Mapping::new(addr, len, prot, flags, file, offset);
-
-            if let Some(prev) = cur.peek_prev() {
-                if prev.end == addr
-                    && prev.flags == flags
-                    && prev.prot == prot
-                    && prev.mmaped_file.is_none()
-                {
-                    prev.end = addr + len.align_up(PAGE_SIZE);
-
-                    return Some(addr);
-                }
-            }
-
-            cur.insert_before(mapping);
+            cur.insert_merge_before(mapping);
 
             Some(addr)
         })
@@ -835,8 +964,7 @@ impl VMData {
             );
 
             match (is_private, is_anonymous) {
-                (false, false) => map.handle_pf_shared_file(reason, addr),
-                (false, true) => map.handle_pf_shared_file(reason, addr),
+                (false, _) => map.handle_pf_shared_file(reason, addr),
                 (true, false) => map.handle_pf_private_file(reason, addr),
                 (true, true) => map.handle_pf_private_anon(reason, addr),
             }
@@ -1030,8 +1158,7 @@ impl VMData {
     fn log_vm(&self) {
         for e in self.maps.iter() {
             if let Some(f) = &e.mmaped_file {
-                dbgln!(
-                    map,
+                dbgln!(map,
                     "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
                     e.start,
                     e.end,
@@ -1088,7 +1215,7 @@ impl VMData {
                         cursor.move_next();
                     }
                     UnmapResult::Mid(new_mapping) => {
-                        cursor.insert_after(new_mapping);
+                        cursor.insert_merge_after(new_mapping);
 
                         return true;
                     }
@@ -1118,24 +1245,23 @@ impl VMData {
                         return Ok(0);
                     }
                     MProtectResult::Full => {
+                        cursor = cursor.merge_prev_next();
+
                         cursor.move_next();
                     }
                     MProtectResult::Begin(split) => {
-                        cursor.insert_after(split);
+                        cursor.insert_merge_after(split);
 
                         return Ok(0);
                     }
                     MProtectResult::Mid(split1, split2) => {
-                        cursor.insert_after(split1);
-                        cursor.move_next();
-                        cursor.insert_after(split2);
+                        cursor = cursor.insert_merge_after(split1);
+                        cursor.insert_merge_after(split2);
 
                         return Ok(0);
                     }
                     MProtectResult::End(split) => {
-                        cursor.insert_after(split);
-                        cursor.move_next();
-                        cursor.move_next();
+                        cursor = cursor.insert_merge_after(split);
                     }
                 }
             }
@@ -1200,7 +1326,11 @@ impl VM {
     ) -> Option<VirtAddr> {
         let mut data = self.data.lock();
 
-        data.mmap(addr, len, prot, flags, file, offset)
+        let res = data.mmap(addr, len, prot, flags, file, offset);
+
+        data.log_vm();
+
+        res
     }
 
     pub fn munmap(&self, addr: VirtAddr, len: usize) -> bool {

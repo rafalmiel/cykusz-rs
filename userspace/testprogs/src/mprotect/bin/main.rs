@@ -30,11 +30,12 @@ fn main() {
             .expect("MMap shared anon failed");
 
     test2();
-    mprotect(addr + 0x1000, 0x4000, MMapProt::PROT_READ | MMapProt::PROT_WRITE | MMapProt::PROT_EXEC).expect("mprotect failed");
+    mprotect(addr + 0x1000, 0x4000,
+             MMapProt::PROT_READ | MMapProt::PROT_WRITE | MMapProt::PROT_EXEC).expect("mprotect failed");
 
     mmap(Some(0x3000), 0x1000,
          MMapProt::PROT_READ | MMapProt::PROT_WRITE | MMapProt::PROT_EXEC,
-         syscall_defs::MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS, None, 0)
+         MMapFlags::MAP_PRIVATE | MMapFlags::MAP_ANONYOMUS, None, 0)
         .expect("MMap shared anon failed");
 
 

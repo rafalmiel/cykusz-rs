@@ -72,11 +72,11 @@ fn main() {
 
     println!("finished {pid}");
 
-    //if pid != 0 {
-    //    let mut status = 0;
-    //    waitpid(pid as isize, &mut status, WaitPidFlags::EXITED);
-    //    println!("exit status: {status}");
+    if pid != 0 {
+        let mut status = 0;
+        let _ = waitpid(pid as isize, &mut status, WaitPidFlags::EXITED);
+        println!("exit status: {status}");
 
-    //}
+    }
 
 }

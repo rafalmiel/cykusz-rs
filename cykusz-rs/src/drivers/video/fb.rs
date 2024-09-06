@@ -685,10 +685,19 @@ impl Device for FbDevice {
 }
 
 impl MappedAccess for FbDevice {
-    fn get_mmap_page(&self, mut offset: usize) -> Option<MMapPageStruct> {
+    fn get_mmap_page(&self, mut offset: usize, _size_check: bool) -> Option<MMapPageStruct> {
+        let buf = fb().state.lock();
+        let buf = buf.buffer();
+
         offset = offset.align_down(PAGE_SIZE);
+
+        // Framebuffer always does size checks
+        if offset / 4 >= buf.len() {
+            return None;
+        }
+
         let addr: PhysAddr =
-            VirtAddr(fb().state.lock().buffer().as_ptr() as usize).to_phys() + offset;
+            VirtAddr(buf.as_ptr() as usize).to_phys() + offset;
 
         Some(MMapPageStruct(MMapPage::Direct(PageDirectItemStruct::new(
             addr,

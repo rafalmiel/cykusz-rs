@@ -351,16 +351,16 @@ impl CachedBlockDev for BlockDevice {
 
         {
             let mut inodes = self.dirty_inode_pages.lock();
-            logln!("Syncing... inodes {}", inodes.len(),);
+            dbgln!(sync, "Syncing... inodes {}", inodes.len(),);
             self.sync_cache(&mut inodes);
         }
         {
             let mut pages = self.dirty_pages.lock();
-            logln!("Syncing... pages {}", pages.len(),);
+            dbgln!(sync, "Syncing... pages {}", pages.len(),);
             self.sync_cache(&mut pages);
         }
 
-        logln!("Syncing... finished");
+        dbgln!(sync, "Syncing... finished");
     }
 
     fn id(&self) -> DevId {

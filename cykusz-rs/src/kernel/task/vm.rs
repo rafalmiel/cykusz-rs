@@ -166,6 +166,7 @@ impl MMapedFile {
         assert!(self.len > new_offset - self.starting_offset);
 
         let new_len = self.len - (new_offset - self.starting_offset);
+        self.len -= new_len;
 
         let mut new = MMapedFile::new(self.file.clone(), new_len, new_offset);
 
@@ -186,7 +187,6 @@ impl MMapedFile {
         assert!(Arc::ptr_eq(&self.file, &other.file));
 
         self.starting_offset = core::cmp::min(self.starting_offset, other.starting_offset);
-
         self.len += other.len;
 
         for a in (start..end).step_by(PAGE_SIZE) {

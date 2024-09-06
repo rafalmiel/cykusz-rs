@@ -1048,7 +1048,7 @@ impl INode for LockedExt2INode {
 
         let id = self.node.read().d_inode().get_rdevid();
 
-        return if id != 0 { Some(id) } else { None };
+        if id != 0 { Some(id) } else { None }
     }
 
     fn sync(&self) -> Result<()> {
@@ -1064,7 +1064,7 @@ impl INode for LockedExt2INode {
 
         self.read().sync_blocks(&self.ext2_fs());
 
-        return Ok(());
+        Ok(())
     }
 
     fn as_cacheable(&self) -> Option<Arc<dyn CachedAccess>> {

@@ -74,7 +74,7 @@ fn main() {
 
     if pid != 0 {
         let mut status = 0;
-        let _ = waitpid(pid as isize, &mut status, WaitPidFlags::EXITED);
+        waitpid(pid as isize, &mut status, WaitPidFlags::EXITED).expect("waitpid failed!");
         println!("exit status: {status}");
 
     }

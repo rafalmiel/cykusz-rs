@@ -222,9 +222,12 @@ pub enum MMapPage {
 pub struct MMapPageStruct(pub MMapPage);
 
 pub trait MappedAccess {
-    fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct>;
-    fn get_mmap_page_debug(&self, offset: usize) -> Option<MMapPageStruct> {
-        self.get_mmap_page(offset)
+    fn get_mmap_page(&self, offset: usize, size_check: bool) -> Option<MMapPageStruct>;
+    fn get_mmap_page_size_check(&self, offset: usize) -> Option<MMapPageStruct> {
+        self.get_mmap_page(offset, true)
+    }
+    fn get_mmap_page_no_size_check(&self, offset: usize) -> Option<MMapPageStruct> {
+        self.get_mmap_page(offset, false)
     }
 }
 
@@ -232,7 +235,7 @@ impl<T: ?Sized> MappedAccess for T
 where
     T: CachedAccess,
 {
-    fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct> {
+    fn get_mmap_page(&self, offset: usize, size_check: bool) -> Option<MMapPageStruct> {
         if current_task_ref().locks() > 0 {
             logln!("get_mmap_page: locks > 0");
         }
@@ -249,47 +252,9 @@ where
             let new_page = PageCacheItemStruct::new(dev.clone(), cache_offset);
 
             if let Some(read) = self.read_direct(offset.align(PAGE_SIZE), new_page.data_mut()) {
-                if read == 0 {
+                if read == 0 && size_check {
                     None
                 } else {
-                    let page = page_cache.make_item(new_page);
-
-                    page.link_with_page();
-
-                    page.notify_clean(&page);
-
-                    Some(MMapPageStruct(MMapPage::Cached(page)))
-                }
-            } else {
-                None
-            }
-        }
-    }
-
-    fn get_mmap_page_debug(&self, offset: usize) -> Option<MMapPageStruct> {
-        println!("get_mmap_page: {}", offset);
-        if current_task_ref().locks() > 0 {
-            logln!("get_mmap_page: locks > 0");
-        }
-
-        let page_cache = cache();
-
-        let dev = self.this();
-
-        let cache_offset = offset / PAGE_SIZE;
-
-        if let Some(page) = page_cache.get(PageCacheItemStruct::make_key(&dev, cache_offset)) {
-            println!("page found in cache");
-            Some(MMapPageStruct(MMapPage::Cached(page)))
-        } else {
-            let new_page = PageCacheItemStruct::new(dev.clone(), cache_offset);
-
-            println!("read direct");
-            if let Some(read) = self.read_direct(offset.align(PAGE_SIZE), new_page.data_mut()) {
-                if read == 0 {
-                    None
-                } else {
-                    println!("read {}", read);
                     let page = page_cache.make_item(new_page);
 
                     page.link_with_page();
@@ -335,7 +300,7 @@ pub trait CachedAccess: RawAccess {
             if current_task_ref().locks() > 0 {
                 logln!("read_cached: locks > 0");
             }
-            if let Some(MMapPageStruct(MMapPage::Cached(page))) = self.get_mmap_page(offset) {
+            if let Some(MMapPageStruct(MMapPage::Cached(page))) = self.get_mmap_page(offset, true) {
                 use core::cmp::min;
 
                 let page_offset = offset % PAGE_SIZE;
@@ -378,7 +343,7 @@ pub trait CachedAccess: RawAccess {
             if current_task_ref().locks() > 0 {
                 logln!("update_cached_synced: locks > 0");
             }
-            if let Some(MMapPageStruct(MMapPage::Cached(page))) = self.get_mmap_page(offset) {
+            if let Some(MMapPageStruct(MMapPage::Cached(page))) = self.get_mmap_page(offset, true) {
                 use core::cmp::min;
 
                 let page_offset = offset % PAGE_SIZE;

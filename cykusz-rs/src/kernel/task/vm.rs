@@ -90,12 +90,12 @@ impl AnonymousSharedMem {
 }
 
 impl MappedAccess for AnonymousSharedMem {
-    fn get_mmap_page(&self, offset: usize) -> Option<MMapPageStruct> {
+    fn get_mmap_page(&self, offset: usize, size_check: bool) -> Option<MMapPageStruct> {
         let mut pages = self.pages.lock();
 
         let offset = offset.align_down(PAGE_SIZE);
 
-        if offset >= self.len {
+        if offset >= self.len && size_check {
             return None;
         }
 
@@ -364,7 +364,7 @@ impl Mapping {
 
             let mappable = f.file.get_dir_item().inode().as_mappable().unwrap();
 
-            if let Some(MMapPageStruct(MMapPage::Cached(p))) = mappable.get_mmap_page(offset) {
+            if let Some(MMapPageStruct(MMapPage::Cached(p))) = mappable.get_mmap_page(offset, false) {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
                 {
@@ -468,7 +468,7 @@ impl Mapping {
 
             let mappable = f.file.get_dir_item().inode().as_mappable().unwrap();
 
-            match mappable.get_mmap_page(offset) {
+            match mappable.get_mmap_page(offset, false) {
                 Some(MMapPageStruct(MMapPage::Cached(p))) => {
                     if !is_present {
                         // Insert page to the list of active mappings if not present
@@ -988,7 +988,7 @@ impl VMData {
         let mut base_addr = VirtAddr(0);
 
         if let Some(MMapPageStruct(MMapPage::Cached(elf_page))) =
-            exe.inode().as_mappable()?.get_mmap_page(0)
+            exe.inode().as_mappable()?.get_mmap_page(0, true)
         {
             let hdr = unsafe { ElfHeader::load(elf_page.data()) };
 

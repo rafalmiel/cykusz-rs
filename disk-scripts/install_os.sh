@@ -14,6 +14,12 @@ cp -f build/isofiles/boot/grub/grub.cfg mnt/grub/
 sed -i "s/{ROOT_UUID}/$(blkid -s UUID -o value /dev/loop0p2)/g" mnt/grub/grub.cfg
 sed -i "s/{LOGS}/$CYKUSZ_LOGS/g" mnt/grub/grub.cfg
 
+RUST_PROG_MODE=release
+
+if [ "$#" -ge 1 ]
+then
+    RUST_PROG_MODE=$1
+fi
 
 umount mnt
 
@@ -28,7 +34,7 @@ for prog in $PROGS; do
 done
 
 for prog in $RUST_PROGS; do
-    cp -f userspace/target/x86_64-unknown-cykusz/release/$prog mnt/bin/$prog
+    cp -f userspace/target/x86_64-unknown-cykusz/$RUST_PROG_MODE/$prog mnt/bin/$prog
 done
 
 rsync -a sysroot/cykusz/usr mnt/
@@ -36,8 +42,8 @@ rsync -a sysroot/cykusz/etc mnt/
 
 mkdir -p mnt/etc
 mkdir -p mnt/home
-echo $(blkid -s UUID -o value /dev/loop0p1) /boot > mnt/etc/fstab
-echo $(blkid -s UUID -o value /dev/loop0p3) /home >> mnt/etc/fstab
+echo "$(blkid -s UUID -o value /dev/loop0p1)" /boot > mnt/etc/fstab
+echo "$(blkid -s UUID -o value /dev/loop0p3)" /home >> mnt/etc/fstab
 
 umount mnt
 

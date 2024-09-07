@@ -82,7 +82,11 @@ $(iso): $(kernel) $(grub_cfg) $(rust_shell)
 
 $(disk): $(kernel) cargo_user $(cross_cpp)
 	#echo fake install_os
-	sudo CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh
+ifdef dev
+	sudo CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh debug
+else
+	sudo CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh release
+endif
 
 $(vdi): $(disk)
 	disk-scripts/make_vdi.sh

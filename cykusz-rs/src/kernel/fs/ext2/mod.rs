@@ -89,6 +89,10 @@ impl Ext2Filesystem {
         *self.sectors_per_block.get().unwrap()
     }
 
+    fn block_size(&self) -> usize {
+        self.superblock().block_size()
+    }
+
     pub fn read_block(&self, block: usize, dest: &mut [u8]) -> Option<usize> {
         if current_task_ref().locks() > 0 {
             logln!("read_block: locks > 0");

@@ -292,21 +292,33 @@ impl Ext2INode {
         self.d_inode.ftype().into()
     }
 
-    fn free_s_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
+    fn free_s_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem, current_offset: &mut usize, from_size: usize) -> bool {
         let mut block = fs.make_slice_buf_from::<u32>(ptr);
+
+        let mut res = true;
 
         for p in block.slice_mut() {
             if *p != 0 {
-                fs.group_descs().free_block_ptr(*p as usize);
+                if *current_offset >= from_size {
+                    fs.group_descs().free_block_ptr(*p as usize);
+                    self.d_inode.dec_sector_count(fs.sectors_per_block() as u32);
 
-                *p = 0;
-            } else {
-                continue;
+                    *p = 0;
+                } else {
+                    res = false;
+                }
             }
+
+            *current_offset += fs.block_size();
         }
         fs.write_block(ptr, block.slice().to_bytes());
 
-        fs.group_descs().free_block_ptr(ptr);
+        if res {
+            fs.group_descs().free_block_ptr(ptr);
+            self.d_inode.dec_sector_count(fs.sectors_per_block() as u32);
+        }
+
+        res
     }
 
     fn sync_s_ptr(&self, ptr: usize, fs: &Ext2Filesystem) {
@@ -323,21 +335,32 @@ impl Ext2INode {
         fs.sync_block(ptr);
     }
 
-    fn free_d_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
+    fn free_d_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem, current_offset: &mut usize, from_size: usize) -> bool {
         let mut block = fs.make_slice_buf_from::<u32>(ptr);
+
+        let ptrs_per_block = block.len();
+
+        let mut res = true;
 
         for p in block.slice_mut() {
             if *p != 0 {
-                self.free_s_ptr(*p as usize, fs);
-
-                *p = 0;
+                if self.free_s_ptr(*p as usize, fs, current_offset, from_size) {
+                    *p = 0;
+                } else {
+                    res = false;
+                }
             } else {
-                continue;
+                *current_offset += ptrs_per_block * fs.block_size();
             }
         }
         fs.write_block(ptr, block.slice().to_bytes());
 
-        fs.group_descs().free_block_ptr(ptr);
+        if res {
+            fs.group_descs().free_block_ptr(ptr);
+            self.d_inode.dec_sector_count(fs.sectors_per_block() as u32);
+        }
+
+        res
     }
 
     fn sync_d_ptr(&self, ptr: usize, fs: &Ext2Filesystem) {
@@ -354,21 +377,32 @@ impl Ext2INode {
         fs.sync_block(ptr);
     }
 
-    fn free_t_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem) {
+    fn free_t_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem, current_offset: &mut usize, from_size: usize) -> bool {
         let mut block = fs.make_slice_buf_from::<u32>(ptr);
+
+        let ptrs_per_block = block.len();
+
+        let mut res = true;
 
         for p in block.slice_mut() {
             if *p != 0 {
-                self.free_d_ptr(*p as usize, fs);
-
-                *p = 0;
+                if self.free_d_ptr(*p as usize, fs, current_offset, from_size) {
+                    *p = 0;
+                } else {
+                    res = false;
+                }
             } else {
-                continue;
+                *current_offset += ptrs_per_block * ptrs_per_block * fs.block_size();
             }
         }
         fs.write_block(ptr, block.slice().to_bytes());
 
-        fs.group_descs().free_block_ptr(ptr);
+        if res {
+            fs.group_descs().free_block_ptr(ptr);
+            self.d_inode.dec_sector_count(fs.sectors_per_block() as u32);
+        }
+
+        res
     }
 
     fn sync_t_ptr(&self, ptr: usize, fs: &Ext2Filesystem) {
@@ -384,7 +418,7 @@ impl Ext2INode {
         fs.sync_block(ptr);
     }
 
-    pub fn free_blocks(&mut self, fs: &Ext2Filesystem) {
+    fn free_blocks_from(&mut self, fs: &Ext2Filesystem, from_size: usize) {
         if self.ftype() == FileType::Symlink && self.d_inode.size_lower() <= 60 {
             return;
         }
@@ -394,38 +428,71 @@ impl Ext2INode {
         }
 
         logln!("free inode blocks {} {:?}", self.id, self.d_inode);
+        let mut current_offset: usize = 0;
 
         for i in 0usize..15 {
             let ptr = self.d_inode.block_ptrs()[i] as usize;
 
-            if ptr == 0 {
-                continue;
-            }
+            let ptrs_per_block = fs.block_size() / 4;
 
-            if i < 12 {
-                fs.group_descs().free_block_ptr(ptr);
+            if if i < 12 {
+                let res = if ptr != 0 && current_offset >= from_size {
+                    fs.group_descs().free_block_ptr(ptr);
+                    self.d_inode.dec_sector_count(fs.sectors_per_block() as u32);
+
+                    true
+                } else {
+                    false
+                };
+
+                current_offset += fs.block_size();
+
+                res
             } else {
                 match i {
                     12 => {
-                        self.free_s_ptr(ptr, fs);
+                        if ptr != 0 {
+                            self.free_s_ptr(ptr, fs, &mut current_offset, from_size)
+                        } else {
+                            current_offset += ptrs_per_block * fs.block_size();
+
+                            false
+                        }
                     }
                     13 => {
-                        self.free_d_ptr(ptr, fs);
+                        if ptr != 0 {
+                            self.free_d_ptr(ptr, fs, &mut current_offset, from_size)
+                        } else {
+                            current_offset += ptrs_per_block * ptrs_per_block * fs.block_size();
+
+                            false
+                        }
                     }
                     14 => {
-                        self.free_t_ptr(ptr, fs);
+                        if ptr != 0 {
+                            self.free_t_ptr(ptr, fs, &mut current_offset, from_size)
+                        } else {
+                            current_offset += ptrs_per_block * ptrs_per_block * ptrs_per_block * fs.block_size();
+
+                            false
+                        }
                     }
                     _ => unreachable!(),
                 }
+            } {
+                self.d_inode.block_ptrs_mut()[i] = 0;
             }
 
-            self.d_inode.block_ptrs_mut()[i] = 0;
         }
-        self.d_inode.set_size_lower(0);
-        self.d_inode.set_sector_count(0);
+        self.d_inode.set_size_lower(from_size as u32);
         logln!("freed inode blocks {} {:?}", self.id, self.d_inode);
 
         fs.group_descs().write_d_inode(self.id, self.d_inode());
+
+    }
+
+    pub fn free_blocks(&mut self, fs: &Ext2Filesystem) {
+        self.free_blocks_from(fs, 0)
     }
 
     pub fn sync_blocks(&self, fs: &Ext2Filesystem) {
@@ -985,34 +1052,29 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotFile);
         }
 
-        if size == 0 {
-            self.node.write().free_blocks(&self.ext2_fs());
+        let current_size = self.node.read().d_inode().size_lower() as usize;
 
+        if size > current_size {
             let mut node = self.d_inode_writer();
 
-            node.set_size_lower(0);
-            node.set_sector_count(0);
+            node.set_size_lower(size as u32);
+
+            logln_disabled!(
+                "truncate: fd: {} size: {} {:?}",
+                node.id(),
+                size,
+                node.locked.d_inode
+            );
 
             Ok(())
         } else {
-            let current_size = self.node.read().d_inode().size_lower() as usize;
+            self.node.write().free_blocks_from(&self.ext2_fs(), size);
 
-            if size > current_size {
-                let mut node = self.d_inode_writer();
-
-                node.set_size_lower(size as u32);
-
-                logln_disabled!(
-                    "truncate: fd: {} size: {} {:?}",
-                    node.id(),
-                    size,
-                    node.locked.d_inode
-                );
-
-                Ok(())
-            } else {
-                Err(FsError::NotSupported)
+            if size == 0 {
+                assert_eq!(self.node.read().d_inode().sector_count(), 0);
             }
+
+            Ok(())
         }
     }
 

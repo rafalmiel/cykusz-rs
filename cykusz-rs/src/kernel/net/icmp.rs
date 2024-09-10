@@ -28,7 +28,7 @@ enum IcmpType {
     DestUnreachable = 3,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 struct IcmpHeader {
     typ: IcmpType,
     code: u8,
@@ -77,7 +77,7 @@ impl IcmpHeader {
     }
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 struct IcmpEchoHeader {
     echo_id: NetU16,
     echo_seq: NetU16,

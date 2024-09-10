@@ -24,7 +24,7 @@ impl PacketUpHierarchy<Udp> for Packet<Ip> {}
 
 impl PacketHeader<UdpHeader> for Packet<Udp> {}
 
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct UdpHeader {
     pub src_port: NetU16,
     pub dst_port: NetU16,

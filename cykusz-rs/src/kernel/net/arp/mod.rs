@@ -44,7 +44,7 @@ enum Oper {
     ReverseReply = NetU16::new(4).net_value(),
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct ArpHeader {
     htype: HType,
     ptype: PType,

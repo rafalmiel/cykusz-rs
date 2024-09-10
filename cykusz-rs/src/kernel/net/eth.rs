@@ -12,7 +12,7 @@ pub enum EthType {
     ARP = NetU16::new(0x0806).net_value(),
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct EthHeader {
     dst_mac: [u8; 6],
     src_mac: [u8; 6],

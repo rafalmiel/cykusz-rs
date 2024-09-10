@@ -180,8 +180,6 @@ pub fn init() {
 
         core::mem::drop(def);
 
-        busy_sleep(10_000_000_000);
-
         dhcp::init();
     }
 }

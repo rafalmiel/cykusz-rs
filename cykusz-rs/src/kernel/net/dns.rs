@@ -23,7 +23,7 @@ impl PacketUpHierarchy<Dns> for Packet<Udp> {}
 
 impl PacketHeader<DnsHeader> for Packet<Dns> {}
 
-#[repr(packed)]
+#[repr(C, packed)]
 struct DnsHeader {
     id: NetU16,
     flags: NetU16,

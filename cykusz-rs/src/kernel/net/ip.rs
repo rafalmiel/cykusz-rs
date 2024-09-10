@@ -114,7 +114,7 @@ impl<P: IpBase> PacketDownHierarchy<Ip> for Packet<P> {
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct IpHeader {
     pub v: NetU8,
     pub tos: NetU8,

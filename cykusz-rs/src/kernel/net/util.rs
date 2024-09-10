@@ -5,7 +5,7 @@ pub mod checksum {
 
     use crate::kernel::net::ip::{Ip4, IpHeader, IpType};
 
-    #[repr(packed)]
+    #[repr(C, packed)]
     pub struct PseudoHeader {
         src_ip: Ip4,
         dst_ip: Ip4,

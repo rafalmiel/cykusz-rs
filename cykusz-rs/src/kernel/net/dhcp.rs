@@ -47,7 +47,7 @@ enum DhcpOptMsgType {
     DhcpRelease = NetU8::new(7).net_value(),
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 struct DhcpHeader {
     op: DhcpType,
     htype: HType,

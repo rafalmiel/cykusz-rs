@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 
 use syscall_defs::ioctl::net::{IfConf, IfReq, IfrFlags};
 use syscall_defs::net::SockDomain;
-
+use crate::arch::timer::busy_sleep;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::eth::Eth;
@@ -179,6 +179,8 @@ pub fn init() {
         dev.driver.link_up();
 
         core::mem::drop(def);
+
+        busy_sleep(10_000_000_000);
 
         dhcp::init();
     }

@@ -31,7 +31,7 @@ impl PacketTrait for Packet<Tcp> {
     }
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct TcpHeader {
     src_port: NetU16,
     dst_port: NetU16,

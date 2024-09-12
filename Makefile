@@ -102,7 +102,7 @@ else
 endif
 
 $(vdi): $(disk)
-	#disk-scripts/make_vdi.sh
+	disk-scripts/make_vmdk.sh
 	disk-scripts/attach_vdi.sh
 
 $(kernel): cargo_kernel $(rust_os) $(assembly_object_files) $(linker_script)

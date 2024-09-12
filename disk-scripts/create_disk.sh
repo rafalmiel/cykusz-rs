@@ -1,10 +1,8 @@
 #!/bin/bash
 
-user=$USER
-
 SPATH=$(dirname $(readlink -f "$0"))
 CYKUSZ_DIR=$(realpath $SPATH/..)
 
-sudo $CYKUSZ_DIR/disk-scripts/make_disk.sh $user
+$CYKUSZ_DIR/disk-scripts/make_disk.sh
 sleep 1
-sudo $CYKUSZ_DIR/disk-scripts/install_grub.sh
+$CYKUSZ_DIR/disk-scripts/install_grub.sh

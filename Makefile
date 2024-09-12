@@ -41,7 +41,7 @@ purge: clean
 	rm -rf build
 	rm -rf target
 
-run: $(iso) $(disk)
+run: $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -m 512 -smp cpus=1  -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 5811 -smp cpus=4 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000e,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host --enable-kvm
 	qemu-system-x86_64 \
@@ -55,14 +55,31 @@ run: $(iso) $(disk)
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 5811 -smp cpus=4 -audio driver=pipewire,model=hda -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host --enable-kvm
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host
 
-run_ata: $(iso) $(disk)
+run_ata: $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -m 512 -smp cpus=4  -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
 	qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -hda disk.img -rtc base=utc,clock=host
 
-vbox: $(iso) $(vdi)
-	VBoxManage startvm cykusz  -E VBOX_GUI_DBG_AUTO_SHOW=true -E VBOX_GUI_DBG_ENABLED=true
+vbox: $(disk) vdi
+	touch ./vbox_serial.log
+	losetup -D
+	losetup /dev/loop0 ./disk.img
+	VBoxManage startvm cykusz  -E VBOX_GUI_DBG_AUTO_SHOW=false -E VBOX_GUI_DBG_ENABLED=false
+	losetup -D
+ifdef logs
+	less +F --exit-follow-on-close ./vbox_serial.log
+endif
 
-debug: $(iso) $(disk)
+vbox_debug: $(disk) vdi
+	touch ./vbox_serial.log
+	losetup -D
+	losetup /dev/loop0 ./disk.img
+	VBoxManage startvm cykusz  -E VBOX_GUI_DBG_AUTO_SHOW=true -E VBOX_GUI_DBG_ENABLED=true
+	losetup -D
+ifdef logs
+	less +F --exit-follow-on-close ./vbox_serial.log
+endif
+
+debug: $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -s -S -smp cpus=4 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
 	#qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 5811 -smp cpus=4 -no-shutdown -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000e,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -monitor /dev/stdout
 	qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 5811 -smp cpus=4 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=hn0 -device e1000,netdev=hn0,id=nic1 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -monitor /dev/stdout
@@ -73,21 +90,11 @@ gdb:
 kdbg:
 	@kdbg -r localhost:1234
 
-bochs: $(iso) $(disk)
+bochs: $(disk)
 	@rm -f disk.img.lock
 	bochs -f bochsrc.txt -q
 
-iso: $(iso)
-
-$(iso): $(kernel) $(grub_cfg) $(rust_shell)
-	mkdir -p build/isofiles/boot/grub
-	cp $(kernel) build/isofiles/boot/kernel.bin
-	cp $(grub_cfg) build/isofiles/boot/grub
-	cp $(rust_shell) build/isofiles/boot/program
-	grub-mkrescue -d /usr/lib/grub/i386-pc/ -o $(iso) build/isofiles 2> /dev/null
-
 $(disk): $(kernel) cargo_user $(cross_cpp)
-	#echo fake install_os
 ifdef dev
 	sudo CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh debug
 else
@@ -95,14 +102,16 @@ else
 endif
 
 $(vdi): $(disk)
-	disk-scripts/make_vdi.sh
+	#disk-scripts/make_vdi.sh
 	disk-scripts/attach_vdi.sh
 
 $(kernel): cargo_kernel $(rust_os) $(assembly_object_files) $(linker_script)
 	ld -n --whole-archive --gc-sections -T $(linker_script) -o $(kernel) $(assembly_object_files) $(rust_os)
 
 usb: $(kernel)
-	sudo disk-scripts/install_usb.sh $(usb_dev)
+	disk-scripts/install_usb.sh $(usb_dev)
+
+vdi: $(vdi)
 
 cargo_kernel:
 ifdef dev
@@ -126,7 +135,10 @@ toolchain: $(cross_cpp)
 	sysroot/build.sh check_build
 
 fsck:
-	sudo disk-scripts/fsck_disk.sh
+	disk-scripts/fsck_disk.sh
+
+fsck_fix:
+	disk-scripts/fsck_disk_fix.sh
 
 $(cross_cpp): toolchain
 

@@ -1,4 +1,3 @@
-#![feature(new_uninit)]
 #![feature(slice_as_chunks)]
 #![feature(int_roundings)]
 #![no_std]

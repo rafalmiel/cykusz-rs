@@ -735,7 +735,7 @@ pub fn sys_rename(
     };
 
     if !Weak::ptr_eq(&new.inode().fs().unwrap(), &old.inode().fs().unwrap()) {
-        return Err(SyscallError::EACCES);
+        return Err(SyscallError::EXDEV);
     }
 
     if new.inode().ftype()? != FileType::Dir {

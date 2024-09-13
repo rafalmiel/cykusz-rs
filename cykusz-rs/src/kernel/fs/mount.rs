@@ -1,6 +1,7 @@
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
+use alloc::vec;
 use alloc::vec::Vec;
 
 use hashbrown::HashMap;
@@ -46,7 +47,7 @@ impl MountedFS {
 }
 
 struct MountsData {
-    mounts: BTreeMap<MountKey, Mountpoint>,
+    mounts: BTreeMap<MountKey, Vec<Mountpoint>>,
     mounted_devs: HashMap<DevId, MountedFS>,
 }
 
@@ -90,39 +91,35 @@ impl Mounts {
         mut mounts: MutexGuard<MountsData>,
         fs_factory: impl FnOnce(&MutexGuard<MountsData>) -> Arc<dyn Filesystem>,
     ) -> Result<()> {
-        if dir.is_mountpoint() {
-            return Err(FsError::EntryNotFound);
-        }
-
         let key = Self::make_key(&dir);
 
-        if mounts.mounts.contains_key(&key) {
-            Err(FsError::EntryExists)
+        let fs = fs_factory(&mounts);
+
+        let dev_id = fs.device().id();
+        let root = fs.root_dentry();
+
+        root.update_name(dir.read().name.clone());
+        root.update_parent(dir.read().parent.clone());
+
+        let mount = Mountpoint {
+            fs: fs.clone(),
+            root_entry: root.clone(),
+            orig_entry: dir.clone(),
+        };
+
+        if let Some(mnt) = mounts.mounts.get_mut(&key) {
+            mnt.push(mount);
         } else {
-            let fs = fs_factory(&mounts);
-
-            let dev_id = fs.device().id();
-            let root = fs.root_dentry();
-
-            root.update_name(dir.read().name.clone());
-            root.update_parent(dir.read().parent.clone());
-
-            mounts.mounts.insert(
-                key,
-                Mountpoint {
-                    fs: fs.clone(),
-                    root_entry: root.clone(),
-                    orig_entry: dir.clone(),
-                },
-            );
-            if let Err(mut e) = mounts.mounted_devs.try_insert(dev_id, MountedFS::new(&fs)) {
-                e.entry.get_mut().ref_count += 1;
-            }
-
-            dir.set_is_mountpont(true);
-
-            Ok(())
+            mounts.mounts.insert(key, vec![mount]);
         }
+
+        if let Err(mut e) = mounts.mounted_devs.try_insert(dev_id, MountedFS::new(&fs)) {
+            e.entry.get_mut().ref_count += 1;
+        }
+
+        dir.set_is_mountpont(true);
+
+        Ok(())
     }
 
     fn mark_mounted(&self, fs: Arc<dyn Filesystem>) {
@@ -177,7 +174,7 @@ impl Mounts {
 
         if let Some(m) = mounts.mounts.get(&key) {
             //println!("found mount: {:?}", key);
-            Ok(m.clone())
+            Ok(m.last().unwrap().clone())
         } else {
             Err(FsError::EntryNotFound)
         }
@@ -187,46 +184,56 @@ impl Mounts {
         let mut mounts = self.mounts.lock();
         //println!("umount: {:?}", key);
 
-        if let Some(ent) = mounts.mounts.get_mut(&key).cloned() {
-            let id = ent.fs.device().id();
-            let ref_cnt = mounts.mounted_devs.get(&id).unwrap().ref_count;
+        let (id, fs) = if let Some(ent) = mounts.mounts.get_mut(&key) {
+            let mountpoint = ent.pop().unwrap();
 
-            logln!(
-                "umount {:?} ref_cnt: {} dev_id: {} mountpoint strong count: {}",
+            let id = mountpoint.fs.device().id();
+
+            dbgln!(
+                mount,
+                "umount {:?} dev_id: {} mountpoint strong count: {}",
                 key,
-                ref_cnt,
                 id,
-                ent.root_entry.strong_count()
+                mountpoint.root_entry.strong_count()
             );
 
-            if ent.root_entry.strong_count() > 3 {
+            if mountpoint.root_entry.strong_count() > 2 {
                 // given currently held pointers, strong count of 3 means the DirEntry is unused
+                ent.push(mountpoint);
                 return Err(FsError::Busy);
             }
 
-            ent.orig_entry.set_is_mountpont(false);
+            mountpoint.orig_entry.set_is_mountpont(!ent.is_empty());
 
-            mounts.mounts.remove(&key);
-
-            if ref_cnt == 1 {
-                ent.fs.umount();
-
-                mounts.mounted_devs.remove(&id);
-            } else {
-                mounts.mounted_devs.get_mut(&id).unwrap().ref_count -= 1;
+            if ent.is_empty() {
+                mounts.mounts.remove(&key);
             }
 
-            Ok(())
+            (id, mountpoint.fs.clone())
         } else {
-            Err(FsError::EntryNotFound)
+            return Err(FsError::EntryNotFound)
+        };
+
+        let mounted_fs = mounts.mounted_devs.get_mut(&id).unwrap();
+
+        if mounted_fs.ref_count == 1 {
+            fs.umount();
+
+            mounts.mounted_devs.remove(&id);
+        } else {
+            mounted_fs.ref_count -= 1;
         }
+
+        Ok(())
     }
 
     fn sync_all(&self) {
         let mounts = self.mounts.lock();
 
-        for (_k, m) in mounts.mounts.iter() {
-            m.fs.sync();
+        for (_k, m) in mounts.mounted_devs.iter() {
+            if let Some(fs) = &m.fs.upgrade() {
+                fs.sync();
+            }
         }
     }
 
@@ -238,9 +245,7 @@ impl Mounts {
         drop(mounts);
 
         for key in keys.iter() {
-            if let Err(_e) = self.unmount_by_key(key) {
-                logln!("Failed to unmount {:?}", key);
-            } else {
+            while let Ok(_) = self.unmount_by_key(key) {
                 logln!("Unmounted {:?}", key);
             }
         }

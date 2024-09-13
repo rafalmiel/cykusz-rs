@@ -9,8 +9,15 @@ mkdir -p mnt
 sudo mount /dev/loop0p1 mnt
 sudo chown $USER:$USER mnt
 
-cp -f build/isofiles/boot/kernel.bin mnt/
-cp -f build/isofiles/boot/grub/grub.cfg mnt/grub/
+if [ "$1" == "debug" ]
+then
+    KERNEL=kernel-x86_64-g.bin
+else
+    KERNEL=kernel-x86_64.bin
+fi
+
+cp -f build/$KERNEL mnt/kernel.bin
+cp -f cykusz-rs/src/arch/x86_64/asm/grub.cfg mnt/grub/
 
 sed -i "s/{ROOT_UUID}/$(blkid -s UUID -o value /dev/loop0p2)/g" mnt/grub/grub.cfg
 sed -i "s/{LOGS}/$CYKUSZ_LOGS/g" mnt/grub/grub.cfg
@@ -27,9 +34,9 @@ sudo umount mnt
 PROGS="test testcpp hello stack nyancat ttytest fork poweroff stat fbdoom doom1.wad open_sleep"
 RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client forktest mprotecttest"
 
-mkdir -p mnt/bin
 sudo mount /dev/loop0p2 mnt
-sudo chown $USER:$USER mnt
+sudo chown -R $USER:$USER mnt
+mkdir -p mnt/bin
 
 for prog in $PROGS; do
 	cp -f sysroot/build/$prog mnt/bin/$prog

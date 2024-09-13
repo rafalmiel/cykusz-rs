@@ -96,9 +96,9 @@ bochs: $(disk)
 
 $(disk): $(kernel) cargo_user $(cross_cpp)
 ifdef dev
-	sudo CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh debug
+	CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh debug
 else
-	sudo CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh release
+	CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh release
 endif
 
 $(vdi): $(disk)

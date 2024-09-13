@@ -292,7 +292,13 @@ impl Ext2INode {
         self.d_inode.ftype().into()
     }
 
-    fn free_s_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem, current_offset: &mut usize, from_size: usize) -> bool {
+    fn free_s_ptr(
+        &mut self,
+        ptr: usize,
+        fs: &Ext2Filesystem,
+        current_offset: &mut usize,
+        from_size: usize,
+    ) -> bool {
         let mut block = fs.make_slice_buf_from::<u32>(ptr);
 
         let mut res = true;
@@ -335,7 +341,13 @@ impl Ext2INode {
         fs.sync_block(ptr);
     }
 
-    fn free_d_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem, current_offset: &mut usize, from_size: usize) -> bool {
+    fn free_d_ptr(
+        &mut self,
+        ptr: usize,
+        fs: &Ext2Filesystem,
+        current_offset: &mut usize,
+        from_size: usize,
+    ) -> bool {
         let mut block = fs.make_slice_buf_from::<u32>(ptr);
 
         let ptrs_per_block = block.len();
@@ -377,7 +389,13 @@ impl Ext2INode {
         fs.sync_block(ptr);
     }
 
-    fn free_t_ptr(&mut self, ptr: usize, fs: &Ext2Filesystem, current_offset: &mut usize, from_size: usize) -> bool {
+    fn free_t_ptr(
+        &mut self,
+        ptr: usize,
+        fs: &Ext2Filesystem,
+        current_offset: &mut usize,
+        from_size: usize,
+    ) -> bool {
         let mut block = fs.make_slice_buf_from::<u32>(ptr);
 
         let ptrs_per_block = block.len();
@@ -472,7 +490,8 @@ impl Ext2INode {
                         if ptr != 0 {
                             self.free_t_ptr(ptr, fs, &mut current_offset, from_size)
                         } else {
-                            current_offset += ptrs_per_block * ptrs_per_block * ptrs_per_block * fs.block_size();
+                            current_offset +=
+                                ptrs_per_block * ptrs_per_block * ptrs_per_block * fs.block_size();
 
                             false
                         }
@@ -482,13 +501,11 @@ impl Ext2INode {
             } {
                 self.d_inode.block_ptrs_mut()[i] = 0;
             }
-
         }
         self.d_inode.set_size_lower(from_size as u32);
         logln!("freed inode blocks {} {:?}", self.id, self.d_inode);
 
         fs.group_descs().write_d_inode(self.id, self.d_inode());
-
     }
 
     pub fn free_blocks(&mut self, fs: &Ext2Filesystem) {
@@ -1110,7 +1127,11 @@ impl INode for LockedExt2INode {
 
         let id = self.node.read().d_inode().get_rdevid();
 
-        if id != 0 { Some(id) } else { None }
+        if id != 0 {
+            Some(id)
+        } else {
+            None
+        }
     }
 
     fn sync(&self) -> Result<()> {

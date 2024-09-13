@@ -327,7 +327,6 @@ impl Mapping {
         res
     }
 
-
     fn handle_pf_private_anon(&mut self, reason: PageFaultReason, addr: VirtAddr) -> bool {
         let addr_aligned = addr.align_down(PAGE_SIZE);
 
@@ -364,7 +363,8 @@ impl Mapping {
 
             let mappable = f.file.get_dir_item().inode().as_mappable().unwrap();
 
-            if let Some(MMapPageStruct(MMapPage::Cached(p))) = mappable.get_mmap_page(offset, false) {
+            if let Some(MMapPageStruct(MMapPage::Cached(p))) = mappable.get_mmap_page(offset, false)
+            {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
                 {
@@ -710,7 +710,6 @@ impl<'a> InsertMergeAfter for CursorMut<'a, Mapping> {
         } else {
             self.insert_before(mapping);
             self.move_prev();
-
         }
 
         self
@@ -1158,7 +1157,8 @@ impl VMData {
     fn log_vm(&self) {
         for e in self.maps.iter() {
             if let Some(f) = &e.mmaped_file {
-                dbgln!(map,
+                dbgln!(
+                    map,
                     "{} {}: {:?}, {:?} [ {} {:#x} {:#x} ]",
                     e.start,
                     e.end,

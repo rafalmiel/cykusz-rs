@@ -5,7 +5,7 @@ use bit_field::BitField;
 use tock_registers::fields::FieldValue;
 use tock_registers::interfaces::{Readable, Writeable};
 use tock_registers::registers::{InMemoryRegister, ReadWrite};
-use tock_registers::{register_bitfields, LocalRegisterCopy, register_structs};
+use tock_registers::{register_bitfields, register_structs, LocalRegisterCopy};
 
 register_bitfields! [
     u32,

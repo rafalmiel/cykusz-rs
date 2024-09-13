@@ -1,9 +1,9 @@
-use alloc::string::String;
-use alloc::sync::{Arc, Weak};
-use syscall_defs::OpenFlags;
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::{register_device, Device};
 use crate::kernel::fs::inode::INode;
+use alloc::string::String;
+use alloc::sync::{Arc, Weak};
+use syscall_defs::OpenFlags;
 
 struct NullDev {
     id: DevId,
@@ -13,22 +13,30 @@ struct NullDev {
 
 impl NullDev {
     fn new() -> Arc<NullDev> {
-        Arc::new_cyclic(|me| {
-            NullDev {
-                id: crate::kernel::device::alloc_id(),
-                name: "null".into(),
-                sref: me.clone()
-            }
+        Arc::new_cyclic(|me| NullDev {
+            id: crate::kernel::device::alloc_id(),
+            name: "null".into(),
+            sref: me.clone(),
         })
     }
 }
 
 impl INode for NullDev {
-    fn read_at(&self, _offset: usize, _buf: &mut [u8], _flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
+    fn read_at(
+        &self,
+        _offset: usize,
+        _buf: &mut [u8],
+        _flags: OpenFlags,
+    ) -> crate::kernel::fs::vfs::Result<usize> {
         Ok(0)
     }
 
-    fn write_at(&self, _offset: usize, buf: &[u8], _flags: OpenFlags) -> crate::kernel::fs::vfs::Result<usize> {
+    fn write_at(
+        &self,
+        _offset: usize,
+        buf: &[u8],
+        _flags: OpenFlags,
+    ) -> crate::kernel::fs::vfs::Result<usize> {
         Ok(buf.len())
     }
 }

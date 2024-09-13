@@ -696,8 +696,7 @@ impl MappedAccess for FbDevice {
             return None;
         }
 
-        let addr: PhysAddr =
-            VirtAddr(buf.as_ptr() as usize).to_phys() + offset;
+        let addr: PhysAddr = VirtAddr(buf.as_ptr() as usize).to_phys() + offset;
 
         Some(MMapPageStruct(MMapPage::Direct(PageDirectItemStruct::new(
             addr,

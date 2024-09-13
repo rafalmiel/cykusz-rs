@@ -4,8 +4,6 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
-use syscall_defs::ioctl::net::{IfConf, IfReq, IfrFlags};
-use syscall_defs::net::SockDomain;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::eth::Eth;
@@ -13,6 +11,8 @@ use crate::kernel::net::ip::Ip4;
 use crate::kernel::sched::create_param_task;
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::RwSpin;
+use syscall_defs::ioctl::net::{IfConf, IfReq, IfrFlags};
+use syscall_defs::net::SockDomain;
 
 pub use self::packet::*;
 

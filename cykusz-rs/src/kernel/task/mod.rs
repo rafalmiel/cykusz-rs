@@ -213,6 +213,8 @@ impl Task {
         // !!! Prevent memory leak as we are not running destructors here!
         drop(vm);
 
+        dbgln!(exec, "exec {} {} {}", exe.full_path(), exe.name(), exe.parent().is_some());
+
         unsafe {
             // EXEC!
             self.arch_task_mut().exec(

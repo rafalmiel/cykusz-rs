@@ -7,7 +7,7 @@ use spin::Once;
 use crate::arch::raw::mm::UserAddr;
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, CacheItemAdapter, Cacheable, WeakWrap};
-use crate::kernel::fs::ext2::FsDevice;
+use crate::kernel::fs::FsDevice;
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, unmap, PhysAddr, PAGE_SIZE};
 use crate::kernel::sched::current_task_ref;

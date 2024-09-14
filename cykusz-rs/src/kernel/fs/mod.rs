@@ -11,11 +11,12 @@ use syscall_defs::{FileType, OpenFlags};
 use crate::kernel::block::{get_blkdev_by_name, get_blkdev_by_uuid};
 use crate::kernel::device::{register_device_listener, Device, DeviceListener};
 use crate::kernel::fs::dirent::DirEntryItem;
-use crate::kernel::fs::ext2::{Ext2Filesystem, FsDevice};
+use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::{Filesystem, FilesystemKind};
 use crate::kernel::fs::icache::INodeItem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
+use crate::kernel::fs::pcache::CachedBlockDev;
 use crate::kernel::fs::ramfs::RamFS;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task;
@@ -52,6 +53,12 @@ impl DevListener {
 
     fn dev_inode(&self) -> INodeItem {
         self.devfs.root_dentry().inode().clone()
+    }
+}
+
+pub trait FsDevice: Device {
+    fn as_cached_device(&self) -> Option<Arc<dyn CachedBlockDev>> {
+        None
     }
 }
 

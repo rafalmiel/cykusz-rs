@@ -1,7 +1,7 @@
 use alloc::sync::Arc;
 
 use crate::kernel::fs::dirent::DirEntryItem;
-use crate::kernel::fs::ext2::FsDevice;
+use crate::kernel::fs::FsDevice;
 
 pub enum FilesystemKind {
     RamFS = 1,

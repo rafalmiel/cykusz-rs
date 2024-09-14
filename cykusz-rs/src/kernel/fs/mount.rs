@@ -10,11 +10,11 @@ use spin::Once;
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::cache::Cacheable;
 use crate::kernel::fs::dirent::DirEntryItem;
-use crate::kernel::fs::ext2::{Ext2Filesystem, FsDevice};
+use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::{Filesystem, FilesystemKind};
 use crate::kernel::fs::ramfs::RamFS;
-use crate::kernel::fs::root_dentry;
 use crate::kernel::fs::vfs::{FsError, Result};
+use crate::kernel::fs::{root_dentry, FsDevice};
 use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 
 #[derive(Clone)]
@@ -211,7 +211,7 @@ impl Mounts {
 
             (id, mountpoint.fs.clone())
         } else {
-            return Err(FsError::EntryNotFound)
+            return Err(FsError::EntryNotFound);
         };
 
         let mounted_fs = mounts.mounted_devs.get_mut(&id).unwrap();

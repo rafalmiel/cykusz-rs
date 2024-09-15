@@ -548,6 +548,7 @@ fn remove_dir(file: &DirEntryItem, path: &Path) -> SyscallResult {
     }
 
     let (_, name) = path.containing_dir();
+    dbgln!(unlink, "remove dir {}", name.str());
     file.inode().rmdir(name.str())?;
 
     file.drop_from_cache();
@@ -569,11 +570,11 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
 
     let path = Path::new(path_str);
 
-    logln4!("sys_unlink: {}, flags: {}", path.str(), flags);
+    dbgln!(unlink, "sys_unlink: {}, flags: {}", path.str(), flags);
 
     let file = get_dir_entry(at, Some(path), LookupMode::None, true)?;
 
-    log!("unlink inode: ");
+    dbgln!(unlink, "unlink inode: ");
     file.inode().debug();
 
     let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;

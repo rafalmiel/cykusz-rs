@@ -188,14 +188,14 @@ impl LockedExt2INode {
 impl Drop for LockedExt2INode {
     fn drop(&mut self) {
         let inode = self.node.read();
-        logln!("drop inode {}", inode.id);
+        dbgln!(ext2, "drop inode {}", inode.id);
 
         let hl_count = inode.d_inode.hl_count();
         let id = inode.id;
 
         drop(inode);
 
-        logln!("Dropping inode {} hl {}", id, hl_count);
+        dbgln!(ext2, "Dropping inode {} hl {}", id, hl_count);
 
         if hl_count == 0 {
             self.ext2_fs().free_inode(self)
@@ -441,11 +441,11 @@ impl Ext2INode {
             return;
         }
 
-        if ![FileType::File, FileType::Symlink].contains(&self.ftype()) {
+        if ![FileType::File, FileType::Symlink, FileType::Dir].contains(&self.ftype()) {
             return;
         }
 
-        logln!("free inode blocks {} {:?}", self.id, self.d_inode);
+        dbgln!(ext2, "free inode blocks {} {:?} {:?}", self.id, self.d_inode, self.d_inode.block_ptrs());
         let mut current_offset: usize = 0;
 
         for i in 0usize..15 {

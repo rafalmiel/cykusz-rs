@@ -392,6 +392,7 @@ impl BlockGroupDescriptors {
                 let mut sb = sb.write_inner();
                 sb.dec_free_blocks();
 
+                dbgln!(ext2, "alloc_block_ptr {:?}", Some(id));
                 Some(id)
             } else {
                 None
@@ -442,6 +443,7 @@ impl BlockGroupDescriptors {
     }
 
     pub fn free_block_ptr(&self, mut block: usize) {
+        dbgln!(ext2, "free_block_ptr {:?}", block);
         let fs = self.fs();
         let sb = fs.superblock();
 

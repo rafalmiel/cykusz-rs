@@ -148,7 +148,7 @@ impl Ext2Filesystem {
     }
 
     pub fn free_inode(&self, inode: &LockedExt2INode) {
-        logln_disabled!("Free inode: {}", inode.read_debug(33).id());
+        dbgln!(ext2, "Free inode: {}", inode.read_debug(33).id());
 
         inode.write_debug(17).free_blocks(self);
 

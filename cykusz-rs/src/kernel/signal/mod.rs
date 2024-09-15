@@ -304,11 +304,7 @@ impl Signals {
     pub fn trigger(&self, signal: usize, this_thread: bool) -> TriggerResult {
         assert!(signal < SIGNAL_COUNT);
 
-        let sigs = self.entries();
-
-        let set_pending = |sigs: SpinGuard<Entries>, trigger_result: TriggerResult| {
-            drop(sigs);
-
+        let set_pending = |trigger_result: TriggerResult| {
             self.set_pending(signal as u64, this_thread);
 
             if self.is_blocked(signal) {
@@ -319,9 +315,9 @@ impl Signals {
         };
 
         if signal == syscall_defs::signal::SIGCONT || signal == syscall_defs::signal::SIGKILL {
-            set_pending(sigs, TriggerResult::Execute(default::cont))
+            set_pending(TriggerResult::Execute(default::cont))
         } else {
-            set_pending(sigs, TriggerResult::Triggered)
+            set_pending(TriggerResult::Triggered)
         }
     }
 

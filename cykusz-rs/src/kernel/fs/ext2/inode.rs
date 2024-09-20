@@ -445,7 +445,13 @@ impl Ext2INode {
             return;
         }
 
-        dbgln!(ext2, "free inode blocks {} {:?} {:?}", self.id, self.d_inode, self.d_inode.block_ptrs());
+        dbgln!(
+            ext2,
+            "free inode blocks {} {:?} {:?}",
+            self.id,
+            self.d_inode,
+            self.d_inode.block_ptrs()
+        );
         let mut current_offset: usize = 0;
 
         for i in 0usize..15 {

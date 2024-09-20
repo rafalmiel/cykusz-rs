@@ -6,6 +6,9 @@ version = "0.1.0"
 
 [lib]
 crate-type = ["staticlib"]
+test = false
+doctest = false
+bench = false
 
 [features]
 logs = []

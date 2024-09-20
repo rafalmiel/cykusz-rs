@@ -56,7 +56,8 @@ impl PhysPage {
         let _lock = self.lock_pt();
 
         unsafe {
-            self.this().p_cache = WeakWrap::empty();
+            let this = self.this();
+            this.p_cache = WeakWrap::empty();
         }
     }
 
@@ -68,7 +69,8 @@ impl PhysPage {
         let _lock = self.lock_pt();
 
         unsafe {
-            self.this().p_cache = ArcWrap::downgrade(&page);
+            let this = self.this();
+            this.p_cache = ArcWrap::downgrade(&page);
         }
     }
 

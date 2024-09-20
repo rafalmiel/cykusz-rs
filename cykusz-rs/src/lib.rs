@@ -4,7 +4,6 @@
 #![feature(auto_traits)]
 #![feature(c_variadic)]
 #![feature(concat_idents)]
-#![feature(const_mut_refs)]
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(negative_impls)]
@@ -27,7 +26,7 @@ extern crate intrusive_collections;
 extern crate lazy_static;
 
 use core::arch::asm;
-
+use core::ptr::addr_of_mut;
 use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::path::Path;
@@ -53,13 +52,13 @@ static mut DEBUG: bool = false;
 
 pub fn enable_debug() {
     unsafe {
-        DEBUG = true;
+        addr_of_mut!(DEBUG).write(true);
     }
 }
 
 pub fn disable_debug() {
     unsafe {
-        DEBUG = false;
+        addr_of_mut!(DEBUG).write(false);
     }
 }
 
@@ -81,7 +80,7 @@ pub fn rust_main(stack_top: VirtAddr) {
     println!("[ OK ] Per-CPU Storage Initialized");
 
     unsafe {
-        CPU_ID = 0;
+        addr_of_mut!(CPU_ID).write(0);
     }
 
     kernel::fs::init();
@@ -174,7 +173,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::tls::init(VirtAddr(stack_ptr as usize));
 
     unsafe {
-        crate::CPU_ID = cpu_num;
+        addr_of_mut!(CPU_ID).write(cpu_num);
     }
 
     kernel::sched::init_ap();

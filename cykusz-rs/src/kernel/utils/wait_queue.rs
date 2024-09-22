@@ -111,7 +111,11 @@ impl WaitQueue {
     }
 
     pub fn wait(&self, flags: WaitQueueFlags) -> SignalResult<()> {
-        let _irq = IrqGuard::maybe_new(flags.contains(WaitQueueFlags::IRQ_DISABLE));
+        let _irq = if flags.contains(WaitQueueFlags::IRQ_DISABLE) {
+            Some(IrqGuard::new())
+        } else {
+            None
+        };
 
         let task = current_task();
 
@@ -155,11 +159,15 @@ impl WaitQueue {
         flags: WaitQueueFlags,
         mut cond: F,
     ) -> SignalResult<Option<()>> {
-        let _irq = IrqGuard::maybe_new(flags.contains(WaitQueueFlags::IRQ_DISABLE));
-
         if !cond() && flags.contains(WaitQueueFlags::NO_HANG) {
             return Ok(None);
         }
+
+        let _irq = if flags.contains(WaitQueueFlags::IRQ_DISABLE) {
+            Some(IrqGuard::new())
+        } else {
+            None
+        };
 
         let task = current_task();
 

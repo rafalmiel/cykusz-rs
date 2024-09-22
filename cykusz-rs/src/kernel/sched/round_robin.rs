@@ -1,5 +1,4 @@
 use alloc::sync::Arc;
-use core::ptr::{addr_of, addr_of_mut};
 use intrusive_collections::LinkedList;
 
 use crate::arch::int;

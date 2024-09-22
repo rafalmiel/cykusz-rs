@@ -108,7 +108,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn read(&self) -> RwSpinReadGuard<T> {
-        let notify = self.maybe_preempt_disable();
+        let notify = self.notify && self.maybe_preempt_disable();
 
         RwSpinReadGuard {
             g: Some(self.l.read()),
@@ -128,7 +128,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn read_upgradeable(&self) -> RwSpinUpgradeableGuard<T> {
-        let notify = self.maybe_preempt_disable();
+        let notify = self.notify && self.maybe_preempt_disable();
         RwSpinUpgradeableGuard {
             g: Some(self.l.upgradeable_read()),
             irq: false,
@@ -147,7 +147,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn try_read(&self) -> Option<RwSpinReadGuard<T>> {
-        let notify = self.maybe_preempt_disable();
+        let notify = self.notify && self.maybe_preempt_disable();
 
         let lock = match self.l.try_read() {
             Some(l) => Some(l),
@@ -196,7 +196,7 @@ impl<T> RwSpin<T> {
     }
 
     pub fn try_read_upgradeable(&self) -> Option<RwSpinUpgradeableGuard<T>> {
-        let notify = self.maybe_preempt_disable();
+        let notify = self.notify && self.maybe_preempt_disable();
 
         let lock = match self.l.try_upgradeable_read() {
             Some(l) => Some(l),

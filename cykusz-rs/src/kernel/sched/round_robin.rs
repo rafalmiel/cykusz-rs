@@ -1,5 +1,5 @@
 use alloc::sync::Arc;
-
+use core::ptr::{addr_of, addr_of_mut};
 use intrusive_collections::LinkedList;
 
 use crate::arch::int;
@@ -16,14 +16,14 @@ fn set_current(current: &Arc<Task>) {
     let _guard = IrqGuard::new();
 
     unsafe {
-        CURRENT_TASK = Some(current.clone());
+        addr_of_mut!(CURRENT_TASK).write(Some(current.clone()));
     }
 }
 
 fn get_current<'a>() -> &'a Arc<Task> {
     let _guard = IrqGuard::new();
 
-    unsafe { CURRENT_TASK.as_ref().unwrap() }
+    unsafe { addr_of!(CURRENT_TASK).as_ref_unchecked().as_ref().unwrap() }
 }
 
 struct Queues {

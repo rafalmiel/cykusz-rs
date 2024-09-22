@@ -377,9 +377,7 @@ fn divide_by_zero(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
 }
 
 fn debug(_frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
-    unsafe {
-        println!("INT: Debug exception! CPU: {}", crate::CPU_ID);
-    }
+    println!("INT: Debug exception! CPU: {}", crate::cpu_id());
     loop {}
 }
 

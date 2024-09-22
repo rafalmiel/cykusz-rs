@@ -1,4 +1,4 @@
-use core::ptr::addr_of;
+use core::ptr::{addr_of, addr_of_mut};
 
 use crate::arch::raw::descriptor as dsc;
 use crate::arch::raw::gdt;
@@ -62,8 +62,9 @@ pub const fn ring3_ds() -> sgm::SegmentSelector {
 
 pub fn early_init() {
     unsafe {
-        INIT_GDTR.init(&INIT_GDT[..]);
-        dsc::lgdt(addr_of!(INIT_GDTR));
+        let init_gdtr = addr_of_mut!(INIT_GDTR).as_mut_unchecked();
+        init_gdtr.init(&INIT_GDT[..]);
+        dsc::lgdt(init_gdtr);
 
         sgm::set_cs(ring0_cs());
         sgm::load_ds(ring0_ds());
@@ -75,18 +76,22 @@ pub fn early_init() {
 
 pub fn update_tss_rps0(new_rsp: usize) {
     unsafe {
-        TSS.rsp[0] = new_rsp as u64;
+        let tss = addr_of_mut!(TSS).as_mut_unchecked();
+        tss.rsp[0] = new_rsp as u64;
     }
 }
 
 #[inline(never)]
 fn init_tss(stack_top: VirtAddr, fs_base: u64) {
     unsafe {
-        TSS.rsp[0] = stack_top.0 as u64;
-        TSS.kern_fs_base = fs_base;
+        let tss = addr_of_mut!(TSS).as_mut_unchecked();
+        tss.rsp[0] = stack_top.0 as u64;
+        tss.kern_fs_base = fs_base;
+
+        let gdt = addr_of_mut!(GDT).as_mut_unchecked();
 
         {
-            let gdt_low = &mut GDT[5];
+            let gdt_low = &mut gdt[5];
             //logln!("here {:p}", gdt_low as *mut _);
 
             gdt_low.set_offset(addr_of!(TSS) as u32);
@@ -94,7 +99,7 @@ fn init_tss(stack_top: VirtAddr, fs_base: u64) {
         }
 
         {
-            let gdt_high = &mut GDT[6];
+            let gdt_high = &mut gdt[6];
             gdt_high.set_raw((addr_of!(TSS) as u64) >> 32);
         }
 
@@ -108,8 +113,9 @@ fn init_tss(stack_top: VirtAddr, fs_base: u64) {
 //TLS available
 pub fn init(stack_top: VirtAddr, fs_base: u64) {
     unsafe {
-        GDTR.init(&GDT[..]);
-        dsc::lgdt(addr_of!(GDTR));
+        let gdtr = addr_of_mut!(GDTR).as_mut_unchecked();
+        gdtr.init(&GDT[..]);
+        dsc::lgdt(gdtr);
 
         sgm::set_cs(ring0_cs());
         sgm::load_ds(ring0_ds());

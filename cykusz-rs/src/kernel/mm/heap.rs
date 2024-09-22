@@ -1,6 +1,6 @@
 use core::alloc::{GlobalAlloc, Layout};
 use core::ops::Deref;
-use core::ptr::NonNull;
+use core::ptr::{addr_of, addr_of_mut, NonNull};
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use linked_list_allocator::Heap;
@@ -12,13 +12,12 @@ use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::types::Align;
 
 pub fn init() {
-    use crate::HEAP;
-
     for addr in (HEAP_START..(HEAP_START + HEAP_SIZE)).step_by(PAGE_SIZE) {
         map(addr);
     }
     unsafe {
-        HEAP.0.lock().init(HEAP_START.0 as *mut u8, HEAP_SIZE);
+        let heap = heap_mut();
+        heap.0.lock().init(HEAP_START.0 as *mut u8, HEAP_SIZE);
     }
 }
 
@@ -117,7 +116,12 @@ impl LeakCatcher {
 }
 
 pub fn heap_mem() -> usize {
-    unsafe { crate::HEAP.lock().used() }
+    unsafe {
+        let heap = &addr_of!(crate::HEAP).read();
+        let used = heap.lock().used();
+
+        used
+    }
 }
 
 impl LockedHeap {
@@ -208,25 +212,31 @@ unsafe impl GlobalAlloc for LockedHeap {
     }
 }
 
+fn heap() -> &'static LockedHeap {
+    unsafe { addr_of!(crate::HEAP).as_ref_unchecked() }
+}
+
+fn heap_mut() -> &'static LockedHeap {
+    unsafe { addr_of_mut!(crate::HEAP).as_mut_unchecked() }
+}
+
 pub fn allocate_layout(layout: Layout) -> Option<*mut u8> {
-    unsafe { Some(crate::HEAP.alloc(layout) as *mut u8) }
+    unsafe { Some(heap().alloc(layout) as *mut u8) }
 }
 
 pub fn deallocate_layout(ptr: *mut u8, layout: Layout) {
-    unsafe { crate::HEAP.dealloc(ptr, layout) }
+    unsafe { heap().dealloc(ptr, layout) }
 }
 
 pub fn allocate(size: usize) -> Option<*mut u8> {
     unsafe {
-        Some(
-            crate::HEAP.alloc(::core::alloc::Layout::from_size_align_unchecked(size, 8)) as *mut u8,
-        )
+        Some(heap().alloc(::core::alloc::Layout::from_size_align_unchecked(size, 8)) as *mut u8)
     }
 }
 
 pub fn deallocate(ptr: *mut u8, size: usize) {
     unsafe {
-        crate::HEAP.dealloc(
+        heap().dealloc(
             ptr,
             ::core::alloc::Layout::from_size_align_unchecked(size, 8),
         )
@@ -236,7 +246,7 @@ pub fn deallocate(ptr: *mut u8, size: usize) {
 pub fn allocate_align(size: usize, align: usize) -> Option<*mut u8> {
     unsafe {
         Some(
-            crate::HEAP.alloc(::core::alloc::Layout::from_size_align_unchecked(
+            heap().alloc(::core::alloc::Layout::from_size_align_unchecked(
                 size, align,
             )) as *mut u8,
         )
@@ -245,7 +255,7 @@ pub fn allocate_align(size: usize, align: usize) -> Option<*mut u8> {
 
 pub fn deallocate_align(ptr: *mut u8, size: usize, align: usize) {
     unsafe {
-        crate::HEAP.dealloc(
+        heap().dealloc(
             ptr,
             ::core::alloc::Layout::from_size_align_unchecked(size, align),
         )

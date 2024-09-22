@@ -15,6 +15,7 @@
 #![feature(linked_list_cursors)]
 #![feature(trace_macros)]
 #![feature(unsigned_is_multiple_of)]
+#![feature(ptr_as_ref_unchecked)]
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;
@@ -26,7 +27,7 @@ extern crate intrusive_collections;
 extern crate lazy_static;
 
 use core::arch::asm;
-use core::ptr::addr_of_mut;
+use core::ptr::{addr_of, addr_of_mut};
 use syscall_defs::OpenFlags;
 
 use crate::kernel::fs::path::Path;
@@ -70,6 +71,10 @@ pub fn bochs() {
     unsafe {
         asm!("xchg bx, bx");
     }
+}
+
+pub fn cpu_id() -> u8 {
+    unsafe { addr_of!(CPU_ID).read() }
 }
 
 pub fn rust_main(stack_top: VirtAddr) {

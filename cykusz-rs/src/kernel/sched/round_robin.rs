@@ -16,14 +16,19 @@ fn set_current(current: &Arc<Task>) {
     let _guard = IrqGuard::new();
 
     unsafe {
-        addr_of_mut!(CURRENT_TASK).write(Some(current.clone()));
+        let t = &raw mut CURRENT_TASK;
+        let _prev = t.read(); //run destructor of previous entry
+        t.write(Some(current.clone()));
     }
 }
 
 fn get_current<'a>() -> &'a Arc<Task> {
     let _guard = IrqGuard::new();
 
-    unsafe { addr_of!(CURRENT_TASK).as_ref_unchecked().as_ref().unwrap() }
+    unsafe {
+        let t = &raw const CURRENT_TASK;
+        t.as_ref_unchecked().as_ref().unwrap()
+    }
 }
 
 struct Queues {
@@ -73,7 +78,7 @@ impl Queues {
 
         crate::kernel::sched::finalize();
         unsafe {
-            switch!(&self.sched_task, &to);
+            switch!(&self.sched_task, to);
         }
     }
 
@@ -85,7 +90,7 @@ impl Queues {
         }
 
         unsafe {
-            switch!(&from, &self.sched_task);
+            switch!(from, &self.sched_task);
         }
     }
 
@@ -99,7 +104,7 @@ impl Queues {
         fun();
 
         unsafe {
-            switch!(&from, &self.sched_task);
+            switch!(from, &self.sched_task);
         }
     }
 

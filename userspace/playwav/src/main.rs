@@ -6,19 +6,8 @@ use std::process::ExitCode;
 use std::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
 use syscall_defs::{MMapFlags, MMapProt};
 
-fn main() -> Result<(), ExitCode> {
-    let mut args = std::env::args();
-
-    if args.len() != 2 {
-        println!("Usage: umount <dest dir path>");
-        return Err(ExitCode::from(1));
-    }
-
-    args.next();
-
-    let file = args.next().unwrap();
-
-    let mut wav = std::fs::File::open(file).map_err(|_e| ExitCode::from(1))?;
+fn play(song: &str) -> Result<(), ExitCode> {
+    let mut wav = std::fs::File::open(song).map_err(|_e| ExitCode::from(1))?;
 
     let wav_size = wav.stream_len().map_err(|_e| ExitCode::from(2))? as usize;
 
@@ -44,7 +33,7 @@ fn main() -> Result<(), ExitCode> {
     )
     .map_err(|_e| ExitCode::from(4))?;
 
-    println!("file size: {}", wav_size);
+    //println!("file size: {}", wav_size);
 
     let get_current_hda_block =
         || unsafe { (hda_map as *const u64).offset(4).read_volatile() as usize / 2048 };
@@ -77,4 +66,44 @@ fn main() -> Result<(), ExitCode> {
     hda_data.fill(0); //silence
 
     Ok(())
+}
+
+fn main() -> Result<(), ExitCode> {
+    let mut args = std::env::args();
+
+    if args.len() < 2 {
+        println!("Usage: playwav [-d] <dest dir path>");
+        return Err(ExitCode::from(1));
+    }
+
+    args.next();
+    let mut daemonize = false;
+
+    let mut file = args.next().unwrap();
+    if let Some(arg2) = args.next() {
+        if file == "-d" {
+            daemonize = true;
+            file = arg2;
+        }
+    }
+
+    if !daemonize {
+        return Ok(play(file.as_str())?);
+    }
+
+    let daemon = syscall_user::fork().expect("fork failed");
+
+    if daemon > 0 {
+        return Ok(())
+    }
+
+    let _sid = syscall_user::setsid().expect("setsid failed");
+
+    syscall_user::chdir("/").expect("chdir failed");
+
+    syscall_user::close(0).expect("close 0 faield");
+    syscall_user::close(1).expect("close 1 faield");
+    syscall_user::close(2).expect("close 2 faield");
+
+    Ok(play(file.as_str())?)
 }

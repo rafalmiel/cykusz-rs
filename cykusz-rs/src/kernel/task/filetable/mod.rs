@@ -235,7 +235,9 @@ impl FileHandle {
                 sysd.off = offset + sysd.reclen as usize;
 
                 if buf.len() < sysd.reclen as usize {
-                    self.dir_iter.lock().1 = Some(d.clone());
+                    let mut lock = self.dir_iter.lock();
+
+                    lock.1 = Some(d.clone());
 
                     break offset;
                 }
@@ -245,7 +247,7 @@ impl FileHandle {
                         .copy_from(&sysd as *const _ as *const u8, struct_len);
 
                     let sysd_ref = buf.as_mut_ptr() as *mut SysDirEntry;
-                    let name = core::ptr::addr_of_mut!((*sysd_ref).name);
+                    let name = &raw mut (*sysd_ref).name;
                     name.as_mut()
                         .unwrap()
                         .as_mut_ptr()

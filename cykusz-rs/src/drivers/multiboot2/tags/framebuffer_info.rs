@@ -1,5 +1,3 @@
-use core::ptr::addr_of;
-
 use crate::drivers::multiboot2::Tag;
 use crate::kernel::mm::VirtAddr;
 
@@ -87,6 +85,6 @@ impl FramebufferInfo {
     }
 
     pub fn framebuffer_type(&self) -> &'static FramebufferType {
-        unsafe { VirtAddr(addr_of!(self.color_info) as usize).read_ref::<FramebufferType>() }
+        unsafe { VirtAddr((&raw const self.color_info) as usize).read_ref::<FramebufferType>() }
     }
 }

@@ -1,6 +1,6 @@
 use core::alloc::{GlobalAlloc, Layout};
 use core::ops::Deref;
-use core::ptr::{addr_of, addr_of_mut, NonNull};
+use core::ptr::NonNull;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use linked_list_allocator::Heap;
@@ -117,7 +117,7 @@ impl LeakCatcher {
 
 pub fn heap_mem() -> usize {
     unsafe {
-        let heap = &addr_of!(crate::HEAP).read();
+        let heap = (&raw const crate::HEAP).read();
         let used = heap.lock().used();
 
         used
@@ -213,11 +213,11 @@ unsafe impl GlobalAlloc for LockedHeap {
 }
 
 fn heap() -> &'static LockedHeap {
-    unsafe { addr_of!(crate::HEAP).as_ref_unchecked() }
+    unsafe { (&raw const crate::HEAP).as_ref_unchecked() }
 }
 
 fn heap_mut() -> &'static LockedHeap {
-    unsafe { addr_of_mut!(crate::HEAP).as_mut_unchecked() }
+    unsafe { (&raw mut crate::HEAP).as_mut_unchecked() }
 }
 
 pub fn allocate_layout(layout: Layout) -> Option<*mut u8> {

@@ -62,6 +62,7 @@ pub struct Task {
     gid: AtomicUsize,
     sid: AtomicUsize,
     on_cpu: AtomicUsize,
+    exe: Spin<Option<DirEntryItem>>,
     parent: Spin<Option<Arc<Task>>>,
     children: Spin<intrusive_collections::LinkedList<TaskAdapter>>,
     sibling: intrusive_collections::LinkedListLink,
@@ -139,6 +140,14 @@ impl Task {
         Self::make_ptr(task)
     }
 
+    pub fn exe(&self) -> Option<DirEntryItem> {
+        self.exe.lock().clone()
+    }
+
+    pub fn set_exe(&self, exe: Option<DirEntryItem>) {
+        *self.exe.lock() = exe;
+    }
+
     pub fn fork(&self) -> Arc<Task> {
         let mut task = Task::new();
 
@@ -163,6 +172,8 @@ impl Task {
         if let Some(term) = self.terminal().terminal() {
             task.terminal().connect(term);
         }
+
+        task.set_exe(self.exe());
 
         logln2!("new fork task {}", task.pid());
 
@@ -220,6 +231,8 @@ impl Task {
             exe.name(),
             exe.parent().is_some()
         );
+
+        self.set_exe(Some(exe.clone()));
 
         unsafe {
             // EXEC!
@@ -572,6 +585,45 @@ impl Task {
                 }
                 Ok(Err(e)) => {
                     panic!("Unexpected error from wait_thread: {:?}", e);
+                }
+            }
+        }
+    }
+
+    pub fn terminate_children(&self) {
+        for c in self
+            .children()
+            .iter()
+            .filter(|t| t.pid() != self.pid() && t.state() != TaskState::Unused)
+        {
+            dbgln!(
+                poweroff,
+                "sigkill to {} {}",
+                c.pid(),
+                if let Some(e) = c.exe() {
+                    e.full_path()
+                } else {
+                    String::new()
+                }
+            );
+            c.signal(syscall_defs::signal::SIGKILL);
+        }
+
+        loop {
+            match self.wait_pid(
+                -1,
+                &mut syscall_defs::waitpid::Status::Invalid(0),
+                syscall_defs::waitpid::WaitPidFlags::all(),
+            ) {
+                Ok(Err(SyscallError::ECHILD)) => {
+                    break;
+                }
+                Ok(Ok(pid)) => {
+                    dbgln!(poweroff, "terminated child pid: {}", pid);
+                }
+                Err(_) => continue,
+                Ok(Err(e)) => {
+                    panic!("Unexpected error from wait_pid {:?}", e);
                 }
             }
         }

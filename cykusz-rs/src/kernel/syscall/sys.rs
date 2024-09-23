@@ -1233,12 +1233,6 @@ pub fn sys_sleep(time_ns: u64) -> SyscallResult {
 }
 
 pub fn sys_fork() -> SyscallResult {
-    //println!("icache stats");
-    //crate::kernel::fs::icache::cache().print_stats();
-    //println!("dir entry stats");
-    //crate::kernel::fs::dirent::cache().print_stats();
-    //println!("page cache stats");
-    //crate::kernel::fs::pcache::cache().print_stats();
     let child = crate::kernel::sched::fork();
 
     Ok(child.tid())
@@ -1606,17 +1600,13 @@ pub fn sys_fsync(fd: u64) -> SyscallResult {
     Ok(0)
 }
 
-pub fn sys_poweroff() -> ! {
-    crate::kernel::sched::close_all_tasks();
-    println!("[ SHUTDOWN ] Closed all tasks");
-    crate::kernel::fs::dirent::cache().clear();
-    println!("[ SHUTDOWN ] Cleared dir cache");
-    crate::kernel::fs::icache::cache().clear();
-    println!("[ SHUTDOWN ] Cleared inode cache");
-    crate::kernel::fs::mount::umount_all();
-    println!("[ SHUTDOWN ] Unmounted fs");
-
-    crate::arch::acpi::power_off()
+pub fn sys_poweroff() -> SyscallResult {
+    let init = crate::kernel::init::init_task();
+    // Exec poweroff as an init task
+    init.signals()
+        .setup_sig_exec(crate::sigexec_poweroff, Arc::new(()));
+    init.wake_up_as_next();
+    Ok(0)
 }
 
 pub fn sys_reboot() -> SyscallResult {

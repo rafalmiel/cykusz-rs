@@ -26,14 +26,16 @@ extern crate intrusive_collections;
 #[macro_use]
 extern crate lazy_static;
 
-use core::arch::asm;
-use core::ptr::{addr_of, addr_of_mut};
-use syscall_defs::OpenFlags;
-
+use crate::arch::int;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
+use alloc::sync::Arc;
+use core::any::Any;
+use core::arch::asm;
+use core::ptr::{addr_of, addr_of_mut};
+use syscall_defs::OpenFlags;
 
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
@@ -205,11 +207,30 @@ fn idle() -> ! {
         current_task_ref().locks()
     );
     loop {
-        crate::kernel::int::disable();
-        if crate::kernel::sched::reschedule() {
-            crate::kernel::int::enable();
+        kernel::int::disable();
+        if kernel::sched::reschedule() {
+            kernel::int::enable();
         } else {
-            crate::kernel::int::enable_and_halt();
+            kernel::int::enable_and_halt();
         }
     }
+}
+
+fn sigexec_poweroff(_param: Arc<dyn Any + Send + Sync>) {
+    // executing as init task here
+    dbgln!(
+        poweroff,
+        "sigexec_poweroff, int enabled? {}",
+        int::is_enabled()
+    );
+    kernel::sched::close_all_tasks();
+    println!("[ SHUTDOWN ] Closed all tasks");
+    kernel::fs::dirent::cache().clear();
+    println!("[ SHUTDOWN ] Cleared dir cache");
+    kernel::fs::icache::cache().clear();
+    println!("[ SHUTDOWN ] Cleared inode cache");
+    kernel::fs::mount::umount_all();
+    println!("[ SHUTDOWN ] Unmounted fs");
+
+    arch::acpi::power_off()
 }

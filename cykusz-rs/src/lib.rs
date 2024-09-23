@@ -34,7 +34,6 @@ use crate::kernel::sched::current_task_ref;
 use alloc::sync::Arc;
 use core::any::Any;
 use core::arch::asm;
-use core::ptr::{addr_of, addr_of_mut};
 use syscall_defs::OpenFlags;
 
 #[global_allocator]
@@ -55,13 +54,13 @@ static mut DEBUG: bool = false;
 
 pub fn enable_debug() {
     unsafe {
-        addr_of_mut!(DEBUG).write(true);
+        (&raw mut DEBUG).write(true);
     }
 }
 
 pub fn disable_debug() {
     unsafe {
-        addr_of_mut!(DEBUG).write(false);
+        (&raw mut DEBUG).write(false);
     }
 }
 
@@ -76,7 +75,7 @@ pub fn bochs() {
 }
 
 pub fn cpu_id() -> u8 {
-    unsafe { addr_of!(CPU_ID).read() }
+    unsafe { CPU_ID }
 }
 
 pub fn rust_main(stack_top: VirtAddr) {
@@ -87,7 +86,7 @@ pub fn rust_main(stack_top: VirtAddr) {
     println!("[ OK ] Per-CPU Storage Initialized");
 
     unsafe {
-        addr_of_mut!(CPU_ID).write(0);
+        (&raw mut CPU_ID).write(0);
     }
 
     kernel::fs::init();
@@ -180,7 +179,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::tls::init(VirtAddr(stack_ptr as usize));
 
     unsafe {
-        addr_of_mut!(CPU_ID).write(cpu_num);
+        (&raw mut CPU_ID).write(cpu_num);
     }
 
     kernel::sched::init_ap();

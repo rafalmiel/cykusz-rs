@@ -1,5 +1,3 @@
-use core::ptr::addr_of;
-
 use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
 use crate::kernel::mm::{MappedAddr, PhysAddr, VirtAddr};
 
@@ -80,7 +78,7 @@ impl Info {
     pub fn framebuffer_info_tag(&self) -> Option<&'static tags::framebuffer_info::FramebufferInfo> {
         self.tags()
             .find(|t| t.typ == 8)
-            .map(|t| unsafe { VirtAddr(addr_of!(*t) as usize).read_ref::<FramebufferInfo>() })
+            .map(|t| unsafe { VirtAddr((&raw const *t) as usize).read_ref::<FramebufferInfo>() })
     }
 
     pub fn modules_tags(

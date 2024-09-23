@@ -1,5 +1,3 @@
-use core::ptr::{addr_of, addr_of_mut};
-
 use crate::arch::raw::descriptor as dsc;
 use crate::arch::raw::gdt;
 use crate::arch::raw::segmentation as sgm;
@@ -62,7 +60,7 @@ pub const fn ring3_ds() -> sgm::SegmentSelector {
 
 pub fn early_init() {
     unsafe {
-        let init_gdtr = addr_of_mut!(INIT_GDTR).as_mut_unchecked();
+        let init_gdtr = (&raw mut INIT_GDTR).as_mut_unchecked();
         init_gdtr.init(&INIT_GDT[..]);
         dsc::lgdt(init_gdtr);
 
@@ -76,7 +74,7 @@ pub fn early_init() {
 
 pub fn update_tss_rps0(new_rsp: usize) {
     unsafe {
-        let tss = addr_of_mut!(TSS).as_mut_unchecked();
+        let tss = (&raw mut TSS).as_mut_unchecked();
         tss.rsp[0] = new_rsp as u64;
     }
 }
@@ -84,36 +82,36 @@ pub fn update_tss_rps0(new_rsp: usize) {
 #[inline(never)]
 fn init_tss(stack_top: VirtAddr, fs_base: u64) {
     unsafe {
-        let tss = addr_of_mut!(TSS).as_mut_unchecked();
+        let tss = (&raw mut TSS).as_mut_unchecked();
         tss.rsp[0] = stack_top.0 as u64;
         tss.kern_fs_base = fs_base;
 
-        let gdt = addr_of_mut!(GDT).as_mut_unchecked();
+        let gdt = (&raw mut GDT).as_mut_unchecked();
 
         {
             let gdt_low = &mut gdt[5];
             //logln!("here {:p}", gdt_low as *mut _);
 
-            gdt_low.set_offset(addr_of!(TSS) as u32);
+            gdt_low.set_offset((&raw const TSS) as u32);
             gdt_low.set_limit(::core::mem::size_of::<TaskStateSegment>() as u32);
         }
 
         {
             let gdt_high = &mut gdt[6];
-            gdt_high.set_raw((addr_of!(TSS) as u64) >> 32);
+            gdt_high.set_raw(((&raw const TSS) as u64) >> 32);
         }
 
         dsc::load_tr(&sgm::SegmentSelector::from_raw(5 << 3));
 
         use crate::arch::raw::msr;
-        msr::wrmsr(msr::IA32_KERNEL_GS_BASE, addr_of!(TSS) as u64);
+        msr::wrmsr(msr::IA32_KERNEL_GS_BASE, (&raw const TSS) as u64);
     }
 }
 
 //TLS available
 pub fn init(stack_top: VirtAddr, fs_base: u64) {
     unsafe {
-        let gdtr = addr_of_mut!(GDTR).as_mut_unchecked();
+        let gdtr = (&raw mut GDTR).as_mut_unchecked();
         gdtr.init(&GDT[..]);
         dsc::lgdt(gdtr);
 

@@ -1,3 +1,5 @@
+#![feature(raw_ref_op)]
+
 use syscall_user as syscall;
 
 use syscall_defs::waitpid::WaitPidFlags;
@@ -12,7 +14,7 @@ fn spawn_shell() -> usize {
             syscall::ioctl(
                 0,
                 syscall_defs::ioctl::tty::TIOCSPGRP,
-                core::ptr::addr_of!(pid) as usize,
+                (&raw const pid) as usize,
             )
             .expect("Failed to attach tty");
 

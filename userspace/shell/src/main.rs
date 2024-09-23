@@ -1,11 +1,11 @@
+#![feature(raw_ref_op)]
+#![feature(ptr_as_ref_unchecked)]
 extern crate syscall_defs;
 
 #[macro_use]
 extern crate syscall_user;
 
 use syscall_user as syscall;
-
-use std::ptr::{addr_of, addr_of_mut};
 
 use chrono::{Datelike, Timelike};
 use syscall::bochs;
@@ -42,7 +42,9 @@ fn ls(path: &str) {
                 let struct_len = core::mem::size_of::<SysDirEntry>();
 
                 loop {
-                    let dentry = unsafe { &*(addr_of!(buf).offset(offset) as *const SysDirEntry) };
+                    let dentry = unsafe {
+                        ((&raw const buf).offset(offset) as *const SysDirEntry).as_ref_unchecked()
+                    };
                     let namebytes = unsafe {
                         core::slice::from_raw_parts(
                             dentry.name.as_ptr(),
@@ -121,7 +123,7 @@ impl Tty {
         syscall::ioctl(
             self.fd,
             syscall_defs::ioctl::tty::TIOCSPGRP,
-            core::ptr::addr_of!(gid) as usize,
+            (&raw const gid) as usize,
         )
         .expect("Failed to set fg terminal group");
     }
@@ -744,12 +746,12 @@ static mut READY: bool = false;
 
 fn set_ready(r: bool) {
     unsafe {
-        addr_of_mut!(READY).write_volatile(r);
+        (&raw mut READY).write_volatile(r);
     }
 }
 
 fn ready() -> bool {
-    unsafe { addr_of!(READY).read_volatile() }
+    unsafe { (&raw const READY).read_volatile() }
 }
 
 fn signal_test() {
@@ -843,7 +845,7 @@ fn main_old() -> ! {
         print!("[root {}]# ", make_str(&pwd[0..pwd_r]));
 
         // Read some data from stdin
-        let r = syscall::read(1, &mut unsafe { *addr_of_mut!(buf) }).unwrap();
+        let r = syscall::read(1, &mut buf).unwrap();
 
         {
             // Write data from stdin into the file

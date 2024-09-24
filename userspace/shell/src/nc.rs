@@ -56,7 +56,7 @@ fn recv(fd: usize) -> bool {
 
 fn start(fd: usize) {
     unsafe {
-        SENT = 0;
+        (&raw mut SENT).write(0);
     }
 
     let mut read_fds: FdSet = FdSet::new();

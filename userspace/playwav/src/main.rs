@@ -33,6 +33,13 @@ fn play(song: &str) -> Result<(), ExitCode> {
     )
     .map_err(|_e| ExitCode::from(4))?;
 
+    for addr in (wav_map..wav_map + wav_size).step_by(4096) {
+        let _ = unsafe {
+            // prefault to read the file into memory
+            (addr as *const u64).read_volatile()
+        };
+    }
+
     //println!("file size: {}", wav_size);
 
     let get_current_hda_block =
@@ -52,7 +59,10 @@ fn play(song: &str) -> Result<(), ExitCode> {
 
         let chunk = std::cmp::min(rem, 2048);
 
-        while ((get_current_hda_block() + 3) % buf_block_count) != wp_block {}
+        while ((get_current_hda_block() + 3) % buf_block_count) != wp_block {
+            // yield cpu for other tasks
+            let _ = syscall_user::yield_execution();
+        }
 
         hda_data[wp_block * 2048..wp_block * 2048 + chunk]
             .copy_from_slice(&wav_data[file_block * 2048..file_block * 2048 + chunk]);
@@ -61,7 +71,10 @@ fn play(song: &str) -> Result<(), ExitCode> {
         file_block += 1;
     }
 
-    while get_current_hda_block() != wp_block {}
+    while get_current_hda_block() != wp_block {
+        // yield cpu for other tasks
+        let _ = syscall_user::yield_execution();
+    }
 
     hda_data.fill(0); //silence
 

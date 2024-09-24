@@ -482,6 +482,10 @@ pub fn ioctl(fd: usize, cmd: usize, arg: usize) -> SyscallResult {
     unsafe { syscall3(SYS_IOCTL, fd, cmd, arg) }
 }
 
+pub fn yield_execution() -> SyscallResult {
+    unsafe { syscall0(SYS_YIELD) }
+}
+
 pub fn sigaction(
     sig: usize,
     mut sigaction: Option<&mut syscall_defs::signal::SigAction>,

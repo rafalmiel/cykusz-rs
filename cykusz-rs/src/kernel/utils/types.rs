@@ -73,16 +73,14 @@ impl<'a, T> Iterator for PageIter<'a, T> {
                     .align_down(PAGE_SIZE) as *const T
             };
 
-            self.cur = if next <= last {
+            if next <= last {
                 unsafe { Some(&*next) }
             } else {
                 None
-            };
-
-            None
+            }
         };
 
-        return Some(ret);
+        Some(ret)
     }
 }
 
@@ -90,13 +88,11 @@ pub trait Prefault {
     fn prefault(&self);
 }
 
-impl<T> Prefault for &T {
+impl<T: Copy> Prefault for &T {
     fn prefault(&self) {
-        let t = *self;
+        let t = **self;
 
-        unsafe {
-            (t as *const T).read_volatile();
-        }
+        core::hint::black_box(t); // prevent optimisations...
     }
 }
 

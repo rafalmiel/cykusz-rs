@@ -491,6 +491,7 @@ impl Table<Level4> {
 
         let (was_alloc_2, l1) = l2.alloc_next_level(page.p2_index(), user);
 
+        dbgln!(virt, "map_flags {} {:?}", addr, flags);
         if l1.alloc_set_flags(page.p1_index(), Entry::from_kernel_flags(flags)) {
             l2.entries[page.p2_index()].inc_entry_count();
         }

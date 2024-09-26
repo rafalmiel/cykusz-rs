@@ -4,4 +4,4 @@ exclude = ["userspace", "sysroot/src/rust"]
 resolver = "2"
 
 [profile.release]
-debug=false
+debug=true

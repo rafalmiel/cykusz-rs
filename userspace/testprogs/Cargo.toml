@@ -15,6 +15,12 @@ test = false
 bench = false
 path = "src/mprotect/bin/main.rs"
 
+[[bin]]
+name = "threads"
+test = false
+bench = false
+path = "src/threads/bin/main.rs"
+
 [dependencies.syscall-defs]
 path = "../../syscall-defs"
 

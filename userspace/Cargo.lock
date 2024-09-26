@@ -71,6 +71,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sound-daemon"
+version = "0.1.0"
+dependencies = [
+ "syscall-defs",
+ "syscall-user",
+]
+
+[[package]]
 name = "syscall-defs"
 version = "0.1.0"
 dependencies = [

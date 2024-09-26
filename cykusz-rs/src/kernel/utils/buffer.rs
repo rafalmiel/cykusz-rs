@@ -164,7 +164,7 @@ impl BufferQueue {
             return Ok(0);
         }
 
-        logln4!("appending data len: {}", data.len());
+        dbgln!(buffer, "appending data len: {}", data.len());
 
         let mut buffer = self
             .writer_queue
@@ -174,6 +174,12 @@ impl BufferQueue {
             })?
             .ok_or(vfs::FsError::WouldBlock)?;
 
+        dbgln!(
+            buffer,
+            "appending data starting: available size: {}",
+            buffer.available_size()
+        );
+
         if !self.has_readers() {
             logln!("no readers......");
             return Err(FsError::Pipe);
@@ -181,11 +187,11 @@ impl BufferQueue {
 
         let written = buffer.append_data(data);
 
-        logln4!("data appended");
+        dbgln!(buffer, "data appended {}", written);
 
         drop(buffer);
 
-        self.reader_queue.notify_one();
+        self.reader_queue.notify_all();
 
         Ok(written)
     }
@@ -213,7 +219,7 @@ impl BufferQueue {
             return Ok(0);
         }
 
-        logln!("READ DATA WAIT");
+        dbgln!(buffer, "read data wait");
         let mut buffer = self
             .reader_queue
             .wait_lock_for(wg_flags, &self.buffer, |l| {
@@ -221,7 +227,7 @@ impl BufferQueue {
             })?
             .ok_or(vfs::FsError::WouldBlock)?;
 
-        logln!("READ DATA STARTING");
+        dbgln!(buffer, "read data starting");
         let read = if transient {
             buffer.read_data_transient_from(offset, buf)
         } else {
@@ -230,10 +236,10 @@ impl BufferQueue {
 
         drop(buffer);
 
-        logln!("READ DATA DONE {}", read);
+        dbgln!(buffer, "read data done {}", read);
 
         if !transient && read > 0 {
-            self.writer_queue.notify_one();
+            self.writer_queue.notify_all();
         }
 
         Ok(read)
@@ -300,11 +306,11 @@ impl Buffer {
             return 0;
         }
 
-        return if self.r <= self.w {
+        if self.r <= self.w {
             self.data.len() - (self.w - self.r)
         } else {
             self.r - self.w
-        };
+        }
     }
 
     pub fn size(&self) -> usize {
@@ -312,24 +318,31 @@ impl Buffer {
     }
 
     pub fn append_data(&mut self, data: &[u8]) -> usize {
+        dbgln!(buffer, "append data {} {} {}", self.r, self.w, data.len());
         if self.full {
+            dbgln!(buffer, "append data buffer full");
             return 0;
         }
 
         if self.r > self.w {
             let cap = self.r - self.w;
             let to_copy = core::cmp::min(cap, data.len());
+            dbgln!(buffer, "append data {}..{}", self.w, self.w + to_copy);
             self.data.as_mut_slice()[self.w..self.w + to_copy].copy_from_slice(&data[..to_copy]);
-            self.w += to_copy;
+            self.w = (self.w + to_copy) % self.data.len();
             self.full = self.r == self.w;
+            dbgln!(buffer, "append data copied {}", to_copy);
             to_copy
         } else {
             let right = self.data.len() - self.w;
             let to_copy = core::cmp::min(right, data.len());
+            dbgln!(buffer, "append data 2 {}..{}", self.w, self.w + to_copy);
             self.data.as_mut_slice()[self.w..self.w + to_copy].copy_from_slice(&data[..to_copy]);
+            dbgln!(buffer, "append data done");
             self.w = (self.w + to_copy) % self.data.len();
             self.full = self.r == self.w;
             let written = if to_copy < data.len() {
+                dbgln!(buffer, "append data recurse");
                 self.append_data(&data[to_copy..])
             } else {
                 0

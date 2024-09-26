@@ -1356,6 +1356,7 @@ impl VM {
         if current_task_ref().locks() > 0 {
             logln!("handle_pagefault: locks > 0");
         }
+        dbgln!(vm, "handle_pagefault: {:?} {}", reason, addr);
         let mut res = self.data.lock();
 
         let ret = res.handle_pagefault(reason, addr);

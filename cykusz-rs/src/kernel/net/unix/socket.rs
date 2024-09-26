@@ -380,6 +380,8 @@ impl INode for Socket {
             return Err(FsError::NotSupported);
         };
 
+        dbgln!(unix, "Writing {} data", buf.len());
+
         Ok(target
             .buffer
             .append_data_flags(buf, WaitQueueFlags::from(flags))?)

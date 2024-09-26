@@ -1140,10 +1140,9 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
             }
             if let Some(handle) = task.get_handle(fd.fd as usize) {
                 let f = handle.poll(if first { Some(&mut poll_table) } else { None }, fd.events)?;
+                fd.revents = f;
                 if !f.is_empty() {
                     found += 1;
-
-                    fd.revents = f;
 
                     logln4!("found {}: {:?}", fd.fd, fd.revents);
                 }

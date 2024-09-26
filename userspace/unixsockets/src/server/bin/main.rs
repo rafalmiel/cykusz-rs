@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::os::fd::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 
 use syscall_user::util::read_all_to_string;
@@ -19,16 +20,31 @@ fn main() -> std::io::Result<()> {
     let listener = UnixListener::bind("/unix-socket")?;
 
     loop {
-        match listener.accept() {
-            Ok((s, _addr)) => {
-                println!("server: got client");
+        let mut pollfd = [syscall_defs::poll::PollFd::new(
+            listener.as_raw_fd() as i32,
+            syscall_defs::poll::PollEventFlags::READ,
+        )];
 
-                if let Err(_e) = read_and_answer(s) {
-                    println!("server: client disconnected, awaiting next...");
-                }
+        if let Ok(res) = syscall_user::poll(&mut pollfd, -1) {
+            if res == 0
+                || !pollfd[0]
+                    .revents
+                    .contains(syscall_defs::poll::PollEventFlags::READ)
+            {
+                continue;
             }
-            Err(e) => {
-                println!("server: accept err: {:?}", e);
+            println!("server: poll result: {}", res);
+            match listener.accept() {
+                Ok((s, _addr)) => {
+                    println!("server: got client");
+
+                    if let Err(_e) = read_and_answer(s) {
+                        println!("server: client disconnected, awaiting next...");
+                    }
+                }
+                Err(e) => {
+                    println!("server: accept err: {:?}", e);
+                }
             }
         }
     }

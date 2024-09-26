@@ -400,15 +400,33 @@ impl INode for Socket {
         } else {
             None
         };
-        if flags.contains(PollEventFlags::READ) {
-            if self.buffer.has_data() {
-                res_flags.insert(PollEventFlags::READ);
-            }
+        let is_listening = if flags.contains(PollEventFlags::READ) {
+            if self.is_listening() {
+                let data = self.data.lock();
 
-            if !self.has_writers() {
-                res_flags.insert(PollEventFlags::HUP);
+                if let SocketState::Listening(q) = &*data {
+                    if !q.queue.is_empty() {
+                        res_flags.insert(PollEventFlags::READ);
+                    }
+                } else {
+                    return Err(FsError::NotSupported);
+                }
+
+                true
+            } else {
+                if self.buffer.has_data() {
+                    res_flags.insert(PollEventFlags::READ);
+                }
+
+                if !self.has_writers() {
+                    res_flags.insert(PollEventFlags::HUP);
+                }
+
+                false
             }
-        }
+        } else {
+            false
+        };
         if flags.contains(PollEventFlags::WRITE) {
             if target.clone().unwrap().buffer.available_size() > 0 {
                 res_flags.insert(PollEventFlags::WRITE);
@@ -421,7 +439,11 @@ impl INode for Socket {
 
         if let Some(p) = poll_table {
             if flags.contains(PollEventFlags::READ) {
-                p.listen(&self.buffer.readers_queue());
+                if !is_listening {
+                    p.listen(&self.buffer.readers_queue());
+                } else {
+                    p.listen(&self.wq);
+                }
             }
             if flags.contains(PollEventFlags::WRITE) {
                 p.listen(&target.unwrap().buffer.writers_queue());

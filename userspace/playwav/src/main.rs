@@ -107,7 +107,7 @@ fn main() -> Result<(), ExitCode> {
     let daemon = syscall_user::fork().expect("fork failed");
 
     if daemon > 0 {
-        return Ok(())
+        return Ok(());
     }
 
     let _sid = syscall_user::setsid().expect("setsid failed");

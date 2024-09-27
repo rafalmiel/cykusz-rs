@@ -14,7 +14,7 @@ use crate::arch::mm::VirtAddr;
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
-use crate::kernel::sched::{new_task_tid, SleepFlags};
+use crate::kernel::sched::{current_task_ref, new_task_tid, SleepFlags};
 use crate::kernel::signal::{SignalResult, Signals, KSIGSTOPTHR};
 use crate::kernel::sync::{LockApi, RwSpin, Spin, SpinGuard};
 use crate::kernel::task::children_events::WaitPidEvents;
@@ -591,39 +591,60 @@ impl Task {
     }
 
     pub fn terminate_children(&self) {
-        for c in self
-            .children()
-            .iter()
-            .filter(|t| t.pid() != self.pid() && t.state() != TaskState::Unused)
-        {
-            dbgln!(
-                poweroff,
-                "sigkill to {} {}",
-                c.pid(),
-                if let Some(e) = c.exe() {
-                    e.full_path()
-                } else {
-                    String::new()
-                }
-            );
-            c.signal(syscall_defs::signal::SIGKILL);
-        }
+        'outer: loop {
+            for c in self.children().iter().filter(|t| {
+                t.is_process_leader() && t.pid() != self.pid() && t.state() != TaskState::Unused
+            }) {
+                dbgln!(
+                    poweroff,
+                    "sigkill to {} {}",
+                    c.pid(),
+                    if let Some(e) = c.exe() {
+                        e.full_path()
+                    } else {
+                        String::new()
+                    }
+                );
+                c.signal(syscall_defs::signal::SIGKILL);
+            }
 
-        loop {
-            match self.wait_pid(
-                -1,
-                &mut syscall_defs::waitpid::Status::Invalid(0),
-                syscall_defs::waitpid::WaitPidFlags::all(),
-            ) {
-                Ok(Err(SyscallError::ECHILD)) => {
-                    break;
-                }
-                Ok(Ok(pid)) => {
-                    dbgln!(poweroff, "terminated child pid: {}", pid);
-                }
-                Err(_) => continue,
-                Ok(Err(e)) => {
-                    panic!("Unexpected error from wait_pid {:?}", e);
+            'inner: loop {
+                let mut status = syscall_defs::waitpid::Status::Invalid(0);
+                match self.wait_pid(
+                    -1,
+                    &mut status,
+                    syscall_defs::waitpid::WaitPidFlags::EXITED
+                        | syscall_defs::waitpid::WaitPidFlags::NOHANG,
+                ) {
+                    Ok(Err(SyscallError::ECHILD)) => {
+                        if self.children.lock().iter().any(|t| t.is_process_leader()) {
+                            dbgln!(poweroff, "got ECHILD with children");
+                            break 'inner;
+                        } else {
+                            dbgln!(poweroff, "got ECHILD without children");
+                            break 'outer;
+                        }
+                    }
+                    Ok(Ok(pid)) => {
+                        dbgln!(
+                            poweroff,
+                            "terminated child pid: {} status: {:?}",
+                            pid,
+                            status
+                        );
+                    }
+                    Err(e) => {
+                        dbgln!(
+                            poweroff,
+                            "got signal error {:?}, pending: {:#x} has_children: {}",
+                            e,
+                            self.signals().pending(),
+                            !self.children.lock().is_empty()
+                        );
+                    }
+                    Ok(Err(e)) => {
+                        panic!("Unexpected error from wait_pid {:?}", e);
+                    }
                 }
             }
         }
@@ -773,7 +794,13 @@ impl Task {
     }
 
     pub fn signal(&self, sig: usize) -> bool {
-        logln5!("signal {} sig: {}", self.pid(), sig);
+        dbgln!(
+            signal,
+            "{}: signal {} sig: {}",
+            current_task_ref().tid(),
+            self.pid(),
+            sig
+        );
         if self.state() != TaskState::Unused {
             self.do_signal(sig, false)
         } else {
@@ -801,6 +828,7 @@ impl Task {
             parent.children_events.add_zombie(self.me());
 
             if self.is_process_leader() {
+                dbgln!(waitpid, "signal zombie SIGCHILD by {}", self.tid());
                 parent.signal(SIGCHLD);
             }
         }
@@ -811,6 +839,7 @@ impl Task {
             parent.children_events.add_continued(self.me());
 
             if self.is_process_leader() {
+                dbgln!(waitpid, "signal cont SIGCHILD by {}", self.tid());
                 parent.signal(SIGCHLD);
             }
         }
@@ -822,6 +851,7 @@ impl Task {
             parent.children_events.add_stopped(self.me());
 
             if self.is_process_leader() {
+                dbgln!(waitpid, "signal stop SIGCHILD by {}", self.tid());
                 parent.signal(SIGCHLD);
             }
         }

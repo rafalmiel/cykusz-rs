@@ -324,13 +324,17 @@ impl Queues {
             if let Some(task) = cursor.remove() {
                 self.push_runnable_front(task, true);
             }
+        } else {
+            // if process was not stopped, wake it up in case it has some pending signals to process
+            self.wake(task, _lock)
         }
     }
 
     fn exit(&mut self, status: syscall_defs::waitpid::Status, lock: SpinGuard<()>) -> ! {
         let current = get_current();
 
-        logln!(
+        dbgln!(
+            task,
             "exit tid: {}, sc: {}, wc: {}, st: {:?}",
             current.tid(),
             Arc::strong_count(current),

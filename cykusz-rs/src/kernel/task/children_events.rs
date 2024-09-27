@@ -91,6 +91,7 @@ impl WaitPidEvents {
 
             while let Some(t) = cur.get() {
                 let status = t.waitpid_status();
+                dbgln!(waitpid, "checking task {} = {:?}", t.tid(), status);
                 if ((flags.exited() && (status.is_exited() || status.is_signaled()))
                     || (flags.continued() && status.is_continued())
                     || (flags.stopped() && status.is_stopped()))
@@ -123,7 +124,7 @@ impl WaitPidEvents {
             return Ok(Some(res));
         }
 
-        return Ok(None);
+        Ok(None)
     }
 
     pub fn wait_thread(
@@ -152,7 +153,7 @@ impl WaitPidEvents {
         status: &mut syscall_defs::waitpid::Status,
         flags: WaitPidFlags,
     ) -> SignalResult<SyscallResult> {
-        logln4!("{} waitpid {} {:?}", me.tid(), pid, flags);
+        dbgln!(waitpid, "{} waitpid {} {:?}", me.tid(), pid, flags);
         let ret = self.wait_on(me, flags, false, |t| {
             if !t.is_process_leader() {
                 false
@@ -165,9 +166,16 @@ impl WaitPidEvents {
                 }
             }
         });
-        logln4!("{} waitpid {} {:?} = {:?}", me.tid(), pid, flags, ret);
+        dbgln!(
+            waitpid,
+            "{} waitpid {} {:?} = {:?}",
+            me.tid(),
+            pid,
+            flags,
+            ret
+        );
 
-        return match ret {
+        match ret {
             Ok(Some((tid, st))) => {
                 *status = st;
 
@@ -175,6 +183,6 @@ impl WaitPidEvents {
             }
             Ok(None) => Ok(Err(SyscallError::ECHILD)),
             Err(e) => Err(e),
-        };
+        }
     }
 }

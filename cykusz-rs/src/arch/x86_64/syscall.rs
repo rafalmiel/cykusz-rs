@@ -50,9 +50,11 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
         }
     } else {
         //logln!("syscall {:?} {:?}", regs, sys_frame);
+        let task = current_task_ref();
         dbgln!(
             syscall,
-            "syscall {} {}, ret: 0x{:x}",
+            "syscall [task {}] {} {}, ret: 0x{:x}",
+            task.tid(),
             regs.rax,
             SYSCALL_STRING[regs.rax as usize],
             sys_frame.rip
@@ -62,7 +64,13 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
             regs.rax, regs.rdi, regs.rsi, regs.rdx, regs.r10, regs.r8, regs.r9,
         );
 
-        dbgln!(syscall, "done syscall {} = {:?}", regs.rax, res);
+        dbgln!(
+            syscall,
+            "done syscall [task {}] {} = {:?}",
+            task.tid(),
+            SYSCALL_STRING[regs.rax as usize],
+            res
+        );
 
         crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs);
     }

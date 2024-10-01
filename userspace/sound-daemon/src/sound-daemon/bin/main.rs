@@ -6,7 +6,43 @@ use std::process::ExitCode;
 use syscall_defs::poll::{PollEventFlags, PollFd};
 use syscall_defs::{MMapFlags, MMapProt};
 
-type SoundChunk = [u8; 2048];
+#[repr(transparent)]
+struct SoundChunk([i16; 1024]);
+
+#[repr(transparent)]
+struct MixChunk([i32; 1024]);
+
+impl MixChunk {
+    fn new() -> MixChunk {
+        MixChunk([0i32; 1024])
+    }
+
+    fn mix(&mut self, chunk: &SoundChunk) {
+        self.0.iter_mut().zip(chunk.0.iter()).for_each(|(m, s)| {
+            *m += *s as i32;
+        })
+    }
+
+    fn to_sound_chunk(&self) -> SoundChunk {
+        let mut s = SoundChunk::new();
+        s.0.iter_mut().zip(self.0.iter()).for_each(|(s, m)| {
+            *s = (*m).clamp(i16::MIN as i32, i16::MAX as i32) as i16;
+        });
+        s
+    }
+}
+
+impl SoundChunk {
+    fn new() -> SoundChunk {
+        SoundChunk([0i16; 1024])
+    }
+
+    fn as_bytes_mut(&mut self) -> &mut [u8; 2048] {
+        unsafe {
+            std::mem::transmute::<&mut [i16; 1024], &mut [u8; 2048]>(&mut self.0)
+        }
+    }
+}
 
 struct Client {
     input: UnixStream,
@@ -24,9 +60,9 @@ impl Client {
     }
 
     fn fetch(&mut self) -> usize {
-        let mut data = [0u8; 2048];
+        let mut data = SoundChunk::new();
 
-        if let Ok(n) = self.input.read(data.as_mut_slice()) {
+        if let Ok(n) = self.input.read(data.as_bytes_mut()) {
             if n == 0 {
                 return 0;
             }
@@ -38,7 +74,7 @@ impl Client {
         }
     }
 
-    fn pop(&mut self) -> Option<[u8; 2048]> {
+    fn pop(&mut self) -> Option<SoundChunk> {
         self.chunks.pop_front()
     }
 }
@@ -127,29 +163,17 @@ impl<'a> Output<'a> {
         let mut to_delete = Vec::new();
         if (self.pos[4] / 2048 + 3) % 32 == self.write_pos {
             //println!("got pos: {}", self.pos[4] / 2048);
-            let mut chunk = [0u8; 2048];
-
-            let mut mix = |to_mix: &mut [u8; 2048]| {
-                let to_mix =
-                    unsafe { std::mem::transmute::<&mut [u8; 2048], &mut [i16; 1024]>(to_mix) };
-
-                let dest =
-                    unsafe { std::mem::transmute::<&mut [u8; 2048], &mut [i16; 1024]>(&mut chunk) };
-
-                for (m, d) in to_mix.iter_mut().zip(dest) {
-                    *d = d.saturating_add(*m);
-                }
-            };
+            let mut chunk = MixChunk::new();
 
             for c in self.clients.values_mut() {
-                if let Some(mut s) = c.pop() {
-                    mix(&mut s);
+                if let Some(s) = c.pop() {
+                    chunk.mix(&s);
                 } else if c.disconnected {
                     to_delete.push(c.input.as_raw_fd());
                 }
             }
 
-            self.sound[self.write_pos as usize] = chunk;
+            self.sound[self.write_pos as usize] = chunk.to_sound_chunk();
 
             self.write_pos = (self.write_pos + 1) % 32;
         }

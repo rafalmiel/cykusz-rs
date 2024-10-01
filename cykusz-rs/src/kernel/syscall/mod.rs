@@ -14,6 +14,7 @@ fn conditional_enable_int(sys: usize) {
     use syscall_defs::*;
     match sys {
         SYS_FUTEX_WAKE | SYS_FUTEX_WAIT | SYS_KILL | SYS_EXIT | SYS_EXIT_THREAD | SYS_EXEC => {
+            assert!(!crate::int::is_enabled());
             return;
         }
         _ => {

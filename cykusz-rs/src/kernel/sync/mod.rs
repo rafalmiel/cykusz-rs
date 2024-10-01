@@ -27,7 +27,13 @@ pub trait LockApi<'a, T: ?Sized + 'a> {
     type Guard: LockGuard;
 
     fn lock(&'a self) -> Self::Guard;
+    fn lock_debug(&'a self, _debug: usize) -> Self::Guard {
+        self.lock()
+    }
     fn try_lock(&'a self) -> Option<Self::Guard>;
     fn lock_irq(&'a self) -> Self::Guard;
+    fn lock_irq_debug(&'a self, _debug: usize) -> Self::Guard {
+        self.lock_irq()
+    }
     fn try_lock_irq(&'a self) -> Option<Self::Guard>;
 }

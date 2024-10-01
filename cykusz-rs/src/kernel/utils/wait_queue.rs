@@ -154,6 +154,45 @@ impl WaitQueue {
         Ok(Some(lock))
     }
 
+    pub fn wait_lock_for_debug<'a, T, G: LockApi<'a, T>, F: FnMut(&mut G::Guard) -> bool>(
+        &self,
+        flags: WaitQueueFlags,
+        mtx: &'a G,
+        debug: usize,
+        mut cond: F,
+    ) -> SignalResult<Option<G::Guard>> {
+        let irq = flags.contains(WaitQueueFlags::IRQ_DISABLE);
+        let mut lock = if irq {
+            mtx.lock_irq_debug(debug)
+        } else {
+            mtx.lock_debug(debug)
+        };
+
+        if cond(&mut lock) {
+            return Ok(Some(lock));
+        } else if flags.contains(WaitQueueFlags::NO_HANG) {
+            return Ok(None);
+        }
+
+        let task = current_task();
+
+        let _guard = WaitQueueGuard::new(self, &task);
+
+        while !cond(&mut lock) {
+            drop(lock);
+
+            Self::do_await_io(flags, &task)?;
+
+            lock = if irq {
+                mtx.lock_irq_debug(debug)
+            } else {
+                mtx.lock_debug(debug)
+            };
+        }
+
+        Ok(Some(lock))
+    }
+
     pub fn wait_for<F: FnMut() -> bool>(
         &self,
         flags: WaitQueueFlags,
@@ -229,7 +268,7 @@ impl WaitQueue {
 
         t.wake_up();
 
-        return true;
+        true
     }
 
     pub fn notify_group(&self, gid: usize) -> bool {
@@ -244,7 +283,7 @@ impl WaitQueue {
         let mut res = false;
 
         for i in 0..len {
-            let t = tasks[i].clone();
+            let t = &tasks[i];
 
             if t.gid() == gid {
                 t.wake_up();
@@ -253,7 +292,7 @@ impl WaitQueue {
             }
         }
 
-        return res;
+        res
     }
 
     pub fn notify_all(&self) -> bool {
@@ -267,7 +306,7 @@ impl WaitQueue {
         let mut res = false;
 
         for i in 0..len {
-            let t = tasks[i].clone();
+            let t = &tasks[i];
 
             t.wake_up();
 

@@ -295,9 +295,9 @@ impl Task {
     }
 
     pub fn remove_child(&self, child: &Task) {
-        let mut children = self.children.lock();
-
         if child.sibling.is_linked() {
+            let mut children = self.children.lock();
+
             let mut cur = unsafe { children.cursor_mut_from_ptr(child) };
 
             child.set_parent(None);
@@ -313,10 +313,9 @@ impl Task {
     }
 
     pub fn add_child(&self, child: Arc<Task>) {
-        let mut children = self.children.lock();
-
         child.set_parent(Some(self.me()));
 
+        let mut children = self.children.lock();
         children.push_back(child);
     }
 
@@ -337,7 +336,13 @@ impl Task {
     pub fn migrate_children_to_init(&self) {
         let parent = crate::kernel::init::init_task();
 
-        let mut children = self.children.lock_irq();
+        dbgln!(
+            task,
+            "migrate to init, interrupts: {}",
+            crate::kernel::int::is_enabled()
+        );
+
+        let mut children = self.children.lock();
 
         let mut cursor = children.front_mut();
 
@@ -352,6 +357,13 @@ impl Task {
                 cursor.move_next();
             }
         }
+
+        drop(children);
+        dbgln!(
+            task,
+            "migrate to init fini, interrupts: {}",
+            crate::kernel::int::is_enabled()
+        );
 
         // Migrate already dead child processes not waited for by the parent
         parent.children_events.migrate(&self.children_events);

@@ -39,13 +39,17 @@ impl<T> Spin<T> {
             l: M::new(user_data),
         }
     }
+}
 
-    pub fn lock_debug(&self, id: usize) -> SpinGuard<T> {
+impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
+    type Guard = SpinGuard<'a, T>;
+
+    fn lock_debug(&self, id: usize) -> SpinGuard<T> {
         let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
 
-        logln!("l: - {}", id);
+        dbgln!(lock, "l: - {}", id);
         let lock = self.l.lock();
-        logln!("l: + {}", id);
+        dbgln!(lock, "l: + {}", id);
 
         SpinGuard {
             g: Some(lock),
@@ -55,11 +59,13 @@ impl<T> Spin<T> {
         }
     }
 
-    pub fn lock_irq_debug(&self, id: usize) -> SpinGuard<T> {
+    fn lock_irq_debug(&self, id: usize) -> SpinGuard<T> {
         let int_enabled = crate::kernel::int::is_enabled();
         crate::kernel::int::disable();
 
+        dbgln!(lock, "l: - {}", id);
         let lock = self.l.lock();
+        dbgln!(lock, "l: + {}", id);
 
         SpinGuard {
             g: Some(lock),
@@ -68,10 +74,6 @@ impl<T> Spin<T> {
             debug: id,
         }
     }
-}
-
-impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
-    type Guard = SpinGuard<'a, T>;
 
     fn lock(&'a self) -> Self::Guard {
         let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
@@ -192,7 +194,9 @@ impl<'a, T: ?Sized> SpinGuard<'a, T> {
 impl<'a, T: ?Sized> Drop for SpinGuard<'a, T> {
     fn drop(&mut self) {
         drop(self.g.take());
-        if self.debug > 0 {}
+        if self.debug > 0 {
+            dbgln!(lock, "l: D {}", self.debug)
+        }
         if self.notify {
             crate::kernel::sched::preempt_enable();
         }

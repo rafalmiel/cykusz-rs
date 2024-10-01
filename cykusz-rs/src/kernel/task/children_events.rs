@@ -74,7 +74,7 @@ impl WaitPidEvents {
         no_intr: bool,
         mut cond: impl FnMut(&Task) -> bool,
     ) -> SignalResult<Option<(usize, syscall_defs::waitpid::Status)>> {
-        let mut res = (0, syscall_defs::waitpid::Status::Invalid(0));
+        let mut res = (0, syscall_defs::waitpid::Status::Invalid(0), None);
 
         let mut wq_flags: WaitQueueFlags = if flags.nohang() {
             WaitQueueFlags::NO_HANG
@@ -86,42 +86,46 @@ impl WaitPidEvents {
             wq_flags.insert(WaitQueueFlags::NON_INTERRUPTIBLE);
         }
 
-        let result = self.wq.wait_lock_for(wq_flags, &self.tasks, |l| {
-            let mut cur = l.tasks.front_mut();
+        let found = self
+            .wq
+            .wait_lock_for(wq_flags, &self.tasks, |l| {
+                let mut cur = l.tasks.front_mut();
 
-            while let Some(t) = cur.get() {
-                let status = t.waitpid_status();
-                dbgln!(waitpid, "checking task {} = {:?}", t.tid(), status);
-                if ((flags.exited() && (status.is_exited() || status.is_signaled()))
-                    || (flags.continued() && status.is_continued())
-                    || (flags.stopped() && status.is_stopped()))
-                    && cond(t)
-                {
-                    res = (t.tid(), status);
+                while let Some(t) = cur.get() {
+                    let status = t.waitpid_status();
+                    dbgln!(waitpid, "checking task {} = {:?}", t.tid(), status);
+                    if ((flags.exited() && (status.is_exited() || status.is_signaled()))
+                        || (flags.continued() && status.is_continued())
+                        || (flags.stopped() && status.is_stopped()))
+                        && cond(t)
+                    {
+                        res = (t.tid(), status, Some(t.me()));
 
-                    if status.is_exited() || status.is_signaled() {
-                        t.remove_from_parent();
+                        cur.remove();
 
-                        if t.is_process_leader() {
-                            if let Err(e) = sessions().remove_process(&t.me()) {
-                                panic!("Failed to remove process from a session {:?}", e);
-                            }
-                        }
+                        return true;
+                    } else {
+                        cur.move_next();
                     }
+                }
 
-                    cur.remove();
+                !me.children().iter().any(&mut cond)
+            })?
+            .is_some();
 
-                    return true;
-                } else {
-                    cur.move_next();
+        if found && !res.1.is_invalid() {
+            if res.1.is_exited() || res.1.is_signaled() {
+                let task = res.2.unwrap();
+                task.remove_from_parent();
+
+                if task.is_process_leader() {
+                    if let Err(e) = sessions().remove_process(&task) {
+                        panic!("Failed to remove process from a session {:?}", e);
+                    }
                 }
             }
 
-            !me.children().iter().any(&mut cond)
-        })?;
-
-        if result.is_some() && !res.1.is_invalid() {
-            return Ok(Some(res));
+            return Ok(Some((res.0, res.1)));
         }
 
         Ok(None)
@@ -132,18 +136,18 @@ impl WaitPidEvents {
         me: &Task,
         pid: usize,
         tid: usize,
-        flags: syscall_defs::waitpid::WaitPidFlags,
+        flags: WaitPidFlags,
         no_intr: bool,
     ) -> SignalResult<SyscallResult> {
         let res = self.wait_on(me, flags, no_intr, |t| {
             !t.is_process_leader() && pid == t.pid() && (t.tid() == tid || tid == 0)
         });
 
-        return match res {
+        match res {
             Ok(Some((tid, _st))) => Ok(Ok(tid)),
             Ok(None) => Ok(Err(SyscallError::ECHILD)),
             Err(e) => Err(e),
-        };
+        }
     }
 
     pub fn wait_pid(

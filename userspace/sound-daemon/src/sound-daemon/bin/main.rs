@@ -38,9 +38,7 @@ impl SoundChunk {
     }
 
     fn as_bytes_mut(&mut self) -> &mut [u8; 2048] {
-        unsafe {
-            std::mem::transmute::<&mut [i16; 1024], &mut [u8; 2048]>(&mut self.0)
-        }
+        unsafe { std::mem::transmute::<&mut [i16; 1024], &mut [u8; 2048]>(&mut self.0) }
     }
 }
 
@@ -190,9 +188,7 @@ fn sound_daemon() -> Result<(), ExitCode> {
 
     loop {
         let mut polls = output.poll_fds();
-        if let Ok(res) =
-            syscall_user::poll(polls.as_mut_slice(), 0)
-        {
+        if let Ok(res) = syscall_user::poll(polls.as_mut_slice(), 0) {
             if res > 0 {
                 for (id, ev) in polls.iter().enumerate() {
                     if id == 0 && ev.revents.contains(PollEventFlags::READ) {

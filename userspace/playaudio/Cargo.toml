@@ -1,0 +1,26 @@
+[package]
+name = "playaudio"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "playwav"
+test = false
+bench = false
+path = "src/playwav/bin/main.rs"
+
+[[bin]]
+name = "playmidi"
+test = false
+bench = false
+path = "src/playmidi/bin/main.rs"
+
+[dependencies]
+rustysynth = "*"
+wavers = "*"
+
+[dependencies.syscall-defs]
+path = "../../syscall-defs"
+
+[dependencies.syscall-user]
+path = "../syscall-user"

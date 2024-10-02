@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = ["init", "shell", "mount", "umount", "syscall-user", "unixsockets", "testprogs", "playwav", "sound-daemon"]
+members = ["init", "shell", "mount", "umount", "syscall-user", "unixsockets", "testprogs", "playaudio", "sound-daemon"]

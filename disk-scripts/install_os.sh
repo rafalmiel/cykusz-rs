@@ -48,6 +48,16 @@ done
 
 cp sysroot/assets/imperial.wav mnt/
 cp sysroot/assets/D_E1M1.mid mnt/
+
+if ! [ -f sysroot/assets/FluidR3_GM.sf2 ]; then
+    pushd .
+    cd sysroot/assets || exit 1
+    wget https://keymusician01.s3.amazonaws.com/FluidR3_GM.zip
+    unzip FluidR3_GM.zip
+    sync
+    popd || exit 1
+fi
+
 cp sysroot/assets/FluidR3_GM.sf2 mnt/
 
 rsync -a sysroot/cykusz/usr mnt/

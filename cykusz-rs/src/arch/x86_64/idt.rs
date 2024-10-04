@@ -494,7 +494,7 @@ fn general_protection_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFram
 
         return;
     }
-    logln!(
+    println!(
         "General Protection Fault error! 0x{:x} frame: {:?}",
         err,
         frame //unsafe { crate::CPU_ID }

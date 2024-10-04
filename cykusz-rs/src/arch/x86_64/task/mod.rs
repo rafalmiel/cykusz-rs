@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::arch::x86_64::{_fxrstor64, _fxsave64};
 use core::mem::size_of;
 use core::ptr::Unique;
 
@@ -30,6 +31,16 @@ const USER_STACK_SIZE: usize = 0x64000;
 const KERN_STACK_SIZE: usize = 0x40000;
 const KERN_STACK_ORDER: usize = 6;
 
+#[repr(align(16))]
+#[derive(Debug, Copy, Clone)]
+pub struct FpuState([u8; 512]);
+
+impl Default for FpuState {
+    fn default() -> Self {
+        FpuState([0u8; 512])
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 pub struct Context {
@@ -53,7 +64,7 @@ pub struct Context {
     pub rip: usize,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug)]
 pub struct Task {
     pub ctx: Unique<Context>,
     //top of the stack, used to deallocate
@@ -62,6 +73,7 @@ pub struct Task {
     pub stack_size: usize,
     pub user_stack: Option<usize>,
     pub user_fs_base: usize,
+    pub fpu: FpuState,
 }
 
 impl Context {
@@ -168,6 +180,7 @@ impl Task {
             stack_size: 0,
             user_stack: None,
             user_fs_base: 0,
+            fpu: FpuState::default(),
         }
     }
 
@@ -336,6 +349,7 @@ impl Task {
                 stack_size,
                 user_stack,
                 user_fs_base: 0,
+                fpu: FpuState::default(),
             }
         }
     }
@@ -422,6 +436,7 @@ impl Task {
             stack_size: KERN_STACK_SIZE,
             user_stack: self.user_stack,
             user_fs_base: self.user_fs_base,
+            fpu: self.fpu,
         }
     }
 
@@ -442,6 +457,7 @@ impl Task {
             stack_size: KERN_STACK_SIZE,
             user_stack: Some(user_stack),
             user_fs_base: self.user_fs_base,
+            fpu: FpuState::default(),
         }
     }
 
@@ -603,6 +619,8 @@ pub fn activate_task(to: &Task) {
             crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
 
+        _fxrstor64(to.fpu.0.as_ptr());
+
         activate_to(to.ctx.as_ref());
     }
 }
@@ -612,7 +630,10 @@ pub fn switch(from: &mut Task, to: &Task) {
         if to.is_user() {
             crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
+        _fxsave64(from.fpu.0.as_mut_ptr());
 
         switch_to(&mut from.ctx, to.ctx.as_ref());
+
+        _fxrstor64(from.fpu.0.as_ptr());
     }
 }

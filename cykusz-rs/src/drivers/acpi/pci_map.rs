@@ -14,7 +14,11 @@ fn call_pic1() {
     let mut arg = ACPI_OBJECT {
         Type: ACPI_TYPE_INTEGER as i32,
     };
-    arg.Integer.Value = 1;
+
+    #[allow(unused_unsafe)]
+    unsafe {
+        arg.Integer.Value = 1;
+    }
 
     let mut arg_list = ACPI_OBJECT_LIST {
         Count: 1,
@@ -59,10 +63,9 @@ unsafe extern "C" fn get_irq_resource(
                 tbl.Address as u64 >> 16,
                 tbl.Pin as u8,
                 *res.Data
-                    .Irq
-                    .Interrupts
-                    .as_ptr()
-                    .offset(tbl.SourceIndex as u8 as isize) as u32,
+                    .Irq.as_ref()
+                    .Interrupts.Interrupts.as_ref()
+                    .Interrupts.as_ptr().offset(tbl.SourceIndex as u8 as isize) as u32
             );
         }
         ACPI_RESOURCE_TYPE_EXTENDED_IRQ => {
@@ -260,7 +263,7 @@ impl PciBridge {
         let mut tbl = unsafe { &mut *(buf.Pointer as *mut acpi_pci_routing_table) };
 
         while tbl.Length != 0 {
-            if tbl.Source[0] == 0 {
+            if unsafe { tbl.Source.Source.as_ref().Source.as_slice(4) }[0] == 0 {
                 self.add_irq(
                     tbl.Address as u64 >> 16,
                     tbl.Pin as u8,
@@ -273,7 +276,7 @@ impl PciBridge {
                     assert_eq!(
                         AcpiGetHandle(
                             self.acpi_handle,
-                            tbl.Source.as_mut_ptr(),
+                            tbl.Source.Source.as_mut().Source.as_mut_ptr(),
                             &mut src_handle as *mut ACPI_HANDLE,
                         ),
                         AE_OK

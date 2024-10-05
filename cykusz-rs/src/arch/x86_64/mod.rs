@@ -8,6 +8,7 @@ pub mod raw;
 #[macro_use]
 pub mod task;
 pub mod acpi;
+pub mod cpu;
 pub mod dev;
 pub mod gdt;
 pub mod idt;
@@ -24,6 +25,8 @@ pub mod utils;
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr) {
+    cpu::init();
+
     let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
 
     output::init(mboot.framebuffer_info_tag());
@@ -74,7 +77,7 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
 
 #[no_mangle]
 pub extern "C" fn x86_64_rust_main_ap() {
-    crate::arch::raw::mm::enable_nxe_bit();
+    cpu::init();
 
     gdt::early_init();
 

@@ -1,6 +1,4 @@
 use crate::kernel::sync::LockApi;
-
-pub mod cpu;
 pub mod hpet;
 pub mod ioapic;
 pub mod lapic;
@@ -23,7 +21,10 @@ pub fn init() {
 
         lapic::init(apic);
 
-        println!("[ OK ] LAPIC Initialized (x2apic: {})", cpu::has_x2apic());
+        println!(
+            "[ OK ] LAPIC Initialized (x2apic: {})",
+            crate::arch::cpu::has_x2apic()
+        );
     } else {
         panic!("No APIC found!");
     }

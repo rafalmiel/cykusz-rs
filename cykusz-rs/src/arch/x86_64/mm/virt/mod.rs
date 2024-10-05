@@ -113,12 +113,6 @@ fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
 }
 
 pub fn init(mboot_info: &crate::drivers::multiboot2::Info) {
-    use crate::arch::raw::mm::{enable_nxe_bit, enable_write_protect_bit};
-    enable_nxe_bit();
-    enable_write_protect_bit();
-
-    println!("[ OK ] NXE and Write Protect Enabled");
-
     remap(&mboot_info);
 
     println!("[ OK ] Kernel Code Remapped");

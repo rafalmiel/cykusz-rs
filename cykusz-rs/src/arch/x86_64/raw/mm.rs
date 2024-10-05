@@ -111,19 +111,3 @@ pub unsafe fn flush_all() {
     use crate::arch::raw::ctrlregs::{cr3, cr3_write};
     cr3_write(cr3())
 }
-
-pub fn enable_nxe_bit() {
-    use crate::arch::raw::msr::{rdmsr, wrmsr, IA32_EFER};
-
-    let nxe_bit = 1 << 11;
-    unsafe {
-        let efer = rdmsr(IA32_EFER);
-        wrmsr(IA32_EFER, efer | nxe_bit);
-    }
-}
-
-pub fn enable_write_protect_bit() {
-    use crate::arch::raw::ctrlregs::{cr0, cr0_write, Cr0};
-
-    unsafe { cr0_write(cr0() | Cr0::CR0_WRITE_PROTECT) };
-}

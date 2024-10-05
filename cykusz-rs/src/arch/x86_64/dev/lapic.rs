@@ -68,7 +68,7 @@ impl LApic {
     }
 
     pub fn init(&mut self, hdr: &'static MadtHeader) {
-        self.x2 = crate::arch::dev::cpu::has_x2apic();
+        self.x2 = crate::arch::cpu::has_x2apic();
 
         if !self.x2 {
             self.lapic_base = Some(hdr.lapic_address());

@@ -1,7 +1,5 @@
 use rustysynth::{MidiFile, MidiFileSequencer, SoundFont, Synthesizer, SynthesizerSettings};
 use std::fs::File;
-use std::io::Write;
-use std::os::unix::net::UnixStream;
 use std::process::ExitCode;
 use std::sync::Arc;
 use wavers::Samples;
@@ -65,21 +63,9 @@ fn main() -> Result<(), ExitCode> {
 
     println!("Send...");
 
-    let mut socket = UnixStream::connect("/sound-daemon.pid").map_err(|_e| ExitCode::from(3))?;
-
     let buf = unsafe { std::slice::from_raw_parts(both.as_ptr() as *const u8, both.len() * 4) };
 
-    let mut written = 0;
-    loop {
-        let n = socket
-            .write(&buf[written..])
-            .map_err(|_e| ExitCode::from(4))?;
-        written += n;
-        if written == buf.len() {
-            break;
-        }
-    }
-    println!("write finished");
+    playaudio::play(buf)?;
 
     Ok(())
 }

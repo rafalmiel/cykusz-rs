@@ -30,4 +30,4 @@ acpica_patched:
 $(OBJDIR)%.o: $(SRCDIR)%.c _Makefile acpica_patched
 	@mkdir -p $(dir $@)
 	@echo [GCC] -o $@
-	@gcc -m64 -o $@ -c $< $(CFLAGS) $(CPPFLAGS) -mcmodel=large -fno-builtin -fno-stack-protector -mno-red-zone -nostdlib
+	@gcc -m64 -o $@ -c $< $(CFLAGS) $(CPPFLAGS) -mcmodel=large -fno-builtin -fno-stack-protector -mno-red-zone -nostdlib -mgeneral-regs-only

@@ -12,7 +12,6 @@ extern test_long_mode
 extern setup_page_tables
 extern enable_paging
 extern __p4_table
-extern setup_SSE
 extern higher_half_start_ap
 
 section .apinit_trampoline
@@ -111,7 +110,6 @@ start:
 
     call setup_page_tables
     call enable_paging
-    call setup_SSE
 
     lgdt [gdt64.pointer]
 

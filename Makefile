@@ -46,6 +46,8 @@ run: $(disk)
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 5811 -smp cpus=4 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000e,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host --enable-kvm
 	#/home/ck/code/qemu/build/qemu-system-x86_64
 	qemu-system-x86_64 \
+        -cpu host \
+        -d cpu \
         -serial stdio \
         -no-reboot \
         -m 5811 \

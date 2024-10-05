@@ -1,11 +1,8 @@
 use alloc::vec::Vec;
-use core::arch::x86_64::{_fxrstor64, _fxsave64};
 use core::mem::size_of;
 use core::ptr::Unique;
 
-use syscall_defs::exec::ExeArgs;
-use syscall_defs::{MMapFlags, MMapProt, OpenFlags};
-
+use crate::arch::cpu::fpu::FpuState;
 use crate::arch::gdt;
 use crate::arch::gdt::update_tss_rps0;
 use crate::arch::idt::RegsFrame;
@@ -24,22 +21,14 @@ use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};
 use crate::kernel::task::vm::{TlsVmInfo, VM};
+use syscall_defs::exec::ExeArgs;
+use syscall_defs::{MMapFlags, MMapProt, OpenFlags};
 
 mod args;
 
 const USER_STACK_SIZE: usize = 0x64000;
 const KERN_STACK_SIZE: usize = 0x40000;
 const KERN_STACK_ORDER: usize = 6;
-
-#[repr(align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct FpuState([u8; 512]);
-
-impl Default for FpuState {
-    fn default() -> Self {
-        FpuState([0u8; 512])
-    }
-}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -619,7 +608,7 @@ pub fn activate_task(to: &Task) {
             crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
 
-        _fxrstor64(to.fpu.0.as_ptr());
+        to.fpu.restore();
 
         activate_to(to.ctx.as_ref());
     }
@@ -628,12 +617,13 @@ pub fn activate_task(to: &Task) {
 pub fn switch(from: &mut Task, to: &Task) {
     unsafe {
         if to.is_user() {
-            crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
+            update_tss_rps0(to.stack_top + to.stack_size);
         }
-        _fxsave64(from.fpu.0.as_mut_ptr());
+
+        from.fpu.save();
 
         switch_to(&mut from.ctx, to.ctx.as_ref());
 
-        _fxrstor64(from.fpu.0.as_ptr());
+        from.fpu.restore();
     }
 }

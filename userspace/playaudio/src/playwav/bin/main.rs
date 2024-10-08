@@ -21,7 +21,10 @@ fn send_to_daemon(song: &str) -> Result<(), ExitCode> {
     )
     .map_err(|_e| ExitCode::from(1))?;
 
-    let buf = unsafe { &*slice_from_raw_parts(wav_map as *const u8, wav_size) };
+    let data_size = unsafe { ((wav_map + 40) as *const u32).read() };
+
+    // +44 to skip headers
+    let buf = unsafe { &*slice_from_raw_parts((wav_map + 44) as *const u8, data_size as usize) };
 
     playaudio::play(buf)?;
 

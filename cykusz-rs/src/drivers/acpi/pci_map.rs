@@ -15,10 +15,7 @@ fn call_pic1() {
         Type: ACPI_TYPE_INTEGER as i32,
     };
 
-    #[allow(unused_unsafe)]
-    unsafe {
-        arg.Integer.Value = 1;
-    }
+    unsafe { arg.Integer }.Value = 1;
 
     let mut arg_list = ACPI_OBJECT_LIST {
         Count: 1,
@@ -63,9 +60,14 @@ unsafe extern "C" fn get_irq_resource(
                 tbl.Address as u64 >> 16,
                 tbl.Pin as u8,
                 *res.Data
-                    .Irq.as_ref()
-                    .Interrupts.Interrupts.as_ref()
-                    .Interrupts.as_ptr().offset(tbl.SourceIndex as u8 as isize) as u32
+                    .Irq
+                    .as_ref()
+                    .Interrupts
+                    .Interrupts
+                    .as_ref()
+                    .Interrupts
+                    .as_ptr()
+                    .offset(tbl.SourceIndex as u8 as isize) as u32,
             );
         }
         ACPI_RESOURCE_TYPE_EXTENDED_IRQ => {

@@ -16,16 +16,19 @@ use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::{register_device, Device};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, MappedAccess, PageDirectItemStruct};
+use crate::kernel::fs::poll::PollTable;
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate_order, map_to_flags, VirtAddr};
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::types::Align;
+use crate::kernel::utils::wait_queue::WaitQueue;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use bit_field::BitField;
 use spin::Once;
+use syscall_defs::poll::PollEventFlags;
 use tock_registers::interfaces::Writeable;
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
@@ -128,7 +131,7 @@ impl IntelHdaData {
         Some(self.streams[num_input_streams + num_output_streams + idx])
     }
 
-    fn handle_interrupt(&mut self) -> bool {
+    fn handle_interrupt(&mut self, wq: &WaitQueue) -> bool {
         let ints = self.reg.intsts.get_local();
 
         dbgln!(audio, "interrupt: {:#b}", ints.get());
@@ -162,6 +165,8 @@ impl IntelHdaData {
                         s.status().get()
                     );
                     s.clear_interrupts();
+
+                    wq.notify_one();
                 }
             }
             for i in 0..bss {
@@ -526,6 +531,7 @@ struct IntelHda {
     self_ref: Weak<IntelHda>,
     id: DevId,
     data: Spin<IntelHdaData>,
+    wq: WaitQueue,
 }
 
 impl IntelHda {
@@ -534,6 +540,7 @@ impl IntelHda {
             self_ref: me.clone(),
             id: crate::kernel::device::alloc_id(),
             data: Spin::new(IntelHdaData::new(base_addr)),
+            wq: WaitQueue::new(),
         })
     }
 
@@ -560,7 +567,7 @@ impl IntelHda {
     }
 
     fn handle_interrupt(&self) -> bool {
-        self.data.lock_irq().handle_interrupt()
+        self.data.lock_irq().handle_interrupt(&self.wq)
     }
 }
 
@@ -579,6 +586,23 @@ impl Device for IntelHda {
 }
 
 impl INode for IntelHda {
+    fn poll(
+        &self,
+        poll_table: Option<&mut PollTable>,
+        _flags: PollEventFlags,
+    ) -> crate::kernel::fs::vfs::Result<PollEventFlags> {
+        // Wait for an output buffer pos change
+        // bit of a hack, let it sleep and report ready after we get notify
+        // TODO: Think of a better way
+        if let Some(pt) = poll_table {
+            pt.listen(&self.wq);
+
+            Ok(PollEventFlags::empty())
+        } else {
+            Ok(PollEventFlags::WRITE)
+        }
+    }
+
     fn as_mappable(&self) -> Option<Arc<dyn MappedAccess>> {
         if let Some(me) = self.self_ref.upgrade() {
             return Some(me);

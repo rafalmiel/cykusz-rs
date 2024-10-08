@@ -1123,7 +1123,7 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
     } else {
         return Err(SyscallError::EINVAL);
     };
-    logln4!("POLL {:?}", fds);
+    dbgln!(poll, "POLL {:?}", fds);
 
     let task = current_task_ref();
 
@@ -1144,7 +1144,7 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
                 if !f.is_empty() {
                     found += 1;
 
-                    logln4!("found {}: {:?}", fd.fd, fd.revents);
+                    dbgln!(poll, "found {}: {:?}", fd.fd, fd.revents);
                 }
             } else {
                 fd.revents = PollEventFlags::NVAL;
@@ -1162,7 +1162,7 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
             )?;
 
             timed_out = task.sleep_until() == 0 && timeout_ms >= 0;
-            logln2!("timedout: {}", timed_out);
+            dbgln!(poll, "timedout: {}", timed_out);
         } else {
             break 'search;
         }
@@ -1170,6 +1170,7 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
         first = false;
     }
 
+    dbgln!(poll, "poll ret: {:?}", fds);
     Ok(found)
 }
 

@@ -631,7 +631,7 @@ impl MsixTable {
         let offset = self.addr + 16 * num;
 
         unsafe {
-            offset.store_volatile(addr.val() as u64);
+            offset.store_volatile(addr.val());
             (offset + 8).store_volatile(data.val() as u32);
             (offset + 12).store_volatile(0u32);
         }

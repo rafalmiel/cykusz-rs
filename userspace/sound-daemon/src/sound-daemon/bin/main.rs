@@ -1,4 +1,5 @@
 use std::collections::{HashMap, LinkedList};
+use std::fs::File;
 use std::io::Read;
 use std::ops::Add;
 use std::os::fd::AsRawFd;
@@ -126,6 +127,7 @@ impl Client {
 
 struct Output<'a> {
     listener: UnixListener,
+    hda_dev: File,
     clients: HashMap<i32, Client>,
     pos: &'a [u64; 512],
     sound: &'a mut [SoundChunk; 32],
@@ -151,6 +153,7 @@ impl<'a> Output<'a> {
 
         let mut output = Output::<'a> {
             listener,
+            hda_dev,
             clients: HashMap::new(),
             pos: unsafe { &*(hda_map as *const [u64; 512]) },
             last_write_pos: HdaWritePos::from_pos(0),
@@ -172,6 +175,7 @@ impl<'a> Output<'a> {
 
     fn add_client(&mut self, client: Client) {
         self.clients.insert(client.input.as_raw_fd(), client);
+        self.reinit_fds();
     }
 
     fn fetch(&mut self, client_id: i32) -> usize {
@@ -185,6 +189,8 @@ impl<'a> Output<'a> {
     fn remove(&mut self, client_id: i32) {
         if let Some(client) = self.clients.get_mut(&client_id) {
             client.disconnected = true;
+
+            self.reinit_fds();
         }
     }
 
@@ -192,6 +198,8 @@ impl<'a> Output<'a> {
         self.poll_fds.clear();
         self.poll_fds
             .push(PollFd::new(self.listener.as_raw_fd(), PollEventFlags::READ));
+        self.poll_fds
+            .push(PollFd::new(self.hda_dev.as_raw_fd(), PollEventFlags::WRITE));
         for c in self.clients.values() {
             if !c.disconnected {
                 self.poll_fds
@@ -205,9 +213,6 @@ impl<'a> Output<'a> {
     }
 
     fn poll_fds(&mut self) -> Vec<PollFd> {
-        if self.poll_fds.len() != self.clients.len() + 1 {
-            self.reinit_fds();
-        }
         self.poll_fds.clone()
     }
 
@@ -250,14 +255,14 @@ fn sound_daemon() -> Result<(), ExitCode> {
 
     loop {
         let mut polls = output.poll_fds();
-        if let Ok(res) = syscall_user::poll(polls.as_mut_slice(), 0) {
+        if let Ok(res) = syscall_user::poll(polls.as_mut_slice(), -1) {
             if res > 0 {
                 for (id, ev) in polls.iter().enumerate() {
-                    if !ev.revents.contains(PollEventFlags::READ) {
-                        continue;
-                    }
+                    let is_read = ev.revents.contains(PollEventFlags::READ);
+                    let is_write = ev.revents.contains(PollEventFlags::WRITE);
+                    let is_hup = ev.revents.contains(PollEventFlags::HUP);
                     match id {
-                        0 => {
+                        0 if is_read => {
                             match output.listener().accept() {
                                 Ok((s, _addr)) => {
                                     output.add_client(Client::new(s));
@@ -267,9 +272,11 @@ fn sound_daemon() -> Result<(), ExitCode> {
                                 }
                             }
                         }
-                        a if a > 0 => {
-                            if output.fetch(ev.fd) == 0 && ev.revents.contains(PollEventFlags::HUP)
-                            {
+                        1 if is_write => {
+                            output.process();
+                        }
+                        a if a > 1 && is_read => {
+                            if output.fetch(ev.fd) == 0 && is_hup {
                                 output.remove(ev.fd);
                             }
                         }
@@ -278,12 +285,11 @@ fn sound_daemon() -> Result<(), ExitCode> {
                 }
             }
         };
-
-        output.process();
     }
 }
 
 fn main() -> Result<(), ExitCode> {
+    //return Ok(sound_daemon()?);
     let daemon = syscall_user::fork().expect("fork failed");
 
     if daemon > 0 {

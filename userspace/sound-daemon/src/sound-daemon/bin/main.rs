@@ -1,5 +1,6 @@
 use std::collections::{HashMap, LinkedList};
 use std::io::Read;
+use std::ops::Add;
 use std::os::fd::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::process::ExitCode;
@@ -11,6 +12,52 @@ struct SoundChunk([i16; 1024]);
 
 #[repr(transparent)]
 struct MixChunk([i32; 1024]);
+
+const CHUNK_COUNT: u64 = 32;
+const WRITE_HEADROOM: u64 = 3;
+
+type HdaWritePos = WritePos<CHUNK_COUNT>;
+
+#[derive(Eq, PartialEq, Copy, Clone)]
+struct WritePos<const MAX: u64>(pub u64);
+
+impl<const MAX: u64> WritePos<MAX> {
+    fn from_pos(pos: u64) -> Self {
+        WritePos(pos / 2048)
+    }
+
+    fn distance_to(&self, other: Self) -> usize {
+        if self.0 <= other.0 {
+            // ...S....O...MAX
+            other.0 as usize - self.0 as usize
+        } else {
+            // ...O....S...MAX
+            MAX as usize - self.0 as usize + other.0 as usize
+        }
+    }
+}
+
+impl<const MAX: u64> From<WritePos<MAX>> for usize {
+    fn from(value: WritePos<MAX>) -> Self {
+        value.0 as usize
+    }
+}
+
+impl<const MAX: u64> Add for WritePos<MAX> {
+    type Output = WritePos<MAX>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        WritePos::<MAX>((self.0 + rhs.0) % MAX)
+    }
+}
+
+impl<const MAX: u64> Add<u64> for WritePos<MAX> {
+    type Output = WritePos<MAX>;
+
+    fn add(self, rhs: u64) -> Self::Output {
+        WritePos::<MAX>((self.0 + rhs) % MAX)
+    }
+}
 
 impl MixChunk {
     fn new() -> MixChunk {
@@ -82,7 +129,7 @@ struct Output<'a> {
     clients: HashMap<i32, Client>,
     pos: &'a [u64; 512],
     sound: &'a mut [SoundChunk; 32],
-    write_pos: u64,
+    last_write_pos: HdaWritePos,
     poll_fds: Vec<PollFd>,
 }
 
@@ -106,10 +153,13 @@ impl<'a> Output<'a> {
             listener,
             clients: HashMap::new(),
             pos: unsafe { &*(hda_map as *const [u64; 512]) },
-            write_pos: 0,
+            last_write_pos: HdaWritePos::from_pos(0),
             sound: unsafe { &mut *((hda_map + 4096) as *mut [SoundChunk; 32]) },
             poll_fds: Vec::new(),
         };
+
+        // 3 chunks headroom
+        output.last_write_pos = output.hda_write_pos() + WRITE_HEADROOM;
 
         output.reinit_fds();
 
@@ -150,6 +200,10 @@ impl<'a> Output<'a> {
         }
     }
 
+    fn hda_write_pos(&self) -> HdaWritePos {
+        HdaWritePos::from_pos(self.pos[4])
+    }
+
     fn poll_fds(&mut self) -> Vec<PollFd> {
         if self.poll_fds.len() != self.clients.len() + 1 {
             self.reinit_fds();
@@ -159,22 +213,30 @@ impl<'a> Output<'a> {
 
     fn process(&mut self) {
         let mut to_delete = Vec::new();
-        if (self.pos[4] / 2048 + 3) % 32 == self.write_pos {
+        let current_hda_pos = self.hda_write_pos();
+        let expected_hda_pos = self.hda_write_pos() + 3;
+        while expected_hda_pos != self.last_write_pos {
             //println!("got pos: {}", self.pos[4] / 2048);
+            let do_mix = current_hda_pos.distance_to(self.last_write_pos) < WRITE_HEADROOM as usize;
             let mut chunk = MixChunk::new();
 
             for c in self.clients.values_mut() {
                 if let Some(s) = c.pop() {
-                    chunk.mix(&s);
+                    if do_mix {
+                        chunk.mix(&s);
+                    }
                 } else if c.disconnected {
                     to_delete.push(c.input.as_raw_fd());
+                    c.disconnected = false; // to not push into vector twice
                 }
             }
 
-            self.sound[self.write_pos as usize] = chunk.to_sound_chunk();
+            self.sound[self.last_write_pos.0 as usize] = chunk.to_sound_chunk();
 
-            self.write_pos = (self.write_pos + 1) % 32;
+            self.last_write_pos = self.last_write_pos + 1;
         }
+
+        self.last_write_pos = expected_hda_pos;
 
         for c in &to_delete {
             self.clients.remove(c);
@@ -191,19 +253,27 @@ fn sound_daemon() -> Result<(), ExitCode> {
         if let Ok(res) = syscall_user::poll(polls.as_mut_slice(), 0) {
             if res > 0 {
                 for (id, ev) in polls.iter().enumerate() {
-                    if id == 0 && ev.revents.contains(PollEventFlags::READ) {
-                        match output.listener().accept() {
-                            Ok((s, _addr)) => {
-                                output.add_client(Client::new(s));
-                            }
-                            Err(_e) => {
-                                //println!("server: accept err: {:?}", e);
+                    if !ev.revents.contains(PollEventFlags::READ) {
+                        continue;
+                    }
+                    match id {
+                        0 => {
+                            match output.listener().accept() {
+                                Ok((s, _addr)) => {
+                                    output.add_client(Client::new(s));
+                                }
+                                Err(_e) => {
+                                    //println!("server: accept err: {:?}", e);
+                                }
                             }
                         }
-                    } else if id > 0 && ev.revents.contains(PollEventFlags::READ) {
-                        if output.fetch(ev.fd) == 0 && ev.revents.contains(PollEventFlags::HUP) {
-                            output.remove(ev.fd);
+                        a if a > 0 => {
+                            if output.fetch(ev.fd) == 0 && ev.revents.contains(PollEventFlags::HUP)
+                            {
+                                output.remove(ev.fd);
+                            }
                         }
+                        _ => {}
                     }
                 }
             }

@@ -8,14 +8,24 @@ use std::process::ExitCode;
 use syscall_defs::poll::{PollEventFlags, PollFd};
 use syscall_defs::{MMapFlags, MMapProt};
 
+const CHUNK_SIZE: usize = 2048;
 #[repr(transparent)]
-struct SoundChunk([i16; 1024]);
+struct SoundChunk([i16; CHUNK_SIZE / 2]);
 
 #[repr(transparent)]
-struct MixChunk([i32; 1024]);
+struct MixChunk([i32; CHUNK_SIZE / 2]);
 
 const CHUNK_COUNT: u64 = 32;
 const WRITE_HEADROOM: u64 = 3;
+
+const MAX_CHUNKS_IN_BUF: usize = 16;
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum FetchResult {
+    Full,
+    More,
+    None,
+}
 
 type HdaWritePos = WritePos<CHUNK_COUNT>;
 
@@ -94,6 +104,7 @@ struct Client {
     input: UnixStream,
     chunks: LinkedList<SoundChunk>,
     disconnected: bool,
+    full: bool,
 }
 
 impl Client {
@@ -102,21 +113,27 @@ impl Client {
             input,
             chunks: LinkedList::new(),
             disconnected: false,
+            full: false,
         }
     }
 
-    fn fetch(&mut self) -> usize {
+    fn fetch(&mut self) -> FetchResult {
         let mut data = SoundChunk::new();
 
         if let Ok(n) = self.input.read(data.as_bytes_mut()) {
             if n == 0 {
-                return 0;
+                return FetchResult::None;
+            } else if n == CHUNK_SIZE {
+                self.chunks.push_back(data);
             }
-            self.chunks.push_back(data);
 
-            n
+            if self.chunks.len() == MAX_CHUNKS_IN_BUF {
+                FetchResult::Full
+            } else {
+                FetchResult::More
+            }
         } else {
-            0
+            FetchResult::None
         }
     }
 
@@ -137,7 +154,7 @@ struct Output<'a> {
 
 impl<'a> Output<'a> {
     fn new() -> Result<Output<'a>, ExitCode> {
-        let hda_dev = std::fs::File::open("/dev/hda").map_err(|_e| ExitCode::from(1))?;
+        let hda_dev = File::open("/dev/hda").map_err(|_e| ExitCode::from(1))?;
 
         let hda_map = syscall_user::mmap(
             None,
@@ -178,17 +195,25 @@ impl<'a> Output<'a> {
         self.reinit_fds();
     }
 
-    fn fetch(&mut self, client_id: i32) -> usize {
+    fn fetch(&mut self, client_id: i32) -> FetchResult {
         if let Some(c) = self.clients.get_mut(&client_id) {
             c.fetch()
         } else {
-            0
+            FetchResult::None
         }
     }
 
     fn remove(&mut self, client_id: i32) {
         if let Some(client) = self.clients.get_mut(&client_id) {
             client.disconnected = true;
+
+            self.reinit_fds();
+        }
+    }
+
+    fn mark_full(&mut self, client_id: i32) {
+        if let Some(client) = self.clients.get_mut(&client_id) {
+            client.full = true;
 
             self.reinit_fds();
         }
@@ -201,7 +226,7 @@ impl<'a> Output<'a> {
         self.poll_fds
             .push(PollFd::new(self.hda_dev.as_raw_fd(), PollEventFlags::WRITE));
         for c in self.clients.values() {
-            if !c.disconnected {
+            if !c.disconnected && !c.full {
                 self.poll_fds
                     .push(PollFd::new(c.input.as_raw_fd(), PollEventFlags::READ));
             }
@@ -220,6 +245,7 @@ impl<'a> Output<'a> {
         let mut to_delete = Vec::new();
         let current_hda_pos = self.hda_write_pos();
         let expected_hda_pos = self.hda_write_pos() + 3;
+        let mut reinit = false;
         while expected_hda_pos != self.last_write_pos {
             //println!("got pos: {}", self.pos[4] / 2048);
             let do_mix = current_hda_pos.distance_to(self.last_write_pos) < WRITE_HEADROOM as usize;
@@ -229,6 +255,10 @@ impl<'a> Output<'a> {
                 if let Some(s) = c.pop() {
                     if do_mix {
                         chunk.mix(&s);
+                    }
+                    if c.full {
+                        c.full = false;
+                        reinit = true;
                     }
                 } else if c.disconnected {
                     to_delete.push(c.input.as_raw_fd());
@@ -246,6 +276,10 @@ impl<'a> Output<'a> {
         for c in &to_delete {
             self.clients.remove(c);
         }
+
+        if reinit {
+            self.reinit_fds();
+        }
     }
 }
 
@@ -259,7 +293,6 @@ fn sound_daemon() -> Result<(), ExitCode> {
             if res > 0 {
                 for (id, ev) in polls.iter().enumerate() {
                     let is_read = ev.revents.contains(PollEventFlags::READ);
-                    let is_write = ev.revents.contains(PollEventFlags::WRITE);
                     let is_hup = ev.revents.contains(PollEventFlags::HUP);
                     match id {
                         0 if is_read => {
@@ -272,18 +305,20 @@ fn sound_daemon() -> Result<(), ExitCode> {
                                 }
                             }
                         }
-                        1 if is_write => {
-                            output.process();
-                        }
-                        a if a > 1 && is_read => {
-                            if output.fetch(ev.fd) == 0 && is_hup {
+                        a if a > 1 && is_read => match output.fetch(ev.fd) {
+                            FetchResult::None if is_hup => {
                                 output.remove(ev.fd);
                             }
-                        }
+                            FetchResult::Full => {
+                                output.mark_full(ev.fd);
+                            }
+                            _ => {}
+                        },
                         _ => {}
                     }
                 }
             }
+            output.process();
         };
     }
 }

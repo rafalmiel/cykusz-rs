@@ -18,7 +18,7 @@ struct MixChunk([i32; CHUNK_SIZE / 2]);
 const CHUNK_COUNT: u64 = 32;
 const WRITE_HEADROOM: u64 = 3;
 
-const MAX_CHUNKS_IN_BUF: usize = 16;
+const MAX_CHUNKS_IN_BUF: usize = 1;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum FetchResult {

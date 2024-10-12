@@ -1,5 +1,6 @@
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[repr(u16)]
 pub enum ButtonCode {
     BTN_MOUSE = 0x100,
     BTN_LEFT = 0x110,
@@ -11,6 +12,7 @@ pub enum ButtonCode {
 
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[repr(u16)]
 pub enum RelCode {
     REL_X = 0x00,
     REL_Y = 0x01,

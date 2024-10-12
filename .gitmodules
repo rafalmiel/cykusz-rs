@@ -1,3 +1,7 @@
 [submodule "acpica/acpica"]
 	path = acpica/acpica
 	url = https://github.com/acpica/acpica
+[submodule "userspace/doom/doomgeneric"]
+	path = userspace/doom/doomgeneric
+	url = https://github.com/rafalmiel/doomgeneric.git
+	branch = cykusz

@@ -1,0 +1,44 @@
+mod fb;
+mod input;
+
+use crate::DoomScreen;
+use std::process::ExitCode;
+
+pub struct CykuszDoom {
+    fb: fb::Fb,
+    input: input::Input,
+}
+
+impl CykuszDoom {
+    pub fn new(doom_screen: DoomScreen) -> Result<CykuszDoom, ExitCode> {
+        Ok(CykuszDoom {
+            fb: fb::Fb::new(doom_screen)?,
+            input: input::Input::new(),
+        })
+    }
+
+    pub fn get_ticks_ms(&self) -> u32 {
+        ((unsafe { syscall_user::syscall0(syscall_defs::SYS_TICKSNS).unwrap() }) / 1_000_000) as u32
+    }
+
+    pub fn sleep_ms(&self, ms: u32) {
+        syscall_user::sleep(ms as usize).unwrap();
+    }
+
+    pub fn draw_frame(&mut self) {
+        self.input.poll();
+        self.fb.flip();
+    }
+
+    pub fn get_key(&mut self) -> Option<(bool, u8)> {
+        self.input.get_key()
+    }
+
+    pub fn get_mouse(&mut self) -> Option<((bool, bool, bool), i32, i32)> {
+        self.input.get_mouse()
+    }
+
+    pub fn quit(&self) {
+        self.input.quit();
+    }
+}

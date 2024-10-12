@@ -3,6 +3,7 @@ pub const NR_KEYS: usize = 256;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 #[allow(non_camel_case_types, dead_code)]
+#[repr(u16)]
 pub enum KeyCode {
     KEY_RESERVED = 0,
     KEY_ESC = 1,

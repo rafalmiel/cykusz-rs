@@ -150,6 +150,7 @@ impl INode for MouseState {
         flags: OpenFlags,
     ) -> crate::kernel::fs::vfs::Result<usize> {
         if buf.len() % core::mem::size_of::<Event>() != 0 {
+            dbgln!(mouse, "Failed mouse read of {} bytes", buf.len());
             Err(FsError::InvalidParam)
         } else {
             Ok(self.buf.read_data_flags(

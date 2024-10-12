@@ -13,7 +13,6 @@ SECTIONS {
                 KEEP(*(.multiboot_header))
                 build/arch/x86_64/asm/boot.o(.text* .rodata* .data* .bss*)
                 build/arch/x86_64/asm/paging.o(.text* .rodata* .data* .bss*)
-                build/arch/x86_64/asm/sse.o(.text* .rodata* .data* .bss*)
                 build/arch/x86_64/asm/test.o(.text* .rodata* .data* .bss*)
                 build/arch/x86_64/asm/long_mode_init.o(.text* .rodata* .data* .bss*)
         }

@@ -1,0 +1,16 @@
+[package]
+name = "doom"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "*"
+
+[dependencies.syscall-defs]
+path = "../../syscall-defs"
+
+[dependencies.syscall-user]
+path = "../syscall-user"
+
+[build-dependencies]
+cc = "1.0"

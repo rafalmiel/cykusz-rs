@@ -47,7 +47,6 @@ run: $(disk)
 	#/home/ck/code/qemu/build/qemu-system-x86_64
 	qemu-system-x86_64 \
         -cpu host \
-        -d cpu \
         -serial stdio \
         -no-reboot \
         -m 5811 \

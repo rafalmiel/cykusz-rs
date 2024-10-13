@@ -2,11 +2,12 @@
 #![feature(raw_ref_op)]
 
 mod cykusz;
-mod keys;
+mod doomgeneric;
 
 use std::ffi::{c_char, c_int, c_uchar, c_uint, CString};
 
 static mut DOOM: Option<cykusz::CykuszDoom> = None;
+static mut DOOM_SCREEN: Option<DoomScreen> = None;
 
 #[derive(Debug)]
 pub struct DoomScreen {
@@ -15,40 +16,40 @@ pub struct DoomScreen {
     height: usize,
 }
 
+impl DoomScreen {
+    fn new() -> DoomScreen {
+        DoomScreen {
+            map: unsafe {
+                std::slice::from_raw_parts(
+                    doomgeneric::DG_ScreenBuffer,
+                    (doomgeneric::DOOMGENERIC_RESX * doomgeneric::DOOMGENERIC_RESY * 4) as usize,
+                )
+            },
+            width: doomgeneric::DOOMGENERIC_RESX as usize,
+            height: doomgeneric::DOOMGENERIC_RESY as usize,
+        }
+    }
+}
+
 fn doom<'a>() -> &'a mut cykusz::CykuszDoom {
     unsafe { DOOM.as_mut().unwrap_unchecked() }
 }
 
-extern "C" {
-    fn doomgeneric_Create(c: c_int, argv: *const *const c_char);
-    fn doomgeneric_Tick();
-
-    static DG_ScreenBuffer: *mut u32;
-}
-
-fn doomgeneric_screen() -> DoomScreen {
-    pub const DOOMGENERIC_RESX: usize = 640;
-    pub const DOOMGENERIC_RESY: usize = 400;
-
-    DoomScreen {
-        map: unsafe {
-            std::slice::from_raw_parts(DG_ScreenBuffer, DOOMGENERIC_RESX * DOOMGENERIC_RESY * 4)
-        },
-        width: DOOMGENERIC_RESX,
-        height: DOOMGENERIC_RESY,
-    }
+fn doom_screen() -> &'static mut DoomScreen {
+    unsafe { DOOM_SCREEN.as_mut().unwrap_unchecked() }
 }
 
 #[no_mangle]
 extern "C" fn DG_Init() {
     unsafe {
-        (&raw mut DOOM).write(Some(cykusz::CykuszDoom::new(doomgeneric_screen()).unwrap()));
+        (&raw mut DOOM_SCREEN).write(Some(DoomScreen::new()));
+        (&raw mut DOOM).write(Some(cykusz::CykuszDoom::new().unwrap()));
     }
 }
 
 #[no_mangle]
 extern "C" fn DG_DrawFrame() {
-    doom().draw_frame()
+    doom().draw_frame(doom_screen())
 }
 
 #[no_mangle]
@@ -119,12 +120,12 @@ fn main() {
             .map(|arg| arg.as_ptr())
             .collect::<Vec<*const c_char>>();
 
-        doomgeneric_Create(c_args.len() as c_int, c_args.as_ptr());
+        doomgeneric::doomgeneric_Create(c_args.len() as c_int, c_args.as_ptr() as *mut *mut c_char);
 
         libc::atexit(DG_Quit);
 
         loop {
-            doomgeneric_Tick();
+            doomgeneric::doomgeneric_Tick();
         }
     }
 }

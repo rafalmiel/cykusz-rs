@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "playwav"
+name = "play"
 test = false
 bench = false
-path = "src/playwav/bin/main.rs"
+path = "src/play/bin/main.rs"
 
 [[bin]]
 name = "playmidi"
@@ -18,6 +18,13 @@ path = "src/playmidi/bin/main.rs"
 [dependencies]
 rustysynth = "*"
 wavers = "*"
+fon = "*"
+
+[dependencies.kittyaudio]
+features = ["symphonia"]
+default-features = false
+git = "https://github.com/rafalmiel/kittyaudio.git"
+branch = "cykusz"
 
 [dependencies.syscall-defs]
 path = "../../syscall-defs"

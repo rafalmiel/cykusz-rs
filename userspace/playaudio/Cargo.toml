@@ -18,7 +18,10 @@ path = "src/playmidi/bin/main.rs"
 [dependencies]
 rustysynth = "*"
 wavers = "*"
-fon = "*"
+
+[dependencies.fon]
+git = "https://github.com/rafalmiel/fon.git"
+branch = "cykusz"
 
 [dependencies.kittyaudio]
 features = ["symphonia"]

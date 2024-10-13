@@ -15,6 +15,7 @@ use syscall_defs::net::{MsgFlags, MsgHdr, SockAddrPtr, SockAddrUn, SockTypeFlags
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::{Mode, Stat};
 use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
+use crate::kernel::mm::PAGE_SIZE;
 
 struct ConnectionQueue {
     queue: Vec<Arc<Socket>>,
@@ -217,8 +218,8 @@ impl SocketService for Socket {
             let client = q.queue.pop().ok_or(SyscallError::ECONNREFUSED)?;
             let new = Socket::new_unbound(None);
 
-            new.buffer.init_size(4096 * 4);
-            client.buffer.init_size(4096 * 4);
+            new.buffer.init_size(4 * PAGE_SIZE);
+            client.buffer.init_size(4 * PAGE_SIZE);
 
             *new.data.lock() = SocketState::Connected(client.clone());
             *client.data.lock() = SocketState::Connected(new.clone());

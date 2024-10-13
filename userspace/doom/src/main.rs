@@ -1,8 +1,12 @@
 #![allow(non_snake_case)]
 #![feature(raw_ref_op)]
+#![feature(const_mut_refs)]
+#![feature(ptr_as_ref_unchecked)]
+#![feature(duration_millis_float)]
 
 mod cykusz;
 mod doomgeneric;
+mod sound;
 
 use std::ffi::{c_char, c_int, c_uchar, c_uint, CString};
 

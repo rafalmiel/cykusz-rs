@@ -153,10 +153,14 @@ impl INode for MouseState {
             dbgln!(mouse, "Failed mouse read of {} bytes", buf.len());
             Err(FsError::InvalidParam)
         } else {
-            Ok(self.buf.read_data_flags(
+            let result = Ok(self.buf.read_data_flags(
                 buf,
                 WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::from(flags),
-            )?)
+            )?);
+
+            dbgln!(mouse, "read {:?}", result);
+
+            result
         }
     }
 
@@ -210,7 +214,8 @@ impl MouseState {
                         &evt as *const Event as *const u8,
                         core::mem::size_of::<Event>(),
                     );
-                    self.buf.try_append_data_irq(bytes);
+                    let bytes = self.buf.try_append_data_irq(bytes);
+                    dbgln!(mouse, "got mouse event {:?} {}", evt, bytes);
                 }
             }
         }
@@ -229,7 +234,7 @@ pub fn init() {
     MOUSE.call_once(|| {
         Arc::new_cyclic(|me| MouseState {
             state: Spin::new(State::new()),
-            buf: BufferQueue::new(4 * 32, true, true),
+            buf: BufferQueue::new(128 * size_of::<Event>(), true, true),
             dev_id: crate::kernel::device::alloc_id(),
             self_ref: me.clone(),
         })

@@ -2,6 +2,7 @@ use crate::cykusz::input::read_event;
 use crate::doomgeneric;
 use std::fs::File;
 use std::os::fd::AsRawFd;
+use std::process::ExitCode;
 use syscall_defs::events::keys::KeyCode;
 use syscall_defs::poll::{PollEventFlags, PollFd};
 
@@ -13,14 +14,14 @@ pub struct KeyboardInput {
 }
 
 impl KeyboardInput {
-    pub fn new() -> KeyboardInput {
-        let kbd = File::open("/dev/kbd").unwrap();
-        KeyboardInput {
+    pub fn new() -> Result<KeyboardInput, ExitCode> {
+        let kbd = File::open("/dev/kbd").map_err(|_| ExitCode::FAILURE)?;
+        Ok(KeyboardInput {
             file: kbd,
             kbd_key_queue: [(false, 0); 16],
             kbd_write_pos: 0,
             kbd_read_pos: 0,
-        }
+        })
     }
 
     pub fn poll_fd(&self) -> PollFd {

@@ -3,5 +3,4 @@
 #![allow(non_snake_case)]
 #![allow(unused)]
 
-include!(concat!(env!("OUT_DIR"), "/doomgeneric.rs"));
-include!(concat!(env!("OUT_DIR"), "/keys.rs"));
+include!(concat!(env!("OUT_DIR"), "/binds.rs"));

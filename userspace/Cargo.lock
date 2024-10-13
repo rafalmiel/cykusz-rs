@@ -111,7 +111,11 @@ version = "0.1.0"
 dependencies = [
  "bindgen",
  "cc",
+ "fon",
+ "kittyaudio",
  "libc",
+ "playaudio",
+ "rustysynth",
  "syscall-defs",
  "syscall-user",
 ]
@@ -140,8 +144,7 @@ checksum = "af9673d8203fcb076b19dfd17e38b3d4ae9f44959416ea532ce72415a6020365"
 [[package]]
 name = "fon"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad46a0e6c9bc688823a742aa969b5c08fdc56c2a436ee00d5c6fbcb5982c55c4"
+source = "git+https://github.com/rafalmiel/fon.git?branch=cykusz#5b3f6d9d97109ddba0fa326ab91003ad883f9414"
 dependencies = [
  "libm",
 ]
@@ -172,7 +175,7 @@ dependencies = [
 [[package]]
 name = "kittyaudio"
 version = "0.1.9"
-source = "git+https://github.com/rafalmiel/kittyaudio.git?branch=cykusz#456cefe0b843130a357a3d06ffbc9e6648c4a795"
+source = "git+https://github.com/rafalmiel/kittyaudio.git?branch=cykusz#dfce297e6e8ececa6345b1cfa08a9947131211d3"
 dependencies = [
  "parking_lot",
  "symphonia",

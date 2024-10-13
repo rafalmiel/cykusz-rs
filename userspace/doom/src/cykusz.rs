@@ -10,9 +10,9 @@ pub struct CykuszDoom {
 }
 
 impl CykuszDoom {
-    pub fn new(doom_screen: DoomScreen) -> Result<CykuszDoom, ExitCode> {
+    pub fn new() -> Result<CykuszDoom, ExitCode> {
         Ok(CykuszDoom {
-            fb: fb::Fb::new(doom_screen)?,
+            fb: fb::Fb::new()?,
             input: input::Input::new(),
         })
     }
@@ -25,9 +25,9 @@ impl CykuszDoom {
         syscall_user::sleep(ms as usize).unwrap();
     }
 
-    pub fn draw_frame(&mut self) {
+    pub fn draw_frame(&mut self, out: &mut DoomScreen) {
         self.input.poll();
-        self.fb.flip();
+        self.fb.flip(out);
     }
 
     pub fn get_key(&mut self) -> Option<(bool, u8)> {

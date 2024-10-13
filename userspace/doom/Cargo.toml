@@ -13,4 +13,5 @@ path = "../../syscall-defs"
 path = "../syscall-user"
 
 [build-dependencies]
+bindgen = "*"
 cc = "1.0"

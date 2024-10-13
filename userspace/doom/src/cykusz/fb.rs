@@ -12,12 +12,10 @@ pub struct Fb {
     #[allow(unused)]
     height: usize,
     pitch: usize,
-
-    doom_screen: DoomScreen,
 }
 
 impl Fb {
-    pub fn new(doom_screen: DoomScreen) -> Result<Fb, ExitCode> {
+    pub fn new() -> Result<Fb, ExitCode> {
         let fb = File::open("/dev/fb").map_err(|_| ExitCode::FAILURE)?;
 
         let mut fb_info = syscall_defs::ioctl::fb::FbInfo::default();
@@ -49,19 +47,16 @@ impl Fb {
             width: fb_info.width as usize,
             height: fb_info.height as usize,
             pitch: fb_info.pitch as usize / 4,
-            doom_screen,
         });
 
         fb
     }
 
-    pub fn flip(&mut self) {
+    pub fn flip(&mut self, out: &mut DoomScreen) {
         if let Some(mem) = self.mem.as_mut() {
-            for i in 0..self.doom_screen.height {
-                mem[i * self.pitch..i * self.pitch + self.doom_screen.width].copy_from_slice(
-                    &self.doom_screen.map[i * self.doom_screen.width
-                        ..i * self.doom_screen.width + self.doom_screen.width],
-                )
+            for i in 0..out.height {
+                mem[i * self.pitch..i * self.pitch + out.width]
+                    .copy_from_slice(&out.map[i * out.width..i * out.width + out.width])
             }
         }
     }

@@ -1,6 +1,7 @@
 use crate::cykusz::input::read_event;
 use std::fs::File;
 use std::os::fd::AsRawFd;
+use std::process::ExitCode;
 use syscall_defs::events::buttons::{ButtonCode, RelCode};
 use syscall_defs::events::EventType;
 use syscall_defs::poll::{PollEventFlags, PollFd};
@@ -15,16 +16,16 @@ pub struct MouseInput {
 }
 
 impl MouseInput {
-    pub fn new() -> MouseInput {
-        let mouse = File::open("/dev/mouse").unwrap();
+    pub fn new() -> Result<MouseInput, ExitCode> {
+        let mouse = File::open("/dev/mouse").map_err(|_| ExitCode::FAILURE)?;
 
-        MouseInput {
+        Ok(MouseInput {
             file: mouse,
             mouse_has_data: false,
             mouse_buttons: (false, false, false),
             mouse_relx: 0,
             mouse_rely: 0,
-        }
+        })
     }
 
     pub fn poll_fd(&self) -> PollFd {

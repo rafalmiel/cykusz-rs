@@ -1,0 +1,7 @@
+#include "doomgeneric/doomgeneric/doomgeneric.h"
+#include "doomgeneric/doomgeneric/doomkeys.h"
+#include "doomgeneric/doomgeneric/i_sound.h"
+#include "doomgeneric/doomgeneric/w_wad.h"
+#include "doomgeneric/doomgeneric/z_zone.h"
+#include "doomgeneric/doomgeneric/mus2mid.h"
+#include "doomgeneric/doomgeneric/memio.h"

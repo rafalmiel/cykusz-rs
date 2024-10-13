@@ -6,6 +6,7 @@ use crate::cykusz::input::mouse::MouseInput;
 use std::fs::File;
 use std::mem::MaybeUninit;
 use std::os::fd::AsRawFd;
+use std::process::ExitCode;
 use syscall_defs::events::Event;
 use syscall_defs::poll::PollEventFlags;
 
@@ -30,7 +31,7 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new() -> Input {
+    pub fn new() -> Result<Input, ExitCode> {
         let mut termios = MaybeUninit::<libc::termios>::uninit();
 
         unsafe {
@@ -42,13 +43,13 @@ impl Input {
         let input = Input {
             orig_termios: termios,
 
-            keyboard: KeyboardInput::new(),
-            mouse: MouseInput::new(),
+            keyboard: KeyboardInput::new()?,
+            mouse: MouseInput::new()?,
         };
 
         input.enable_raw_mode();
 
-        input
+        Ok(input)
     }
 
     pub fn poll(&mut self) {

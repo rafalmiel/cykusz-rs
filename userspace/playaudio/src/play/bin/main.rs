@@ -1,9 +1,9 @@
 #![feature(seek_stream_len)]
 #![feature(raw_ref_op)]
 
-use std::process::ExitCode;
 use fon::chan::{Ch16, Ch32};
 use kittyaudio::Frame;
+use std::process::ExitCode;
 
 fn main() -> Result<(), ExitCode> {
     let mut args = std::env::args();
@@ -20,7 +20,7 @@ fn main() -> Result<(), ExitCode> {
 
     println!("Opened {file}");
 
-    let mut mixer = kittyaudio::RecordMixer::new();
+    let mixer = kittyaudio::RecordMixer::new();
     mixer.play(song);
 
     println!("Sent to mixer");
@@ -32,9 +32,8 @@ fn main() -> Result<(), ExitCode> {
     while !mixer.is_finished() {
         mixer.fill_buffer(44100, &mut frames);
 
-        let buf = unsafe {
-            std::slice::from_raw_parts(frames.as_ptr() as *const f32, frames.len() * 2)
-        };
+        let buf =
+            unsafe { std::slice::from_raw_parts(frames.as_ptr() as *const f32, frames.len() * 2) };
 
         // Resample to our format
         let audio = fon::Audio::<Ch32, 2>::with_f32_buffer(44100, buf);

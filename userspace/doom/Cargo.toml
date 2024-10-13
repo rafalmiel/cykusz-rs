@@ -5,12 +5,26 @@ edition = "2021"
 
 [dependencies]
 libc = "*"
+rustysynth = "*"
+
+[dependencies.fon]
+git = "https://github.com/rafalmiel/fon.git"
+branch = "cykusz"
+
+[dependencies.kittyaudio]
+features = []
+default-features = false
+git = "https://github.com/rafalmiel/kittyaudio.git"
+branch = "cykusz"
 
 [dependencies.syscall-defs]
 path = "../../syscall-defs"
 
 [dependencies.syscall-user]
 path = "../syscall-user"
+
+[dependencies.playaudio]
+path = "../playaudio"
 
 [build-dependencies]
 bindgen = "*"

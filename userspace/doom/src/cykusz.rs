@@ -1,3 +1,4 @@
+mod audio;
 mod fb;
 mod input;
 
@@ -7,13 +8,15 @@ use std::process::ExitCode;
 pub struct CykuszDoom {
     fb: fb::Fb,
     input: input::Input,
+    audio: audio::Audio,
 }
 
 impl CykuszDoom {
     pub fn new() -> Result<CykuszDoom, ExitCode> {
         Ok(CykuszDoom {
             fb: fb::Fb::new()?,
-            input: input::Input::new(),
+            input: input::Input::new()?,
+            audio: audio::Audio::new()?,
         })
     }
 
@@ -40,5 +43,9 @@ impl CykuszDoom {
 
     pub fn quit(&self) {
         self.input.quit();
+    }
+
+    pub fn audio(&mut self) -> &mut audio::Audio {
+        &mut self.audio
     }
 }

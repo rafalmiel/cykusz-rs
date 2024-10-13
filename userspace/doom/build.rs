@@ -32,27 +32,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     cc::Build::new()
         .flag("-w") // Disable warnings
+        .define("FEATURE_SOUND", "1")
+        .define("__CYKUSZ__", "1")
         .files(dg_c_paths)
         .compile("doomgeneric");
 
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     bindgen::Builder::default()
-        .header("doomgeneric/doomgeneric/doomkeys.h")
+        .header("bindwrap.h")
+        .allowlist_file(".*doomgeneric.*")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .generate()
         .expect("Unable to generate bindings")
-        .write_to_file(out_path.join("keys.rs"))
-        .expect("Couldn't write bindings!");
-
-    bindgen::Builder::default()
-        .header("doomgeneric/doomgeneric/doomgeneric.h")
-        .allowlist_file("doomgeneric/doomgeneric/doomgeneric.h")
-        .blocklist_function("^DG_.*")
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
-        .generate()
-        .expect("Unable to generate bindings")
-        .write_to_file(out_path.join("doomgeneric.rs"))
+        .write_to_file(out_path.join("binds.rs"))
         .expect("Couldn't write bindings!");
 
     println!("cargo:rustc-link-lib=static=doomgeneric");

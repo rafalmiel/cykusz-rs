@@ -26,6 +26,7 @@ impl Read for MidiData {
     }
 }
 
+
 impl MidiData {
     fn to_sound(mut self, sound_font: &Arc<rustysynth::SoundFont>) -> kittyaudio::Sound {
         use rustysynth::*;
@@ -120,6 +121,7 @@ pub struct Music {
     current: Option<SoundHandle>,
     sound_font: Arc<rustysynth::SoundFont>,
     id: usize,
+    volume: f32,
 }
 
 impl Music {
@@ -131,16 +133,16 @@ impl Music {
             current: None,
             sound_font: Arc::new(rustysynth::SoundFont::new(&mut sf).unwrap()),
             id: 1,
+            volume: 0.5,
         }
     }
 
     pub fn shutdown(&mut self) {}
 
     pub fn set_volume(&mut self, volume: c_int) {
+        self.volume = (volume as f32) / 128f32;
         if let Some(track) = &self.current {
-            let volume = (volume as f32) / 128f32;
-
-            track.set_volume(volume);
+            track.set_volume(self.volume);
         }
     }
 
@@ -182,6 +184,7 @@ impl Music {
         if let Some(handle) = handle {
             self.current = Some(handle.clone());
 
+            handle.set_volume(self.volume);
             handle.loop_all(looping);
 
             self.mixer.play(handle.clone());

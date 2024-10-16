@@ -28,6 +28,49 @@ impl sfxinfo_t {
             std::str::from_utf8(name_bytes).unwrap().to_string()
         }
     }
+
+    fn get_sound(&self) -> Option<Box<kittyaudio::Sound>> {
+        let lumpnum = self.lumpnum;
+        let data: *mut u8 =
+            unsafe { W_CacheLumpNum(lumpnum, crate::doomgeneric::PU_STATIC as c_int) as *mut u8 };
+        let lumplen = unsafe { W_LumpLength(lumpnum as c_uint) };
+
+        if lumplen <= 8 {
+            return None;
+        }
+
+        let data = unsafe { std::slice::from_raw_parts_mut(data, lumplen as usize) };
+
+        if data[0] != 0x03 || data[1] != 0x00 {
+            return None;
+        }
+
+        let sample_rate = ((data[3] as u32) << 8) | (data[2] as u32);
+        let length: usize = ((data[7] as usize) << 24)
+            | ((data[6] as usize) << 16)
+            | ((data[5] as usize) << 8)
+            | (data[4] as usize);
+
+        if (length > lumplen as usize - 8) || (length <= 48) {
+            return None;
+        }
+
+        let data = &data[16..length - 16];
+
+        // do conversion
+        let audio = fon::Audio::<ChU8, 1>::with_u8_buffer(sample_rate, data);
+        let audio = fon::Audio::<Ch32, 2>::with_audio(44100, &audio);
+
+        let frames: &[Frame] = unsafe { std::mem::transmute(audio.as_slice()) };
+
+        let snd = kittyaudio::Sound::from_frames(44100, frames);
+
+        unsafe {
+            W_ReleaseLumpNum(lumpnum);
+        }
+
+        Some(Box::new(snd))
+    }
 }
 
 impl Sounds {
@@ -104,51 +147,15 @@ impl Sounds {
     }
 
     fn cache_sound(&mut self, sound: &mut sfxinfo_t) -> bool {
-        let lumpnum = sound.lumpnum;
-        let data: *mut u8 =
-            unsafe { W_CacheLumpNum(lumpnum, crate::doomgeneric::PU_STATIC as c_int) as *mut u8 };
-        let lumplen = unsafe { W_LumpLength(lumpnum as c_uint) };
+        if let Some(snd) = sound.get_sound() {
+            let r = Box::into_raw(snd);
 
-        if lumplen <= 8 {
-            return false;
+            sound.driver_data = r as *mut c_void;
+
+            true
+        } else {
+            false
         }
-
-        let data = unsafe { std::slice::from_raw_parts_mut(data, lumplen as usize) };
-
-        if data[0] != 0x03 || data[1] != 0x00 {
-            return false;
-        }
-
-        let sample_rate = ((data[3] as u32) << 8) | (data[2] as u32);
-        let length: usize = ((data[7] as usize) << 24)
-            | ((data[6] as usize) << 16)
-            | ((data[5] as usize) << 8)
-            | (data[4] as usize);
-
-        if (length > lumplen as usize - 8) || (length <= 48) {
-            return false;
-        }
-
-        let data = &data[16..length - 16];
-
-        // do conversion
-        let audio = fon::Audio::<ChU8, 1>::with_u8_buffer(sample_rate, data);
-        let audio = fon::Audio::<Ch32, 2>::with_audio(44100, &audio);
-
-        let frames: &[Frame] = unsafe { std::mem::transmute(audio.as_slice()) };
-
-        let snd = kittyaudio::Sound::from_frames(44100, frames);
-
-        let b = Box::new(snd);
-        let r = Box::into_raw(b);
-
-        sound.driver_data = r as *mut c_void;
-
-        unsafe {
-            W_ReleaseLumpNum(lumpnum);
-        }
-
-        true
     }
 
     pub fn cache_sounds(&mut self, sounds: &mut [sfxinfo_t]) {

@@ -62,7 +62,7 @@ fn main() -> Result<(), ExitCode> {
 
     println!("soundfont: {soundfont_path}, midi: {midi_path}");
 
-    let mut sf2 = MMapFileReader::open(soundfont_path).map_err(|_| ExitCode::FAILURE)?;
+    let mut sf2 = File::open(soundfont_path).map_err(|_| ExitCode::FAILURE)?;
     let sound_font = Arc::new(SoundFont::new(&mut sf2).unwrap());
 
     println!("Creating sequencer...");

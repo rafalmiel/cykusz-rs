@@ -193,7 +193,6 @@ impl Music {
 
     pub fn stop_song(&mut self) {
         if let Some(handle) = &self.current {
-            handle.pause();
             handle.set_loop_enabled(false);
             handle.seek_to_end();
         }

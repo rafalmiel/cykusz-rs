@@ -129,7 +129,6 @@ impl Sounds {
 
     pub fn stop(&mut self, channel: c_int) {
         if let Some(s) = &mut self.sounds[channel as usize] {
-            s.pause();
             s.seek_to_end();
         }
     }

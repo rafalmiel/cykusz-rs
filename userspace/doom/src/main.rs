@@ -124,6 +124,11 @@ fn main() {
             .map(|arg| arg.as_ptr())
             .collect::<Vec<*const c_char>>();
 
+        (&raw mut doomgeneric::key_strafeleft).write('a' as c_int);
+        (&raw mut doomgeneric::key_straferight).write('d' as c_int);
+        (&raw mut doomgeneric::key_up).write('w' as c_int);
+        (&raw mut doomgeneric::key_down).write('s' as c_int);
+
         doomgeneric::doomgeneric_Create(c_args.len() as c_int, c_args.as_ptr() as *mut *mut c_char);
 
         libc::atexit(DG_Quit);

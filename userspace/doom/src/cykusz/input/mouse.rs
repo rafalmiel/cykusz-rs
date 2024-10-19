@@ -75,7 +75,8 @@ impl MouseInput {
 
         self.mouse_has_data = false;
 
-        let ret = Some((self.mouse_buttons, self.mouse_relx, self.mouse_rely));
+        // 0 as mouse-y, since we move with keyboard
+        let ret = Some((self.mouse_buttons, self.mouse_relx, 0));
 
         self.mouse_relx = 0;
         self.mouse_rely = 0;

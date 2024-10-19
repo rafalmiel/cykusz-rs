@@ -26,7 +26,6 @@ impl Read for MidiData {
     }
 }
 
-
 impl MidiData {
     fn to_sound(mut self, sound_font: &Arc<rustysynth::SoundFont>) -> kittyaudio::Sound {
         use rustysynth::*;
@@ -126,7 +125,9 @@ pub struct Music {
 
 impl Music {
     pub fn new(mixer: Arc<kittyaudio::RecordMixer>) -> Music {
-        let mut sf = std::fs::File::open("/FluidR3_GM.sf2").unwrap();
+        let mut sf =
+            std::fs::File::open(std::env::var("DOOM_SF").unwrap_or("/FluidR3_GM.sf2".into()))
+                .unwrap();
         Music {
             mixer,
             music: std::collections::HashMap::new(),

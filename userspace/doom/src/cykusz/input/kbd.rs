@@ -96,6 +96,15 @@ impl KeyboardInput {
             KeyCode::KEY_N => 'n' as u8,
             KeyCode::KEY_M => 'm' as u8,
 
+            KeyCode::KEY_1 => '1' as u8,
+            KeyCode::KEY_2 => '2' as u8,
+            KeyCode::KEY_3 => '3' as u8,
+            KeyCode::KEY_4 => '4' as u8,
+            KeyCode::KEY_5 => '5' as u8,
+            KeyCode::KEY_6 => '6' as u8,
+            KeyCode::KEY_7 => '7' as u8,
+            KeyCode::KEY_8 => '8' as u8,
+
             _ => 0,
         }
     }

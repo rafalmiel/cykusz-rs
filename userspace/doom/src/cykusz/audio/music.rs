@@ -138,6 +138,10 @@ impl Music {
         }
     }
 
+    pub fn init(&mut self) -> bool {
+        true
+    }
+
     pub fn shutdown(&mut self) {}
 
     pub fn set_volume(&mut self, volume: c_int) {
@@ -159,7 +163,7 @@ impl Music {
         }
     }
 
-    pub fn register_song(&mut self, data: &[u8]) -> *mut () {
+    pub fn register(&mut self, data: &[u8]) -> *mut () {
         let msc = MusicData::new(data);
         let midi = msc.to_midi();
 
@@ -175,11 +179,11 @@ impl Music {
         0 as *mut ()
     }
 
-    pub fn unregister_song(&mut self, handle: *mut ()) {
+    pub fn unregister(&mut self, handle: *mut ()) {
         self.music.remove(&(handle as usize));
     }
 
-    pub fn play_song(&mut self, handle: *mut (), looping: bool) {
+    pub fn play(&mut self, handle: *mut (), looping: bool) {
         let handle = self.music.get(&(handle as usize));
 
         if let Some(handle) = handle {

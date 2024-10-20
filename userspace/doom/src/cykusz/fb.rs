@@ -52,11 +52,11 @@ impl Fb {
         fb
     }
 
-    pub fn flip(&mut self, out: &mut DoomScreen) {
+    pub fn flip(&mut self, from: &DoomScreen) {
         if let Some(mem) = self.mem.as_mut() {
-            for i in 0..out.height {
-                mem[i * self.pitch..i * self.pitch + out.width]
-                    .copy_from_slice(&out.map[i * out.width..i * out.width + out.width])
+            for i in 0..from.height {
+                mem[i * self.pitch..i * self.pitch + from.width]
+                    .copy_from_slice(&from.map[i * from.width..i * from.width + from.width])
             }
         }
     }

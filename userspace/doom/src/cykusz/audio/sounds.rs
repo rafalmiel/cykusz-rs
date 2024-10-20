@@ -71,6 +71,14 @@ impl sfxinfo_t {
 
         Some(Box::new(snd))
     }
+
+    fn cache(&mut self) {
+        if let Some(snd) = self.get_sound() {
+            let r = Box::into_raw(snd);
+
+            self.driver_data = r as *mut c_void;
+        }
+    }
 }
 
 impl Sounds {
@@ -85,8 +93,10 @@ impl Sounds {
         }
     }
 
-    pub fn init(&mut self, use_prefix: bool) {
+    pub fn init(&mut self, use_prefix: bool) -> bool {
         self.use_prefix = use_prefix;
+
+        true
     }
 
     pub fn shutdown(&mut self) {}
@@ -145,19 +155,7 @@ impl Sounds {
         }
     }
 
-    fn cache_sound(&mut self, sound: &mut sfxinfo_t) -> bool {
-        if let Some(snd) = sound.get_sound() {
-            let r = Box::into_raw(snd);
-
-            sound.driver_data = r as *mut c_void;
-
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn cache_sounds(&mut self, sounds: &mut [sfxinfo_t]) {
+    pub fn cache(&mut self, sounds: &mut [sfxinfo_t]) {
         for sound in sounds {
             let lump_name = sound.lump_name(self.use_prefix);
 
@@ -167,7 +165,7 @@ impl Sounds {
                 continue;
             }
 
-            self.cache_sound(sound);
+            sound.cache();
         }
     }
 }

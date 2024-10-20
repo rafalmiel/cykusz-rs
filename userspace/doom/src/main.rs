@@ -39,7 +39,7 @@ fn doom<'a>() -> &'a mut cykusz::CykuszDoom {
     unsafe { DOOM.as_mut().unwrap_unchecked() }
 }
 
-fn doom_screen() -> &'static mut DoomScreen {
+fn doom_screen() -> &'static DoomScreen {
     unsafe { DOOM_SCREEN.as_mut().unwrap_unchecked() }
 }
 

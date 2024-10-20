@@ -28,7 +28,7 @@ impl CykuszDoom {
         syscall_user::sleep(ms as usize).unwrap();
     }
 
-    pub fn draw_frame(&mut self, out: &mut DoomScreen) {
+    pub fn draw_frame(&mut self, out: &DoomScreen) {
         self.input.poll();
         self.fb.flip(out);
     }

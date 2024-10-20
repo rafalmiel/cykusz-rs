@@ -67,7 +67,7 @@ extern "C" fn music_is_playing() -> boolean {
 }
 
 extern "C" fn music_poll() {
-    crate::doom().audio().music().poll()
+    crate::doom().audio().poll()
 }
 
 #[no_mangle]

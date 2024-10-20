@@ -9,8 +9,11 @@ mod doomgeneric;
 mod sound;
 
 use std::ffi::{c_char, c_int, c_uchar, c_uint, CString};
+use std::process::ExitCode;
+use std::sync::atomic::{AtomicBool, Ordering};
+use crate::cykusz::CykuszDoom;
 
-static mut DOOM: Option<cykusz::CykuszDoom> = None;
+static mut DOOM: *mut CykuszDoom = std::ptr::null_mut();
 static mut DOOM_SCREEN: Option<DoomScreen> = None;
 
 #[derive(Debug)]
@@ -36,7 +39,9 @@ impl DoomScreen {
 }
 
 fn doom<'a>() -> &'a mut cykusz::CykuszDoom {
-    unsafe { DOOM.as_mut().unwrap_unchecked() }
+    unsafe {
+        DOOM.as_mut().unwrap()
+    }
 }
 
 fn doom_screen() -> &'static DoomScreen {
@@ -47,7 +52,6 @@ fn doom_screen() -> &'static DoomScreen {
 extern "C" fn DG_Init() {
     unsafe {
         (&raw mut DOOM_SCREEN).write(Some(DoomScreen::new()));
-        (&raw mut DOOM).write(Some(cykusz::CykuszDoom::new().unwrap()));
     }
 }
 
@@ -109,12 +113,34 @@ extern "C" fn DG_GetMouse(buttons: *mut c_int, rel_x: *mut c_int, rel_y: *mut c_
 #[no_mangle]
 extern "C" fn DG_SetWindowTitle(_title: *const c_char) {}
 
-extern "C" fn DG_Quit() {
-    doom().quit();
+static PANICKED: AtomicBool = AtomicBool::new(false);
+extern "C" fn CK_Quit() {
+    if PANICKED.load(Ordering::Relaxed) {
+        // Return, as DOOM will be dropped by stack unwinding
+        return;
+    }
+    unsafe {
+        // Gotta force drop here to run cleanups, since doom will do exit() and skip our Dtors
+        drop(DOOM.read());
+    }
+    println!("Good Bye!");
 }
 
-fn main() {
+fn main() -> Result<(), ExitCode> {
     unsafe {
+        let mut doom = CykuszDoom::new()?;
+
+        (&raw mut DOOM).write(&raw mut doom);
+        // Graceful exit handler
+        libc::atexit(CK_Quit);
+
+        let orig = std::panic::take_hook();
+
+        std::panic::set_hook(Box::new(move |p| {
+            orig(p);
+            PANICKED.store(true, Ordering::Relaxed);
+        }));
+
         let args = std::env::args()
             .map(|arg| CString::new(arg).unwrap())
             .collect::<Vec<CString>>();
@@ -130,8 +156,6 @@ fn main() {
         (&raw mut doomgeneric::key_down).write('s' as c_int);
 
         doomgeneric::doomgeneric_Create(c_args.len() as c_int, c_args.as_ptr() as *mut *mut c_char);
-
-        libc::atexit(DG_Quit);
 
         loop {
             doomgeneric::doomgeneric_Tick();

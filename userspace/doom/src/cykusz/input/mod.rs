@@ -80,10 +80,6 @@ impl Input {
         self.mouse.get_mouse()
     }
 
-    pub fn quit(&self) {
-        self.disable_raw_mode();
-    }
-
     fn enable_raw_mode(&self) {
         let mut new = self.orig_termios;
 
@@ -101,5 +97,11 @@ impl Input {
                 &raw const self.orig_termios,
             );
         }
+    }
+}
+
+impl Drop for Input {
+    fn drop(&mut self) {
+        self.disable_raw_mode();
     }
 }

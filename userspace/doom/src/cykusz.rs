@@ -41,10 +41,6 @@ impl CykuszDoom {
         self.input.get_mouse()
     }
 
-    pub fn quit(&self) {
-        self.input.quit();
-    }
-
     pub fn audio(&mut self) -> &mut audio::Audio {
         &mut self.audio
     }

@@ -1,6 +1,7 @@
 use kittyaudio::SoundHandle;
 use std::io::Read;
 use std::os::raw::{c_int, c_void};
+use std::process::ExitCode;
 use std::ptr::null_mut;
 use std::sync::Arc;
 
@@ -124,18 +125,20 @@ pub struct Music {
 }
 
 impl Music {
-    pub fn new(mixer: Arc<kittyaudio::RecordMixer>) -> Music {
+    pub fn new(mixer: Arc<kittyaudio::RecordMixer>) -> Result<Music, ExitCode> {
         let mut sf =
             std::fs::File::open(std::env::var("DOOM_SF").unwrap_or("/FluidR3_GM.sf2".into()))
-                .unwrap();
-        Music {
+                .map_err(|_e| { ExitCode::FAILURE })?;
+        Ok(Music {
             mixer,
             music: std::collections::HashMap::new(),
             current: None,
-            sound_font: Arc::new(rustysynth::SoundFont::new(&mut sf).unwrap()),
+            sound_font: Arc::new(rustysynth::SoundFont::new(&mut sf).map_err(|_e| {
+                ExitCode::FAILURE
+            })?),
             id: 1,
             volume: 0.5,
-        }
+        })
     }
 
     pub fn init(&mut self) -> bool {

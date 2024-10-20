@@ -4,6 +4,7 @@ use crate::doomgeneric::{
 use fon::chan::{Ch32, ChU8};
 use kittyaudio::{Frame, SoundHandle};
 use std::os::raw::{c_char, c_int, c_uint, c_void};
+use std::process::ExitCode;
 use std::sync::Arc;
 
 pub struct Sounds {
@@ -82,15 +83,15 @@ impl sfxinfo_t {
 }
 
 impl Sounds {
-    pub fn new(mixer: Arc<kittyaudio::RecordMixer>) -> Sounds {
-        Sounds {
+    pub fn new(mixer: Arc<kittyaudio::RecordMixer>) -> Result<Sounds, ExitCode> {
+        Ok(Sounds {
             use_prefix: false,
             mixer,
             sounds: [
                 None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None, None,
             ],
-        }
+        })
     }
 
     pub fn init(&mut self, use_prefix: bool) -> bool {

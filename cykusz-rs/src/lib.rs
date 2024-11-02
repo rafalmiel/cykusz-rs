@@ -1,9 +1,10 @@
 #![no_std]
-#![allow(internal_features)]
+#![allow(internal_features,incomplete_features)]
 #![feature(alloc_error_handler)]
 #![feature(auto_traits)]
 #![feature(c_variadic)]
 #![feature(concat_idents)]
+#![feature(generic_const_exprs)]
 #![feature(lang_items)]
 #![feature(linkage)]
 #![feature(negative_impls)]
@@ -16,6 +17,7 @@
 #![feature(trace_macros)]
 #![feature(unsigned_is_multiple_of)]
 #![feature(ptr_as_ref_unchecked)]
+#![feature(maybe_uninit_as_bytes)]
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;

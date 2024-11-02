@@ -18,14 +18,16 @@ use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::current_ns;
-use crate::kernel::utils::buffer::BufferQueue;
-use crate::kernel::utils::wait_queue::WaitQueueFlags;
+use crate::kernel::utils::spsc_queue::SPSCQueue;
+use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 struct MouseState {
     state: Spin<State>,
     dev_id: DevId,
-    buf: BufferQueue,
     self_ref: Weak<MouseState>,
+
+    spsc: SPSCQueue<'static, Event, 128>,
+    wq: WaitQueue,
 }
 
 struct State {
@@ -70,12 +72,12 @@ impl<'a> StateIter<'a> {
 
     fn get_rel_x(&self) -> i32 {
         let d = self.state.packet[1] as i32;
-        return d - (((self.state.packet[0] as i32) << 4) & 0x100);
+        d - (((self.state.packet[0] as i32) << 4) & 0x100)
     }
 
     fn get_rel_y(&self) -> i32 {
         let d = self.state.packet[2] as i32;
-        return d - (((self.state.packet[0] as i32) << 3) & 0x100);
+        d - (((self.state.packet[0] as i32) << 3) & 0x100)
     }
 }
 
@@ -149,18 +151,31 @@ impl INode for MouseState {
         buf: &mut [u8],
         flags: OpenFlags,
     ) -> crate::kernel::fs::vfs::Result<usize> {
+        dbgln!(mouse, "read_at");
         if buf.len() % core::mem::size_of::<Event>() != 0 {
             dbgln!(mouse, "Failed mouse read of {} bytes", buf.len());
             Err(FsError::InvalidParam)
         } else {
-            let result = Ok(self.buf.read_data_flags(
-                buf,
-                WaitQueueFlags::IRQ_DISABLE | WaitQueueFlags::from(flags),
-            )?);
+            if let Some(()) = self.wq.wait_for(
+                WaitQueueFlags::from(flags) | WaitQueueFlags::IRQ_DISABLE,
+                || self.spsc.has_data(),
+            )? {
+                let res = self.spsc.try_read_one();
+                dbgln!(mouse, "trying to read one {:?}", res);
+                if let Some(e) = res {
+                    dbgln!(mouse, "got {:?}", e);
+                    buf.copy_from_slice(unsafe {
+                        core::slice::from_raw_parts(&e as *const _ as *const u8, size_of::<Event>())
+                    });
 
-            dbgln!(mouse, "read {:?}", result);
-
-            result
+                    Ok(size_of::<Event>())
+                } else {
+                    dbgln!(mouse, "read failed");
+                    Ok(0)
+                }
+            } else {
+                Ok(0)
+            }
         }
     }
 
@@ -174,10 +189,10 @@ impl INode for MouseState {
         }
 
         if let Some(pt) = poll_table {
-            pt.listen(&self.buf.readers_queue());
+            pt.listen(&self.wq);
         }
 
-        Ok(if self.buf.has_data() {
+        Ok(if self.spsc.has_data() {
             PollEventFlags::READ
         } else {
             PollEventFlags::empty()
@@ -209,14 +224,10 @@ impl MouseState {
         if state.index == 0 && state.opened {
             if let Some(evt) = state.iter().next() {
                 drop(state);
-                unsafe {
-                    let bytes: &[u8] = core::slice::from_raw_parts(
-                        &evt as *const Event as *const u8,
-                        core::mem::size_of::<Event>(),
-                    );
-                    let bytes = self.buf.try_append_data_irq(bytes);
-                    dbgln!(mouse, "got mouse event {:?} {}", evt, bytes);
-                }
+
+                let res = self.spsc.try_write_one(&evt);
+                dbgln!(mouse, "int write evt: {:?} {:?}", evt, res);
+                self.wq.notify_one();
             }
         }
 
@@ -234,11 +245,15 @@ pub fn init() {
     MOUSE.call_once(|| {
         Arc::new_cyclic(|me| MouseState {
             state: Spin::new(State::new()),
-            buf: BufferQueue::new(128 * size_of::<Event>(), true, true),
             dev_id: crate::kernel::device::alloc_id(),
             self_ref: me.clone(),
+
+            spsc: SPSCQueue::new(),
+            wq: WaitQueue::new(),
         })
     });
+
+    mouse().spsc.init();
 
     crate::kernel::device::register_device(mouse().clone())
         .expect("Failed to register keyboard device")

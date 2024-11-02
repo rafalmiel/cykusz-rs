@@ -27,6 +27,7 @@ hashbrown = "*"
 lru = "*"
 vte = "*"
 linked_list_allocator = "*"
+bbqueue = "*"
 
 [dependencies.uuid]
 default-features = false

@@ -197,11 +197,12 @@ macro_rules! enable_unsigned_ops {
             ///
             /// Returns `None` if it is not possible to calculate `steps_between`
             /// without overflow.
-            fn steps_between(start: &Self, end: &Self) -> Option<usize> {
-                if start < end {
-                    return Some(end.0 - start.0);
+            fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
+                if start <= end {
+                    let diff = end.0 - start.0;
+                    return (diff, Some(diff));
                 } else {
-                    None
+                    (0, None)
                 }
             }
 

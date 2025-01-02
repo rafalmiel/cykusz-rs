@@ -106,7 +106,7 @@ impl Irqs {
 
         if let IrqHandler::SharedInterrupt(h) = &mut *irqs {
             if let Some(i) = h.iter().enumerate().find_map(|(i, e)| {
-                if *e == handler {
+                if core::ptr::fn_addr_eq(*e, handler) {
                     return Some(i);
                 } else {
                     None

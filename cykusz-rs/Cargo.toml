@@ -22,7 +22,7 @@ spin = "*"
 bit_field = "*"
 intrusive-collections = "*"
 paste = "*"
-downcast-rs = { version = "*", default-features = false }
+downcast-rs = { version = "*", default-features = false, features=["sync"]}
 hashbrown = "*"
 lru = "*"
 vte = "*"

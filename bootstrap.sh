@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+set -e
+
 git submodule update --init --recursive
 
 ./sysroot/make_docker_image.sh

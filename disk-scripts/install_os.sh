@@ -2,11 +2,11 @@
 
 set -x
 
-losetup -D
-losetup -P /dev/loop0 disk.img
+lo=$(losetup -f)
+losetup -P $lo disk.img
 
 mkdir -p mnt
-sudo mount /dev/loop0p1 mnt
+sudo mount "$lo"p1 mnt
 sudo chown $USER:$USER mnt
 
 if [ "$1" == "debug" ]
@@ -34,7 +34,7 @@ sudo umount mnt
 PROGS="test testcpp hello stack nyancat ttytest fork poweroff stat fbdoom doom1.wad open_sleep"
 RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client forktest mprotecttest play playmidi threads sound-daemon doom"
 
-sudo mount /dev/loop0p2 mnt
+sudo mount "$lo"p2 mnt
 sudo chown -R $USER:$USER mnt
 mkdir -p mnt/bin
 
@@ -66,9 +66,9 @@ rsync -a sysroot/cykusz/etc mnt/
 
 mkdir -p mnt/etc
 mkdir -p mnt/home
-echo "$(blkid -s UUID -o value /dev/loop0p1)" /boot > mnt/etc/fstab
-echo "$(blkid -s UUID -o value /dev/loop0p3)" /home >> mnt/etc/fstab
+echo "$(blkid -s UUID -o value "$lo"p1)" /boot > mnt/etc/fstab
+echo "$(blkid -s UUID -o value "$lo"p3)" /home >> mnt/etc/fstab
 
 sudo umount mnt
 
-losetup -D
+losetup -d $lo

@@ -569,6 +569,8 @@ function _mlibc {
 function _dummy_libc {
     mkdir -p $SYSROOT/usr/lib
     $TRIPLE-gcc -nostdlib -nostartfiles -shared -x c /dev/null -o $SYSROOT/usr/lib/libc.so
+    $TRIPLE-gcc -nostdlib -nostartfiles -shared -x c /dev/null -o $SYSROOT/usr/lib/crti.o
+    $TRIPLE-gcc -nostdlib -nostartfiles -shared -x c /dev/null -o $SYSROOT/usr/lib/crtn.o
 }
 
 function _libgcc {

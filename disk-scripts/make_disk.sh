@@ -10,9 +10,9 @@ parted -- disk.img mkpart primary ext2 64Mib 4GiB # 112MB
 parted -- disk.img mkpart primary ext2 4GiB 4.5Gib # 64
 parted disk.img set 1 boot on
 
-losetup -D
-losetup -P /dev/loop0 disk.img
-sudo -u $USER mkfs.ext2 /dev/loop0p1
-sudo -u $USER mkfs.ext2 /dev/loop0p2
-sudo -u $USER mkfs.ext2 /dev/loop0p3
-losetup -D
+lo=$(losetup -f)
+losetup -P $lo disk.img
+sudo -u $USER mkfs.ext2 "$lo"p1
+sudo -u $USER mkfs.ext2 "$lo"p2
+sudo -u $USER mkfs.ext2 "$lo"p3
+losetup -d $lo

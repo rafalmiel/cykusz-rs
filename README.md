@@ -74,50 +74,47 @@ https://github.com/rafalmiel/cykusz-rs/assets/3881998/afa514a1-f435-4eeb-8c80-20
 
 You will need following packages to compile and run the os:
 * rust ([rustup](https://rustup.rs/))
+* build-essential
 * nasm
 * qemu
 * grub2
 * parted
-* docker (for userspace docker build)
+* e2fsprogs
+* docker
+
+(!!) Please make sure your user is part of the disk and docker groups
+```bash
+sudo usermod -aG disk docker
+newgrp - # or relogin
+```
 
 ### Building:
-```bash
-git clone https://github.com/rafalmiel/cykusz-rs.git
-git submodule update --init --recursive
+#### Sysroot
+As an initial step we need to build the sysroot with ported software, and most importantly llvm/rust cross-compiler
+that will be required to build rust userspace programs.
 
-rustup override set nightly
-rustup component add rust-src
+The build will be done using docker and it will take a long time. In case something fails, you can find the logs in the 
+sysroot/logs directory.
+```bash
+git clone https://github.com/rafalmiel/cykusz-rs.git --recursive
+
+cd cykusz-rs
+./bootstrap.sh
+```
+
+#### Kenrel
+Once we have sysroot built, rebuilding kernel will be fairly quick with:
+```bash
 make
-
-./disk-scripts/create_disk.sh
 ```
 
-## Building Userspace
-It is recommended to use docker for building userspace for stable environment.
-
-### Using docker
-```bash
-./sysroot/make_docker_image.sh
-./sysroot/toolchain_docker.sh
-```
-
-### Using host
-```bash
-./sysroot/toolchain.sh
-```
-
-## Running
-### qemu
+### Running
+#### qemu
 ```bash
 make run
 ```
 
-### bochs
-```bash
-make bochs
-```
-
-### VirtualBox
+#### VirtualBox
 ```bash
 # Run only once to import the image into VirtualBox
 ./create_vbox_image.sh
@@ -125,3 +122,7 @@ make bochs
 make vbox
 ```
 
+#### bochs
+```bash
+make bochs
+```

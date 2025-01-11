@@ -19,7 +19,7 @@ fi
 cp -f build/$KERNEL mnt/kernel.bin
 cp -f cykusz-rs/src/arch/x86_64/asm/grub.cfg mnt/grub/
 
-sed -i "s/{ROOT_UUID}/$(blkid -s UUID -o value /dev/loop0p2)/g" mnt/grub/grub.cfg
+sed -i "s/{ROOT_UUID}/$(blkid -s UUID -o value "$lo"p2)/g" mnt/grub/grub.cfg
 sed -i "s/{LOGS}/$CYKUSZ_LOGS/g" mnt/grub/grub.cfg
 
 RUST_PROG_MODE=release

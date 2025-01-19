@@ -3,11 +3,12 @@
 set -x
 
 lo=$(losetup -f)
+u=$(logname)
 losetup -P $lo disk.img
 
 mkdir -p mnt
 sudo mount "$lo"p1 mnt
-sudo chown $USER:$USER mnt
+sudo chown $u:$u mnt
 
 if [ "$1" == "debug" ]
 then
@@ -35,7 +36,7 @@ PROGS="test testcpp hello stack nyancat ttytest fork poweroff stat fbdoom doom1.
 RUST_PROGS="init shell mount umount unixsocket-server unixsocket-client forktest mprotecttest play playmidi threads sound-daemon doom"
 
 sudo mount "$lo"p2 mnt
-sudo chown -R $USER:$USER mnt
+sudo chown -R $u:$u mnt
 mkdir -p mnt/bin
 
 for prog in $PROGS; do

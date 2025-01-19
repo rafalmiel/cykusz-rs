@@ -121,7 +121,8 @@ download-ci-llvm = false
 targets = "X86"
 
 [build]
-target = ["x86_64-unknown-cykusz", "x86_64-unknown-linux-gnu"]
+host = ["x86_64-unknown-linux-gnu", "x86_64-unknown-cykusz"]
+target = ["x86_64-unknown-linux-gnu", "x86_64-unknown-cykusz"]
 build-dir = "$RUST_BUILD_DIR"
 docs = false
 
@@ -278,7 +279,8 @@ function _prepare_libiconv {
         pushd .
         cd $LIBICONV_SRC_DIR
         ./gitsub.sh pull
-        ./autogen.sh
+
+        ACLOCAL_PATH=$ACLOCAL_PATH:$LIBICONV_SRC_DIR/gnulib/m4 ./autogen.sh
         cp config.sub.cykusz gnulib/build-aux/config.sub
         cp config.sub.cykusz libcharset/build-aux/config.sub
         cp config.sub.cykusz build-aux/config.sub
@@ -879,6 +881,7 @@ function _cykusz_libiconv {
 function _cykusz_libidn2 {
     _prepare_libidn2
 
+    rm -rf $LIBIDN2_CYKUSZ_BUILD_DIR
     mkdir -p $LIBIDN2_CYKUSZ_BUILD_DIR
 
     pushd .
@@ -890,12 +893,20 @@ function _cykusz_libidn2 {
     cp ./lib/idn2.h $LIBIDN2_SRC_DIR/lib/
 
     cd lib
-    make gendata
-    make gentr46map
-    cd ../
 
-    cp ./lib/gendata $LIBIDN2_SRC_DIR/lib/gendata
-    cp ./lib/gentr46map $LIBIDN2_SRC_DIR/lib/gentr46map
+    if [ ! -f $LIBIDN2_SRC_DIR/lib/gendata ]; then
+        make gendata
+        cp ./gendata $LIBIDN2_SRC_DIR/lib/gendata
+    else
+        cp $LIBIDN2_SRC_DIR/lib/gendata ./gendata
+    fi
+    if [ ! -f $LIBIDN2_SRC_DIR/lib/gentr46map ]; then
+        make gentr46map
+        cp ./gentr46map $LIBIDN2_SRC_DIR/lib/gentr46map
+    else
+        cp $LIBIDN2_SRC_DIR/lib/gentr46map ./gentr46map
+    fi
+    cd ../
 
     $LIBIDN2_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --disable-nls --disable-static --disable-doc
 

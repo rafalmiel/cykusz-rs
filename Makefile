@@ -101,6 +101,7 @@ bochs: $(disk)
 	bochs -f bochsrc.txt -q
 
 $(disk): $(kernel) cargo_user $(cross_cpp)
+	disk-scripts/install_grub.sh
 ifdef dev
 	CYKUSZ_LOGS=$(logs) disk-scripts/install_os.sh debug
 else

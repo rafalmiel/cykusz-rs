@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ex
+
 SPATH=$(dirname $(readlink -f "$0"))
 CYKUSZ_DIR=$(realpath $SPATH/..)
 

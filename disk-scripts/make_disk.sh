@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 dd if=/dev/zero of=disk.img count=$((1024*5 + 64)) bs=$((1024*1024))
 

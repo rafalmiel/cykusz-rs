@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -ex
+
 lo=$(losetup -f)
 u=$(logname)
 losetup -P $lo disk.img

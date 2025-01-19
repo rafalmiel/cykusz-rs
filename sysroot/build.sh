@@ -121,7 +121,6 @@ download-ci-llvm = false
 targets = "X86"
 
 [build]
-host = ["x86_64-unknown-linux-gnu", "x86_64-unknown-cykusz"]
 target = ["x86_64-unknown-linux-gnu", "x86_64-unknown-cykusz"]
 build-dir = "$RUST_BUILD_DIR"
 docs = false

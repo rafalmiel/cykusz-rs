@@ -40,6 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     bindgen::Builder::default()
+        .rust_target("1.80.0".parse()?)
         .header("bindwrap.h")
         .allowlist_file(".*doomgeneric.*")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

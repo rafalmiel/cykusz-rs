@@ -1,7 +1,7 @@
 use crate::doomgeneric::{
     sfxinfo_t, W_CacheLumpNum, W_CheckNumForName, W_GetNumForName, W_LumpLength, W_ReleaseLumpNum,
 };
-use fon::chan::{Ch32, ChU8};
+use fon::samp::{Samp8, Samp32};
 use kittyaudio::{Frame, SoundHandle};
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::process::ExitCode;
@@ -59,8 +59,8 @@ impl sfxinfo_t {
         let data = &data[16..length - 16];
 
         // do conversion
-        let audio = fon::Audio::<ChU8, 1>::with_u8_buffer(sample_rate, data);
-        let audio = fon::Audio::<Ch32, 2>::with_audio(44100, &audio);
+        let audio = fon::Audio::<Samp8, 1>::with_u8_buffer(sample_rate, data);
+        let audio = fon::Audio::<Samp32, 2>::with_audio(44100, &audio);
 
         let frames: &[Frame] = unsafe { std::mem::transmute(audio.as_slice()) };
 

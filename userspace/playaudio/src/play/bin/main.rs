@@ -1,7 +1,7 @@
 #![feature(seek_stream_len)]
 #![feature(raw_ref_op)]
 
-use fon::chan::{Ch16, Ch32};
+use fon::samp::{Samp16, Samp32};
 use kittyaudio::Frame;
 use std::process::ExitCode;
 
@@ -36,8 +36,8 @@ fn main() -> Result<(), ExitCode> {
             unsafe { std::slice::from_raw_parts(frames.as_ptr() as *const f32, frames.len() * 2) };
 
         // Resample to our format
-        let audio = fon::Audio::<Ch32, 2>::with_f32_buffer(44100, buf);
-        let mut audio = fon::Audio::<Ch16, 2>::with_audio(44100, &audio);
+        let audio = fon::Audio::<Samp32, 2>::with_f32_buffer(44100, buf);
+        let mut audio = fon::Audio::<Samp16, 2>::with_audio(44100, &audio);
 
         let buf = unsafe {
             std::slice::from_raw_parts(audio.as_i16_slice().as_ptr() as *const u8, audio.len() * 4)

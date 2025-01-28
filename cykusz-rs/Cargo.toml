@@ -25,7 +25,7 @@ paste = "*"
 downcast-rs = { version = "*", default-features = false, features=["sync"]}
 hashbrown = "*"
 lru = "*"
-vte = { git = "https://github.com/rafalmiel/vte.git", branch = "cykusz", default-features = false }
+vte = { git = "https://github.com/alacritty/vte.git", default-features = false }
 linked_list_allocator = "*"
 bbqueue = "*"
 

@@ -323,7 +323,7 @@ checksum = "b3758f5e68192bb96cc8f9b7e2c2cfdabb435499a28499a42f8f984092adad4b"
 [[package]]
 name = "vte"
 version = "0.14.1"
-source = "git+https://github.com/rafalmiel/vte.git?branch=cykusz#2b506095d2dc4fbfa1e93b12b96c6637cdda55dc"
+source = "git+https://github.com/alacritty/vte.git#85894d42cb8f9684154555bce0e6b7638e753c8b"
 dependencies = [
  "arrayvec",
  "memchr",

@@ -514,7 +514,7 @@ impl OutputBuffer {
 
         let mut performer = AnsiEscape::new(me, update);
 
-        self.state.advance(&mut performer, char);
+        self.state.advance(&mut performer, &[char]);
 
         let mut update = performer.update_delta();
 
@@ -548,7 +548,7 @@ impl OutputBuffer {
         //log4!("\n");
 
         for c in bytes.iter() {
-            self.state.advance(&mut performer, *c);
+            self.state.advance(&mut performer, &[*c]);
         }
 
         let mut update = performer.update_delta();

@@ -2,7 +2,7 @@ mod music;
 mod sounds;
 
 use crate::cykusz::audio::music::Music;
-use fon::chan::{Ch16, Ch32};
+use fon::samp::{Samp16, Samp32};
 use kittyaudio::Frame;
 use sounds::Sounds;
 use std::os::unix::net::UnixStream;
@@ -73,8 +73,8 @@ impl Audio {
             };
 
             // Resample to our format
-            let audio = fon::Audio::<Ch32, 2>::with_f32_buffer(44100, buf);
-            let mut audio = fon::Audio::<Ch16, 2>::with_audio(44100, &audio);
+            let audio = fon::Audio::<Samp32, 2>::with_f32_buffer(44100, buf);
+            let mut audio = fon::Audio::<Samp16, 2>::with_audio(44100, &audio);
 
             let buf = unsafe {
                 std::slice::from_raw_parts(

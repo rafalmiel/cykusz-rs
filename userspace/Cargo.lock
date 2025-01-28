@@ -143,8 +143,8 @@ checksum = "af9673d8203fcb076b19dfd17e38b3d4ae9f44959416ea532ce72415a6020365"
 
 [[package]]
 name = "fon"
-version = "0.6.0"
-source = "git+https://github.com/rafalmiel/fon.git?branch=cykusz#5b3f6d9d97109ddba0fa326ab91003ad883f9414"
+version = "0.7.0"
+source = "git+https://github.com/rafalmiel/fon.git?branch=cykusz#6bac1de8f341aab492cec095c009a47033947e37"
 dependencies = [
  "libm",
 ]

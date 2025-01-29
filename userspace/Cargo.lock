@@ -144,7 +144,7 @@ checksum = "af9673d8203fcb076b19dfd17e38b3d4ae9f44959416ea532ce72415a6020365"
 [[package]]
 name = "fon"
 version = "0.7.0"
-source = "git+https://github.com/rafalmiel/fon.git?branch=cykusz#6bac1de8f341aab492cec095c009a47033947e37"
+source = "git+https://github.com/rafalmiel/fon.git?branch=cykusz#001a1171626edf27418284865b30745b945a9c75"
 dependencies = [
  "libm",
 ]
@@ -184,8 +184,9 @@ dependencies = [
 
 [[package]]
 name = "kittyaudio"
-version = "0.1.9"
-source = "git+https://github.com/rafalmiel/kittyaudio.git?branch=cykusz#fd4e0ac151ff07c4f80090614dbb107033d37118"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c294271d28cf368aa7fd1540f835c565f552bbda2bef788879e48255957318f"
 dependencies = [
  "parking_lot",
  "symphonia",

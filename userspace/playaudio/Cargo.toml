@@ -26,8 +26,7 @@ branch = "cykusz"
 [dependencies.kittyaudio]
 features = ["symphonia"]
 default-features = false
-git = "https://github.com/rafalmiel/kittyaudio.git"
-branch = "cykusz"
+version = "*"
 
 [dependencies.syscall-defs]
 path = "../../syscall-defs"

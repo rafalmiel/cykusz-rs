@@ -17,7 +17,6 @@ path = "src/playmidi/bin/main.rs"
 
 [dependencies]
 rustysynth = "*"
-wavers = "*"
 
 [dependencies.fon]
 git = "https://github.com/rafalmiel/fon.git"

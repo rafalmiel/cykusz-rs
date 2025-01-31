@@ -6,7 +6,6 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 use syscall_defs::{MMapFlags, MMapProt};
-use wavers::Samples;
 
 #[allow(dead_code)]
 struct MMapFileReader<'a> {
@@ -94,14 +93,17 @@ fn main() -> Result<(), ExitCode> {
 
     println!("Convert...");
 
-    let left: Samples<i16> = wavers::Samples::from(left).convert();
-    let right: Samples<i16> = wavers::Samples::from(right).convert();
+    let left = fon::Audio::<fon::samp::Samp32, 1>::with_f32_buffer(44100, left);
+    let right = fon::Audio::<fon::samp::Samp32, 1>::with_f32_buffer(44100, right);
+
+    let mut left = fon::Audio::<fon::samp::Samp16, 1>::with_audio(44100, &left);
+    let mut right = fon::Audio::<fon::samp::Samp16, 1>::with_audio(44100, &right);
 
     println!("Collect...");
 
-    let both = left
+    let both = left.as_i16_slice()
         .iter()
-        .zip(right.iter())
+        .zip(right.as_i16_slice().iter())
         .map(|(a, b)| (*a, *b))
         .collect::<Vec<(i16, i16)>>();
 

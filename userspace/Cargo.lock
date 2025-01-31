@@ -156,16 +156,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
-name = "i24"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bafc62750bce7c2603750d1c19532e226bb85bd21f5385ab952cc29b8c31e2af"
-dependencies = [
- "bytemuck",
- "num-traits",
-]
-
-[[package]]
 name = "init"
 version = "0.1.0"
 dependencies = [
@@ -190,7 +180,7 @@ checksum = "1c294271d28cf368aa7fd1540f835c565f552bbda2bef788879e48255957318f"
 dependencies = [
  "parking_lot",
  "symphonia",
- "thiserror 2.0.11",
+ "thiserror",
 ]
 
 [[package]]
@@ -299,12 +289,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
-
-[[package]]
 name = "playaudio"
 version = "0.1.0"
 dependencies = [
@@ -313,7 +297,6 @@ dependencies = [
  "rustysynth",
  "syscall-defs",
  "syscall-user",
- "wavers",
 ]
 
 [[package]]
@@ -660,31 +643,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
-dependencies = [
- "thiserror-impl 1.0.69",
-]
-
-[[package]]
-name = "thiserror"
 version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d452f284b73e6d76dd36758a0c8684b1d5be31f92b89d07fd5822175732206fc"
 dependencies = [
- "thiserror-impl 2.0.11",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -718,19 +681,6 @@ version = "0.1.0"
 dependencies = [
  "syscall-defs",
  "syscall-user",
-]
-
-[[package]]
-name = "wavers"
-version = "1.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d599ddd98c95ad3d3fc898cfb5c4023430f6ea62f96083f46d13cc8b82589bd3"
-dependencies = [
- "bytemuck",
- "i24",
- "num-traits",
- "paste",
- "thiserror 1.0.69",
 ]
 
 [[package]]

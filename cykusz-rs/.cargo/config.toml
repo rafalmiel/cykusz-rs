@@ -1,5 +1,6 @@
 [build]
 rustflags = ["-Z", "threads=8"]
+target = "../x86_64-cykusz_os.json"
 
 [unstable]
 build-std-features = ["compiler-builtins-mem"]

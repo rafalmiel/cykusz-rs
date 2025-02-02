@@ -505,11 +505,9 @@ function _rust {
     INSTALL_PATH="$SPATH/cross"
 
     rustup component add rust-src
-    mv $CYKUSZ_DIR/.cargo $CYKUSZ_DIR/.cargo_backup # move .cargo out of the way as it messes up the with build
     CARGO_HOME=$CARGO_HOME ./x.py build --stage 2 -j12
     CARGO_HOME=$CARGO_HOME DESTDIR="$INSTALL_PATH/usr/local" ./x.py install
     CARGO_HOME=$CARGO_HOME DESTDIR="$INSTALL_PATH/usr/local" ./x.py dist
-    mv $CYKUSZ_DIR/.cargo_backup $CYKUSZ_DIR/.cargo
 
     cd $BUILD_DIR/rust/dist
     tar -xf rust-src-nightly.tar.xz

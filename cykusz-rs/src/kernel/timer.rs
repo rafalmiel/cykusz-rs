@@ -178,7 +178,11 @@ pub fn create_timer(obj: Arc<dyn TimerObject>) -> Arc<Timer> {
 pub fn setup() {
     crate::kernel::sched::create_task(timer_fun);
 
+    dbgln!(timer, "timer task created");
+
     crate::arch::timer::setup(timer_handler);
+
+    dbgln!(timer, "timer task setup");
 }
 
 pub fn start() {

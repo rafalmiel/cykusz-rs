@@ -1,12 +1,10 @@
-use alloc::sync::Arc;
-use intrusive_collections::LinkedList;
-
-use crate::arch::int;
 use crate::kernel::sched::{SchedulerInterface, SleepFlags};
 use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, LockApi, Spin, SpinGuard};
 use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
 use crate::kernel::utils::PerCpu;
+use alloc::sync::Arc;
+use intrusive_collections::LinkedList;
 
 #[thread_local]
 static mut CURRENT_TASK: Option<Arc<Task>> = None;
@@ -31,10 +29,6 @@ fn get_current<'a>() -> &'a Arc<Task> {
 }
 
 struct Queues {
-    sched_task: Arc<Task>,
-
-    current: Option<Arc<Task>>,
-
     idle_task: Arc<Task>,
 
     runnable: LinkedList<SchedTaskAdapter>,
@@ -44,70 +38,55 @@ struct Queues {
     awaiting: LinkedList<SchedTaskAdapter>,
 
     stopped: LinkedList<SchedTaskAdapter>,
-
-    prev_id: usize,
 }
 
 impl Default for Queues {
     fn default() -> Queues {
         let idle = Task::this();
 
-        logln!("idle task id {}", idle.tid());
+        dbgln!(sched, "idle task: {}", idle.tid());
 
         Queues {
-            sched_task: Task::new_sched(scheduler_main),
-            current: None,
             idle_task: idle,
 
             runnable: LinkedList::new(SchedTaskAdapter::new()),
             deadline_awaiting: LinkedList::new(SchedTaskAdapter::new()),
             awaiting: LinkedList::new(SchedTaskAdapter::new()),
             stopped: LinkedList::new(SchedTaskAdapter::new()),
-
-            prev_id: 0,
         }
     }
 }
 
 impl Queues {
-    fn switch(&self, to: &Arc<Task>, lock: SpinGuard<()>) {
+    fn switch<F: FnOnce()>(&self, to: &Arc<Task>, lock: SpinGuard<()>, f: Option<F>) {
         let _irq = lock.to_irq_guard();
+
+        if let Some(f) = f {
+            f();
+        }
+
+        let prev = get_current().clone();
 
         set_current(to);
 
         crate::kernel::sched::finalize();
-        unsafe {
-            switch!(&self.sched_task, to);
-        }
-    }
 
-    fn switch_to_sched(&self, from: &Arc<Task>, lock: SpinGuard<()>) {
-        let _irq = lock.to_irq_guard();
+        dbgln!(sched, "{} -> {}", prev.tid(), to.tid());
 
-        if int::is_enabled() {
-            panic!("INT ENABLED");
+        if prev.tid() == to.tid() {
+            return;
         }
 
         unsafe {
-            switch!(from, &self.sched_task);
-        }
-    }
-
-    fn switch_to_sched_exec<F: FnOnce()>(&self, from: &Arc<Task>, lock: SpinGuard<()>, fun: F) {
-        let _irq = lock.to_irq_guard();
-
-        if int::is_enabled() {
-            panic!("INT ENABLED");
-        }
-
-        fun();
-
-        unsafe {
-            switch!(from, &self.sched_task);
+            switch!(prev, to);
         }
     }
 
     fn schedule_check_deadline(&mut self, _lock: &SpinGuard<()>) {
+        if self.deadline_awaiting.is_empty() {
+            return;
+        }
+
         use crate::kernel::timer::current_ns;
 
         let time = current_ns() as usize;
@@ -131,68 +110,46 @@ impl Queues {
 
     #[allow(dead_code)]
     fn debug_sched(&self) {
-        if let Some(t) = &self.current {
-            log!("c: {}| ", t.tid());
-        } else {
-            log!("c: None| ");
-        }
+        log!("c: {}| ", get_current().tid());
 
         for t in &self.runnable {
             log!("{} ", t.tid());
         }
     }
 
-    fn schedule_next(&mut self, lock: SpinGuard<()>) {
-        self.prev_id = get_current().tid();
-
+    fn schedule_next<F: FnOnce()>(&mut self, lock: SpinGuard<()>, f: Option<F>) -> bool {
         self.schedule_check_deadline(&lock);
 
-        //self.debug_sched();
+        let current = get_current().clone();
 
-        if let Some(to_run) = self.runnable.pop_front() {
-            if let Some(current) = self.current.clone() {
-                //println!("{} -> {}", current.id(), to_run.id());
-                if !current.sched.is_linked()
-                    && current.state() == TaskState::Runnable
-                    && current.tid() != to_run.tid()
-                {
-                    self.push_runnable(current, false);
-                }
+        let prev_id = current.tid();
+
+        let to_run = self.runnable.pop_front().unwrap_or_else(|| {
+            if current.tid() != self.idle_task.tid() && current.state() == TaskState::Runnable {
+                current.clone()
+            } else {
+                self.idle_task.clone()
             }
+        });
 
-            assert_eq!(
-                to_run.state(),
-                TaskState::Runnable,
-                "schedule_next: switching to not runnable task {} {:?}",
-                to_run.tid(),
-                to_run.state()
-            );
-
-            self.current = Some(to_run);
-            self.switch(&self.current.as_ref().unwrap(), lock);
-        } else {
-            if let Some(current) = self.current.as_ref() {
-                if current.state() == TaskState::Runnable {
-                    //println!("self {}", current.id());
-                    self.switch(current, lock);
-
-                    return;
-                }
-            }
-            self.current = None;
-            self.switch(&self.idle_task, lock);
+        if current.tid() != to_run.tid()
+            && !current.sched.is_linked()
+            && current.state() == TaskState::Runnable
+        {
+            self.push_runnable(current, false);
         }
+
+        self.switch(&to_run, lock, f);
+
+        prev_id != to_run.tid()
     }
 
-    fn reschedule(&self, lock: SpinGuard<()>) -> bool {
-        self.switch_to_sched(get_current(), lock);
-
-        self.prev_id != get_current().tid()
+    fn reschedule(&mut self, lock: SpinGuard<()>) -> bool {
+        self.schedule_next(lock, Option::<fn()>::None)
     }
-    fn reschedule_exec<F: FnOnce()>(&self, lock: SpinGuard<()>, fun: F) -> bool {
-        self.switch_to_sched_exec(get_current(), lock, fun);
 
-        self.prev_id != get_current().tid()
+    fn reschedule_exec<F: FnOnce()>(&mut self, lock: SpinGuard<()>, fun: F) -> bool {
+        self.schedule_next(lock, Some(fun))
     }
 
     fn queue_task(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
@@ -239,8 +196,10 @@ impl Queues {
 
         // TODO: mark task as uninterruptible and dont wake it up on signals
         if let Some(time_ns) = time_ns {
+            dbgln!(task, "task {} pushed deadline awaiting", task.tid());
             self.push_deadline_awaiting(task, time_ns);
         } else {
+            dbgln!(task, "task {} pushed awaiting", task.tid());
             self.push_awaiting(task);
         }
 
@@ -356,7 +315,7 @@ impl Queues {
         current.set_state(TaskState::Unused);
         assert_eq!(current.sched.is_linked(), false);
 
-        self.switch_to_sched_exec(current, lock, || {
+        self.reschedule_exec(lock, || {
             current.make_zombie(status);
         });
 
@@ -377,7 +336,7 @@ impl Queues {
         );
 
         task.set_state(TaskState::Unused);
-        self.switch_to_sched_exec(task, _lock, || {
+        self.reschedule_exec(_lock, || {
             task.make_zombie(syscall_defs::waitpid::Status::Exited(0));
         });
 
@@ -454,7 +413,7 @@ impl SchedulerInterface for RRScheduler {
     }
 
     fn reschedule(&self) -> bool {
-        let (lock, queue) = self.queues.this_cpu();
+        let (lock, queue) = self.queues.this_cpu_mut();
 
         let lock = lock.lock_irq();
 
@@ -535,21 +494,5 @@ impl RRScheduler {
         Arc::new(RRScheduler {
             queues: PerCpu::new_fn(|| (Spin::new(()), Queues::default())),
         })
-    }
-
-    fn schedule_next(&self) {
-        let (lock, queue) = self.queues.this_cpu_mut();
-
-        let lock = lock.lock_irq();
-
-        queue.schedule_next(lock);
-    }
-}
-
-fn scheduler_main() {
-    let rr_scheduler = super::scheduler().as_impl::<RRScheduler>();
-
-    loop {
-        rr_scheduler.schedule_next();
     }
 }

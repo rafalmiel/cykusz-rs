@@ -129,9 +129,15 @@ impl Task {
     }
 
     pub fn new_kern(fun: fn()) -> Arc<Task> {
-        let mut task = Task::new();
-        task.arch_task = UnsafeCell::new(ArchTask::new_kern(fun));
-        Self::make_ptr(task)
+        let task = Arc::new_cyclic(|me| {
+            let mut task = Task::new();
+            task.sref = me.clone();
+            task.arch_task = UnsafeCell::new(ArchTask::new_kern(fun));
+            task.terminal.init(me);
+            task
+        });
+
+        task
     }
 
     pub fn new_param_kern(fun: usize, val: usize) -> Arc<Task> {
@@ -691,6 +697,7 @@ impl Task {
     }
 
     fn do_await_io(&self, timeout_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
+        dbgln!(task, "{} do_await_io {:?}", self.tid(), self.state());
         if self.locks() > 0 {
             logln!(
                 "await_io: sleeping while holding locks: {}, tid {}",
@@ -699,6 +706,10 @@ impl Task {
             );
         }
         let res = crate::kernel::sched::sleep(timeout_ns, flags);
+
+        if self.state() != TaskState::Runnable {
+            dbgln!(task, "task {} state {:?} expected runnable, failing", self.tid(), self.state());
+        }
 
         assert_eq!(
             self.state(),

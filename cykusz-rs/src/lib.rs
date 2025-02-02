@@ -120,6 +120,8 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     kernel::timer::setup();
 
+    println!("[ OK ] Timer Setup");
+
     kernel::timer::start();
 
     println!("[ OK ] Local Timer Started");
@@ -146,9 +148,15 @@ fn init_task() {
 
     kernel::block::init();
 
+    println!("[ OK ] Block Stack Initialized");
+
     kernel::fs::mount_root();
 
+    println!("[ OK ] Root Mounted");
+
     kernel::tty::init();
+
+    println!("[ OK ] Tty Initialized");
 
     kernel::futex::init();
 

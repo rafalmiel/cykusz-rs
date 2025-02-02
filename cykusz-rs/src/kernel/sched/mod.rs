@@ -102,13 +102,21 @@ impl Scheduler {
     }
 
     fn create_task(&self, fun: fn()) -> Arc<Task> {
+        dbgln!(sched, "create task");
         let task = Task::new_kern(fun);
+        dbgln!(sched, "task created");
 
         self.tasks.register_task(task.clone());
 
+        dbgln!(sched, "task registered");
+
         sessions().register_process(task.clone());
 
+        dbgln!(sched, "task sched registered");
+
         self.sched.queue_task(task.clone());
+
+        dbgln!(sched, "task queued");
 
         task
     }
@@ -125,6 +133,7 @@ impl Scheduler {
         task
     }
 
+    #[allow(unused)]
     pub fn as_impl<T: SchedulerInterface>(&self) -> &T {
         match self.sched.downcast_ref::<T>() {
             Some(e) => e,

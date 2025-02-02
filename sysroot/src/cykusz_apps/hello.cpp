@@ -60,12 +60,12 @@ void print_thread2(int v) {
 			for (int i = 0; ; ++i) {
 				char buf[8];
 				sprintf(buf, "%d|", tid);
-				syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
+				syscalln3(SYS_WRITE, 1, (uint64_t)buf, strlen(buf));
 			}
 
             char buf[20];
             sprintf(buf, "exec stack\n");
-            syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
+            syscalln3(SYS_WRITE, 1, (uint64_t)buf, strlen(buf));
 
 			char* args[] = {"/bin/stack", "-arg1", "-arg2", 0};
 			char* envs[] = {"PATH=/usr/bin:/bin", 0};

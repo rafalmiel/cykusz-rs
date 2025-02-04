@@ -1,5 +1,5 @@
 #![no_std]
-#![allow(internal_features,incomplete_features)]
+#![allow(internal_features, incomplete_features)]
 #![feature(alloc_error_handler)]
 #![feature(auto_traits)]
 #![feature(c_variadic)]

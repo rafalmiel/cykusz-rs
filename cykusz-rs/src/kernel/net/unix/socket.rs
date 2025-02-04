@@ -3,6 +3,7 @@ use crate::kernel::fs::path::Path;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::net::socket::SocketService;
 use crate::kernel::sync::{LockApi, Mutex};
 use crate::kernel::utils::buffer::BufferQueue;
@@ -15,7 +16,6 @@ use syscall_defs::net::{MsgFlags, MsgHdr, SockAddrPtr, SockAddrUn, SockTypeFlags
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::stat::{Mode, Stat};
 use syscall_defs::{OpenFlags, SyscallError, SyscallResult};
-use crate::kernel::mm::PAGE_SIZE;
 
 struct ConnectionQueue {
     queue: Vec<Arc<Socket>>,

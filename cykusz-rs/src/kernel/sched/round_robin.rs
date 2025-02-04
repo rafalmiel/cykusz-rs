@@ -1,5 +1,4 @@
-use crate::kernel::sched::{SchedulerInterface, SleepFlags};
-use crate::kernel::signal::{SignalError, SignalResult};
+use crate::kernel::sched::SchedulerInterface;
 use crate::kernel::sync::{IrqGuard, LockApi, Spin, SpinGuard};
 use crate::kernel::task::{SchedTaskAdapter, Task, TaskState};
 use crate::kernel::utils::PerCpu;
@@ -157,42 +156,14 @@ impl Queues {
         self.push_runnable(task, false);
     }
 
-    fn sleep(
-        &mut self,
-        time_ns: Option<usize>,
-        flags: SleepFlags,
-        lock: SpinGuard<()>,
-    ) -> SignalResult<()> {
+    fn sleep(&mut self, time_ns: Option<usize>, lock: SpinGuard<()>) {
         let task = get_current().clone();
-
-        if task.locks() > 0 {
-            logln!(
-                "warn: sleeping while holding {} locks, tid: {}",
-                task.locks(),
-                task.tid()
-            );
-        }
 
         assert_ne!(
             task.tid(),
             self.idle_task.tid(),
             "Idle task should not sleep"
         );
-
-        if task.has_pending_io() {
-            task.set_has_pending_io(false);
-            return Ok(());
-        }
-
-        if !flags.contains(SleepFlags::NON_INTERRUPTIBLE) && task.signals().has_pending() {
-            return Err(SignalError::Interrupted);
-        }
-
-        let pending = task.signals().pending();
-
-        if pending > 0 {
-            logln!("WARN sleep with pending signals: {:#x}", pending);
-        }
 
         // TODO: mark task as uninterruptible and dont wake it up on signals
         if let Some(time_ns) = time_ns {
@@ -204,14 +175,6 @@ impl Queues {
         }
 
         self.reschedule(lock);
-
-        let task = get_current();
-
-        if task.signals().pending() != pending {
-            Err(SignalError::Interrupted)
-        } else {
-            Ok(())
-        }
     }
 
     fn wake(&mut self, task: Arc<Task>, _lock: SpinGuard<()>) {
@@ -301,7 +264,7 @@ impl Queues {
             status,
         );
 
-        assert_eq!(current.state(), TaskState::Runnable);
+        assert_eq!(current.state(), TaskState::Unused);
         assert_eq!(current.sched.is_linked(), false);
         assert!(current.is_process_leader());
 
@@ -311,9 +274,6 @@ impl Queues {
             crate::kernel::mm::heap::heap_mem(),
             crate::arch::mm::phys::used_mem()
         );
-
-        current.set_state(TaskState::Unused);
-        assert_eq!(current.sched.is_linked(), false);
 
         self.reschedule_exec(lock, || {
             current.make_zombie(status);
@@ -335,7 +295,6 @@ impl Queues {
             Arc::weak_count(task),
         );
 
-        task.set_state(TaskState::Unused);
         self.reschedule_exec(_lock, || {
             task.make_zombie(syscall_defs::waitpid::Status::Exited(0));
         });
@@ -432,12 +391,12 @@ impl SchedulerInterface for RRScheduler {
         queue.queue_task(task, lock);
     }
 
-    fn sleep(&self, until: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
+    fn sleep(&self, until: Option<usize>) {
         let (lock, queue) = self.queues.this_cpu_mut();
 
         let lock = lock.lock_irq();
 
-        queue.sleep(until, flags, lock)
+        queue.sleep(until, lock)
     }
 
     fn wake(&self, task: Arc<Task>) {

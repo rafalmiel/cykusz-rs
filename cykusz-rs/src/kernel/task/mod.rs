@@ -708,7 +708,12 @@ impl Task {
         let res = crate::kernel::sched::sleep(timeout_ns, flags);
 
         if self.state() != TaskState::Runnable {
-            dbgln!(task, "task {} state {:?} expected runnable, failing", self.tid(), self.state());
+            dbgln!(
+                task,
+                "task {} state {:?} expected runnable, failing",
+                self.tid(),
+                self.state()
+            );
         }
 
         assert_eq!(

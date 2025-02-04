@@ -13,8 +13,8 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::round_robin::RRScheduler;
 use crate::kernel::sched::task_container::TaskContainer;
 use crate::kernel::session::sessions;
-use crate::kernel::signal::SignalResult;
-use crate::kernel::task::Task;
+use crate::kernel::signal::{SignalError, SignalResult};
+use crate::kernel::task::{Task, TaskState};
 
 #[macro_export]
 macro_rules! switch {
@@ -55,7 +55,7 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
         self.current_task().tid() as isize
     }
     fn queue_task(&self, task: Arc<Task>);
-    fn sleep(&self, until: Option<usize>, flags: SleepFlags) -> SignalResult<()>;
+    fn sleep(&self, until: Option<usize>);
     fn wake(&self, task: Arc<Task>);
     fn wake_as_next(&self, task: Arc<Task>);
     fn cont(&self, task: Arc<Task>);
@@ -142,7 +142,37 @@ impl Scheduler {
     }
 
     fn sleep(&self, time_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
-        self.sched.sleep(time_ns, flags)
+        let task = current_task_ref();
+        if task.locks() > 0 {
+            logln!(
+                "warn: sleeping while holding {} locks, tid: {}",
+                task.locks(),
+                task.tid()
+            );
+        }
+
+        if task.has_pending_io() {
+            task.set_has_pending_io(false);
+            return Ok(());
+        }
+
+        if !flags.contains(SleepFlags::NON_INTERRUPTIBLE) && task.signals().has_pending() {
+            return Err(SignalError::Interrupted);
+        }
+
+        let pending = task.signals().pending();
+
+        if pending > 0 {
+            logln!("WARN sleep with pending signals: {:#x}", pending);
+        }
+
+        self.sched.sleep(time_ns);
+
+        if task.signals().pending() != pending {
+            Err(SignalError::Interrupted)
+        } else {
+            Ok(())
+        }
     }
 
     fn wake(&self, task: Arc<Task>) {
@@ -266,6 +296,8 @@ impl Scheduler {
 
             current.migrate_children_to_init();
 
+            current.set_state(TaskState::Unused);
+
             self.sched.exit(status)
         } else {
             if !status.is_signaled() {
@@ -287,6 +319,8 @@ impl Scheduler {
 
         if task.is_process_leader() {
             logln_disabled!("[ WARN ] exit thread of a process leader");
+
+            task.set_state(TaskState::Unused);
 
             self.exit(syscall_defs::waitpid::Status::Exited(0));
         } else {

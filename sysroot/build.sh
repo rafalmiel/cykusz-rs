@@ -237,7 +237,8 @@ function _prepare_libunistring {
 
         pushd .
         cd $LIBUNISTRING_SRC_DIR
-        ./gitsub.sh pull
+        ./autopull.sh
+        cd gnulib && git checkout 2118e7cf12997850652002b3af3c44511c98f4bc && cd ../
         ./autogen.sh
         cp config.sub.cykusz gnulib/build-aux/config.sub
         cp config.sub.cykusz build-aux/config.sub

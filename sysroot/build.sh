@@ -81,6 +81,7 @@ TRIPLE=x86_64-cykusz
 export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:$PATH
 export ACLOCAL_PATH=$CROSS/share/aclocal
 export PKG_CONFIG_PATH=$SYSROOT/usr/lib/pkgconfig
+export PKG_CONFIG=$CROSS/bin/pkgconf
 
 function _prepare_mlibc {
     if [ ! -d $MLIBC_SRC_DIR ]; then
@@ -522,7 +523,7 @@ function _binutils {
     pushd .
 
     cd $BINUTILS_BUILD_DIR
-    PKG_CONFIG_PATH=/usr/lib/pkgconfig $BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared
+    $BINUTILS_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --disable-werror --disable-gdb --enable-shared
 
     popd
 
@@ -539,7 +540,7 @@ function _gcc {
     pushd .
 
     cd $GCC_BUILD_DIR
-    PKG_CONFIG_PATH=/usr/lib/pkgconfig $GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared
+    $GCC_SRC_DIR/configure --target=$TRIPLE --prefix="$CROSS" --with-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --enable-shared
 
     popd
 
@@ -601,7 +602,7 @@ function _automake {
     pushd .
 
     cd $AUTOMAKE_BUILD_DIR
-    PKG_CONFIG_PATH=/usr/lib/pkgconfig $AUTOMAKE_SRC_DIR/configure --prefix=$CROSS
+    $AUTOMAKE_SRC_DIR/configure --prefix=$CROSS
 
     make -j4
     make install
@@ -617,7 +618,7 @@ function _autoconf {
     pushd .
 
     cd $AUTOCONF_BUILD_DIR
-    PKG_CONFIG_PATH=/usr/lib/pkgconfig $AUTOCONF_SRC_DIR/configure --prefix=$CROSS
+    $AUTOCONF_SRC_DIR/configure --prefix=$CROSS
 
     make -j4
     make install
@@ -633,7 +634,7 @@ function _libtool {
     pushd .
 
     cd $LIBTOOL_BUILD_DIR
-    PKG_CONFIG_PATH=/usr/lib/pkgconfig $LIBTOOL_SRC_DIR/configure --prefix=$CROSS
+    $LIBTOOL_SRC_DIR/configure --prefix=$CROSS
 
     make -j4
     make install

@@ -148,7 +148,7 @@ EOL
 function _prepare_libtool {
     if [ ! -d $LIBTOOL_SRC_DIR ]; then
         mkdir -p $SRC_DIR
-        git clone --depth 100 -b cykusz https://github.com/rafalmiel/libtool.git $LIBTOOL_SRC_DIR
+        git clone -b cykusz https://github.com/rafalmiel/libtool.git $LIBTOOL_SRC_DIR
 
         pushd .
 

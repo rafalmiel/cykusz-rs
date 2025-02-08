@@ -238,7 +238,6 @@ function _prepare_libunistring {
         pushd .
         cd $LIBUNISTRING_SRC_DIR
         ./autopull.sh
-        cd gnulib && git checkout 2118e7cf12997850652002b3af3c44511c98f4bc && cd ../
         ./autogen.sh
         cp config.sub.cykusz gnulib/build-aux/config.sub
         cp config.sub.cykusz build-aux/config.sub
@@ -815,9 +814,13 @@ function _cykusz_libunistring {
 
     pushd .
 
+    cd $LIBUNISTRING_SRC_DIR
+    git clean -xfd
+    ./autogen.sh
+
     cd $LIBUNISTRING_CYKUSZ_BUILD_DIR
 
-    $LIBUNISTRING_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --disable-static --docdir=/usr/share/doc/libunisttring-1.1
+    $LIBUNISTRING_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --disable-static --docdir=/usr/share/doc/libunisttring-1.3
 
     make DESTDIR=$SYSROOT -j4
     make DESTDIR=$SYSROOT install

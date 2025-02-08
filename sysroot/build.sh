@@ -8,7 +8,10 @@ SRC_DIR=$CYKUSZ_DIR/sysroot/src
 BINUTILS_SRC_DIR=$SRC_DIR/binutils-gdb
 GCC_SRC_DIR=$SRC_DIR/gcc
 RUST_SRC_DIR=$SRC_DIR/rust
+AUTOMAKE_SRC_DIR=$SRC_DIR/automake
+AUTOCONF_SRC_DIR=$SRC_DIR/autoconf
 LIBTOOL_SRC_DIR=$SRC_DIR/libtool
+PKGCONF_SRC_DIR=$SRC_DIR/pkgconf
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
 NYANCAT_SRC_DIR=$SRC_DIR/nyancat
 NCURSES_SRC_DIR=$SRC_DIR/ncurses
@@ -41,7 +44,10 @@ BUILD_DIR=$CYKUSZ_DIR/sysroot/build
 BINUTILS_BUILD_DIR=$BUILD_DIR/binutils-gdb
 BINUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-binutils-gdb
 GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
+AUTOMAKE_BUILD_DIR=$BUILD_DIR/automake
+AUTOCONF_BUILD_DIR=$BUILD_DIR/autoconf
 LIBTOOL_BUILD_DIR=$BUILD_DIR/libtool
+PKGCONF_BUILD_DIR=$BUILD_DIR/pkgconf
 NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
 NANO_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-nano
 BASH_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-bash
@@ -145,6 +151,42 @@ EOL
     fi
 }
 
+function _prepare_automake {
+    if [ ! -d $AUTOMAKE_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone -b cykusz https://github.com/rafalmiel/automake.git $AUTOMAKE_SRC_DIR
+
+        pushd .
+
+        cd $AUTOMAKE_SRC_DIR
+        git submodule update --init
+        ./bootstrap
+
+        popd
+    fi
+}
+
+function _prepare_autoconf {
+    if [ ! -d $AUTOCONF_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone -b cykusz https://github.com/rafalmiel/autoconf.git $AUTOCONF_SRC_DIR
+
+        pushd .
+
+        cd $AUTOCONF_SRC_DIR
+        ./bootstrap
+
+        ARCHIVE_VER="2024.10.16"
+        mkdir -p autoconf-archive && cd autoconf-archive
+        wget https://ftp.gnu.org/gnu/autoconf-archive/autoconf-archive-${ARCHIVE_VER}.tar.xz
+        tar xf autoconf-archive-${ARCHIVE_VER}.tar.xz
+        mkdir -p $CROSS/share/aclocal
+        cp -r autoconf-archive-${ARCHIVE_VER}/m4/* $CROSS/share/aclocal/
+
+        popd
+    fi
+}
+
 function _prepare_libtool {
     if [ ! -d $LIBTOOL_SRC_DIR ]; then
         mkdir -p $SRC_DIR
@@ -155,6 +197,21 @@ function _prepare_libtool {
         cd $LIBTOOL_SRC_DIR
         git submodule update --init
         ./bootstrap
+
+        popd
+    fi
+}
+
+function _prepare_pkgconf {
+    if [ ! -d $PKGCONF_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone -b cykusz https://github.com/rafalmiel/pkgconf.git $PKGCONF_SRC_DIR
+
+        pushd .
+
+        cd $PKGCONF_SRC_DIR
+        git submodule update --init
+        ./autogen.sh
 
         popd
     fi
@@ -211,7 +268,7 @@ function _prepare_wget {
         cd $WGET_SRC_DIR
         ./bootstrap
         rm build-aux/config.sub
-        mv config.sub.cykusz build-aux/config.sub
+        cp config.sub.cykusz build-aux/config.sub
         popd
     fi
 }
@@ -278,8 +335,7 @@ function _prepare_libiconv {
         pushd .
         cd $LIBICONV_SRC_DIR
         ./gitsub.sh pull
-
-        ACLOCAL_PATH=$ACLOCAL_PATH:$LIBICONV_SRC_DIR/gnulib/m4 ./autogen.sh
+        ./autogen.sh
         cp config.sub.cykusz gnulib/build-aux/config.sub
         cp config.sub.cykusz libcharset/build-aux/config.sub
         cp config.sub.cykusz build-aux/config.sub
@@ -290,7 +346,7 @@ function _prepare_libiconv {
 function _prepare_libidn2 {
     if [ ! -d $LIBIDN2_SRC_DIR ]; then
         mkdir -p $SRC_DIR
-        git clone --depth 1 -b cykusz https://github.com/rafalmiel/libidn2.git $LIBIDN2_SRC_DIR
+        git clone -b cykusz https://github.com/rafalmiel/libidn2.git $LIBIDN2_SRC_DIR
 
         pushd .
         cd $LIBIDN2_SRC_DIR
@@ -537,6 +593,38 @@ function _llvm {
     popd
 }
 
+function _automake {
+    _prepare_automake
+
+    mkdir -p $AUTOMAKE_BUILD_DIR
+
+    pushd .
+
+    cd $AUTOMAKE_BUILD_DIR
+    PKG_CONFIG_PATH=/usr/lib/pkgconfig $AUTOMAKE_SRC_DIR/configure --prefix=$CROSS
+
+    make -j4
+    make install
+
+    popd
+}
+
+function _autoconf {
+    _prepare_autoconf
+
+    mkdir -p $AUTOCONF_BUILD_DIR
+
+    pushd .
+
+    cd $AUTOCONF_BUILD_DIR
+    PKG_CONFIG_PATH=/usr/lib/pkgconfig $AUTOCONF_SRC_DIR/configure --prefix=$CROSS
+
+    make -j4
+    make install
+
+    popd
+}
+
 function _libtool {
     _prepare_libtool
 
@@ -546,6 +634,22 @@ function _libtool {
 
     cd $LIBTOOL_BUILD_DIR
     PKG_CONFIG_PATH=/usr/lib/pkgconfig $LIBTOOL_SRC_DIR/configure --prefix=$CROSS
+
+    make -j4
+    make install
+
+    popd
+}
+
+function _pkgconf {
+    _prepare_pkgconf
+
+    mkdir -p $PKGCONF_BUILD_DIR
+
+    pushd .
+
+    cd $PKGCONF_BUILD_DIR
+    $PKGCONF_SRC_DIR/configure --prefix=$CROSS
 
     make -j4
     make install
@@ -814,10 +918,6 @@ function _cykusz_libunistring {
 
     pushd .
 
-    cd $LIBUNISTRING_SRC_DIR
-    git clean -xfd
-    ./autogen.sh
-
     cd $LIBUNISTRING_CYKUSZ_BUILD_DIR
 
     $LIBUNISTRING_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --disable-static --docdir=/usr/share/doc/libunisttring-1.3
@@ -889,8 +989,7 @@ function _cykusz_libidn2 {
 
     cd $LIBIDN2_CYKUSZ_BUILD_DIR
 
-    PKG_CONFIG_PATH=/usr/lib/pkgconfig $LIBIDN2_SRC_DIR/configure --disable-doc --disable-nls
-    #cp $LIBIDN2_SRC_DIR/lib/idna-tables-properties.csv ./lib/
+    $LIBIDN2_SRC_DIR/configure --disable-doc --disable-nls
     cp ./lib/idn2.h $LIBIDN2_SRC_DIR/lib/
 
     cd lib
@@ -1039,7 +1138,6 @@ function _cykusz_python {
     export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
     export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
     $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython --without-ensurepip
-
 
     make -j6 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install

@@ -19,9 +19,7 @@ use crate::kernel::fs::pcache::{
 };
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{
-    allocate_order, map_flags, map_to_flags, unmap, update_flags, PhysAddr, VirtAddr, MAX_USER_ADDR,
-};
+use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, unmap, update_flags, PhysAddr, VirtAddr, MAX_USER_ADDR};
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, Mutex};
 use crate::kernel::task::filetable::FileHandle;
@@ -951,8 +949,7 @@ impl VMData {
             if reason.contains(PageFaultReason::WRITE) && !map.prot.contains(MMapProt::PROT_WRITE) {
                 return false;
             }
-            if reason.contains(PageFaultReason::I_FETCH) && !map.prot.contains(MMapProt::PROT_EXEC)
-            {
+            if reason.contains(PageFaultReason::I_FETCH) && !map.prot.contains(MMapProt::PROT_EXEC) {
                 return false;
             }
 
@@ -1020,7 +1017,7 @@ impl VMData {
                 if path.is_empty() {
                     return None;
                 }
-                logln5!("got interp line {}", path[0]);
+                dbgln!(vm_map, "got interp line {}", path[0]);
 
                 let interp = lookup_by_path(&Path::new(path[0]), LookupMode::None).ok()?;
 
@@ -1081,7 +1078,7 @@ impl VMData {
 
                     let file_offset = p.p_offset.align(PAGE_SIZE as u64);
 
-                    logln!(
+                    dbgln!(vm_map,
                         "mmap {} - {} offset {:#x}",
                         virt_begin, virt_fend, file_offset
                     );

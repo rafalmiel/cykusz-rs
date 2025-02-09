@@ -516,7 +516,7 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
         if task.handle_pagefault(reason, virt) {
             return;
         } else {
-            logln!(
+            dbgln!(page_fault,
                 "[ SIGSEGV ] Task {} page_fault error addr: {}, ip: {:#x}, err: {}",
                 task.tid(),
                 virt,

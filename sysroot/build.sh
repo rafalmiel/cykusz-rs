@@ -714,7 +714,7 @@ function _cykusz_binutils {
 
     cd $BINUTILS_CYKUSZ_BUILD_DIR
 
-    $BINUTILS_SRC_DIR/configure --disable-gdb --disable-gdbserver --host=$TRIPLE --with-build-sysroot=$SYSROOT --disable-werror --enable-shared --prefix=/usr
+    $BINUTILS_SRC_DIR/configure --disable-gdb --disable-gdbserver --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --disable-werror --enable-shared --prefix=/usr
 
     popd
 
@@ -746,8 +746,8 @@ function _cykusz_gcc_debug {
     pushd .
 
     cd $GCC_CYKUSZ_BUILD_DIR
-    $GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
-    CXXFLAGS="-O0" CFLAGS="-O0" $GCC_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
+    $GCC_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
+    CXXFLAGS="-O0" CFLAGS="-O0" $GCC_SRC_DIR/configure --host=$TRIPLE --with-build-sysroot=$SYSROOT --enable-languages=c,c++ --enable-threads=posix --disable-multilib --enable-shared --prefix=/usr
 
     popd
 
@@ -801,7 +801,7 @@ function _cykusz_ncurses {
     pushd .
 
     cd $NCURSES_CYKUSZ_BUILD_DIR
-    $NCURSES_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --disable-stripping --with-debug --enable-widec
+    $NCURSES_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --disable-stripping --with-debug --enable-widec
 
     popd
 
@@ -819,7 +819,7 @@ function _cykusz_nano {
     pushd .
 
     cd $NANO_CYKUSZ_BUILD_DIR
-    $NANO_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --disable-nanorc
+    $NANO_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --disable-nanorc
 
     popd
 
@@ -835,7 +835,7 @@ function _cykusz_less {
     pushd .
 
     cd $LESS_CYKUSZ_BUILD_DIR
-    $LESS_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr
+    $LESS_SRC_DIR/configure --host=$TRIPLE --prefix=/usr
 
     popd
 
@@ -851,7 +851,7 @@ function _cykusz_netcat {
     pushd .
 
     cd $NETCAT_CYKUSZ_BUILD_DIR
-    $NETCAT_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr
+    $NETCAT_SRC_DIR/configure --host=$TRIPLE --prefix=/usr
 
     popd
 
@@ -873,7 +873,7 @@ function _cykusz_coreutils {
 
     cd $COREUTILS_CYKUSZ_BUILD_DIR
 
-    CFLAGS="-Wno-error" $COREUTILS_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr
+    CFLAGS="-Wno-error" $COREUTILS_SRC_DIR/configure --host=$TRIPLE --prefix=/usr
 
     popd
 
@@ -1047,7 +1047,7 @@ function _cykusz_bash {
     pushd .
 
     cd $BASH_CYKUSZ_BUILD_DIR
-    $BASH_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --without-bash-malloc --disable-nls
+    $BASH_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-bash-malloc --disable-nls
 
     popd
 

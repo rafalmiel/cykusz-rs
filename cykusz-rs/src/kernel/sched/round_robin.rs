@@ -285,8 +285,9 @@ impl Queues {
     fn exit_thread(&mut self, _lock: SpinGuard<()>) -> ! {
         let task = get_current();
 
-        assert_eq!(task.state(), TaskState::Runnable);
+        assert_eq!(task.state(), TaskState::Unused);
         assert_eq!(task.sched.is_linked(), false);
+        assert!(!task.is_process_leader());
 
         logln!(
             "exit_thread tid: {}, sc: {}, wc: {}",

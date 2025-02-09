@@ -317,10 +317,10 @@ impl Scheduler {
     pub fn exit_thread(&self) -> ! {
         let task = current_task_ref();
 
+        task.set_state(TaskState::Unused);
+
         if task.is_process_leader() {
             logln_disabled!("[ WARN ] exit thread of a process leader");
-
-            task.set_state(TaskState::Unused);
 
             self.exit(syscall_defs::waitpid::Status::Exited(0));
         } else {

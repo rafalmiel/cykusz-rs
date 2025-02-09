@@ -80,8 +80,11 @@ TRIPLE=x86_64-cykusz
 
 export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:$PATH
 export ACLOCAL_PATH=$CROSS/share/aclocal
+
 export PKG_CONFIG_PATH=$SYSROOT/usr/lib/pkgconfig
 export PKG_CONFIG=$CROSS/bin/pkgconf
+export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
+export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
 
 function _prepare_mlibc {
     if [ ! -d $MLIBC_SRC_DIR ]; then
@@ -887,7 +890,7 @@ function _cykusz_wget {
 
     cd $WGET_CYKUSZ_BUILD_DIR
 
-    $WGET_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --sysconfdir=/etc --disable-nls --with-ssl=openssl --with-openssl
+    $WGET_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --sysconfdir=/etc --disable-nls --with-ssl=openssl --with-openssl
 
     make DESTDIR=$SYSROOT -j4
     make DESTDIR=$SYSROOT install
@@ -1136,8 +1139,6 @@ function _cykusz_python {
 
     cd $PYTHON_CYKUSZ_BUILD_DIR
     export CONFIG_SITE=$SPATH/cfg/python-config-site
-    export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
-    export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
     $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython --without-ensurepip
 
     make -j6 DESTDIR=$SYSROOT

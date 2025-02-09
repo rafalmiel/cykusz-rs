@@ -461,7 +461,7 @@ impl Task {
         args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> ! {
-        logln!("entry point: {}", entry);
+        dbgln!(arch_task, "entry point: {}", entry);
 
         let path = exe.full_path();
 
@@ -554,10 +554,11 @@ impl Task {
         drop(path);
         drop(exe);
 
-        logln!("exec user stack: {:#x}", helper.current());
+        dbgln!(arch_task, "exec user stack: {:#x}", helper.current());
         assert_eq!(helper.current() % 16, 0);
 
         unsafe {
+            crate::bochs();
             asm_jmp_user(helper.current() as usize, entry.0, 0x200);
         }
     }

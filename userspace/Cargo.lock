@@ -192,7 +192,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 [[package]]
 name = "libc"
 version = "0.2.153"
-source = "git+https://github.com/rafalmiel/libc.git?branch=cykusz#6210a6a8b14087422b34e9b985fb3c2766f03a08"
+source = "git+https://github.com/rafalmiel/libc.git?branch=cykusz#632150f0c7708f6d6edc5d44789249aaeeddae7d"
 
 [[package]]
 name = "libloading"

@@ -54,7 +54,7 @@ pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn current_id(&self) -> isize {
         self.current_task().tid() as isize
     }
-    fn queue_task(&self, task: Arc<Task>);
+    fn queue_task(&self, task: Arc<Task>, alloc_cpu: bool);
     fn sleep(&self, until: Option<usize>);
     fn wake(&self, task: Arc<Task>);
     fn wake_as_next(&self, task: Arc<Task>);
@@ -93,6 +93,10 @@ impl Scheduler {
         self.current_task().tid() as isize
     }
 
+    pub fn internal(&self) -> &Arc<dyn SchedulerInterface> {
+        &self.sched
+    }
+
     pub fn reschedule(&self) -> bool {
         self.sched.reschedule()
     }
@@ -114,7 +118,7 @@ impl Scheduler {
 
         dbgln!(sched, "task sched registered");
 
-        self.sched.queue_task(task.clone());
+        self.sched.queue_task(task.clone(), false);
 
         dbgln!(sched, "task queued");
 
@@ -128,7 +132,7 @@ impl Scheduler {
 
         sessions().register_process(task.clone());
 
-        self.sched.queue_task(task.clone());
+        self.sched.queue_task(task.clone(), false);
 
         task
     }
@@ -203,6 +207,7 @@ impl Scheduler {
 
     fn cont(&self, task: Arc<Task>) {
         if task.is_process_leader() {
+            dbgln!(task_stop, "cont threads!");
             task.cont_threads();
             task.notify_continued();
             self.sched.cont(task.clone());
@@ -231,7 +236,7 @@ impl Scheduler {
 
         sessions().register_process(forked.clone());
 
-        self.sched.queue_task(forked.clone());
+        self.sched.queue_task(forked.clone(), true);
 
         forked
     }
@@ -243,6 +248,8 @@ impl Scheduler {
         envs: Option<ExeArgs>,
     ) -> Result<!, SyscallError> {
         let current = self.sched.current_task();
+
+        dbgln!(task, "exec {} -> {}", current.tid(), exe.full_path());
 
         if current.is_process_leader() {
             current.terminate_threads();
@@ -268,7 +275,7 @@ impl Scheduler {
 
         self.tasks.register_task(thread.clone());
 
-        self.sched.queue_task(thread.clone());
+        self.sched.queue_task(thread.clone(), true);
 
         thread
     }
@@ -332,6 +339,10 @@ impl Scheduler {
 
     pub fn get_task(&self, tid: usize) -> Option<Arc<Task>> {
         self.tasks.get(tid)
+    }
+
+    pub fn queue(&self, task: Arc<Task>, alloc_cpu: bool) {
+        self.sched.queue_task(task, alloc_cpu);
     }
 }
 
@@ -398,6 +409,10 @@ pub fn reschedule() -> bool {
     scheduler.reschedule()
 }
 
+pub fn internal() -> Arc<dyn SchedulerInterface> {
+    scheduler().internal().clone()
+}
+
 pub fn get_task(tid: usize) -> Option<Arc<Task>> {
     scheduler().get_task(tid)
 }
@@ -428,6 +443,10 @@ pub fn create_task(fun: fn()) -> Arc<Task> {
 
 pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
     scheduler().create_param_task(fun, val)
+}
+
+pub fn queue_task(task: Arc<Task>, alloc_cpu: bool) {
+    scheduler().queue(task, alloc_cpu);
 }
 
 pub fn sleep(time_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {

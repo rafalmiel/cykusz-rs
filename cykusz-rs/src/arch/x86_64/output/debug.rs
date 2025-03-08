@@ -1,6 +1,7 @@
 use alloc::string::String;
 use hashbrown::HashSet;
 use spin::Once;
+use crate::kernel::sync::Spin;
 
 static ENABLED_LOGGERS: Once<HashSet<String>> = Once::new();
 
@@ -23,13 +24,17 @@ pub fn loggers() -> Option<&'static HashSet<String>> {
     ENABLED_LOGGERS.get()
 }
 
+pub static DBG_LOCK: Spin<()> = Spin::new(());
+
 #[cfg(feature = "logs")]
 #[macro_export]
 macro_rules! dbg {
     ($($log:ident)|*, $($arg:tt)*) => ({
         if let Some(loggers) = crate::arch::output::debug::loggers() {
             if stringify!($($log)|*).split('|').any(|e| { loggers.contains(e.trim()) }) {
+                crate::arch::output::debug::DBG_LOCK.unguarded_obtain();
                 crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
+                crate::arch::output::debug::DBG_LOCK.unguarded_release();
             }
         }
     });

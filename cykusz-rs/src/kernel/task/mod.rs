@@ -528,7 +528,15 @@ impl Task {
     }
 
     pub fn on_cpu(&self) -> usize {
-        self.on_cpu.load(Ordering::SeqCst)
+        self.on_cpu.load(Ordering::Relaxed)
+    }
+
+    pub fn is_on_this_cpu(&self) -> bool {
+        crate::cpu_id() as usize == self.on_cpu()
+    }
+
+    pub fn set_on_cpu(&self, cpu: usize) {
+        self.on_cpu.store(cpu, Ordering::Relaxed);
     }
 
     pub fn has_pending_io(&self) -> bool {
@@ -549,6 +557,7 @@ impl Task {
             .iter()
             .filter(|t| t.pid() == self.pid() && t.state() != TaskState::Stopped)
         {
+            dbgln!(task_stop2, "stop thread {}", c.tid());
             c.signal_thread(KSIGSTOPTHR);
             count += 1;
         }
@@ -559,6 +568,7 @@ impl Task {
                     break;
                 }
                 Ok(Ok(_tid)) => {
+                    dbgln!(task_stop2, "thread notified stopped {}", _tid);
                     count -= 1;
                 }
                 Err(_) => {
@@ -581,6 +591,7 @@ impl Task {
             .iter()
             .filter(|t| t.pid() == self.pid() && t.state() == TaskState::Stopped)
         {
+            dbgln!(task_stop2, "cont thread {}", c.tid());
             crate::kernel::sched::cont_thread(c.me());
             count += 1;
         }
@@ -596,6 +607,7 @@ impl Task {
                     break;
                 }
                 Ok(Ok(_tid)) => {
+                    dbgln!(task_stop2, "thread notified cont {}", _tid);
                     count -= 1;
                 }
                 Err(_) => {

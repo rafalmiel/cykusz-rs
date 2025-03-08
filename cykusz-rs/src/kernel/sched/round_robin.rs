@@ -190,7 +190,7 @@ impl Queues {
             }
         } else {
             if task.state() == TaskState::Unused {
-                panic!("WARN: set pending io on UNUSED task");
+                dbgln!(task, "WARN: set pending io on UNUSED task");
             }
             task.set_has_pending_io(true);
         }
@@ -231,6 +231,8 @@ impl Queues {
             "Idle task should not sleep"
         );
 
+        dbgln!(task_stop, "Stopped task {}", task.tid());
+
         self.push_stopped(sig, task.clone());
 
         self.reschedule_exec(lock, || {
@@ -244,6 +246,7 @@ impl Queues {
             let mut cursor = unsafe { self.stopped.cursor_mut_from_ptr(task.as_ref()) };
 
             if let Some(task) = cursor.remove() {
+                dbgln!(task_stop, "Continued task {}", task.tid());
                 self.push_runnable_front(task, true);
             }
         } else {
@@ -384,7 +387,17 @@ impl SchedulerInterface for RRScheduler {
         get_current()
     }
 
-    fn queue_task(&self, task: Arc<Task>) {
+    fn queue_task(&self, task: Arc<Task>, alloc_cpu: bool) {
+        if alloc_cpu {
+            RRScheduler::alloc_cpu(&task);
+        }
+
+        if Self::maybe_do_ipi(&task, crate::kernel::ipi::queue) {
+            return;
+        }
+
+        assert!(task.is_on_this_cpu());
+
         let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
 
         let lock = lock.lock_irq();
@@ -401,6 +414,12 @@ impl SchedulerInterface for RRScheduler {
     }
 
     fn wake(&self, task: Arc<Task>) {
+        if Self::maybe_do_ipi(&task, crate::kernel::ipi::wake_up) {
+            return;
+        }
+
+        assert!(task.is_on_this_cpu());
+
         let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
 
         let lock = lock.lock_irq();
@@ -409,6 +428,12 @@ impl SchedulerInterface for RRScheduler {
     }
 
     fn wake_as_next(&self, task: Arc<Task>) {
+        if Self::maybe_do_ipi(&task, crate::kernel::ipi::wake_up_next) {
+            return;
+        }
+
+        assert!(task.is_on_this_cpu());
+
         let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
 
         let lock = lock.lock_irq();
@@ -417,6 +442,12 @@ impl SchedulerInterface for RRScheduler {
     }
 
     fn cont(&self, task: Arc<Task>) {
+        if Self::maybe_do_ipi(&task, crate::kernel::ipi::cont) {
+            return;
+        }
+
+        assert!(task.is_on_this_cpu());
+
         let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
 
         let lock = lock.lock_irq();
@@ -454,5 +485,18 @@ impl RRScheduler {
         Arc::new(RRScheduler {
             queues: PerCpu::new_fn(|| (Spin::new(()), Queues::default())),
         })
+    }
+
+    fn alloc_cpu(task: &Arc<Task>) {
+        task.set_on_cpu(task.tid() % crate::kernel::smp::cpu_count());
+    }
+
+    fn maybe_do_ipi(task: &Arc<Task>, fun: fn(&Arc<Task>)) -> bool {
+        if task.is_on_this_cpu() {
+            return false;
+        }
+
+        fun(task);
+        true
     }
 }

@@ -1,5 +1,6 @@
 use crate::arch::dev::pic::PIC;
 use crate::arch::int::InterruptController;
+use crate::kernel::ipi::IpiTarget;
 use crate::kernel::sync::LockApi;
 
 pub struct Controller {}
@@ -26,7 +27,7 @@ impl InterruptController for Controller {
         unimplemented!()
     }
 
-    fn send_ipi(&self, _target_cpu: usize, _vector: usize) {
+    fn send_ipi(&self, _target_cpu: IpiTarget, _vector: usize) {
         // We won't have SMP with PIC controller anyway
         unimplemented!()
     }

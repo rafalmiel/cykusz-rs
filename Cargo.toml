@@ -1,6 +1,6 @@
 [workspace]
 members = ["syscall-defs", "acpica", "cykusz-rs"]
-exclude = ["userspace", "sysroot/src/rust"]
+exclude = ["userspace", "sysroot"]
 resolver = "2"
 
 [profile.release]

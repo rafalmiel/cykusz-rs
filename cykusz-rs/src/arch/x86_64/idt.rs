@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
-
+use core::sync::atomic::{AtomicU64, Ordering};
+use bit_field::BitField;
 use crate::arch::raw::idt;
 use crate::arch::raw::idt::InterruptFrame;
 use crate::arch::tls::restore_user_fs;
@@ -27,6 +28,9 @@ enum IrqHandler {
 
 struct Irqs {
     irqs: [RwSpin<IrqHandler>; 256],
+
+    // handlers invoking eoi themselves bitmap
+    handler_eoi: [AtomicU64; 4],
 }
 
 impl Irqs {
@@ -115,6 +119,18 @@ impl Irqs {
                 h.remove(i);
             }
         }
+    }
+
+    fn set_handler_eoi(&self, int: usize) {
+        let idx = int / 64;
+        let bit = int % 64;
+        self.handler_eoi[idx].fetch_or(*0u64.set_bit(bit, true), Ordering::Relaxed);
+    }
+
+    fn is_handler_eoi(&self, int: usize) -> bool {
+        let idx = int / 64;
+        let bit = int % 64;
+        self.handler_eoi[idx].load(Ordering::Relaxed).get_bit(bit)
     }
 
     pub fn set_divide_by_zero(&self, f: ExceptionFn) {
@@ -257,7 +273,9 @@ pub extern "C" fn isr_handler(
         restore_user_fs();
     }
 
-    end_of_int();
+    if !SHARED_IRQS.is_handler_eoi(int) {
+        end_of_int();
+    }
 }
 
 pub fn init() {
@@ -347,10 +365,16 @@ pub fn set_user_handler(num: usize, f: InterruptFn) {
 
 static SHARED_IRQS: Irqs = {
     const MISSING: RwSpin<IrqHandler> = RwSpin::new(IrqHandler::Missing);
+    const EMPTYU64: AtomicU64 = AtomicU64::new(0);
     Irqs {
         irqs: [MISSING; 256],
+        handler_eoi: [EMPTYU64; 4],
     }
 };
+
+pub fn set_handler_eoi(int: usize) {
+    SHARED_IRQS.set_handler_eoi(int);
+}
 
 pub fn add_shared_irq_handler(irq: usize, handler: SharedInterruptFn) {
     assert!(irq >= 32 && irq < 64, "invalid shared irq nr");

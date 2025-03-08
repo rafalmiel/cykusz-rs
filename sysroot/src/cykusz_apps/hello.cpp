@@ -59,7 +59,7 @@ void print_thread2(int v) {
 			//for (int i = 0; i < 1000; ++i) {
 			for (int i = 0; ; ++i) {
 				char buf[8];
-				sprintf(buf, "%d|", tid);
+				sprintf(buf, "%d|", v);
 				syscalln3(SYS_WRITE, 1, (uint64_t)buf, strlen(buf));
 			}
 

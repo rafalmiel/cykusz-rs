@@ -1,174 +1,182 @@
-use alloc::collections::LinkedList;
+use alloc::boxed::Box;
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicUsize, Ordering};
-
+use core::sync::atomic::{AtomicU64, Ordering};
+use intrusive_collections::{LinkedList, LinkedListLink};
 use spin::Once;
-
+use crate::arch::ipi::IpiKind;
+use crate::kernel;
 use crate::kernel::sync::{LockApi, Spin};
-use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
+use crate::kernel::task::Task;
 use crate::kernel::utils::PerCpu;
 
-type IpiFn = fn(usize, *const ());
-
-pub struct IpiCommand {
-    fun: IpiFn,
-    arg: *const (),
-    src_cpu: usize,
-
-    completed: AtomicUsize,
-    wq: WaitQueue,
+pub enum IpiTarget {
+    Cpu(usize),
+    This,
+    All,
+    AllButThis
 }
 
-impl IpiCommand {
-    pub fn new<T: Sized>(fun: IpiFn, arg: Option<&T>) -> Arc<IpiCommand> {
-        Arc::new(IpiCommand {
-            fun,
-            arg: if let Some(a) = arg {
-                a as *const _ as *const ()
-            } else {
-                core::ptr::null()
-            },
-            src_cpu: unsafe { crate::CPU_ID } as usize,
-            completed: AtomicUsize::new(0),
-            wq: WaitQueue::new(),
-        })
-    }
+#[derive(Debug, Copy, Clone)]
+pub enum TaskIpiOperation {
+    Queue,
+    WakeUp,
+    WakeUpNext,
+    Continue,
+}
 
-    fn completed(&self) -> usize {
-        self.completed.load(Ordering::SeqCst)
-    }
+intrusive_adapter!(TaskIpiAdapter = Box<TaskIpi> : TaskIpi { link: LinkedListLink });
 
-    fn inc_completed(&self) {
-        self.completed.fetch_add(1, Ordering::SeqCst);
-    }
+struct TaskIpi {
+    cmd: TaskIpiOperation,
+    task: Arc<Task>,
+    link: LinkedListLink,
+}
 
-    fn mark_complete(&self) {
-        self.inc_completed();
-
-        self.wq.notify_one();
-    }
-
-    fn execute(&self) {
-        (self.fun)(self.src_cpu, self.arg);
-
-        self.mark_complete();
-    }
-
-    fn wait_complete(&self) {
-        self.wq
-            .wait_for(
-                WaitQueueFlags::NON_INTERRUPTIBLE | WaitQueueFlags::IRQ_DISABLE,
-                || self.completed() == 1,
-            )
-            .expect("not interruptble wait interrupted");
+impl TaskIpi {
+    fn new(cmd: TaskIpiOperation, task: Arc<Task>) -> Box<TaskIpi> {
+        Box::new(TaskIpi {cmd, task, link: LinkedListLink::new()})
     }
 }
 
-unsafe impl Send for Ipi {}
-unsafe impl Sync for Ipi {}
-
-struct IpiCommandList {
-    ipis: Spin<LinkedList<Arc<IpiCommand>>>,
-    wq: WaitQueue,
+struct IpiContext {
+    task_ipi: PerCpu<Spin<LinkedList<TaskIpiAdapter>>>,
 }
 
-impl IpiCommandList {
-    pub fn new() -> IpiCommandList {
-        IpiCommandList {
-            ipis: Spin::new(LinkedList::new()),
-            wq: WaitQueue::new(),
+unsafe impl Sync for IpiContext {}
+unsafe impl Send for IpiContext {}
+
+impl IpiContext {
+    pub fn new() -> Self {
+        IpiContext {
+            task_ipi: PerCpu::new_fn(|| {
+                Spin::new(LinkedList::new(TaskIpiAdapter::new()))
+            }),
         }
     }
 }
 
-pub struct Ipi {
-    ipis: PerCpu<IpiCommandList>,
-}
+static CONTEXT: Once<IpiContext> = Once::new();
 
-impl Ipi {
-    pub fn new() -> Ipi {
-        Ipi {
-            ipis: PerCpu::new_fn(|| IpiCommandList::new()),
-        }
+fn context() -> &'static IpiContext {
+    unsafe {
+        CONTEXT.get_unchecked()
     }
-}
-
-static IPI: Once<Ipi> = Once::new();
-
-fn ipi() -> &'static Ipi {
-    IPI.get().unwrap()
 }
 
 pub fn init() {
-    IPI.call_once(|| Ipi::new());
-
+    CONTEXT.call_once(|| {
+        IpiContext::new()
+    });
     crate::arch::ipi::init();
-
-    init_ap();
 }
 
 pub fn init_ap() {
-    crate::kernel::sched::create_task(ipi_thread);
 }
 
-pub fn exec_on_cpu(target: usize, cmd: Arc<IpiCommand>) {
-    let ipi = ipi();
-
-    let ipis = ipi.ipis.cpu(target as isize);
-
-    let mut list = ipis.ipis.lock();
-
-    list.push_back(cmd.clone());
-
-    drop(list);
-
-    crate::arch::ipi::send_ipi_to(target);
-
-    cmd.wait_complete();
+pub fn exec_on_cpu(target: IpiTarget, kind: IpiKind) {
+    crate::arch::ipi::send_ipi_to(target, kind);
 }
 
-fn ipi_thread() {
-    // Thread context for this CPU execution
-    let ipi = ipi().ipis.this_cpu();
+pub fn wake_up(task: &Arc<Task>) {
+    let cpu = task.on_cpu();
 
-    loop {
-        let mut list = ipi
-            .wq
-            .wait_lock_for(WaitQueueFlags::NON_INTERRUPTIBLE, &ipi.ipis, |l| {
-                !l.is_empty()
-            })
-            .expect("ipi_thread should not be signalled")
-            .unwrap();
+    if cpu == unsafe { crate::CPU_ID as usize } {
+        crate::kernel::sched::internal().wake(task.clone());
+    } else {
+        dbgln!(ipi, "sending wake {}", task.on_cpu());
+        task_ipi(TaskIpiOperation::WakeUp, task);
+    }
+}
 
-        while let Some(cmd) = list.pop_front() {
-            cmd.execute();
+pub fn wake_up_next(task: &Arc<Task>) {
+    let cpu = task.on_cpu();
+
+    if cpu == unsafe { crate::CPU_ID as usize } {
+        crate::kernel::sched::internal().wake_as_next(task.clone());
+    } else {
+        task_ipi(TaskIpiOperation::WakeUpNext, task);
+    }
+}
+
+pub fn cont(task: &Arc<Task>) {
+    let cpu = task.on_cpu();
+
+    if cpu == unsafe { crate::CPU_ID as usize } {
+        crate::kernel::sched::internal().cont(task.clone());
+    } else {
+        task_ipi(TaskIpiOperation::Continue, task);
+    }
+}
+
+pub fn queue(task: &Arc<Task>) {
+    let cpu = task.on_cpu();
+
+    if cpu == crate::cpu_id() as usize {
+        kernel::sched::internal().queue_task(task.clone(), false);
+    } else {
+        task_ipi(TaskIpiOperation::Queue, task);
+    }
+}
+
+static COUNT: AtomicU64 = AtomicU64::new(0);
+
+fn handle_ipi_task_exec(cmd: TaskIpiOperation, task: &Arc<Task>) {
+    match cmd {
+        TaskIpiOperation::Queue => {
+            kernel::sched::internal().queue_task(task.clone(), false);
+        }
+        TaskIpiOperation::WakeUp => {
+            kernel::sched::internal().wake(task.clone());
+        },
+        TaskIpiOperation::WakeUpNext => {
+            kernel::sched::internal().wake_as_next(task.clone());
+        },
+        TaskIpiOperation::Continue => {
+            kernel::sched::internal().cont(task.clone());
         }
     }
 }
 
-pub fn handle_ipi() {
-    let ipi = ipi().ipis.this_cpu();
+pub fn handle_ipi_task() {
+    dbgln!(ipi2, "got ipi handle {}", crate::cpu_id());
+    let ctx = context();
 
-    // Notify IPI thread as we don't want to exec ipis in the interrupt context
-    ipi.wq.notify_one();
-}
+    let lock = ctx.task_ipi.this_cpu();
 
-fn ipi_test(src: usize, arg: *const ()) {
-    println!(
-        "[ IPI ] Exec ipi from cpu {} on cpu {}, msg: {}",
-        src,
-        unsafe { crate::CPU_ID },
-        unsafe { (arg as *const usize).read() }
-    );
-}
+    let mut cnt = 0;
 
-pub fn test_ipi() {
-    let count = crate::kernel::smp::cpu_count();
+    let mut locked = lock.lock();
 
-    if count > 1 {
-        println!("[ IPI ] Self test, send ipi to cpu 1");
-        let msg = 42usize;
+    /* We need a list here in case multiple cpus send ipi to the same core.
+     * In this case we would receive only one interrupt.
+     * We call end_of_int while holding a lock,
+     * which guarantees elements added after while loop finishes will be processed on next interrupt
+     */
+    while let Some(el) = locked.pop_front() {
+        cnt += 1;
+        drop(locked);
 
-        exec_on_cpu(1, IpiCommand::new(ipi_test, Some(&msg)));
+        handle_ipi_task_exec(el.cmd, &el.task);
+
+        locked = lock.lock_irq();
     }
+
+    dbgln!(ipi_count, "handled {} ipis", cnt);
+    crate::arch::int::end_of_int();
+}
+
+pub fn task_ipi(task_ipi: TaskIpiOperation, task: &Arc<Task>) {
+    let ctx = context();
+
+    let cpu = ctx.task_ipi.cpu(task.on_cpu() as isize);
+    {
+        let mut lock = cpu.lock_irq();
+        lock.push_back(TaskIpi::new(task_ipi, task.clone()));
+    }
+
+    if unsafe {task.arch_task() }.is_user() {
+        dbgln!(ipie, "{} E -> {}", crate::cpu_id(), task.on_cpu());
+    }
+    dbgln!(ipi_count, "+ {} {}->{} ({:?})", COUNT.fetch_add(1, Ordering::SeqCst) + 1, crate::cpu_id(), task.on_cpu(), task_ipi);
+    exec_on_cpu(IpiTarget::Cpu(task.on_cpu()), IpiKind::IpiTask);
 }

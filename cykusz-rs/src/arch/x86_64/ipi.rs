@@ -1,13 +1,31 @@
-pub const IPI_VECTOR: u8 = 0x82;
+use crate::kernel::ipi::IpiTarget;
+
+#[repr(u8)]
+pub enum IpiKind {
+    IpiTask = 82,
+}
+
+impl IpiTarget {
+    pub fn get_dest_target(&self) -> (usize, usize) {
+        match self {
+            IpiTarget::Cpu(t) => (0, *t),
+            IpiTarget::This => (1, 0),
+            IpiTarget::All => (2, 0),
+            IpiTarget::AllButThis => (3, 0),
+        }
+    }
+}
 
 pub fn init() {
-    crate::arch::idt::set_handler(IPI_VECTOR as usize, ipi_interrupt);
+    // task ipi handler responsible for calling eoi
+    crate::arch::idt::set_handler_eoi(IpiKind::IpiTask as usize);
+    crate::arch::idt::set_handler(IpiKind::IpiTask as usize, ipi_task);
 }
 
-pub fn send_ipi_to(target: usize) {
-    crate::arch::int::send_ipi(target, IPI_VECTOR);
+pub fn send_ipi_to(target: IpiTarget, kind: IpiKind) {
+    crate::arch::int::send_ipi(target, kind as u8);
 }
 
-fn ipi_interrupt() {
-    crate::kernel::ipi::handle_ipi();
+fn ipi_task() {
+    crate::kernel::ipi::handle_ipi_task();
 }

@@ -88,7 +88,7 @@ endif
 debug: $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -s -S -smp cpus=4 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
 	#qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 5811 -smp cpus=4 -no-shutdown -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000e,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -monitor /dev/stdout
-	qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 5811 -smp cpus=4 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=hn0 -device e1000,netdev=hn0,id=nic1 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -audio driver=pipewire,model=hda -monitor /dev/stdout
+	qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 5811 -smp cpus=4 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=hn0 -device e1000,netdev=hn0,id=nic1 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -audio driver=pipewire,model=hda -monitor /dev/stdout --enable-kvm
 
 gdb:
 	@rust-gdb "$(kernel)" -ex "target remote :1234"

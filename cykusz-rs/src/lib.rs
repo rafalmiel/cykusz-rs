@@ -134,8 +134,6 @@ pub fn rust_main(stack_top: VirtAddr) {
 }
 
 fn init_task() {
-    kernel::ipi::test_ipi();
-
     kernel::module::init_all();
 
     println!("[ OK ] Modules Initialized");
@@ -200,7 +198,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
     kernel::syscall::init_ap();
 
-    kernel::timer::setup();
+    kernel::timer::setup_ap();
 
     kernel::timer::start();
 

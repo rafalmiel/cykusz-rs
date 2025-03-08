@@ -158,13 +158,13 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
 
 impl Spin<()> {
     pub fn unguarded_release(&self) {
-        spin::MutexGuard::leak(self.l.lock());
-    }
-
-    pub fn unguarded_obtain(&self) {
         unsafe {
             self.l.force_unlock();
         }
+    }
+
+    pub fn unguarded_obtain(&self) {
+        spin::MutexGuard::leak(self.l.lock());
     }
 }
 

@@ -1,11 +1,12 @@
 use core::ptr::read_volatile;
 use core::ptr::write_volatile;
-
+use bit_field::BitField;
 use crate::arch::acpi::apic::MadtHeader;
 use crate::arch::idt;
 use crate::arch::int;
 use crate::arch::mm::MappedAddr;
 use crate::arch::raw::msr;
+use crate::kernel::ipi::IpiTarget;
 use crate::kernel::sync::{IrqLock, LockApi};
 
 pub static LAPIC: IrqLock<LApic> = IrqLock::new(LApic::new());
@@ -164,24 +165,43 @@ impl LApic {
         }
     }
 
-    pub fn send_ipi(&mut self, target: usize, vector: u8) {
-        if !self.x2 {
-            self.reg_write(REG_CMD_ID, (target as u32) << 24);
-            self.reg_write(REG_CMD, vector as u32);
+    pub fn send_ipi(&mut self, target: IpiTarget, vector: u8) {
+        let (dest_type, dest) = target.get_dest_target();
 
+        if !self.x2 {
             let mut status = self.reg_read(REG_CMD) & (1u32 << 12);
+
+            while status > 0 {
+                status = self.reg_read(REG_CMD) & (1u32 << 12);
+            }
+
+            self.reg_write(REG_CMD_ID, (dest as u32) << 24);
+
+            let mut cmd = self.reg_read(REG_CMD);
+            cmd.set_bits(18..=19, dest_type as u32);
+            cmd.set_bits(0..=7, vector as u32);
+
+            self.reg_write(REG_CMD, cmd);
+
+            status = self.reg_read(REG_CMD) & (1u32 << 12);
 
             while status > 0 {
                 status = self.reg_read(REG_CMD) & (1u32 << 12);
             }
         } else {
             unsafe {
+                let mut status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
+
+                while status > 0 {
+                    status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
+                }
+
                 msr::wrmsr(
                     msr::IA32_X2APIC_ICR,
-                    vector as u64 | ((target as u64) << 32),
+                    vector as u64 | ((dest_type as u64) << 18) | ((dest as u64) << 32),
                 );
 
-                let mut status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
+                status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
 
                 while status > 0 {
                     status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
@@ -268,7 +288,6 @@ pub fn init_ap() {
 pub fn setup_timer(f: fn() -> bool) {
     int::set_irq_dest(0, 32);
     idt::add_shared_irq_handler(32, f);
-
     int::mask_int(0, false);
 }
 

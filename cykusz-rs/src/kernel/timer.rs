@@ -185,6 +185,10 @@ pub fn setup() {
     dbgln!(timer, "timer task setup");
 }
 
+pub fn setup_ap() {
+    crate::arch::timer::setup(timer_handler);
+}
+
 pub fn start() {
     crate::arch::timer::start();
 }
@@ -194,6 +198,9 @@ pub fn reset_counter() {
 }
 
 fn timer_handler() {
+    dbgln!(sched_v, "timer handler {}", unsafe {
+        crate::CPU_ID
+    });
     crate::kernel::sched::reschedule();
 }
 

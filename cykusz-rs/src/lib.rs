@@ -185,6 +185,8 @@ fn init_task() {
 pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::tls::init(VirtAddr(stack_ptr as usize));
 
+    dbgln!(cpu, "ap started {}", cpu_num);
+
     unsafe {
         (&raw mut CPU_ID).write(cpu_num);
     }
@@ -192,6 +194,8 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::sched::init_ap();
 
     kernel::ipi::init_ap();
+
+    kernel::ipi::ipi_test();
 
     println!("[ OK ] CPU {} Initialized", unsafe { crate::CPU_ID });
 

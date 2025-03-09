@@ -168,10 +168,12 @@ impl LApic {
     pub fn send_ipi(&mut self, target: IpiTarget, vector: u8) {
         let (dest_type, dest) = target.get_dest_target();
 
+        dbgln!(ipi, "is x2 {}", self.x2);
+
         if !self.x2 {
             self.reg_write(REG_CMD_ID, (dest as u32) << 24);
 
-            let mut cmd = self.reg_read(REG_CMD);
+            let mut cmd = 0u32;
             cmd.set_bits(18..=19, dest_type as u32);
             cmd.set_bits(0..=7, vector as u32);
 

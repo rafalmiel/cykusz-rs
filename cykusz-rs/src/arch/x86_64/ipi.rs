@@ -3,6 +3,7 @@ use crate::kernel::ipi::IpiTarget;
 #[repr(u8)]
 pub enum IpiKind {
     IpiTask = 82,
+    IpiTest = 83,
 }
 
 impl IpiTarget {
@@ -20,6 +21,7 @@ pub fn init() {
     // task ipi handler responsible for calling eoi
     crate::arch::idt::set_handler_eoi(IpiKind::IpiTask as usize);
     crate::arch::idt::set_handler(IpiKind::IpiTask as usize, ipi_task);
+    crate::arch::idt::set_handler(IpiKind::IpiTest as usize, ipi_test);
 }
 
 pub fn send_ipi_to(target: IpiTarget, kind: IpiKind) {
@@ -28,4 +30,8 @@ pub fn send_ipi_to(target: IpiTarget, kind: IpiKind) {
 
 fn ipi_task() {
     crate::kernel::ipi::handle_ipi_task();
+}
+
+fn ipi_test() {
+    dbgln!(ipi, "ipi on cpu {}", crate::cpu_id());
 }

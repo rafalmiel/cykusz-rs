@@ -15,7 +15,6 @@
 #![feature(never_type)]
 #![feature(linked_list_cursors)]
 #![feature(trace_macros)]
-#![feature(unsigned_is_multiple_of)]
 #![feature(ptr_as_ref_unchecked)]
 #![feature(maybe_uninit_as_bytes)]
 extern crate alloc;

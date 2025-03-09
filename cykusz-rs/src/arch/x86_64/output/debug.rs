@@ -32,9 +32,10 @@ macro_rules! dbg {
     ($($log:ident)|*, $($arg:tt)*) => ({
         if let Some(loggers) = crate::arch::output::debug::loggers() {
             if stringify!($($log)|*).split('|').any(|e| { loggers.contains(e.trim()) }) {
-                crate::arch::output::debug::DBG_LOCK.unguarded_obtain();
+                #[allow(unused_imports)]
+                use crate::kernel::sync::LockApi;
+                let _lock = crate::arch::output::debug::DBG_LOCK.lock_irq();
                 crate::arch::output::log_fmt(format_args!($($arg)*)).unwrap();
-                crate::arch::output::debug::DBG_LOCK.unguarded_release();
             }
         }
     });

@@ -180,3 +180,7 @@ pub fn task_ipi(task_ipi: TaskIpiOperation, task: &Arc<Task>) {
     dbgln!(ipi_count, "+ {} {}->{} ({:?})", COUNT.fetch_add(1, Ordering::SeqCst) + 1, crate::cpu_id(), task.on_cpu(), task_ipi);
     exec_on_cpu(IpiTarget::Cpu(task.on_cpu()), IpiKind::IpiTask);
 }
+
+pub fn ipi_test() {
+    exec_on_cpu(IpiTarget::All, IpiKind::IpiTest);
+}

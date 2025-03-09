@@ -169,12 +169,6 @@ impl LApic {
         let (dest_type, dest) = target.get_dest_target();
 
         if !self.x2 {
-            let mut status = self.reg_read(REG_CMD) & (1u32 << 12);
-
-            while status > 0 {
-                status = self.reg_read(REG_CMD) & (1u32 << 12);
-            }
-
             self.reg_write(REG_CMD_ID, (dest as u32) << 24);
 
             let mut cmd = self.reg_read(REG_CMD);
@@ -183,25 +177,19 @@ impl LApic {
 
             self.reg_write(REG_CMD, cmd);
 
-            status = self.reg_read(REG_CMD) & (1u32 << 12);
+            let mut status = self.reg_read(REG_CMD) & (1u32 << 12);
 
             while status > 0 {
                 status = self.reg_read(REG_CMD) & (1u32 << 12);
             }
         } else {
             unsafe {
-                let mut status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
-
-                while status > 0 {
-                    status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
-                }
-
                 msr::wrmsr(
                     msr::IA32_X2APIC_ICR,
                     vector as u64 | ((dest_type as u64) << 18) | ((dest as u64) << 32),
                 );
 
-                status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
+                let mut status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
 
                 while status > 0 {
                     status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);

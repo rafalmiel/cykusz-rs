@@ -11,7 +11,7 @@ use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, Cacheable, WeakWrap};
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
-use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 type CacheKey = (usize, String);
 
@@ -23,17 +23,16 @@ impl Cacheable<CacheKey> for DirEntry {
 
     fn notify_unused(&self, _new_ref: &Weak<CacheItem<CacheKey, DirEntry>>) {
         let mut data = self.write();
-        dbgln!(cache, "mark unused: {}", data.name);
+        //dbgln!(test, "mark unused: {}", data.name);
         data.parent = None;
     }
 
     fn notify_used(&self) {
-        let data = self.write();
-        dbgln!(cache, "mark used: {}", data.name);
+        //dbgln!(test, "mark used: {:?}", self.cache_key());
     }
 
     fn deallocate(&self, _me: &CacheItem<CacheKey, DirEntry>) {
-        logln!("deallocate {}", _me.data.lock().name);
+        //dbgln!(test, "deallocate {:?}", _me.cache_key());
     }
 }
 
@@ -60,7 +59,7 @@ impl Drop for DirEntryData {
 }
 
 pub struct DirEntry {
-    data: Mutex<DirEntryData>,
+    data: Spin<DirEntryData>,
     mountpoint: AtomicBool,
     fs: Once<Weak<dyn Filesystem>>,
     cache_marker: usize,
@@ -96,9 +95,9 @@ impl DirEntryItem {
 impl DirEntry {
     pub fn new_root(inode: INodeItem, name: String) -> DirEntryItem {
         cache().make_item_no_cache(DirEntry {
-            data: Mutex::new(DirEntryData {
+            data: Spin::new(DirEntryData {
                 parent: None,
-                name,
+                name: name,
                 inode: inode.clone(),
             }),
             mountpoint: AtomicBool::new(false),
@@ -114,7 +113,7 @@ impl DirEntry {
             let do_cache = ![".", ".."].contains(&name.as_str());
 
             let e = DirEntry {
-                data: Mutex::new(DirEntryData {
+                data: Spin::new(DirEntryData {
                     parent: Some(parent.clone()),
                     name,
                     inode: inode.clone(),
@@ -140,7 +139,7 @@ impl DirEntry {
 
     pub fn new_no_cache(parent: DirEntryItem, inode: INodeItem, name: String) -> DirEntryItem {
         cache().make_item_no_cache(DirEntry {
-            data: Mutex::new(DirEntryData {
+            data: Spin::new(DirEntryData {
                 parent: Some(parent),
                 name,
                 inode: inode.clone(),
@@ -167,7 +166,7 @@ impl DirEntry {
 
     pub fn inode_item_wrap(inode: INodeItem) -> DirEntryItem {
         cache().make_item_no_cache(DirEntry {
-            data: Mutex::new(DirEntryData {
+            data: Spin::new(DirEntryData {
                 parent: None,
                 name: String::new(),
                 inode: inode.clone(),
@@ -182,11 +181,11 @@ impl DirEntry {
         })
     }
 
-    pub fn read(&self) -> MutexGuard<'_, DirEntryData> {
+    pub fn read(&self) -> SpinGuard<'_, DirEntryData> {
         self.data.lock()
     }
 
-    pub fn write(&self) -> MutexGuard<'_, DirEntryData> {
+    pub fn write(&self) -> SpinGuard<'_, DirEntryData> {
         self.data.lock()
     }
 
@@ -257,7 +256,7 @@ pub fn cache() -> &'static Arc<Cache<CacheKey, DirEntry>> {
 pub fn get(parent: DirEntryItem, name: &String) -> Option<DirEntryItem> {
     let key = DirEntry::make_key(Some(&parent), &name);
 
-    if let Some(e) = cache().get(key) {
+    if let Some(e) = cache().get(key.clone()) {
         if e.parent().is_none() {
             e.update_parent(Some(parent));
         }

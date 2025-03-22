@@ -1,4 +1,3 @@
-#include <cykusz/syscall.h>
 #include <iostream>
 #include <vector>
 #include <signal.h>
@@ -10,11 +9,11 @@
 class TestCtr {
 	public:
 		TestCtr() {
-			std::cout << "Ctr()" << std::endl;
+			//std::cout << "Ctr()" << std::endl;
 		}
 
 		~TestCtr() {
-			std::cout << "~Ctr()" << std::endl;
+			//std::cout << "~Ctr()" << std::endl;
 		}
 };
 
@@ -40,38 +39,12 @@ void print_thread() {
 
 void print_thread2(int v) {
 		//for (int i = 0;i < 10; ++i) {
-		pid_t tid = syscalln0(SYS_GETTID);
-		if (false && v != 7) {
-			for (int i = 0;; ++i) {
-				//printf("%d ", tid);
-				char buf[8];
-				sprintf(buf, "%d|", tid);
-				syscalln3(SYS_WRITE, 0, (uint64_t)buf, strlen(buf));
-			}
-			//for (;;) {
-			//	//printf("%d", v);
-	//		//	printf("Hello, from thread two\n");
-			//	//std::unique_lock<std::mutex> lck{MUT};
-			//	//std::cout << "Hello from thread two " << i << std::endl;
-			//	//write(1, "TT2. Hello printf two\n", 22);
-			//}
-		} else {
-			//for (int i = 0; i < 1000; ++i) {
+			//for (int i = 0;i < 1000; ++i) {
 			for (int i = 0; ; ++i) {
 				char buf[8];
 				sprintf(buf, "%d|", v);
-				syscalln3(SYS_WRITE, 1, (uint64_t)buf, strlen(buf));
+				write(1, (void*)buf, strlen(buf));
 			}
-
-            char buf[20];
-            sprintf(buf, "exec stack\n");
-            syscalln3(SYS_WRITE, 1, (uint64_t)buf, strlen(buf));
-
-			char* args[] = {"/bin/stack", "-arg1", "-arg2", 0};
-			char* envs[] = {"PATH=/usr/bin:/bin", 0};
-
-			execve("/bin/stack", args, envs);
-		}
 }
 
 int main(int argc, char *argv[]) {
@@ -85,10 +58,13 @@ int main(int argc, char *argv[]) {
 
 	//sigaction(SIGINT, &sact, nullptr);
 
-	std::string input{};
-	//std::cout << "Enter your name: ";
+	//std::string input{};
+    //sleep(3);
+	//std::cout << "Enter your name: " << std::endl;
+    //for(;;){}
 
     //for (int i = 0; i < 1000; ++i) {
+        //print_thread2(1);
         std::thread thr1{print_thread2, 1};
         std::thread thr2{print_thread2, 2};
         std::thread thr3{print_thread2, 3};
@@ -121,13 +97,13 @@ int main(int argc, char *argv[]) {
 	//}
 
 	//std::cin >> input;
-	std::cout << "Hello, " << input << "!" << std::endl;
+	//std::cout << "Hello, " << input << "!" << std::endl;
 
-	std::vector<int> vec = {1, 2, 3, 4, 5};
-	for(auto a: vec) {
-		std::cout << a << " ";
-	}
-	std::cout << std::endl;
+	//std::vector<int> vec = {1, 2, 3, 4, 5};
+	//for(auto a: vec) {
+	//	std::cout << a << " ";
+	//}
+	//std::cout << std::endl;
 
 	//char* const args[3] = {"-arg1", "-arg2", nullptr};
 	//char* const envs[1] = {nullptr};

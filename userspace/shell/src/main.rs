@@ -1,7 +1,6 @@
 #![feature(raw_ref_op)]
 #![feature(ptr_as_ref_unchecked)]
 extern crate syscall_defs;
-
 #[macro_use]
 extern crate syscall_user;
 

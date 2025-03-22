@@ -2,17 +2,18 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use spin::Once;
-
 use crate::arch::raw::mm::UserAddr;
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, CacheItemAdapter, Cacheable, WeakWrap};
 use crate::kernel::fs::FsDevice;
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, unmap, PhysAddr, PAGE_SIZE};
+use crate::kernel::mm::{
+    allocate_order, get_flags, map_flags, map_to_flags, unmap, PhysAddr, PAGE_SIZE,
+};
 use crate::kernel::sched::current_task_ref;
-use crate::kernel::sync::{LockApi, Spin};
+use crate::kernel::sync::{LockApi, MutexGuard, Spin};
 use crate::kernel::utils::types::Align;
+use spin::Once;
 
 pub type PageCacheKey = (usize, usize);
 type PageCache = Cache<PageCacheKey, PageCacheItemStruct>;
@@ -76,6 +77,11 @@ pub struct PageCacheItemStruct {
 
 unsafe impl Sync for PageCacheItemStruct {}
 
+#[inline(never)]
+fn check() {
+    dbgln!(pcache, "flags are 0");
+}
+
 impl PageCacheItemStruct {
     pub fn make_key(a: &Weak<dyn CachedAccess>, offset: usize) -> PageCacheKey {
         (a.as_ptr() as *const u8 as usize, offset)
@@ -85,10 +91,24 @@ impl PageCacheItemStruct {
         let page = allocate_order(0).unwrap().address();
 
         map_to_flags(page.to_virt(), page, PageFlags::WRITABLE);
+        dbgln!(
+            pcache,
+            "alloc {} {} {:?} offset {:#x} dev: {:#x}",
+            page,
+            page.to_virt(),
+            123,
+            offset,
+            fs.as_ptr() as *const u8 as usize
+        );
+        let flags = get_flags(page.to_virt()).unwrap();
+        if flags.address() == PhysAddr(0) {
+            check();
+        }
 
         unsafe {
             page.to_virt().as_bytes_mut(PAGE_SIZE).fill(0);
         }
+        dbgln!(pcache, "alloc {} zeroed", page.to_virt());
 
         PageCacheItemStruct {
             fs,
@@ -246,11 +266,16 @@ where
 
         let cache_offset = offset / PAGE_SIZE;
 
-        if let Some(page) = page_cache.get(PageCacheItemStruct::make_key(&dev, cache_offset)) {
+        let page = page_cache.get(PageCacheItemStruct::make_key(&dev, cache_offset));
+
+        let _lock = self.lock_device();
+        if let Some(page) = page {
             Some(MMapPageStruct(MMapPage::Cached(page)))
         } else {
+            //dbgln!(pcache, "get map page: {}", cache_offset);
             let new_page = PageCacheItemStruct::new(dev.clone(), cache_offset);
 
+            dbgln!(pcache, "read {}", new_page.page().to_virt());
             if let Some(read) = self.read_direct(offset.align(PAGE_SIZE), new_page.data_mut()) {
                 if read == 0 && size_check {
                     None
@@ -272,6 +297,8 @@ where
 
 pub trait CachedAccess: RawAccess {
     fn this(&self) -> Weak<dyn CachedAccess>;
+
+    fn lock_device(&'_ self) -> MutexGuard<'_, ()>;
 
     fn notify_dirty(&self, _page: &PageCacheItemArc);
 

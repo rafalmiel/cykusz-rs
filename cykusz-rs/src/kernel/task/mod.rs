@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::string::String;
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
@@ -22,15 +23,19 @@ use crate::kernel::task::cwd::Cwd;
 use crate::kernel::task::filetable::FileHandle;
 use crate::kernel::task::vm::{PageFaultReason, VM};
 use crate::kernel::tty::Terminal;
+use crate::kernel::utils::arc_type::{ArcType, Uid, WeakType};
 
 pub mod children_events;
 pub mod cwd;
 pub mod filetable;
 pub mod vm;
+#[macro_use]
+pub mod intrusive_adapter;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TaskState {
     Unused = 0,
+    Idle = 1,
     Runnable = 2,
     AwaitingIo = 4,
     Stopped = 5,
@@ -42,6 +47,7 @@ impl From<usize> for TaskState {
 
         match val {
             0 => Unused,
+            1 => Idle,
             2 => Runnable,
             4 => AwaitingIo,
             5 => Stopped,
@@ -50,9 +56,22 @@ impl From<usize> for TaskState {
     }
 }
 
-intrusive_adapter!(pub TaskAdapter = Arc<Task> : Task { sibling: LinkedListLink });
-intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLink });
-intrusive_adapter!(pub WaitPidTaskAdapter = Arc<Task> : Task { waitpid: LinkedListLink });
+pub type ArcTask = ArcType<Task>;
+pub type WeakTask = WeakType<Task>;
+
+impl Uid for Task {
+    fn uid(&self) -> usize {
+        self.tid()
+    }
+}
+
+task_intrusive_adapter!(pub TaskAdapter = ArcType<Task> : Task { sibling: LinkedListLink });
+task_intrusive_adapter!(pub SchedTaskAdapter = ArcType<Task> : Task { sched: LinkedListLink });
+task_intrusive_adapter!(pub WaitPidTaskAdapter = ArcType<Task> : Task { waitpid: LinkedListLink });
+
+//intrusive_adapter!(pub TaskAdapter = Arc<Task> : Task { sibling: LinkedListLink });
+//intrusive_adapter!(pub SchedTaskAdapter = Arc<Task> : Task { sched: LinkedListLink });
+//intrusive_adapter!(pub WaitPidTaskAdapter = Arc<Task> : Task { waitpid: LinkedListLink });
 
 #[derive(Default)]
 pub struct Task {
@@ -63,7 +82,7 @@ pub struct Task {
     sid: AtomicUsize,
     on_cpu: AtomicUsize,
     exe: Spin<Option<DirEntryItem>>,
-    parent: Spin<Option<Arc<Task>>>,
+    parent: Spin<Option<ArcTask>>,
     children: Spin<intrusive_collections::LinkedList<TaskAdapter>>,
     sibling: intrusive_collections::LinkedListLink,
     pub sched: intrusive_collections::LinkedListLink,
@@ -72,11 +91,12 @@ pub struct Task {
     locks: AtomicUsize,
     pending_io: AtomicBool,
     to_resched: AtomicBool,
+    terminating: AtomicBool,
     filetable: Arc<filetable::FileTable>,
     vm: Arc<VM>,
     sleep_until: AtomicUsize,
     cwd: RwSpin<Option<Cwd>>,
-    sref: Weak<Task>,
+    sref: WeakTask,
     signals: Signals,
     terminal: Terminal,
     children_events: WaitPidEvents,
@@ -86,7 +106,7 @@ pub struct Task {
 unsafe impl Sync for Task {}
 
 impl Task {
-    pub fn this() -> Arc<Task> {
+    pub fn this() -> ArcTask {
         Self::make_ptr(Self::new())
     }
 
@@ -112,35 +132,35 @@ impl Task {
         def
     }
 
-    fn make_ptr(mut task: Task) -> Arc<Task> {
-        Arc::new_cyclic(|me| {
-            task.sref = me.clone();
+    fn make_ptr(mut task: Task) -> ArcTask {
+        ArcTask::new_cyclic(|me| {
+            task.sref = WeakTask::from(me.clone());
 
-            task.terminal.init(me);
+            task.terminal.init(&task.sref);
 
             task
         })
     }
 
-    pub fn new_sched(fun: fn()) -> Arc<Task> {
+    pub fn new_sched(fun: fn()) -> ArcTask {
         let mut task = Task::new();
         task.arch_task = UnsafeCell::new(ArchTask::new_sched(fun));
         Self::make_ptr(task)
     }
 
-    pub fn new_kern(fun: fn()) -> Arc<Task> {
-        let task = Arc::new_cyclic(|me| {
+    pub fn new_kern(fun: fn()) -> ArcTask {
+        let task = ArcTask::new_cyclic(|me| {
             let mut task = Task::new();
-            task.sref = me.clone();
+            task.sref = WeakTask::from(me.clone());
             task.arch_task = UnsafeCell::new(ArchTask::new_kern(fun));
-            task.terminal.init(me);
+            task.terminal.init(&task.sref);
             task
         });
 
         task
     }
 
-    pub fn new_param_kern(fun: usize, val: usize) -> Arc<Task> {
+    pub fn new_param_kern(fun: usize, val: usize) -> ArcTask {
         let mut task = Task::new();
         task.arch_task = UnsafeCell::new(ArchTask::new_param_kern(fun, val));
         Self::make_ptr(task)
@@ -154,7 +174,7 @@ impl Task {
         *self.exe.lock() = exe;
     }
 
-    pub fn fork(&self) -> Arc<Task> {
+    pub fn fork(&self) -> ArcTask {
         let mut task = Task::new();
 
         task.set_gid(self.gid());
@@ -192,7 +212,9 @@ impl Task {
         args: Option<ExeArgs>,
         envs: Option<ExeArgs>,
     ) -> Result<!, SyscallError> {
-        logln5!("exec task {} {}", self.pid(), exe.full_path());
+        dbgln!(task, "exec task {} {}", self.pid(), exe.full_path());
+
+        self.set_terminating(false);
 
         let mut args = args.unwrap_or(ExeArgs::new());
 
@@ -217,6 +239,8 @@ impl Task {
         // Replace our new vm
         self.vm.fork(&vm);
 
+        dbgln!(task, "vm forked {}", self.tid());
+
         // New process does not inherits signals
         self.signals().clear();
 
@@ -231,17 +255,20 @@ impl Task {
         drop(vm);
 
         dbgln!(
-            exec,
-            "exec {} {} {}",
+            task,
+            "exec {} {} {} sc: {}, wc: {}",
             exe.full_path(),
             exe.name(),
-            exe.parent().is_some()
+            exe.parent().is_some(),
+            ArcTask::strong_count(&self.me()) - 1,
+            ArcTask::weak_count(&self.me()),
         );
 
         self.set_exe(Some(exe.clone()));
 
         unsafe {
             // EXEC!
+            dbgln!(task, "task arch exec {}", self.tid());
             self.arch_task_mut().exec(
                 base_addr,
                 entry,
@@ -255,7 +282,7 @@ impl Task {
         }
     }
 
-    pub fn spawn_thread(&self, entry: VirtAddr, user_stack: VirtAddr) -> Arc<Task> {
+    pub fn spawn_thread(&self, entry: VirtAddr, user_stack: VirtAddr) -> ArcTask {
         let mut thread = Task::new();
 
         thread.arch_task =
@@ -296,47 +323,84 @@ impl Task {
         thread
     }
 
-    pub fn me(&self) -> Arc<Task> {
-        self.sref.upgrade().unwrap()
+    pub fn me(&self) -> ArcTask {
+        if let Some(t) = self.sref.upgrade() {
+            t
+        } else {
+            dbgln!(sched_v, "Task::me == nullptr");
+            crate::lang_items::print_current_backtrace();
+            loop {}
+        }
     }
 
     pub fn remove_child(&self, child: &Task) {
         if child.sibling.is_linked() {
-            let mut children = self.children.lock();
+            let mut children = self.children_debug(9);
 
             let mut cur = unsafe { children.cursor_mut_from_ptr(child) };
 
             child.set_parent(None);
 
             cur.remove();
+            dbgln!(
+                task,
+                "remove child {} from parent {}",
+                child.tid(),
+                self.tid()
+            );
+        } else {
+            dbgln!(
+                task,
+                "remove child failed {}, p: {}",
+                child.tid(),
+                self.tid()
+            );
+        }
+
+        let children = self.children_debug(10);
+        for child in children.iter() {
+            dbgln!(task, "remaining child {} {:?}", child.tid(), child.state());
         }
     }
 
     pub fn remove_from_parent(&self) {
         if let Some(parent) = self.get_parent() {
+            dbgln!(
+                task,
+                "task {} remove from parent {}",
+                self.tid(),
+                parent.tid()
+            );
             parent.remove_child(self);
+        } else {
+            dbgln!(task, "task {} remove from parent NOT FOUND", self.tid());
         }
     }
 
-    pub fn add_child(&self, child: Arc<Task>) {
+    pub fn add_child(&self, child: ArcTask) {
         child.set_parent(Some(self.me()));
 
-        let mut children = self.children.lock();
-        children.push_back(child);
+        let mut children = self.children_debug(11);
+        children.push_back(child.clone());
+        dbgln!(task, "add child {} to parent {}", child.tid(), self.tid());
     }
 
-    pub fn get_parent(&self) -> Option<Arc<Task>> {
+    pub fn get_parent(&self) -> Option<ArcTask> {
         let parent = self.parent.lock();
 
         parent.clone()
     }
 
-    pub fn set_parent(&self, parent: Option<Arc<Task>>) {
+    pub fn set_parent(&self, parent: Option<ArcTask>) {
         *self.parent.lock() = parent;
     }
 
     pub fn children(&self) -> SpinGuard<'_, LinkedList<TaskAdapter>> {
         self.children.lock()
+    }
+
+    pub fn children_debug(&self, dbg: usize) -> SpinGuard<'_, LinkedList<TaskAdapter>> {
+        self.children.lock_irq_debug(dbg)
     }
 
     pub fn migrate_children_to_init(&self) {
@@ -348,13 +412,13 @@ impl Task {
             crate::kernel::int::is_enabled()
         );
 
-        let mut children = self.children.lock();
+        let mut children = self.children_debug(1);
 
         let mut cursor = children.front_mut();
 
         while let Some(child) = cursor.get() {
             if child.is_process_leader() {
-                let task = cursor.remove().unwrap();
+                let task = ArcTask::from(cursor.remove().unwrap());
 
                 dbgln!(task, "Move task {} to init", task.tid());
 
@@ -447,6 +511,14 @@ impl Task {
         self.to_resched.store(s, Ordering::SeqCst);
     }
 
+    pub fn is_terminatng(&self) -> bool {
+        self.terminating.load(Ordering::Relaxed)
+    }
+
+    pub fn set_terminating(&self, t: bool) {
+        self.terminating.store(t, Ordering::Relaxed)
+    }
+
     pub fn state(&self) -> TaskState {
         self.state.load(Ordering::SeqCst).into()
     }
@@ -507,7 +579,19 @@ impl Task {
         self.tid() == self.pid()
     }
 
-    pub fn process_leader(&self) -> Arc<Task> {
+    pub fn is_parent_terminating(&self) -> bool {
+        if self.is_process_leader() {
+            false
+        } else {
+            if let Some(p) = self.get_parent() {
+                p.is_terminatng()
+            } else {
+                false
+            }
+        }
+    }
+
+    pub fn process_leader(&self) -> ArcTask {
         if self.is_process_leader() {
             self.me()
         } else {
@@ -553,7 +637,7 @@ impl Task {
         let mut count = 0;
 
         for c in self
-            .children()
+            .children_debug(3)
             .iter()
             .filter(|t| t.pid() == self.pid() && t.state() != TaskState::Stopped)
         {
@@ -586,11 +670,9 @@ impl Task {
 
         let mut count = 0;
 
-        for c in self
-            .children()
-            .iter()
-            .filter(|t| t.pid() == self.pid() && t.state() == TaskState::Stopped)
-        {
+        for c in self.children_debug(4).iter().filter(|t| {
+            !t.is_process_leader() && t.pid() == self.pid() && t.state() == TaskState::Stopped
+        }) {
             dbgln!(task_stop2, "cont thread {}", c.tid());
             crate::kernel::sched::cont_thread(c.me());
             count += 1;
@@ -621,8 +703,10 @@ impl Task {
     }
 
     pub fn terminate_children(&self) {
+        dbgln!(waitpid, "terminate {} children!", self.tid());
         'outer: loop {
-            for c in self.children().iter().filter(|t| {
+            let mut to_kill = Vec::<ArcTask>::new();
+            for c in self.children_debug(5).iter().filter(|t| {
                 t.is_process_leader() && t.pid() != self.pid() && t.state() != TaskState::Unused
             }) {
                 dbgln!(
@@ -635,8 +719,14 @@ impl Task {
                         String::new()
                     }
                 );
-                c.signal(syscall_defs::signal::SIGKILL);
+                to_kill.push(c.me());
             }
+
+            for t in &to_kill {
+                t.signal(syscall_defs::signal::SIGKILL);
+            }
+
+            to_kill.clear();
 
             'inner: loop {
                 let mut status = syscall_defs::waitpid::Status::Invalid(0);
@@ -644,10 +734,15 @@ impl Task {
                     -1,
                     &mut status,
                     syscall_defs::waitpid::WaitPidFlags::EXITED
-                        | syscall_defs::waitpid::WaitPidFlags::NOHANG,
+                        | syscall_defs::waitpid::WaitPidFlags::CONTINUED
+                        | syscall_defs::waitpid::WaitPidFlags::STOPPED,
                 ) {
                     Ok(Err(SyscallError::ECHILD)) => {
-                        if self.children.lock().iter().any(|t| t.is_process_leader()) {
+                        if self
+                            .children_debug(13)
+                            .iter()
+                            .any(|t| t.is_process_leader())
+                        {
                             dbgln!(poweroff, "got ECHILD with children");
                             break 'inner;
                         } else {
@@ -664,12 +759,73 @@ impl Task {
                         );
                     }
                     Err(e) => {
+                        let empty = !self.children_debug(14).is_empty();
                         dbgln!(
                             poweroff,
                             "got signal error {:?}, pending: {:#x} has_children: {}",
                             e,
                             self.signals().pending(),
-                            !self.children.lock().is_empty()
+                            empty
+                        );
+                        self.signals().clear_pending(SIGCHLD as u64);
+                        break 'inner;
+                    }
+                    Ok(Err(e)) => {
+                        panic!("Unexpected error from wait_pid {:?}", e);
+                    }
+                }
+            }
+        }
+        dbgln!(waitpid, "terminate {} children FINISHED!", self.tid());
+    }
+
+    pub fn terminate_threads(&self) {
+        self.set_terminating(true);
+        dbgln!(waitpid, "terminate threads!");
+        'outer: loop {
+            for c in self.children_debug(6).iter().filter(|t| {
+                !t.is_process_leader() && t.pid() == self.pid() && t.state() != TaskState::Unused
+            }) {
+                dbgln!(
+                    task,
+                    "sigkillthr to {} {}",
+                    c.tid(),
+                    if let Some(e) = c.exe() {
+                        e.full_path()
+                    } else {
+                        String::new()
+                    }
+                );
+                c.signal_thread(crate::kernel::signal::KSIGKILLTHR);
+            }
+
+            'inner: loop {
+                match self.wait_thread(0, syscall_defs::waitpid::WaitPidFlags::EXITED, true) {
+                    Ok(Err(SyscallError::ECHILD)) => {
+                        if self
+                            .children
+                            .lock()
+                            .iter()
+                            .any(|t| !t.is_process_leader() && t.pid() == self.pid())
+                        {
+                            dbgln!(poweroff, "got ECHILD with children");
+                            break 'inner;
+                        } else {
+                            dbgln!(poweroff, "got ECHILD without children");
+                            break 'outer;
+                        }
+                    }
+                    Ok(Ok(pid)) => {
+                        dbgln!(poweroff, "terminated child pid: {}", pid);
+                    }
+                    Err(e) => {
+                        let empty = !self.children_debug(15).is_empty();
+                        dbgln!(
+                            poweroff,
+                            "got signal error {:?}, pending: {:#x} has_children: {}",
+                            e,
+                            self.signals().pending(),
+                            !empty
                         );
                     }
                     Ok(Err(e)) => {
@@ -678,38 +834,55 @@ impl Task {
                 }
             }
         }
+        dbgln!(waitpid, "terminate threads FINISHED!");
     }
 
-    pub fn terminate_threads(&self) {
+    pub fn terminate_threads2(&self) {
         assert!(self.is_process_leader());
 
-        for c in self
-            .children()
-            .iter()
-            .filter(|t| t.pid() == self.pid() && t.state() != TaskState::Unused)
-        {
-            assert!(!c.is_process_leader());
-            c.signal_thread(crate::kernel::signal::KSIGKILLTHR);
-        }
+        dbgln!(task, "teminate threads {}", self.tid());
 
         loop {
-            match self.wait_thread(0, syscall_defs::waitpid::WaitPidFlags::EXITED, true) {
-                Ok(Err(SyscallError::ECHILD)) => {
-                    break;
-                }
-                Ok(Ok(_tid)) => {}
-                Err(_) => {
-                    continue;
-                }
-                Ok(Err(e)) => {
-                    panic!("Unexpected error from wait_thread: {:?}", e);
+            let mut found_threads = false;
+
+            for c in self
+                .children_debug(7)
+                .iter()
+                .filter(|t| t.pid() == self.pid() && t.state() != TaskState::Unused)
+            {
+                assert!(!c.is_process_leader());
+                dbgln!(task, "signal KILLTHR {}", c.tid());
+                c.signal_thread(crate::kernel::signal::KSIGKILLTHR);
+                found_threads = true;
+            }
+
+            if !found_threads {
+                return;
+            }
+
+            loop {
+                match self.wait_thread(0, syscall_defs::waitpid::WaitPidFlags::EXITED, true) {
+                    Ok(Err(SyscallError::ECHILD)) => {
+                        dbgln!(task, "terminate_threads ECHILD");
+                        break;
+                    }
+                    Ok(Ok(_tid)) => {
+                        dbgln!(task, "terminate_threads OK task {}", _tid);
+                    }
+                    Err(_) => {
+                        dbgln!(task, "terminate_threads ERR");
+                        continue;
+                    }
+                    Ok(Err(e)) => {
+                        panic!("Unexpected error from wait_thread: {:?}", e);
+                    }
                 }
             }
         }
     }
 
     fn do_await_io(&self, timeout_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
-        dbgln!(task, "{} do_await_io {:?}", self.tid(), self.state());
+        //dbgln!(task, "{} do_await_io {:?}", self.tid(), self.state());
         if self.locks() > 0 {
             logln!(
                 "await_io: sleeping while holding locks: {}, tid {}",
@@ -793,19 +966,29 @@ impl Task {
     fn do_signal(&self, sig: usize, this_thread: bool) -> bool {
         use crate::kernel::signal::TriggerResult;
 
+        dbgln!(
+            task,
+            "signal task: {} signal: {}, this_thread: {}",
+            self.tid(),
+            sig,
+            this_thread
+        );
+
         match self.signals().trigger(sig, this_thread) {
             TriggerResult::Triggered => {
+                dbgln!(signal, "signal {} triggered", sig);
                 self.wake_up();
 
                 true
             }
             TriggerResult::Execute(f) => {
-                logln2!("SIG TRIGGER EXECUTE {}", sig);
+                dbgln!(signal, "signal {} execute", sig);
                 f(sig, self.me());
 
                 true
             }
             TriggerResult::Blocked if !this_thread => {
+                dbgln!(signal, "signal {} blocked", sig);
                 // Find other thread in process to notify
                 let process_leader = self.process_leader();
 
@@ -816,7 +999,7 @@ impl Task {
                 }
 
                 for c in process_leader
-                    .children()
+                    .children_debug(8)
                     .iter()
                     .filter(|t| t.pid() == self.pid())
                 {
@@ -859,20 +1042,28 @@ impl Task {
     pub fn make_zombie(&self, status: syscall_defs::waitpid::Status) {
         self.terminal().disconnect(None);
 
-        unsafe {
-            self.arch_task_mut().deallocate();
-        }
-
         if let Some(parent) = self.get_parent() {
             self.set_waitpid_status(status);
+            dbgln!(
+                task,
+                "add zombie {} to parent {}",
+                self.me().tid(),
+                parent.tid()
+            );
             parent.children_events.add_zombie(self.me());
 
             if self.is_process_leader() {
-                dbgln!(waitpid, "signal zombie SIGCHILD by {}", self.tid());
+                dbgln!(
+                    waitpid,
+                    "signal zombie SIGCHILD by {} to {}",
+                    self.tid(),
+                    parent.tid()
+                );
                 parent.signal(SIGCHLD);
             }
         }
     }
+
     pub fn notify_continued(&self) {
         if let Some(parent) = self.get_parent() {
             self.set_waitpid_status(syscall_defs::waitpid::Status::Continued);
@@ -919,6 +1110,12 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        logln!("drop task {}", self.tid());
+        dbgln!(task, "drop task {}", self.tid());
+        unsafe {
+            dbgln!(task, "deallocate task user {}", self.tid());
+            self.arch_task_mut().deallocate_user();
+            dbgln!(task, "deallocate task kern {}", self.tid());
+            self.arch_task_mut().deallocate_kern();
+        }
     }
 }

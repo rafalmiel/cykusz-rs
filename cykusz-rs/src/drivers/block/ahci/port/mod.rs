@@ -177,7 +177,12 @@ impl BlockDev for Port {
         let start = crate::kernel::timer::current_ns();
 
         let res = self.run_request(request.clone());
-        dbgln!(ahci, "run_request end {}: {} us", crate::cpu_id(), (crate::kernel::timer::current_ns() - start) / 1000);
+        dbgln!(
+            ahci,
+            "run_request end {}: {} us",
+            crate::cpu_id(),
+            (crate::kernel::timer::current_ns() - start) / 1000
+        );
 
         if let Some(r) = &res {
             if *r / 512 != count {

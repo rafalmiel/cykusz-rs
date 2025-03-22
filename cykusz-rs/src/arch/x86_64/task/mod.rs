@@ -36,7 +36,7 @@ pub struct Context {
     /// Page Table pointer
     pub cr3: usize,
     /// RBX register
-    pub rbp: usize,
+    pub rbx: usize,
     /// R12 register
     pub r12: usize,
     /// R13 register
@@ -46,11 +46,23 @@ pub struct Context {
     /// R15 register
     pub r15: usize,
     /// Base pointer
-    pub rbx: usize,
+    pub rbp: usize,
     /// RFLAGS register
     pub rflags: usize,
     /// Instruction pointer
     pub rip: usize,
+}
+
+impl Context {
+    pub fn debug_stacktrace(&self) {
+        let mut rbp = VirtAddr(unsafe { (&raw const self.rbp).read_unaligned() });
+
+        while !rbp.is_user() {
+            dbgln!(sched_v, "{:#x}", (rbp + 8).read::<u64>());
+
+            rbp = VirtAddr(unsafe { rbp.read::<usize>() });
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -487,6 +499,10 @@ impl Task {
             0,
         );
 
+        //for addr in (VirtAddr(user_stack as usize)..VirtAddr(user_stack as usize)).step_by(PAGE_SIZE) {
+        //    p_table.map_flags(addr, PageFlags::USER | PageFlags::WRITABLE);
+        //}
+
         let tls_ptr = if let Some(tls) = &tls_vm {
             prepare_tls(vm, p_table, tls)
         } else {
@@ -559,6 +575,7 @@ impl Task {
 
         unsafe {
             crate::bochs();
+            dbgln!(arch_task, "asm_jmp_user");
             asm_jmp_user(helper.current() as usize, entry.0, 0x200);
         }
     }
@@ -576,10 +593,12 @@ impl Task {
         }
     }
 
-    pub fn deallocate(&mut self) {
-        self.ctx = Unique::dangling();
-
+    pub fn deallocate_user(&mut self) {
         self.unref_page_table();
+    }
+
+    pub fn deallocate_kern(&mut self) {
+        self.ctx = Unique::dangling();
 
         deallocate_order(
             &Frame::new(MappedAddr(self.stack_top).to_phys()),
@@ -608,8 +627,6 @@ pub fn activate_task(to: &Task) {
         if to.is_user() {
             crate::arch::gdt::update_tss_rps0(to.stack_top + to.stack_size);
         }
-
-        to.fpu.restore();
 
         activate_to(to.ctx.as_ref());
     }

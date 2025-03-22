@@ -3,10 +3,11 @@ use core::marker::PhantomData;
 use crate::arch::mm::virt::entry::Entry;
 use crate::arch::x86_64::mm::phys::PhysPage;
 use crate::kernel::mm::*;
-use crate::kernel::sync::SpinGuard;
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 use super::page;
 
+static KERNEL_PT_LOCK: Spin<()> = Spin::new(());
 const ENTRIES_COUNT: usize = 512;
 
 pub enum Level4 {}
@@ -324,10 +325,15 @@ impl Table<Level1> {
 }
 
 impl Table<Level4> {
-    fn lock(&self) -> Option<SpinGuard<'static, ()>> {
+    fn lock(&self, is_user: bool) -> Option<SpinGuard<'static, ()>> {
+        if !is_user {
+            return Some(KERNEL_PT_LOCK.lock());
+        }
+
         if let Some(pp) = self.phys_page() {
             Some(pp.lock_pt())
         } else {
+            dbgln!(ptable, "no lock obtained!");
             None
         }
     }
@@ -371,7 +377,7 @@ impl Table<Level4> {
     }
 
     pub fn to_phys(&self, addr: VirtAddr) -> Option<PhysAddr> {
-        let _g = self.lock();
+        let _g = self.lock(addr.is_user());
 
         let page = page::Page::new(addr);
 
@@ -410,7 +416,7 @@ impl Table<Level4> {
         addr: VirtAddr,
         mut fun: impl FnMut(&mut Entry),
     ) -> Option<PhysAddr> {
-        let _g = self.lock();
+        let _g = self.lock(addr.is_user());
 
         let page = page::Page::new(addr);
 
@@ -463,7 +469,7 @@ impl Table<Level4> {
     }
 
     pub fn get_flags(&self, addr: VirtAddr) -> Option<Entry> {
-        let _g = self.lock();
+        let _g = self.lock(addr.is_user());
 
         let page = page::Page::new(addr);
 
@@ -479,7 +485,7 @@ impl Table<Level4> {
     }
 
     pub fn map_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) {
-        let _g = self.lock();
+        let _g = self.lock(addr.is_user());
 
         let page = page::Page::new(addr);
 
@@ -506,17 +512,30 @@ impl Table<Level4> {
     }
 
     pub fn map_to_flags(&mut self, virt: VirtAddr, phys: PhysAddr, flags: virt::PageFlags) {
-        let _g = self.lock();
+        let _g = self.lock(virt.is_user());
 
         let page = page::Page::new(virt);
 
         let user = page.p4_index() < 256;
 
-        let (_, l3) = self.alloc_next_level(page.p4_index(), user);
+        let (was_alloc_4, l3) = self.alloc_next_level(page.p4_index(), user);
 
         let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
 
         let (was_alloc_2, l1) = l2.alloc_next_level(page.p2_index(), user);
+
+        dbgln!(
+            ptable,
+            "map {}, {} {} {} {} | {} {} {}",
+            virt,
+            page.p4_index(),
+            page.p3_index(),
+            page.p2_index(),
+            page.p1_index(),
+            was_alloc_4,
+            was_alloc_3,
+            was_alloc_2
+        );
 
         if l1.set_flags(
             page.p1_index(),
@@ -536,7 +555,7 @@ impl Table<Level4> {
     }
 
     pub fn map_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
-        let _g = self.lock();
+        let _g = self.lock(virt.is_user());
 
         let page = page::Page::new(virt);
 
@@ -562,7 +581,7 @@ impl Table<Level4> {
     }
 
     pub fn map_hugepage_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
-        let _g = self.lock();
+        let _g = self.lock(virt.is_user());
 
         let page = page::Page::new(virt);
 
@@ -582,7 +601,10 @@ impl Table<Level4> {
     }
 
     pub fn unmap(&mut self, virt: VirtAddr) {
-        let _g = self.lock();
+        let _g = self.lock(virt.is_user());
+        if !virt.is_user() {
+            dbgln!(ptable, "unmap {}", virt);
+        }
 
         let page = page::Page::new(virt);
 
@@ -600,7 +622,7 @@ impl Table<Level4> {
     }
 
     pub fn deallocate_user(&mut self) {
-        let _g = self.lock();
+        let _g = self.lock(true);
 
         let flags = Entry::PRESENT | Entry::USER;
 
@@ -626,7 +648,7 @@ impl Table<Level4> {
     }
 
     pub fn duplicate(&mut self) -> &P4Table {
-        let _g = self.lock();
+        let _g = self.lock(false);
 
         let new = P4Table::new();
 

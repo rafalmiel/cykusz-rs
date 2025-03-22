@@ -13,8 +13,8 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::round_robin::RRScheduler;
 use crate::kernel::sched::task_container::TaskContainer;
 use crate::kernel::session::sessions;
-use crate::kernel::signal::{SignalError, SignalResult};
-use crate::kernel::task::{Task, TaskState};
+use crate::kernel::signal::SignalResult;
+use crate::kernel::task::{ArcTask, Task};
 
 #[macro_export]
 macro_rules! switch {
@@ -30,6 +30,7 @@ macro_rules! activate_task {
 }
 
 bitflags! {
+    #[derive(Copy, Clone)]
     pub struct SleepFlags: u64 {
         const NON_INTERRUPTIBLE = 1;
     }
@@ -50,18 +51,19 @@ pub fn new_task_tid() -> usize {
 pub trait SchedulerInterface: Send + Sync + DowncastSync {
     fn init(&self) {}
     fn reschedule(&self) -> bool;
-    fn current_task<'a>(&self) -> &'a Arc<Task>;
+    fn current_task<'a>(&self) -> &'a Task;
     fn current_id(&self) -> isize {
         self.current_task().tid() as isize
     }
-    fn queue_task(&self, task: Arc<Task>, alloc_cpu: bool);
-    fn sleep(&self, until: Option<usize>);
-    fn wake(&self, task: Arc<Task>);
-    fn wake_as_next(&self, task: Arc<Task>);
-    fn cont(&self, task: Arc<Task>);
+    fn queue_task(&self, task: ArcTask, alloc_cpu: bool);
+    fn sleep(&self, until: Option<usize>, flags: SleepFlags) -> SignalResult<()>;
+    fn wake(&self, task: ArcTask);
+    fn wake_as_next(&self, task: ArcTask);
+    fn cont(&self, task: ArcTask);
     fn stop(&self, sig: usize);
     fn exit(&self, status: syscall_defs::waitpid::Status) -> !;
     fn exit_thread(&self) -> !;
+    fn debug(&self);
 }
 
 impl_downcast!(sync SchedulerInterface);
@@ -85,7 +87,7 @@ impl Scheduler {
         self.sched.init();
     }
 
-    pub fn current_task<'a>(&self) -> &'a Arc<Task> {
+    pub fn current_task<'a>(&self) -> &'a Task {
         self.sched.current_task()
     }
 
@@ -101,11 +103,11 @@ impl Scheduler {
         self.sched.reschedule()
     }
 
-    pub fn register_task(&self, task: &Arc<Task>) {
+    pub fn register_task(&self, task: &ArcTask) {
         self.tasks.register_task(task.clone());
     }
 
-    fn create_task(&self, fun: fn()) -> Arc<Task> {
+    fn create_task(&self, fun: fn()) -> ArcTask {
         dbgln!(sched, "create task");
         let task = Task::new_kern(fun);
         dbgln!(sched, "task created");
@@ -125,7 +127,7 @@ impl Scheduler {
         task
     }
 
-    fn create_param_task(&self, fun: usize, val: usize) -> Arc<Task> {
+    fn create_param_task(&self, fun: usize, val: usize) -> ArcTask {
         let task = Task::new_param_kern(fun, val);
 
         self.tasks.register_task(task.clone());
@@ -146,44 +148,14 @@ impl Scheduler {
     }
 
     fn sleep(&self, time_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
-        let task = current_task_ref();
-        if task.locks() > 0 {
-            logln!(
-                "warn: sleeping while holding {} locks, tid: {}",
-                task.locks(),
-                task.tid()
-            );
-        }
-
-        if task.has_pending_io() {
-            task.set_has_pending_io(false);
-            return Ok(());
-        }
-
-        if !flags.contains(SleepFlags::NON_INTERRUPTIBLE) && task.signals().has_pending() {
-            return Err(SignalError::Interrupted);
-        }
-
-        let pending = task.signals().pending();
-
-        if pending > 0 {
-            logln!("WARN sleep with pending signals: {:#x}", pending);
-        }
-
-        self.sched.sleep(time_ns);
-
-        if task.signals().pending() != pending {
-            Err(SignalError::Interrupted)
-        } else {
-            Ok(())
-        }
+        self.sched.sleep(time_ns, flags)
     }
 
-    fn wake(&self, task: Arc<Task>) {
+    fn wake(&self, task: ArcTask) {
         self.sched.wake(task);
     }
 
-    fn wake_as_next(&self, task: Arc<Task>) {
+    fn wake_as_next(&self, task: ArcTask) {
         self.sched.wake_as_next(task);
     }
 
@@ -205,19 +177,20 @@ impl Scheduler {
         self.sched.stop(syscall_defs::signal::SIGSTOP);
     }
 
-    fn cont(&self, task: Arc<Task>) {
+    fn cont(&self, task: ArcTask) {
         if task.is_process_leader() {
             dbgln!(task_stop, "cont threads!");
-            task.cont_threads();
-            task.notify_continued();
             self.sched.cont(task.clone());
         } else if let Some(parent) = task.get_parent() {
             cont(parent);
         }
     }
 
-    fn cont_thread(&self, thread: Arc<Task>) {
-        thread.notify_continued();
+    fn debug(&self) {
+        self.sched.debug()
+    }
+
+    fn cont_thread(&self, thread: ArcTask) {
         self.sched.cont(thread.clone());
     }
 
@@ -225,12 +198,12 @@ impl Scheduler {
         self.tasks.close_all_tasks();
     }
 
-    pub fn fork(&self) -> Arc<Task> {
+    pub fn fork(&self) -> ArcTask {
         let current = self.sched.current_task();
 
         let forked = current.fork();
 
-        logln4!("fork {} -> {}", current.tid(), forked.tid());
+        dbgln!(task, "fork {} -> {}", current.tid(), forked.tid());
 
         self.tasks.register_task(forked.clone());
 
@@ -268,10 +241,12 @@ impl Scheduler {
         }
     }
 
-    pub fn spawn_thread(&self, entry: VirtAddr, stack: VirtAddr) -> Arc<Task> {
+    pub fn spawn_thread(&self, entry: VirtAddr, stack: VirtAddr) -> ArcTask {
         let current = self.sched.current_task();
 
         let thread = current.spawn_thread(entry, stack);
+
+        dbgln!(task, "{} spawn thread {}", current.tid(), thread.tid());
 
         self.tasks.register_task(thread.clone());
 
@@ -285,11 +260,12 @@ impl Scheduler {
 
         dbgln!(
             task,
-            "exit tid {} is pl: {}, sc: {}, wc: {}",
+            "exit tid {} is pl: {}, sc: {}, wc: {} status {:?}",
             current.tid(),
             current.is_process_leader(),
-            Arc::strong_count(current),
-            Arc::weak_count(current)
+            ArcTask::strong_count(&current.me()),
+            ArcTask::weak_count(&current.me()),
+            status
         );
 
         assert_eq!(current.locks(), 0, "Killing thread holding a locks");
@@ -303,18 +279,19 @@ impl Scheduler {
 
             current.migrate_children_to_init();
 
-            current.set_state(TaskState::Unused);
+            //dbgln!(mem, "free mem: {} {}", crate::kernel::mm::heap::heap_mem(), crate::arch::mm::phys::free_mem());
 
             self.sched.exit(status)
         } else {
             if !status.is_signaled() {
                 current
                     .process_leader()
-                    .signal(syscall_defs::signal::SIGKILL);
+                    .signal_thread(syscall_defs::signal::SIGKILL);
             } else {
                 current
                     .process_leader()
-                    .signal(status.which_signal() as usize);
+                    .signal_thread(status.which_signal() as usize);
+                self.cont(current.process_leader());
             }
 
             self.exit_thread();
@@ -323,8 +300,6 @@ impl Scheduler {
 
     pub fn exit_thread(&self) -> ! {
         let task = current_task_ref();
-
-        task.set_state(TaskState::Unused);
 
         if task.is_process_leader() {
             logln_disabled!("[ WARN ] exit thread of a process leader");
@@ -337,11 +312,11 @@ impl Scheduler {
         }
     }
 
-    pub fn get_task(&self, tid: usize) -> Option<Arc<Task>> {
+    pub fn get_task(&self, tid: usize) -> Option<ArcTask> {
         self.tasks.get(tid)
     }
 
-    pub fn queue(&self, task: Arc<Task>, alloc_cpu: bool) {
+    pub fn queue(&self, task: ArcTask, alloc_cpu: bool) {
         self.sched.queue_task(task, alloc_cpu);
     }
 }
@@ -381,7 +356,11 @@ pub fn init_ap() {
 }
 
 fn scheduler() -> &'static Scheduler {
-    SCHEDULER.get().unwrap()
+    if let Some(sched) = SCHEDULER.get() {
+        sched
+    } else {
+        panic!("sched is None!");
+    }
 }
 
 pub(in crate::kernel::sched) fn finalize() {
@@ -389,7 +368,7 @@ pub(in crate::kernel::sched) fn finalize() {
     crate::kernel::timer::reset_counter();
 }
 
-pub(in crate::kernel::sched) fn register_task(task: &Arc<Task>) {
+pub(in crate::kernel::sched) fn register_task(task: &ArcTask) {
     scheduler().register_task(task);
 }
 
@@ -413,15 +392,15 @@ pub fn internal() -> Arc<dyn SchedulerInterface> {
     scheduler().internal().clone()
 }
 
-pub fn get_task(tid: usize) -> Option<Arc<Task>> {
+pub fn get_task(tid: usize) -> Option<ArcTask> {
     scheduler().get_task(tid)
 }
 
-pub fn current_task() -> Arc<Task> {
-    scheduler().current_task().clone()
+pub fn current_task() -> ArcTask {
+    scheduler().current_task().me()
 }
 
-pub fn current_task_ref<'a>() -> &'a Arc<Task> {
+pub fn current_task_ref<'a>() -> &'a Task {
     scheduler().current_task()
 }
 
@@ -437,15 +416,15 @@ pub fn exit_thread() -> ! {
     scheduler().exit_thread();
 }
 
-pub fn create_task(fun: fn()) -> Arc<Task> {
+pub fn create_task(fun: fn()) -> ArcTask {
     scheduler().create_task(fun)
 }
 
-pub fn create_param_task(fun: usize, val: usize) -> Arc<Task> {
+pub fn create_param_task(fun: usize, val: usize) -> ArcTask {
     scheduler().create_param_task(fun, val)
 }
 
-pub fn queue_task(task: Arc<Task>, alloc_cpu: bool) {
+pub fn queue_task(task: ArcTask, alloc_cpu: bool) {
     scheduler().queue(task, alloc_cpu);
 }
 
@@ -453,11 +432,11 @@ pub fn sleep(time_ns: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
     scheduler().sleep(time_ns, flags)
 }
 
-pub fn wake(task: Arc<Task>) {
+pub fn wake(task: ArcTask) {
     scheduler().wake(task);
 }
 
-pub fn wake_as_next(task: Arc<Task>) {
+pub fn wake_as_next(task: ArcTask) {
     scheduler().wake_as_next(task);
 }
 
@@ -469,15 +448,19 @@ pub fn stop_thread() {
     scheduler().stop_thread();
 }
 
-pub fn cont(task: Arc<Task>) {
+pub fn cont(task: ArcTask) {
     scheduler().cont(task);
 }
 
-pub fn cont_thread(thread: Arc<Task>) {
+pub fn debug() {
+    scheduler().debug()
+}
+
+pub fn cont_thread(thread: ArcTask) {
     scheduler().cont_thread(thread);
 }
 
-pub fn fork() -> Arc<Task> {
+pub fn fork() -> ArcTask {
     scheduler().fork()
 }
 
@@ -489,7 +472,7 @@ pub fn exec(
     scheduler().exec(exe, args, envs)
 }
 
-pub fn spawn_thread(entry: VirtAddr, stack: VirtAddr) -> Arc<Task> {
+pub fn spawn_thread(entry: VirtAddr, stack: VirtAddr) -> ArcTask {
     scheduler().spawn_thread(entry, stack)
 }
 
@@ -510,7 +493,7 @@ pub fn preempt_disable() -> bool {
         return true;
     }
 
-    return false;
+    false
 }
 
 pub fn current_locks_var<'a>() -> Option<&'a AtomicUsize> {
@@ -526,7 +509,7 @@ pub fn preempt_enable() {
         let current = scheduler().current_task();
 
         if current.dec_locks() == 0 && current.to_reschedule() {
-            crate::kernel::sched::reschedule();
+            reschedule();
         }
     }
 }

@@ -98,6 +98,10 @@ impl IdtEntry {
             self.type_attr.insert(dsc::Flags::SYS_RING0_INTERRUPT_GATE);
         }
     }
+
+    pub fn set_stack_offset(&mut self, offset: usize) {
+        self.ist = offset as u8;
+    }
 }
 
 #[repr(C)]
@@ -130,6 +134,10 @@ impl Idt {
 
     pub unsafe fn set_user(&mut self, idx: usize, user: bool) {
         self.entries[idx].set_user(user);
+    }
+
+    pub unsafe fn set_stack_offset(&mut self, idx: usize, offset: usize) {
+        self.entries[idx].set_stack_offset(offset);
     }
 
     pub fn load(&self) {

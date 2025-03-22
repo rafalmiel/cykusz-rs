@@ -1,4 +1,3 @@
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use syscall_defs::net::MsgFlags;
 use syscall_defs::OpenFlags;
@@ -6,19 +5,19 @@ use syscall_defs::OpenFlags;
 use crate::kernel::sched::{current_task, SleepFlags};
 use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, LockApi, LockGuard, Spin};
-use crate::kernel::task::Task;
+use crate::kernel::task::ArcTask;
 
 pub struct WaitQueue {
-    tasks: Spin<Vec<Arc<Task>>>,
+    tasks: Spin<Vec<ArcTask>>,
 }
 
 pub struct WaitQueueGuard<'a> {
     wq: &'a WaitQueue,
-    task: &'a Arc<Task>,
+    task: &'a ArcTask,
 }
 
 bitflags! {
-    #[derive(Copy, Clone)]
+    #[derive(Debug, Copy, Clone)]
     pub struct WaitQueueFlags: u64 {
         const IRQ_DISABLE = (1u64 << 0);
         const NON_INTERRUPTIBLE = (1u64 << 1);
@@ -58,7 +57,7 @@ impl From<MsgFlags> for WaitQueueFlags {
 }
 
 impl<'a> WaitQueueGuard<'a> {
-    pub fn new(wq: &'a WaitQueue, task: &'a Arc<Task>) -> WaitQueueGuard<'a> {
+    pub fn new(wq: &'a WaitQueue, task: &'a ArcTask) -> WaitQueueGuard<'a> {
         wq.add_task(task.clone());
 
         WaitQueueGuard::<'a> { wq, task }
@@ -108,6 +107,12 @@ impl WaitQueue {
         let task = current_task();
 
         task.await_io(SleepFlags::empty())
+    }
+
+    pub fn task_wait_flags(flags: SleepFlags) -> SignalResult<()> {
+        let task = current_task();
+
+        task.await_io(flags)
     }
 
     pub fn wait(&self, flags: WaitQueueFlags) -> SignalResult<()> {
@@ -219,7 +224,7 @@ impl WaitQueue {
         Ok(Some(()))
     }
 
-    fn do_await_io(flags: WaitQueueFlags, task: &Arc<Task>) -> SignalResult<()> {
+    fn do_await_io(flags: WaitQueueFlags, task: &ArcTask) -> SignalResult<()> {
         let res = task.await_io(flags.into());
 
         return match res {
@@ -234,13 +239,13 @@ impl WaitQueue {
         };
     }
 
-    pub fn add_task(&self, task: Arc<Task>) {
+    pub fn add_task(&self, task: ArcTask) {
         let mut tasks = self.tasks.lock_irq();
 
         tasks.push(task);
     }
 
-    pub fn remove_task(&self, task: Arc<Task>) {
+    pub fn remove_task(&self, task: ArcTask) {
         let mut tasks = self.tasks.lock_irq();
 
         if let Some(idx) = tasks.iter().enumerate().find_map(|e| {
@@ -296,10 +301,21 @@ impl WaitQueue {
     }
 
     pub fn notify_all(&self) -> bool {
+        self.do_notify_all(false)
+    }
+
+    pub fn notify_all_debug(&self) -> bool {
+        self.do_notify_all(true)
+    }
+
+    pub fn do_notify_all(&self, debug: bool) -> bool {
         let tasks = self.tasks.lock_irq();
         let len = tasks.len();
 
         if len == 0 {
+            if debug {
+                dbgln!(notify, "no task notified, len 0");
+            }
             return false;
         }
 
@@ -308,6 +324,9 @@ impl WaitQueue {
         for i in 0..len {
             let t = &tasks[i];
 
+            if debug {
+                dbgln!(notify, "notify task {}", t.tid());
+            }
             t.wake_up();
 
             res = true;

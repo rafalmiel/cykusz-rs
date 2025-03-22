@@ -7,15 +7,15 @@ use syscall_defs::{SyscallError, SyscallResult};
 
 use crate::kernel::sched::{current_task, get_task};
 use crate::kernel::sync::{LockApi, Spin};
-use crate::kernel::task::Task;
+use crate::kernel::task::ArcTask;
 
 pub struct Group {
     id: usize,
-    processes: Spin<HashMap<usize, Arc<Task>>>,
+    processes: Spin<HashMap<usize, ArcTask>>,
 }
 
 impl Group {
-    fn new(leader: Arc<Task>) -> Arc<Group> {
+    fn new(leader: ArcTask) -> Arc<Group> {
         let group = Group {
             id: leader.pid(),
             processes: Spin::new(hashbrown::HashMap::new()),
@@ -49,7 +49,7 @@ impl Group {
             .map(|_f| procs.len())
     }
 
-    fn add_process(&self, process: Arc<Task>) -> SyscallResult {
+    fn add_process(&self, process: ArcTask) -> SyscallResult {
         let mut procs = self.processes.lock();
 
         logln4!("Add {} pid to group {}", process.pid(), self.id);
@@ -63,7 +63,7 @@ impl Group {
         }
     }
 
-    fn register_process(&self, process: Arc<Task>) {
+    fn register_process(&self, process: ArcTask) {
         let mut procs = self.processes.lock();
 
         logln4!("Register {} pid to group {}", process.pid(), self.id);
@@ -84,7 +84,8 @@ impl Group {
     pub fn signal(&self, sig: usize) {
         let procs = self.processes.lock();
 
-        logln4!(
+        dbgln!(
+            signal,
             "Signal group {}, sig: {}, processes: {}",
             self.id,
             sig,
@@ -96,7 +97,7 @@ impl Group {
         }
     }
 
-    pub fn for_each(&self, f: &impl Fn(&Arc<Task>)) {
+    pub fn for_each(&self, f: &impl Fn(&ArcTask)) {
         let procs = self.processes.lock();
 
         for (_id, task) in procs.iter() {
@@ -118,7 +119,7 @@ pub struct Session {
 }
 
 impl Session {
-    fn new(leader: Arc<Task>) -> Arc<Session> {
+    fn new(leader: ArcTask) -> Arc<Session> {
         let session = Session {
             id: leader.pid(),
             groups: Spin::new(hashbrown::HashMap::new()),
@@ -136,7 +137,7 @@ impl Session {
         Arc::new(session)
     }
 
-    fn remove_process(&self, process: &Arc<Task>) -> SyscallResult {
+    fn remove_process(&self, process: &ArcTask) -> SyscallResult {
         let mut groups = self.groups.lock();
 
         if let Some(group) = groups.get(&process.gid()) {
@@ -153,7 +154,7 @@ impl Session {
         Err(SyscallError::ESRCH)
     }
 
-    fn move_to_group(&self, process: Arc<Task>, group: usize) -> SyscallResult {
+    fn move_to_group(&self, process: ArcTask, group: usize) -> SyscallResult {
         let mut groups = self.groups.lock();
 
         let from = groups.get(&process.gid()).ok_or(SyscallError::EPERM)?;
@@ -193,7 +194,7 @@ impl Session {
         }
     }
 
-    fn register_task(&self, process: Arc<Task>) {
+    fn register_task(&self, process: ArcTask) {
         let mut groups = self.groups.lock();
 
         if let Some(group) = groups.get(&process.gid()) {
@@ -211,7 +212,7 @@ impl Session {
         self.groups.lock().get(&gid).cloned()
     }
 
-    pub fn for_each(&self, f: impl Fn(&Arc<Task>)) {
+    pub fn for_each(&self, f: impl Fn(&ArcTask)) {
         let groups = self.groups.lock();
 
         for (_id, group) in groups.iter() {
@@ -235,7 +236,7 @@ impl Sessions {
         }
     }
 
-    pub fn remove_process(&self, process: &Arc<Task>) -> SyscallResult {
+    pub fn remove_process(&self, process: &ArcTask) -> SyscallResult {
         let mut sessions = self.sessions.lock();
 
         logln_disabled!("sessions: Remove process: {}", process.tid());
@@ -253,13 +254,13 @@ impl Sessions {
         Err(SyscallError::ESRCH)
     }
 
-    fn create_session(&self, process: Arc<Task>) {
+    fn create_session(&self, process: ArcTask) {
         let mut sessions = self.sessions.lock();
 
         sessions.insert(process.pid(), Session::new(process));
     }
 
-    fn move_to_group(&self, process: Arc<Task>, group: usize) -> SyscallResult {
+    fn move_to_group(&self, process: ArcTask, group: usize) -> SyscallResult {
         let sessions = self.sessions.lock();
 
         if group == process.gid() || (group == 0 && process.is_group_leader()) {
@@ -271,7 +272,7 @@ impl Sessions {
         session.move_to_group(process, group)
     }
 
-    pub fn register_process(&self, process: Arc<Task>) {
+    pub fn register_process(&self, process: ArcTask) {
         if !process.is_process_leader() {
             return;
         }
@@ -307,7 +308,7 @@ impl Sessions {
         sessions.get(&sid).cloned()
     }
 
-    pub fn set_sid(&self, process: Arc<Task>) -> SyscallResult {
+    pub fn set_sid(&self, process: ArcTask) -> SyscallResult {
         if process.is_group_leader() {
             return Err(SyscallError::EPERM);
         }

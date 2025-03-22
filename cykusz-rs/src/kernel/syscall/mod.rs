@@ -13,7 +13,8 @@ pub fn init_ap() {
 fn conditional_enable_int(sys: usize) {
     use syscall_defs::*;
     match sys {
-        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT | SYS_KILL | SYS_EXIT | SYS_EXIT_THREAD | SYS_EXEC => {
+        SYS_FUTEX_WAKE | SYS_FUTEX_WAIT | SYS_KILL | SYS_EXIT | SYS_EXIT_THREAD | SYS_FORK
+        | SYS_EXEC | SYS_SPAWN_THREAD => {
             assert!(!crate::int::is_enabled());
             return;
         }

@@ -39,6 +39,11 @@ impl<T> Spin<T> {
             l: M::new(user_data),
         }
     }
+
+    #[inline(never)]
+    pub fn is_locked(&self) -> bool {
+        self.l.is_locked()
+    }
 }
 
 impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {

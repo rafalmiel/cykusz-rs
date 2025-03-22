@@ -22,7 +22,7 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::session::{sessions, Group};
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
-use crate::kernel::task::Task;
+use crate::kernel::task::ArcTask;
 use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::types::Prefault;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
@@ -33,7 +33,7 @@ mod input;
 mod keymap;
 mod output;
 
-const BACKLOG_SIZE: usize = 1000;
+const BACKLOG_SIZE: usize = 0;
 
 struct State {
     lshift: bool,
@@ -61,7 +61,7 @@ struct Tty {
     buffer: Spin<InputBuffer>,
     output: Spin<OutputBuffer>,
     wait_queue: WaitQueue,
-    ctrl_task: Spin<Option<Arc<Task>>>,
+    ctrl_task: Spin<Option<ArcTask>>,
     fg_group: Spin<Option<Arc<Group>>>,
     self_ptr: Weak<Tty>,
     termios: Spin<tty::Termios>,
@@ -238,6 +238,22 @@ impl Tty {
         return false;
     }
 
+    fn handle_special(&self, key: KeyCode, released: bool, state: &mut SpinGuard<State>) -> bool {
+        match key {
+            KeyCode::KEY_D if (state.lctrl && state.lshift) && !released => {
+                crate::kernel::sched::debug()
+            }
+            KeyCode::KEY_L if (state.lctrl && state.lshift) && !released => {
+                crate::arch::output::debug::toggle_log()
+            }
+            _ => {
+                return false;
+            }
+        }
+
+        true
+    }
+
     fn handle_canonical(&self, key: KeyCode, released: bool, state: &mut SpinGuard<State>) -> bool {
         match key {
             KeyCode::KEY_BACKSPACE if !released => {
@@ -357,6 +373,10 @@ impl KeyListener for Tty {
             return;
         }
 
+        if self.handle_special(key, released, &mut state) {
+            return;
+        }
+
         if self.handle_scroll(key, released, &mut state) {
             return;
         }
@@ -394,11 +414,11 @@ impl TerminalDevice for Tty {
         self.dev_id
     }
 
-    fn ctrl_process(&self) -> Option<Arc<Task>> {
+    fn ctrl_process(&self) -> Option<ArcTask> {
         self.ctrl_task.lock().as_ref().cloned()
     }
 
-    fn attach(&self, task: Arc<Task>) -> bool {
+    fn attach(&self, task: ArcTask) -> bool {
         if !task.is_session_leader() {
             return false;
         }
@@ -419,7 +439,7 @@ impl TerminalDevice for Tty {
         false
     }
 
-    fn detach(&self, task: Arc<Task>) -> bool {
+    fn detach(&self, task: ArcTask) -> bool {
         let mut ctrl = self.ctrl_task.lock_irq();
 
         if let Some(cur) = ctrl.as_ref() {

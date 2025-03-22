@@ -27,7 +27,9 @@ use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Metadata;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::mm::get_flags;
-use crate::kernel::sync::{LockApi, Mutex, RwMutex, RwMutexReadGuard, RwMutexWriteGuard};
+use crate::kernel::sync::{
+    LockApi, Mutex, MutexGuard, RwMutex, RwMutexReadGuard, RwMutexWriteGuard,
+};
 use crate::kernel::time::unix_timestamp;
 use crate::kernel::utils::slice::ToBytes;
 
@@ -36,6 +38,7 @@ pub struct LockedExt2INode {
     fs: Weak<Ext2Filesystem>,
     self_ref: Weak<LockedExt2INode>,
     dirty_list: Mutex<LinkedList<PageCacheItemAdapter>>,
+    device_lock: Mutex<()>,
 }
 
 impl LockedExt2INode {
@@ -55,6 +58,7 @@ impl LockedExt2INode {
                     dirty_list: Mutex::new(LinkedList::<PageCacheItemAdapter>::new(
                         PageCacheItemAdapter::new(),
                     )),
+                    device_lock: Mutex::new(()),
                 }
             })))
         }
@@ -586,6 +590,10 @@ impl CachedAccess for LockedExt2INode {
         self.self_ref.clone()
     }
 
+    fn lock_device(&'_ self) -> MutexGuard<'_, ()> {
+        self.device_lock.lock()
+    }
+
     fn notify_dirty(&self, page: &PageCacheItemArc) {
         page.link_to_list(&mut *self.dirty_list.lock());
         self.ext2_fs().dev().notify_dirty_inode(page);
@@ -593,10 +601,11 @@ impl CachedAccess for LockedExt2INode {
 
     fn notify_clean(&self, page: &PageCacheItem) {
         self.ext2_fs().dev().notify_clean_inode(page);
-        if let Some(mut s) = self.dirty_list.try_lock() {
-            //logln!("notify clean inode unlink");
-            page.unlink_from_list(&mut *s);
-        }
+        page.unlink_from_list(&mut *self.dirty_list.lock());
+        //if let Some(mut s) = self.dirty_list.try_lock() {
+        //    //logln!("notify clean inode unlink");
+        //    page.unlink_from_list(&mut *s);
+        //}
     }
 
     fn sync_page(&self, page: &PageCacheItem) {

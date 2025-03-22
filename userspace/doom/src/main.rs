@@ -8,10 +8,10 @@ mod cykusz;
 mod doomgeneric;
 mod sound;
 
+use crate::cykusz::CykuszDoom;
 use std::ffi::{c_char, c_int, c_uchar, c_uint, CString};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::cykusz::CykuszDoom;
 
 static mut DOOM: *mut CykuszDoom = std::ptr::null_mut();
 static mut DOOM_SCREEN: Option<DoomScreen> = None;

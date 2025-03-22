@@ -3,17 +3,18 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 
 use spin::Once;
 
-use syscall_defs::poll::PollEventFlags;
-use syscall_defs::stat::{Mode, Stat};
-use syscall_defs::OpenFlags;
-
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::{FsError, Result};
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 use crate::kernel::utils::buffer::BufferQueue;
 use crate::kernel::utils::node_map::{NodeMap, NodeMapItem};
 use crate::kernel::utils::wait_queue::WaitQueueFlags;
+use syscall_defs::poll::PollEventFlags;
+use syscall_defs::signal::SIGPIPE;
+use syscall_defs::stat::{Mode, Stat};
+use syscall_defs::OpenFlags;
 
 pub struct Pipe {
     buf: BufferQueue,
@@ -56,7 +57,7 @@ impl Pipe {
 
 impl NodeMapItem for Pipe {
     fn new(key: Option<(usize, usize)>) -> Arc<Pipe> {
-        logln4!("Created PIPE");
+        dbgln!(pipe, "Created PIPE");
         Arc::new_cyclic(|me| Pipe {
             buf: BufferQueue::new(4096 * 4, false, false),
             sref: me.clone(),
@@ -74,7 +75,7 @@ impl NodeMapItem for Pipe {
 
 impl Drop for Pipe {
     fn drop(&mut self) {
-        logln4!("Dopped PIPE");
+        dbgln!(pipe, "Dopped PIPE");
     }
 }
 
@@ -89,11 +90,19 @@ impl INode for Pipe {
         Ok(stat)
     }
     fn read_at(&self, _offset: usize, buf: &mut [u8], flags: OpenFlags) -> Result<usize> {
+        dbgln!(pipe, "read");
         Ok(self.buf.read_data_flags(buf, WaitQueueFlags::from(flags))?)
     }
 
     fn write_at(&self, _offset: usize, buf: &[u8], flags: OpenFlags) -> Result<usize> {
-        self.buf.append_data_flags(buf, WaitQueueFlags::from(flags))
+        dbgln!(pipe, "write");
+        match self.buf.append_data_flags(buf, WaitQueueFlags::from(flags)) {
+            Err(e) if e == FsError::Pipe => {
+                current_task_ref().signal(SIGPIPE);
+                Err(e)
+            }
+            other => other,
+        }
     }
 
     fn poll(
@@ -145,10 +154,6 @@ impl INode for Pipe {
             self.inc_readers();
 
             self.buf.set_has_readers(true);
-
-            if !flags.contains(OpenFlags::NONBLOCK) {
-                self.buf.wait_for_writers()?;
-            }
         }
 
         if flags.is_open_mode(OpenFlags::WRONLY) {
@@ -159,10 +164,6 @@ impl INode for Pipe {
             self.inc_writers();
 
             self.buf.set_has_writers(true);
-
-            if !flags.contains(OpenFlags::NONBLOCK) {
-                self.buf.wait_for_readers()?;
-            }
         }
 
         Ok(())

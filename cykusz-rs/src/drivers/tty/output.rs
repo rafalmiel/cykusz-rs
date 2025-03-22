@@ -914,7 +914,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 self.output.cursor_y = self.output.saved_y;
             }
             a => {
-                panic!("Unhandled cmd {}", a);
+                dbgln!(vti, "Unhandled cmd {}", a);
             }
         }
     }

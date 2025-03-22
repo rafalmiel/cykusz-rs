@@ -16,6 +16,7 @@
 #![feature(trace_macros)]
 #![feature(ptr_as_ref_unchecked)]
 #![feature(maybe_uninit_as_bytes)]
+#![feature(allocator_api)]
 extern crate alloc;
 #[macro_use]
 extern crate bitflags;
@@ -31,13 +32,14 @@ use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
+use crate::kernel::sync::IrqGuard;
 use alloc::sync::Arc;
 use core::any::Any;
 use core::arch::asm;
 use syscall_defs::OpenFlags;
 
 #[global_allocator]
-static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
+static HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
 
 mod externs;
 #[macro_use]
@@ -227,6 +229,7 @@ fn idle() -> ! {
 }
 
 fn sigexec_poweroff(_param: Arc<dyn Any + Send + Sync>) {
+    let _irq = IrqGuard::new();
     // executing as init task here
     dbgln!(
         poweroff,

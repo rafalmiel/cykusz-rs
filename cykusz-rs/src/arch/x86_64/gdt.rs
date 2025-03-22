@@ -1,3 +1,4 @@
+use crate::arch::idt::set_interrupt_stack_tss_offset;
 use crate::arch::raw::descriptor as dsc;
 use crate::arch::raw::gdt;
 use crate::arch::raw::segmentation as sgm;
@@ -100,6 +101,15 @@ fn init_tss(stack_top: VirtAddr, fs_base: u64) {
             let gdt_high = &mut gdt[6];
             gdt_high.set_raw(((&raw const TSS) as u64) >> 32);
         }
+
+        tss.ist[0] = crate::kernel::mm::allocate_order(2)
+            .unwrap()
+            .address_mapped()
+            .0 as u64
+            + 0x4000;
+        set_interrupt_stack_tss_offset(8, 0);
+        //tss.ist[1] = crate::kernel::mm::allocate_order(6).unwrap().address_mapped().0 as u64 + 0x40000;
+        //set_interrupt_stack_tss_offset(14, 1);
 
         dsc::load_tr(&sgm::SegmentSelector::from_raw(5 << 3));
 

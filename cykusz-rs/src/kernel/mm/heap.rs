@@ -16,9 +16,10 @@ pub fn init() {
         map(addr);
     }
     unsafe {
-        let heap = heap_mut();
-        heap.0.lock().init(HEAP_START.0 as *mut u8, HEAP_SIZE);
+        let heap = heap();
+        heap.0.lock_irq().init(HEAP_START.0 as *mut u8, HEAP_SIZE);
     }
+    LEAK_CATCHER.call_once(|| LeakCatcher::new());
 }
 
 fn map_more_heap(from: *const u8, size: usize) {
@@ -61,7 +62,13 @@ impl LeakCatcher {
         self.disable();
 
         if let Some(p) = self.allocs.lock().insert(ptr, layout) {
-            println!("replacing 0x{:x} {} with {}", ptr, layout.size(), p.size());
+            dbgln!(
+                leakcatcher,
+                "replacing 0x{:x} {} with {}",
+                ptr,
+                layout.size(),
+                p.size()
+            );
         }
 
         if enabled {
@@ -92,7 +99,12 @@ impl LeakCatcher {
         let locks = self.allocs.lock();
 
         for p in locks.iter() {
-            println!("unallocated ptr: 0x{:x} size: {}", p.0, p.1.size());
+            dbgln!(
+                leakcatcher,
+                "unallocated ptr: 0x{:x} size: {}",
+                p.0,
+                p.1.size()
+            );
         }
 
         //locks.clear();
@@ -116,12 +128,10 @@ impl LeakCatcher {
 }
 
 pub fn heap_mem() -> usize {
-    unsafe {
-        let heap = (&raw const crate::HEAP).read();
-        let used = heap.lock().used();
+    let heap = heap();
+    let used = heap.lock_irq().used();
 
-        used
-    }
+    used
 }
 
 impl LockedHeap {
@@ -187,12 +197,17 @@ impl Drop for HeapDebug {
 
 unsafe impl GlobalAlloc for LockedHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        //let _sw = if crate::kernel::smp::is_smp_initialised() {
+        //    Some(crate::kernel::utils::stopwatch::StopWatch::new("alloc"))
+        //} else {
+        //    None
+        //};
         let ptr = self
             .allocate(&mut self.0.lock_irq(), layout)
             .ok()
             .map_or(0 as *mut u8, |alloc| alloc.as_ptr());
 
-        //leak_catcher().track_alloc(ptr as usize, layout);
+        leak_catcher().track_alloc(ptr as usize, layout);
         if HEAP_DEBUG.load(Ordering::SeqCst) {
             println!("Alloc {:p} {}", ptr, layout.size());
         };
@@ -201,7 +216,12 @@ unsafe impl GlobalAlloc for LockedHeap {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        //leak_catcher().track_dealloc(ptr as usize);
+        //let _sw = if crate::kernel::smp::is_smp_initialised() {
+        //    Some(crate::kernel::utils::stopwatch::StopWatch::new("dealloc"))
+        //} else {
+        //    None
+        //};
+        leak_catcher().track_dealloc(ptr as usize);
         if HEAP_DEBUG.load(Ordering::SeqCst) {
             println!("Dealloc {:p} {}", ptr, layout.size());
         };
@@ -214,10 +234,6 @@ unsafe impl GlobalAlloc for LockedHeap {
 
 fn heap() -> &'static LockedHeap {
     unsafe { (&raw const crate::HEAP).as_ref_unchecked() }
-}
-
-fn heap_mut() -> &'static LockedHeap {
-    unsafe { (&raw mut crate::HEAP).as_mut_unchecked() }
 }
 
 pub fn allocate_layout(layout: Layout) -> Option<*mut u8> {

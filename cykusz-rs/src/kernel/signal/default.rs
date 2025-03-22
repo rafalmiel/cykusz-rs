@@ -1,6 +1,4 @@
-use alloc::sync::Arc;
-
-use crate::kernel::task::Task;
+use crate::kernel::task::ArcTask;
 
 #[derive(Copy, Clone)]
 pub enum Action {
@@ -61,7 +59,7 @@ fn stop(sig: usize) {
     crate::kernel::sched::stop(sig);
 }
 
-pub fn cont(_sig: usize, task: Arc<Task>) {
+pub fn cont(_sig: usize, task: ArcTask) {
     logln2!("CONT {}", task.tid());
     crate::kernel::sched::cont(task);
 }

@@ -48,7 +48,7 @@ kvm_params :=
 endif
 
 ifdef debug
-debug_params := -no-reboot -s -S
+debug_params := -no-reboot -s -S -monitor unix:qemu-monitor-socket,server,nowait
 else
 debug_params :=
 endif
@@ -77,6 +77,21 @@ run: $(disk)
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 5811 -smp cpus=4 -audio driver=pipewire,model=hda -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host --enable-kvm
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host
 
+record: $(disk)
+	qemu-system-x86_64 \
+        -icount shift=auto,rr=record,rrfile=replay.bin \
+		-serial stdio \
+		-no-reboot \
+		-m 5811 \
+		-smp cpus=$(cpus) \
+        -net none \
+		-drive format=raw,file=disk.img,if=none,id=test-img \
+        -drive driver=blkreplay,if=none,image=test-img,id=img-blkreplay \
+        -device ich9-ahci,id=ahci -device ide-hd,drive=img-blkreplay,bus=ahci.0 \
+		-rtc base=utc,clock=host \
+		$(kvm_params) \
+		$(debug_params)
+
 run_ata: $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -m 512 -smp cpus=4  -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
 	qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000,netdev=mynet0,id=ck_nic0 -hda disk.img -rtc base=utc,clock=host
@@ -103,6 +118,9 @@ endif
 
 gdb:
 	@rust-gdb "$(kernel)" -ex "target remote :1234"
+
+monitor:
+	socat -,echo=0,icanon=0 unix-connect:qemu-monitor-socket
 
 kdbg:
 	@kdbg -r localhost:1234

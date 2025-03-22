@@ -3,6 +3,7 @@
 use alloc::sync::Arc;
 use core::any::Any;
 use core::ops::{Index, IndexMut};
+use core::ptr::addr_of;
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use bit_field::BitField;
@@ -14,7 +15,7 @@ use syscall_defs::{SyscallError, SyscallResult};
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{IrqGuard, LockApi, Spin, SpinGuard};
-use crate::kernel::task::Task;
+use crate::kernel::task::ArcTask;
 
 mod default;
 
@@ -170,8 +171,16 @@ impl Entries {
     }
 
     pub fn clear_pending(&mut self, sig: u64) {
+        dbgln!(
+            task,
+            "clear pending {} before {:b} addr: {:?}",
+            sig,
+            self.pending(),
+            addr_of!(self)
+        );
         let sig = sig - 1;
         self.pending_mask.set_bit(sig as usize, false);
+        dbgln!(task, "clear pending after {:b}", self.pending());
     }
 
     pub fn set_pending(&mut self, sig: u64) {
@@ -189,6 +198,8 @@ pub struct SigExec {
 
 #[derive(Default)]
 pub struct Signals {
+    // Lock shared between threads of the same process
+    shared_lock: Arc<Spin<()>>,
     entries: Arc<Spin<Entries>>,
     blocked_mask: AtomicU64,
     thread_pending_mask: AtomicU64,
@@ -199,6 +210,7 @@ pub struct Signals {
 impl Clone for Signals {
     fn clone(&self) -> Self {
         Signals {
+            shared_lock: self.shared_lock.clone(),
             entries: self.entries.clone(),
             blocked_mask: AtomicU64::new(self.blocked_mask.load(Ordering::SeqCst)),
             thread_pending_mask: AtomicU64::new(0),
@@ -212,12 +224,16 @@ impl Clone for Signals {
 pub enum TriggerResult {
     Blocked,
     Triggered,
-    Execute(fn(usize, Arc<Task>)),
+    Execute(fn(usize, ArcTask)),
 }
 
 impl Signals {
     pub fn entries(&self) -> SpinGuard<'_, Entries> {
         self.entries.lock_irq()
+    }
+
+    pub fn global_lock(&self) -> SpinGuard<'_, ()> {
+        self.shared_lock.lock_irq()
     }
 
     pub fn thread_pending(&self) -> u64 {
@@ -383,7 +399,8 @@ impl Signals {
         match how {
             syscall_defs::signal::SigProcMask::Block => {
                 self.blocked_mask.fetch_or(set, Ordering::SeqCst);
-                logln2!(
+                dbgln!(
+                    signal,
                     "sigblock {:b} {:b}",
                     set,
                     self.blocked_mask.load(Ordering::SeqCst)
@@ -391,7 +408,8 @@ impl Signals {
             }
             syscall_defs::signal::SigProcMask::Unblock => {
                 self.blocked_mask.fetch_and(!set, Ordering::SeqCst);
-                logln2!(
+                dbgln!(
+                    signal,
                     "sigunblock {:b} {:b}",
                     set,
                     self.blocked_mask.load(Ordering::SeqCst)
@@ -399,7 +417,8 @@ impl Signals {
             }
             syscall_defs::signal::SigProcMask::Set => {
                 self.blocked_mask.store(set, Ordering::SeqCst);
-                logln2!(
+                dbgln!(
+                    signal,
                     "sigset {:b} {:b}",
                     set,
                     self.blocked_mask.load(Ordering::SeqCst)
@@ -421,6 +440,8 @@ pub fn do_signals(_from_syscall: bool, _syscall: usize) -> DoSignalsResult {
 
     let signals = task.signals();
 
+    //let shared_lock = signals.global_lock();
+
     if !signals.has_pending() {
         return DoSignalsResult::None;
     }
@@ -429,8 +450,8 @@ pub fn do_signals(_from_syscall: bool, _syscall: usize) -> DoSignalsResult {
         logln_disabled!(
             "sigkill: {} sc: {}, wc: {}",
             task.tid(),
-            Arc::strong_count(task),
-            Arc::weak_count(task)
+            ArcTask::strong_count(&task.me()),
+            ArcTask::weak_count(&task.me())
         );
 
         signals.clear_pending(syscall_defs::signal::SIGKILL as u64);
@@ -443,8 +464,8 @@ pub fn do_signals(_from_syscall: bool, _syscall: usize) -> DoSignalsResult {
         logln_disabled!(
             "sigkill: {} sc: {}, wc: {}",
             task.tid(),
-            Arc::strong_count(task),
-            Arc::weak_count(task)
+            ArcTask::strong_count(&task.me()),
+            ArcTask::weak_count(&task.me())
         );
 
         signals.clear_pending(syscall_defs::signal::SIGABRT as u64);
@@ -460,6 +481,8 @@ pub fn do_signals(_from_syscall: bool, _syscall: usize) -> DoSignalsResult {
         if !signals.is_blocked(s) && signals.is_pending(s as u64) {
             signals.clear_pending(s as u64);
 
+            //drop(shared_lock);
+
             let entries = signals.entries();
 
             let entry = entries[s];
@@ -467,6 +490,7 @@ pub fn do_signals(_from_syscall: bool, _syscall: usize) -> DoSignalsResult {
             return match entry.handler() {
                 SignalHandler::Default => {
                     drop(entries);
+                    dbgln!(task, "handle default sig task {}", task.tid());
                     default::handle_default(s);
                     DoSignalsResult::Default
                 }

@@ -1,4 +1,5 @@
 pub fn init() {}
+pub fn toggle_log() {}
 
 #[macro_export]
 macro_rules! dbg {

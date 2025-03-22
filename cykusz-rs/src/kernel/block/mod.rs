@@ -104,6 +104,7 @@ pub struct BlockDevice {
     cleanup_timer: Arc<Timer>,
     sync_all_altive: AtomicBool,
     uuid: Once<Option<Uuid>>,
+    device_lock: Mutex<()>,
 }
 
 impl FsDevice for BlockDevice {
@@ -200,6 +201,7 @@ impl BlockDevice {
             cleanup_timer: create_timer(TimerCallback::new(me.clone(), BlockDevice::sync_all)),
             sync_all_altive: AtomicBool::new(false),
             uuid: Once::new(),
+            device_lock: Mutex::new(()),
         })
     }
 
@@ -276,6 +278,10 @@ impl CachedAccess for BlockDevice {
         self.self_ref.clone()
     }
 
+    fn lock_device(&'_ self) -> MutexGuard<'_, ()> {
+        self.device_lock.lock()
+    }
+
     fn notify_dirty(&self, page: &PageCacheItemArc) {
         //logln!("notify dirty page: {}", page.offset());
         let mut dirty = self.dirty_pages.lock();
@@ -294,7 +300,12 @@ impl CachedAccess for BlockDevice {
 
             dirty.remove(&page.cache_key());
 
-            if dirty.is_empty() && self.dirty_inode_pages.lock().is_empty() {
+            if {
+                let e = dirty.is_empty();
+                drop(dirty);
+                e
+            } && self.dirty_inode_pages.lock().is_empty()
+            {
                 self.cleanup_timer.disable();
             }
         }
@@ -338,7 +349,12 @@ impl CachedBlockDev for BlockDevice {
 
             dirty.remove(&page.cache_key());
 
-            if dirty.is_empty() && self.dirty_pages.lock().is_empty() {
+            if {
+                let e = dirty.is_empty();
+                drop(dirty);
+                e
+            } && self.dirty_pages.lock().is_empty()
+            {
                 self.cleanup_timer.disable();
             }
         }

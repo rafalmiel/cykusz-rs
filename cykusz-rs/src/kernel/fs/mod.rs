@@ -224,9 +224,9 @@ fn lookup_by_path_from(
                 let r = if let Some(r) = r {
                     Ok(r)
                 } else {
-                    let current = cur.read();
+                    let current = cur.inode();
 
-                    current.inode.lookup(cur.clone(), s)
+                    current.lookup(cur.clone(), s)
                 };
 
                 //     .or_else(|_| {
@@ -308,6 +308,7 @@ pub fn lookup_by_path_at(
     } else {
         root_dentry().cloned()
     } {
+        //dbgln!(getdir, "lookup {}", path.str());
         lookup_by_path_from(path, lookup_mode, cur, get_symlink_entry, 0)
     } else {
         return Err(FsError::NotSupported);

@@ -2,7 +2,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use spin::Once;
 
-use crate::kernel::device::{alloc_id, Device, register_device};
+use crate::kernel::device::{alloc_id, register_device, Device};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::syscall::sys::PollTable;

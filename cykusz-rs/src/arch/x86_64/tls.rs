@@ -1,6 +1,6 @@
 use crate::arch::raw::msr;
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::sched::current_task;
+use crate::kernel::sched::current_task_ref;
 
 extern "C" {
     pub fn asm_update_kern_fs_base();
@@ -8,7 +8,7 @@ extern "C" {
 
 #[no_mangle]
 pub extern "C" fn restore_user_fs() {
-    let task = current_task();
+    let task = current_task_ref();
 
     update_fs_base(unsafe { task.arch_task().user_fs_base });
 }

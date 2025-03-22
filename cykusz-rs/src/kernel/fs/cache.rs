@@ -10,7 +10,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use intrusive_collections::{LinkedList, LinkedListLink};
 use lru::LruCache;
 
-use crate::kernel::sync::{LockApi, Mutex, Spin};
+use crate::kernel::sync::{LockApi, Mutex, MutexGuard, Spin};
 
 pub trait DropHandler {
     fn handle_drop(&self, arc: Arc<Self>);
@@ -376,6 +376,20 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
         if self.data.lock().move_to_unused(ent.clone()) {
             ent.notify_unused(&Arc::downgrade(&ent));
         }
+    }
+
+    pub fn make_item_locked(
+        &self,
+        item: T,
+        lock: &mut MutexGuard<CacheData<K, T>>,
+    ) -> ArcWrap<CacheItem<K, T>> {
+        let item = CacheItem::<K, T>::new(&self.sref, item);
+
+        lock.insert(item.cache_key(), &item);
+
+        item.notify_used();
+
+        item
     }
 
     pub fn make_item(&self, item: T) -> ArcWrap<CacheItem<K, T>> {

@@ -1,22 +1,20 @@
-use alloc::sync::Arc;
-
 use spin::Once;
 
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::{lookup_by_real_path, root_dentry, LookupMode};
 use crate::kernel::sched::current_task_ref;
-use crate::kernel::task::Task;
+use crate::kernel::task::ArcTask;
 
-static INIT: Once<Arc<Task>> = Once::new();
+static INIT: Once<ArcTask> = Once::new();
 
-pub fn init_task() -> &'static Arc<Task> {
+pub fn init_task() -> &'static ArcTask {
     unsafe { INIT.get_unchecked() }
 }
 
 pub fn exec() -> ! {
     let task = current_task_ref();
 
-    INIT.call_once(|| task.clone());
+    INIT.call_once(|| task.me());
 
     task.set_cwd(root_dentry().unwrap().clone());
 

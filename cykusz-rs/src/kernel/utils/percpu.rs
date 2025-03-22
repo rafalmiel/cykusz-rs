@@ -1,6 +1,6 @@
+use crate::kernel::mm::heap::allocate_align;
 use core::cell::UnsafeCell;
 use core::ptr::Unique;
-use crate::kernel::mm::heap::allocate_align;
 
 pub struct PerCpu<T> {
     data: UnsafeCell<Unique<T>>,

@@ -7,8 +7,8 @@ use kittyaudio::Frame;
 use sounds::Sounds;
 use std::os::unix::net::UnixStream;
 use std::process::ExitCode;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 pub struct Audio {

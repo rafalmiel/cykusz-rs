@@ -198,9 +198,6 @@ pub fn reset_counter() {
 }
 
 fn timer_handler() {
-    dbgln!(sched_v, "timer handler {}", unsafe {
-        crate::CPU_ID
-    });
     crate::kernel::sched::reschedule();
 }
 

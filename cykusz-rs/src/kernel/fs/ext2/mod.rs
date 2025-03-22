@@ -89,7 +89,7 @@ impl Ext2Filesystem {
 
     pub fn read_block(&self, block: usize, dest: &mut [u8]) -> Option<usize> {
         if current_task_ref().locks() > 0 {
-            logln!("read_block: locks > 0");
+            dbgln!(warn, "read_block: locks > 0");
         }
         self.dev
             .read_cached(block * self.sectors_per_block() * 512, dest)

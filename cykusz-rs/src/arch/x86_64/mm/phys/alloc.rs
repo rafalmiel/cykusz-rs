@@ -19,7 +19,7 @@ pub fn allocate() -> Option<Frame> {
 }
 
 pub fn allocate_order(order: usize) -> Option<Frame> {
-    let mut bdy = BUDDY.lock();
+    let mut bdy = BUDDY.lock_irq();
 
     if let Some(addr) = bdy.alloc(order) {
         Some(Frame::new(addr))
@@ -51,19 +51,19 @@ pub fn deallocate(frame: &Frame) {
 }
 
 pub fn deallocate_order(frame: &Frame, order: usize) {
-    let mut bdy = BUDDY.lock();
+    let mut bdy = BUDDY.lock_irq();
 
     bdy.dealloc(frame.address(), order);
 }
 
 pub fn used_mem() -> usize {
-    let bdy = BUDDY.lock();
+    let bdy = BUDDY.lock_irq();
 
     bdy.used_mem()
 }
 
 pub fn free_mem() -> usize {
-    let bdy = BUDDY.lock();
+    let bdy = BUDDY.lock_irq();
 
     bdy.free_mem()
 }

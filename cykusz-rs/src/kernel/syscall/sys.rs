@@ -2,7 +2,6 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
-
 use syscall_defs::net::{MsgFlags, MsgHdr, SockAddrPtr, SockDomain, SockOption, SockTypeFlags};
 use syscall_defs::poll::{FdSet, PollEventFlags};
 use syscall_defs::signal::SigAction;
@@ -66,13 +65,13 @@ fn get_dir_entry(
     lookup_mode: LookupMode,
     get_symlink_entry: bool,
 ) -> Result<DirEntryItem, SyscallError> {
-    logln!(
-        "get dir entry: {:?} {:?} {:?} get_symlink_entry: {}",
-        fd,
-        path,
-        lookup_mode,
-        get_symlink_entry
-    );
+    //dbgln!(getdir,
+    //    "get dir entry: {:?} {:?} {:?} get_symlink_entry: {}",
+    //    fd,
+    //    path,
+    //    lookup_mode,
+    //    get_symlink_entry
+    //);
 
     let task = current_task_ref();
 
@@ -94,10 +93,21 @@ fn get_dir_entry(
         }
     };
 
-    if let Some(path) = path {
+    if let Some(p) = &path {
+        dbgln!(getdir, "before opt {:p}", p.str().as_ptr())
+    }
+    if let Some(p) = path {
+        dbgln!(getdir, "after opt {:p}", p.str().as_ptr());
+        //dbgln!(getdir,
+        //    "get dir entry: {:?} {:?} {:?} get_symlink_entry: {}",
+        //    fd,
+        //    path,
+        //    lookup_mode,
+        //    get_symlink_entry
+        //);
         Ok(lookup_by_path_at(
             file_dir,
-            &path,
+            &p,
             lookup_mode,
             get_symlink_entry,
         )?)
@@ -166,6 +176,8 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
+
+    dbgln!(sys_write, "task {} fd {}", task.tid(), fd);
 
     return if let Some(f) = task.get_handle(fd) {
         if f.flags().is_writable() {
@@ -293,7 +305,7 @@ pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) ->
 pub fn sys_fcntl(fd: u64, cmd: u64, flags: u64) -> SyscallResult {
     let cmd = FcntlCmd::from(cmd);
 
-    logln5!("SYS_FCNTL {} {:?} {}", fd as isize, cmd, flags);
+    dbgln!(syscall_v, "SYS_FCNTL {} {:?} {}", fd as isize, cmd, flags);
 
     match cmd {
         FcntlCmd::GetFD => {
@@ -1444,15 +1456,6 @@ pub fn sys_kill(pid: u64, sig: u64) -> SyscallResult {
     }
 }
 
-pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
-    let uaddr = VirtAddr(uaddr as usize);
-    let expected = expected as u32;
-
-    //println!("[ FUTEX ] wait {} {} {}", uaddr, expected, crate::kernel::int::is_enabled());
-
-    crate::kernel::futex::futex().wait(uaddr, expected)
-}
-
 pub fn sys_pipe(fds: u64, flags: u64) -> SyscallResult {
     let fds = unsafe { core::slice::from_raw_parts_mut(fds as *mut u32, 2) };
 
@@ -1464,11 +1467,18 @@ pub fn sys_pipe(fds: u64, flags: u64) -> SyscallResult {
 
     let flags = OpenFlags::from_bits(flags as usize).ok_or(SyscallError::EINVAL)?;
 
-    let f1 = OpenFlags::RDONLY | (flags & OpenFlags::CLOEXEC | OpenFlags::NONBLOCK);
+    let f1 = OpenFlags::RDONLY | (flags & OpenFlags::CLOEXEC);
     let f2 = OpenFlags::WRONLY | (flags & OpenFlags::CLOEXEC);
 
     if let Ok(fd1) = task.open_file(entry.clone(), f1) {
         if let Ok(fd2) = task.open_file(entry, f2) {
+            dbgln!(
+                sys_pipe,
+                "task {} fd1 {} fd2 {}",
+                task.tid(),
+                fds[0],
+                fds[1]
+            );
             fds[0] = fd1 as u32;
             fds[1] = fd2 as u32;
 
@@ -1526,6 +1536,15 @@ pub fn sys_truncate(fd: u64, size: u64) -> SyscallResult {
         .map(|_r| Ok(0))?
 }
 
+pub fn sys_futex_wait(uaddr: u64, expected: u64) -> SyscallResult {
+    let uaddr = VirtAddr(uaddr as usize);
+    let expected = expected as u32;
+
+    //println!("[ FUTEX ] wait {} {} {}", uaddr, expected, crate::kernel::int::is_enabled());
+
+    crate::kernel::futex::futex().wait(uaddr, expected)
+}
+
 pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
     let uaddr = VirtAddr(uaddr as usize);
 
@@ -1537,6 +1556,7 @@ pub fn sys_futex_wake(uaddr: u64) -> SyscallResult {
 }
 
 pub fn sys_stat(fd: u64, path: u64, path_len: u64, stat: u64, flags: u64) -> SyscallResult {
+    //dbgln!(getdir, "sys_stat {} {:#x} {} {} {:#b}", fd as i64, path, path_len, stat, flags);
     let fd = OpenFD::try_from(fd)?;
     logln!("atflags: {:X}", flags);
     let flags = AtFlags::from_bits(flags).ok_or(SyscallError::EINVAL)?;

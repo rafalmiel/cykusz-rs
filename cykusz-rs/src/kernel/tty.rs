@@ -1,5 +1,5 @@
 use alloc::collections::BTreeMap;
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 
 use spin::Once;
 
@@ -9,13 +9,13 @@ use crate::kernel::fs::vfs::FsError;
 use crate::kernel::fs::{lookup_by_real_path, LookupMode};
 use crate::kernel::session::Group;
 use crate::kernel::sync::{LockApi, RwSpin, Spin};
-use crate::kernel::task::Task;
+use crate::kernel::task::{ArcTask, WeakTask};
 
 pub trait TerminalDevice: Send + Sync {
     fn id(&self) -> DevId;
-    fn ctrl_process(&self) -> Option<Arc<Task>>;
-    fn attach(&self, task: Arc<Task>) -> bool;
-    fn detach(&self, task: Arc<Task>) -> bool;
+    fn ctrl_process(&self) -> Option<ArcTask>;
+    fn attach(&self, task: ArcTask) -> bool;
+    fn detach(&self, task: ArcTask) -> bool;
     fn set_fg_group(&self, group: Arc<Group>) -> bool;
 }
 
@@ -43,7 +43,7 @@ pub fn get_tty_by_id(id: DevId) -> Option<Arc<dyn TerminalDevice>> {
 
 pub struct Terminal {
     ctrl_term: Arc<Spin<Option<Arc<dyn TerminalDevice>>>>,
-    proc: Once<Weak<Task>>,
+    proc: Once<WeakTask>,
 }
 
 impl Default for Terminal {
@@ -68,11 +68,11 @@ pub fn get_tty_by_path(path: &str) -> Result<Arc<dyn TerminalDevice>, FsError> {
 }
 
 impl Terminal {
-    pub fn init(&self, task: &Weak<Task>) {
+    pub fn init(&self, task: &WeakTask) {
         self.proc.call_once(|| task.clone());
     }
 
-    fn task(&self) -> Option<Arc<Task>> {
+    fn task(&self) -> Option<ArcTask> {
         unsafe { self.proc.get_unchecked().upgrade() }
     }
 

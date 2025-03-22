@@ -75,6 +75,10 @@ pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut 
         );
 
         crate::arch::signal::arch_sys_check_signals(res, sys_frame, regs);
+
+        if task.is_parent_terminating() {
+            crate::kernel::syscall::sys::sys_exit_thread();
+        }
     }
 }
 

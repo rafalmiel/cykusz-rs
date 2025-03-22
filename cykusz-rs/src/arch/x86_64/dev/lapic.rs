@@ -1,6 +1,3 @@
-use core::ptr::read_volatile;
-use core::ptr::write_volatile;
-use bit_field::BitField;
 use crate::arch::acpi::apic::MadtHeader;
 use crate::arch::idt;
 use crate::arch::int;
@@ -8,6 +5,9 @@ use crate::arch::mm::MappedAddr;
 use crate::arch::raw::msr;
 use crate::kernel::ipi::IpiTarget;
 use crate::kernel::sync::{IrqLock, LockApi};
+use bit_field::BitField;
+use core::ptr::read_volatile;
+use core::ptr::write_volatile;
 
 pub static LAPIC: IrqLock<LApic> = IrqLock::new(LApic::new());
 

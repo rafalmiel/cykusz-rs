@@ -19,7 +19,9 @@ use crate::kernel::fs::pcache::{
 };
 use crate::kernel::fs::{lookup_by_path, LookupMode};
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{allocate_order, map_flags, map_to_flags, unmap, update_flags, PhysAddr, VirtAddr, MAX_USER_ADDR};
+use crate::kernel::mm::{
+    allocate_order, map_flags, map_to_flags, unmap, update_flags, PhysAddr, VirtAddr, MAX_USER_ADDR,
+};
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, Mutex};
 use crate::kernel::task::filetable::FileHandle;
@@ -774,7 +776,11 @@ impl VMData {
         }
     }
 
-    fn find_fixed(&mut self, addr: VirtAddr, len: usize) -> Option<(VirtAddr, CursorMut<'_, Mapping>)> {
+    fn find_fixed(
+        &mut self,
+        addr: VirtAddr,
+        len: usize,
+    ) -> Option<(VirtAddr, CursorMut<'_, Mapping>)> {
         let mut cur = self.maps.cursor_front_mut();
 
         while let Some(c) = cur.current() {
@@ -949,7 +955,8 @@ impl VMData {
             if reason.contains(PageFaultReason::WRITE) && !map.prot.contains(MMapProt::PROT_WRITE) {
                 return false;
             }
-            if reason.contains(PageFaultReason::I_FETCH) && !map.prot.contains(MMapProt::PROT_EXEC) {
+            if reason.contains(PageFaultReason::I_FETCH) && !map.prot.contains(MMapProt::PROT_EXEC)
+            {
                 return false;
             }
 
@@ -1316,7 +1323,7 @@ impl VM {
     }
 
     pub fn fork(&self, vm: &VM) {
-        self.data.lock().fork(vm);
+        self.data.lock_irq().fork(vm);
     }
 
     pub fn mmap_vm(
@@ -1328,7 +1335,7 @@ impl VM {
         file: Option<Arc<FileHandle>>,
         offset: usize,
     ) -> Option<VirtAddr> {
-        let mut data = self.data.lock();
+        let mut data = self.data.lock_irq();
 
         let res = data.mmap(addr, len, prot, flags, file, offset);
 
@@ -1338,13 +1345,13 @@ impl VM {
     }
 
     pub fn munmap(&self, addr: VirtAddr, len: usize) -> bool {
-        let mut data = self.data.lock();
+        let mut data = self.data.lock_irq();
 
         data.unmap(addr, len)
     }
 
     pub fn mprotect_vm(&self, addr: VirtAddr, len: usize, prot: MMapProt) -> SyscallResult {
-        let mut data = self.data.lock();
+        let mut data = self.data.lock_irq();
 
         data.mprotect(addr, len, prot)
     }
@@ -1354,10 +1361,12 @@ impl VM {
             logln!("handle_pagefault: locks > 0");
         }
         dbgln!(vm, "handle_pagefault: {:?} {}", reason, addr);
-        let mut res = self.data.lock();
+        dbgln!(vm_v, "handle pagefault start {}", current_task_ref().tid());
+        let mut res = self.data.lock_irq();
 
         let ret = res.handle_pagefault(reason, addr);
 
+        dbgln!(vm_v, "handle pagefault end {}", current_task_ref().tid());
         ret
     }
 
@@ -1371,18 +1380,18 @@ impl VM {
         Option<TlsVmInfo>,
         Option<(DirEntryItem, Option<ExeArgs>)>,
     )> {
-        self.data.lock().load_bin(exe)
+        self.data.lock_irq().load_bin(exe)
     }
 
     pub fn clear(&self) {
-        self.data.lock().maps.clear();
+        self.data.lock_irq().maps.clear();
     }
 
     pub fn print_vm(&self) {
-        self.data.lock().print_vm();
+        self.data.lock_irq().print_vm();
     }
 
     pub fn log_vm(&self) {
-        self.data.lock().log_vm();
+        self.data.lock_irq().log_vm();
     }
 }

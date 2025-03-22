@@ -1,9 +1,8 @@
 use crate::kernel::sync::{LockApi, Spin};
-use crate::kernel::task::Task;
-use alloc::sync::Arc;
+use crate::kernel::task::ArcTask;
 
 pub struct TaskContainer {
-    tasks: Spin<hashbrown::HashMap<usize, Arc<Task>>>,
+    tasks: Spin<hashbrown::HashMap<usize, ArcTask>>,
 }
 
 impl Default for TaskContainer {
@@ -16,16 +15,20 @@ impl Default for TaskContainer {
 
 impl TaskContainer {
     #[allow(unused)]
-    pub fn get(&self, id: usize) -> Option<Arc<Task>> {
+    pub fn get(&self, id: usize) -> Option<ArcTask> {
         self.tasks.lock().get(&id).cloned()
     }
 
     pub fn remove_task(&self, id: usize) {
-        self.tasks.lock().remove(&id);
+        if let Some(_) = self.tasks.lock().remove(&id) {
+            dbgln!(task, "task {} removed from container", id);
+        }
     }
 
-    pub fn register_task(&self, task: Arc<Task>) {
-        self.tasks.lock().insert(task.tid(), task);
+    pub fn register_task(&self, task: ArcTask) {
+        if matches!(self.tasks.lock().insert(task.tid(), task.clone()), None) {
+            dbgln!(task, "task {} registered in container", task.tid());
+        }
     }
 
     pub fn close_all_tasks(&self) {

@@ -1,5 +1,5 @@
-use core::arch::asm;
 use crate::kernel::ipi::IpiTarget;
+use core::arch::asm;
 
 mod apic;
 pub mod msi;

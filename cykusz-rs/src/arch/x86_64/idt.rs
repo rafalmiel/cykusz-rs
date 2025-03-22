@@ -1,15 +1,15 @@
-use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU64, Ordering};
-use bit_field::BitField;
 use crate::arch::raw::idt;
 use crate::arch::raw::idt::InterruptFrame;
 use crate::arch::tls::restore_user_fs;
 use crate::arch::x86_64::int::end_of_int;
 use crate::kernel::mm::VirtAddr;
-use crate::kernel::sched::{current_task, current_task_ref};
+use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::Spin;
 use crate::kernel::sync::{LockApi, RwSpin};
 use crate::kernel::task::vm::PageFaultReason;
+use alloc::vec::Vec;
+use bit_field::BitField;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 static IDT: Spin<idt::Idt> = Spin::new(idt::Idt::new());
 
@@ -363,6 +363,12 @@ pub fn set_user_handler(num: usize, f: InterruptFn) {
     SHARED_IRQS.set_int_handler(num, f);
 }
 
+pub fn set_interrupt_stack_tss_offset(num: usize, offset: usize) {
+    unsafe {
+        IDT.lock_irq().set_stack_offset(num, offset);
+    }
+}
+
 static SHARED_IRQS: Irqs = {
     const MISSING: RwSpin<IrqHandler> = RwSpin::new(IrqHandler::Missing);
     const EMPTYU64: AtomicU64 = AtomicU64::new(0);
@@ -534,13 +540,14 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
     if virt.is_user() {
         // page fault originated in userspace
         // let the task try handle it
-        let task = current_task();
+        let task = current_task_ref();
 
         //println!("user pagefault {:#x} {} {:?} pid: {}", frame.ip, virt, reason, task.tid());
         if task.handle_pagefault(reason, virt) {
             return;
         } else {
-            dbgln!(page_fault,
+            dbgln!(
+                page_fault,
                 "[ SIGSEGV ] Task {} page_fault error addr: {}, ip: {:#x}, err: {}",
                 task.tid(),
                 virt,
@@ -565,19 +572,21 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
     }
 
     if VirtAddr(frame.ip as usize).is_user() {
-        let task = current_task();
+        let task = current_task_ref();
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
     }
 
     println!(
-        "PAGE FAULT! 0x{:x} CPU: {}, rip: {:?} virt: {}",
+        "PAGE FAULT! 0x{:x} CPU: {}, rip: {:?} virt: {} reason: {:?}",
         err,
         unsafe { crate::CPU_ID },
         frame,
-        virt
+        virt,
+        reason
     );
+    crate::lang_items::print_current_backtrace();
     loop {}
 }
 

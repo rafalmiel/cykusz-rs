@@ -1,4 +1,3 @@
-use crate::drivers::block::ahci::reg::fis;
 use crate::drivers::block::ata::AtaCommand;
 use bit_field::BitField;
 use tock_registers::fields::FieldValue;

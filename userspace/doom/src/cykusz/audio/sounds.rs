@@ -1,7 +1,7 @@
 use crate::doomgeneric::{
     sfxinfo_t, W_CacheLumpNum, W_CheckNumForName, W_GetNumForName, W_LumpLength, W_ReleaseLumpNum,
 };
-use fon::samp::{Samp8, Samp32};
+use fon::samp::{Samp32, Samp8};
 use kittyaudio::{Frame, SoundHandle};
 use std::os::raw::{c_char, c_int, c_uint, c_void};
 use std::process::ExitCode;

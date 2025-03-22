@@ -1,5 +1,3 @@
-use alloc::sync::Arc;
-
 use intrusive_collections::LinkedList;
 
 use syscall_defs::waitpid::WaitPidFlags;
@@ -9,7 +7,7 @@ use crate::kernel::sched::current_task_ref;
 use crate::kernel::session::sessions;
 use crate::kernel::signal::SignalResult;
 use crate::kernel::sync::{LockApi, Spin};
-use crate::kernel::task::{Task, WaitPidTaskAdapter};
+use crate::kernel::task::{ArcTask, Task, WaitPidTaskAdapter};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 
 #[derive(Default)]
@@ -21,15 +19,23 @@ struct TaskLists {
 pub struct WaitPidEvents {
     tasks: Spin<TaskLists>,
     wq: WaitQueue,
+    wq_threads: WaitQueue,
 }
 
 impl WaitPidEvents {
     pub fn migrate(&self, other: &WaitPidEvents) {
         {
-            let mut this_tasks = self.tasks.lock();
-            let mut other_tasks = other.tasks.lock();
+            let mut this_tasks = self.tasks.lock_irq();
+            let mut other_tasks = other.tasks.lock_irq();
+
+            dbgln!(
+                task,
+                "migrate waitpid len: {}",
+                other_tasks.tasks.iter().count()
+            );
 
             while let Some(t) = other_tasks.tasks.pop_front() {
+                dbgln!(task, "migrate task {}", t.tid());
                 this_tasks.tasks.push_back(t);
             }
         }
@@ -37,38 +43,59 @@ impl WaitPidEvents {
         self.wq.notify_all();
     }
 
-    pub fn add_zombie(&self, zombie: Arc<Task>) {
+    pub fn add_zombie(&self, zombie: ArcTask) {
+        let is_process = zombie.is_process_leader();
+
         if !zombie.waitpid.is_linked() {
-            let mut list = self.tasks.lock();
+            let mut list = self.tasks.lock_irq();
 
             list.tasks.push_back(zombie);
         }
 
-        self.wq.notify_all();
+        if is_process {
+            dbgln!(notify, "wq notify all");
+            self.wq.notify_all_debug();
+        } else {
+            dbgln!(notify, "wq_threads notify all");
+            self.wq_threads.notify_all_debug();
+        }
     }
 
-    pub fn add_stopped(&self, stopped: Arc<Task>) {
+    pub fn add_stopped(&self, stopped: ArcTask) {
+        let is_process = stopped.is_process_leader();
+
         if !stopped.waitpid.is_linked() {
-            let mut list = self.tasks.lock();
+            let mut list = self.tasks.lock_irq();
 
             list.tasks.push_back(stopped);
         }
 
-        self.wq.notify_all();
+        if is_process {
+            self.wq.notify_all_debug();
+        } else {
+            self.wq_threads.notify_all_debug();
+        }
     }
 
-    pub fn add_continued(&self, continued: Arc<Task>) {
+    pub fn add_continued(&self, continued: ArcTask) {
+        let is_process = continued.is_process_leader();
+
         if !continued.waitpid.is_linked() {
-            let mut list = self.tasks.lock();
+            let mut list = self.tasks.lock_irq();
 
             list.tasks.push_back(continued);
         }
 
-        self.wq.notify_all();
+        if is_process {
+            self.wq.notify_all_debug();
+        } else {
+            self.wq_threads.notify_all_debug();
+        }
     }
 
     fn wait_on(
         &self,
+        wq: &WaitQueue,
         me: &Task,
         flags: WaitPidFlags,
         no_intr: bool,
@@ -79,15 +106,14 @@ impl WaitPidEvents {
         let mut wq_flags: WaitQueueFlags = if flags.nohang() {
             WaitQueueFlags::NO_HANG
         } else {
-            WaitQueueFlags::empty()
+            WaitQueueFlags::IRQ_DISABLE
         };
 
         if no_intr {
             wq_flags.insert(WaitQueueFlags::NON_INTERRUPTIBLE);
         }
 
-        let found = self
-            .wq
+        let found = wq
             .wait_lock_for(wq_flags, &self.tasks, |l| {
                 let mut cur = l.tasks.front_mut();
 
@@ -101,6 +127,15 @@ impl WaitPidEvents {
                     {
                         res = (t.tid(), status, Some(t.me()));
 
+                        dbgln!(
+                            task,
+                            "task {} waitpid remove {} {} {}",
+                            t.tid(),
+                            t.sibling.is_linked(),
+                            t.sched.is_linked(),
+                            t.waitpid.is_linked()
+                        );
+
                         cur.remove();
 
                         return true;
@@ -109,7 +144,7 @@ impl WaitPidEvents {
                     }
                 }
 
-                !me.children().iter().any(&mut cond)
+                !me.children_debug(2).iter().any(&mut cond)
             })?
             .is_some();
 
@@ -122,7 +157,22 @@ impl WaitPidEvents {
                     if let Err(e) = sessions().remove_process(&task) {
                         panic!("Failed to remove process from a session {:?}", e);
                     }
+                    dbgln!(
+                        task,
+                        "task {} remove process from sessions sc: {} wc: {}",
+                        task.tid(),
+                        ArcTask::strong_count(&task),
+                        ArcTask::weak_count(&task)
+                    );
                 }
+
+                dbgln!(
+                    task,
+                    "task {} wait_on sc: {} wc: {}",
+                    task.tid(),
+                    ArcTask::strong_count(&task),
+                    ArcTask::weak_count(&task)
+                );
             }
 
             return Ok(Some((res.0, res.1)));
@@ -139,7 +189,22 @@ impl WaitPidEvents {
         flags: WaitPidFlags,
         no_intr: bool,
     ) -> SignalResult<SyscallResult> {
-        let res = self.wait_on(me, flags, no_intr, |t| {
+        dbgln!(
+            waitpid,
+            "task {} wait_thread pid {} tid {} flags {:?} no_intr: {}",
+            me.tid(),
+            pid,
+            tid,
+            flags,
+            no_intr
+        );
+        let res = self.wait_on(&self.wq_threads, me, flags, no_intr, |t| {
+            dbgln!(
+                waitpid,
+                "task {} wait_thread check run, candidate: {}",
+                me.tid(),
+                t.tid()
+            );
             !t.is_process_leader() && pid == t.pid() && (t.tid() == tid || tid == 0)
         });
 
@@ -157,8 +222,14 @@ impl WaitPidEvents {
         status: &mut syscall_defs::waitpid::Status,
         flags: WaitPidFlags,
     ) -> SignalResult<SyscallResult> {
-        dbgln!(waitpid, "{} waitpid {} {:?}", me.tid(), pid, flags);
-        let ret = self.wait_on(me, flags, false, |t| {
+        dbgln!(waitpid, "task {} waitpid {} {:?}", me.tid(), pid, flags);
+        let ret = self.wait_on(&self.wq, me, flags, false, |t| {
+            dbgln!(
+                waitpid,
+                "task {} wait_pid check run, candidate: {}",
+                me.tid(),
+                t.tid()
+            );
             if !t.is_process_leader() {
                 false
             } else {

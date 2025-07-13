@@ -26,7 +26,7 @@ impl<T: Default> Default for Mutex<T> {
 impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
     type Guard = MutexGuard<'a, T>;
 
-    fn lock(&self) -> MutexGuard<T> {
+    fn lock(&'a self) -> Self::Guard {
         let task = current_task();
 
         self.wait_queue.add_task(task.clone());
@@ -44,7 +44,20 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
         }
     }
 
-    fn lock_irq(&self) -> MutexGuard<T> {
+    fn try_lock(&'a self) -> Option<Self::Guard> {
+        loop {
+            return if let Some(g) = self.mutex.try_lock() {
+                Some(MutexGuard {
+                    g: Some(g),
+                    m: &self,
+                })
+            } else {
+                None
+            };
+        }
+    }
+
+    fn lock_irq(&'a self) -> Self::Guard {
         let task = current_task();
 
         self.wait_queue.add_task(task.clone());
@@ -59,19 +72,6 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
             } else {
                 let _ = WaitQueue::task_wait();
             }
-        }
-    }
-
-    fn try_lock(&self) -> Option<MutexGuard<T>> {
-        loop {
-            return if let Some(g) = self.mutex.try_lock() {
-                Some(MutexGuard {
-                    g: Some(g),
-                    m: &self,
-                })
-            } else {
-                None
-            };
         }
     }
 

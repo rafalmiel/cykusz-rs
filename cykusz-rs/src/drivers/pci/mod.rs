@@ -387,7 +387,7 @@ impl PciHeader0 {
         self.data.read(0x34, 8) as u8
     }
 
-    pub fn capabilities_iter(&self) -> CapabilityIter {
+    pub fn capabilities_iter(&self) -> CapabilityIter<'_> {
         CapabilityIter::new(&self.data, self.capabilities_ptr())
     }
 

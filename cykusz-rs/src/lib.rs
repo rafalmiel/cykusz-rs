@@ -3,7 +3,6 @@
 #![feature(alloc_error_handler)]
 #![feature(auto_traits)]
 #![feature(c_variadic)]
-#![feature(concat_idents)]
 #![feature(generic_const_exprs)]
 #![feature(lang_items)]
 #![feature(linkage)]

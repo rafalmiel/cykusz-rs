@@ -182,11 +182,11 @@ impl DirEntry {
         })
     }
 
-    pub fn read(&self) -> MutexGuard<DirEntryData> {
+    pub fn read(&self) -> MutexGuard<'_, DirEntryData> {
         self.data.lock()
     }
 
-    pub fn write(&self) -> MutexGuard<DirEntryData> {
+    pub fn write(&self) -> MutexGuard<'_, DirEntryData> {
         self.data.lock()
     }
 

@@ -49,7 +49,7 @@ impl PhysPage {
         (self.this_addr() - Self::base_addr()) / core::mem::size_of::<Self>() * PAGE_SIZE
     }
 
-    pub fn lock_pt(&self) -> SpinGuard<()> {
+    pub fn lock_pt(&self) -> SpinGuard<'_, ()> {
         self.pt_lock.lock()
     }
 

@@ -16,7 +16,7 @@ pub const SIGTSTP: usize = 20;
 pub const SIGTTIN: usize = 21;
 pub const SIGTTOU: usize = 22;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone)]
 pub enum SignalHandler {
     Ignore,
     Default,

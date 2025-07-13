@@ -44,37 +44,6 @@ impl<T> Spin<T> {
 impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
     type Guard = SpinGuard<'a, T>;
 
-    fn lock_debug(&self, id: usize) -> SpinGuard<T> {
-        let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
-
-        dbgln!(lock, "l: - {}", id);
-        let lock = self.l.lock();
-        dbgln!(lock, "l: + {}", id);
-
-        SpinGuard {
-            g: Some(lock),
-            irq: false,
-            notify,
-            debug: id,
-        }
-    }
-
-    fn lock_irq_debug(&self, id: usize) -> SpinGuard<T> {
-        let int_enabled = crate::kernel::int::is_enabled();
-        crate::kernel::int::disable();
-
-        dbgln!(lock, "l: - {}", id);
-        let lock = self.l.lock();
-        dbgln!(lock, "l: + {}", id);
-
-        SpinGuard {
-            g: Some(lock),
-            irq: int_enabled,
-            notify: false,
-            debug: id,
-        }
-    }
-
     fn lock(&'a self) -> Self::Guard {
         let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
 
@@ -85,6 +54,21 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
             irq: false,
             notify,
             debug: 0,
+        }
+    }
+
+    fn lock_debug(&'a self, id: usize) -> Self::Guard {
+        let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
+
+        dbgln!(lock, "l: - {}", id);
+        let lock = self.l.lock();
+        dbgln!(lock, "l: + {}", id);
+
+        SpinGuard {
+            g: Some(lock),
+            irq: false,
+            notify,
+            debug: id,
         }
     }
 
@@ -125,6 +109,22 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
             irq: int_enabled,
             notify: false,
             debug: 0,
+        }
+    }
+
+    fn lock_irq_debug(&'a self, id: usize) -> Self::Guard {
+        let int_enabled = crate::kernel::int::is_enabled();
+        crate::kernel::int::disable();
+
+        dbgln!(lock, "l: - {}", id);
+        let lock = self.l.lock();
+        dbgln!(lock, "l: + {}", id);
+
+        SpinGuard {
+            g: Some(lock),
+            irq: int_enabled,
+            notify: false,
+            debug: id,
         }
     }
 

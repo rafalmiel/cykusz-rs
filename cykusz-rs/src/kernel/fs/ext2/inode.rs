@@ -111,15 +111,15 @@ impl LockedExt2INode {
         Err(FsError::NotSupported)
     }
 
-    pub fn read(&self) -> RwMutexReadGuard<Ext2INode> {
+    pub fn read(&self) -> RwMutexReadGuard<'_, Ext2INode> {
         self.node.read()
     }
 
-    pub fn read_debug(&self, _id: usize) -> RwMutexReadGuard<Ext2INode> {
+    pub fn read_debug(&self, _id: usize) -> RwMutexReadGuard<'_, Ext2INode> {
         self.node.read()
     }
 
-    pub fn d_inode_writer(&self) -> DINodeWriter {
+    pub fn d_inode_writer(&self) -> DINodeWriter<'_> {
         DINodeWriter {
             locked: self.write_debug(16),
             fs: self.fs.clone(),
@@ -127,11 +127,11 @@ impl LockedExt2INode {
         }
     }
 
-    pub fn write(&self) -> RwMutexWriteGuard<Ext2INode> {
+    pub fn write(&self) -> RwMutexWriteGuard<'_, Ext2INode> {
         self.node.write()
     }
 
-    pub fn write_debug(&self, _id: usize) -> RwMutexWriteGuard<Ext2INode> {
+    pub fn write_debug(&self, _id: usize) -> RwMutexWriteGuard<'_, Ext2INode> {
         self.node.write()
     }
 

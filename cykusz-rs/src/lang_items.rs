@@ -5,7 +5,6 @@ use core::panic::PanicInfo;
 extern "C" fn eh_personality() {}
 
 #[cfg(not(test))]
-#[no_mangle]
 #[lang = "panic_impl"]
 pub fn panic_impl(pi: &PanicInfo) -> ! {
     println!("PANIC: {:?}", pi);

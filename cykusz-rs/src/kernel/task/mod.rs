@@ -335,7 +335,7 @@ impl Task {
         *self.parent.lock() = parent;
     }
 
-    pub fn children(&self) -> SpinGuard<LinkedList<TaskAdapter>> {
+    pub fn children(&self) -> SpinGuard<'_, LinkedList<TaskAdapter>> {
         self.children.lock()
     }
 

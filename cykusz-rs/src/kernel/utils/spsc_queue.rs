@@ -21,8 +21,8 @@ where
     p_data: PhantomData<T>,
     queue: BBBuffer<{ N * size_of::<T>() }>,
 
-    prod: Once<core::cell::RefCell<bbqueue::Producer<'a, { N * size_of::<T>() }>>>,
-    cons: Once<core::cell::RefCell<bbqueue::Consumer<'a, { N * size_of::<T>() }>>>,
+    prod: Once<core::cell::RefCell<Producer<'a, { N * size_of::<T>() }>>>,
+    cons: Once<core::cell::RefCell<Consumer<'a, { N * size_of::<T>() }>>>,
 
     data_count: AtomicUsize,
 }
@@ -52,11 +52,11 @@ where
         self.cons.call_once(move || core::cell::RefCell::new(cons));
     }
 
-    fn prod(&self) -> core::cell::RefMut<Producer<'a, { N * size_of::<T>() }>> {
+    fn prod(&self) -> core::cell::RefMut<'_, Producer<'a, { N * size_of::<T>() }>> {
         unsafe { self.prod.get_unchecked().borrow_mut() }
     }
 
-    fn cons(&self) -> core::cell::RefMut<Consumer<'a, { N * size_of::<T>() }>> {
+    fn cons(&self) -> core::cell::RefMut<'_, Consumer<'a, { N * size_of::<T>() }>> {
         unsafe { self.cons.get_unchecked().borrow_mut() }
     }
 

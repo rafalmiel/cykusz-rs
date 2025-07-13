@@ -50,10 +50,10 @@ impl INodeGroup {
         self.fs().superblock().inode_size()
     }
 
-    pub fn read(&self) -> MutexGuard<INodeVec> {
+    pub fn read(&self) -> MutexGuard<'_, INodeVec> {
         self.inodes.lock()
     }
-    pub fn write(&self) -> MutexGuard<INodeVec> {
+    pub fn write(&self) -> MutexGuard<'_, INodeVec> {
         self.inodes.lock()
     }
 

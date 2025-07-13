@@ -36,7 +36,7 @@ impl Mbr {
         self.bytes()[510..] == [0x55, 0xAA]
     }
 
-    pub fn partition(&self, idx: usize) -> Option<Partition> {
+    pub fn partition(&self, idx: usize) -> Option<Partition<'_>> {
         if idx >= 4 {
             return None;
         }

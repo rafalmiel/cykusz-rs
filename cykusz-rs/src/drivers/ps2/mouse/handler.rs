@@ -47,7 +47,7 @@ impl State {
         }
     }
 
-    fn iter(&mut self) -> StateIter {
+    fn iter(&mut self) -> StateIter<'_> {
         StateIter {
             state: self,
             idx: 0,

@@ -71,10 +71,10 @@ impl Superblock {
         self.read_inner().blocks_in_group() as usize
     }
 
-    pub fn read_inner(&self) -> RwMutexReadGuard<disk::superblock::Superblock> {
+    pub fn read_inner(&self) -> RwMutexReadGuard<'_, disk::superblock::Superblock> {
         self.d_superblock.read()
     }
-    pub fn write_inner(&self) -> RwMutexWriteGuard<disk::superblock::Superblock> {
+    pub fn write_inner(&self) -> RwMutexWriteGuard<'_, disk::superblock::Superblock> {
         self.d_superblock.write()
     }
 

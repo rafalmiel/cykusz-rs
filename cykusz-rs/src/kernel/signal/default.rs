@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 
 use crate::kernel::task::Task;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone)]
 pub enum Action {
     Ignore,
     Handle(fn(usize)),
@@ -67,7 +67,7 @@ pub fn cont(_sig: usize, task: Arc<Task>) {
 }
 
 pub(in crate::kernel::signal) fn ignore_by_default(sig: usize) -> bool {
-    DEFAULT_ACTIONS[sig] == Action::Ignore
+    matches!(DEFAULT_ACTIONS[sig], Action::Ignore)
 }
 
 pub(in crate::kernel::signal) fn action(sig: usize) -> Action {

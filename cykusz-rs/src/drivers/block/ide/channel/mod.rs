@@ -110,7 +110,7 @@ impl IdeChannelData {
         self.prdt_addr = prdt.address();
     }
 
-    pub fn get_prdt(&mut self) -> PrdTable {
+    pub fn get_prdt(&mut self) -> PrdTable<'_> {
         PrdTable::new(self.prdt_addr, 8192 / 8)
     }
 

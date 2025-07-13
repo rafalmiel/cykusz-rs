@@ -774,7 +774,7 @@ impl VMData {
         }
     }
 
-    fn find_fixed(&mut self, addr: VirtAddr, len: usize) -> Option<(VirtAddr, CursorMut<Mapping>)> {
+    fn find_fixed(&mut self, addr: VirtAddr, len: usize) -> Option<(VirtAddr, CursorMut<'_, Mapping>)> {
         let mut cur = self.maps.cursor_front_mut();
 
         while let Some(c) = cur.current() {
@@ -798,7 +798,7 @@ impl VMData {
         &mut self,
         addr: VirtAddr,
         len: usize,
-    ) -> Option<(VirtAddr, CursorMut<Mapping>)> {
+    ) -> Option<(VirtAddr, CursorMut<'_, Mapping>)> {
         use core::cmp::max;
 
         dbgln!(map_v, "find_any_above {} {}", addr, len);

@@ -77,7 +77,7 @@ impl<T> RwMutex<T> {
         self.mutex.writer_count()
     }
 
-    pub fn read(&self) -> RwMutexReadGuard<T> {
+    pub fn read(&self) -> RwMutexReadGuard<'_, T> {
         let task = current_task();
 
         self.reader_wait_queue.add_task(task.clone());
@@ -95,7 +95,7 @@ impl<T> RwMutex<T> {
         }
     }
 
-    pub fn read_irq(&self) -> RwMutexReadGuard<T> {
+    pub fn read_irq(&self) -> RwMutexReadGuard<'_, T> {
         let task = current_task();
 
         self.reader_wait_queue.add_task(task.clone());
@@ -113,7 +113,7 @@ impl<T> RwMutex<T> {
         }
     }
 
-    pub fn read_upgradeable(&self) -> RwMutexUpgradeableGuard<T> {
+    pub fn read_upgradeable(&self) -> RwMutexUpgradeableGuard<'_, T> {
         let task = current_task();
 
         self.reader_wait_queue.add_task(task.clone());
@@ -131,7 +131,7 @@ impl<T> RwMutex<T> {
         }
     }
 
-    pub fn read_upgradeable_irq(&self) -> RwMutexUpgradeableGuard<T> {
+    pub fn read_upgradeable_irq(&self) -> RwMutexUpgradeableGuard<'_, T> {
         let task = current_task();
 
         self.reader_wait_queue.add_task(task.clone());
@@ -149,7 +149,7 @@ impl<T> RwMutex<T> {
         }
     }
 
-    pub fn write(&self) -> RwMutexWriteGuard<T> {
+    pub fn write(&self) -> RwMutexWriteGuard<'_, T> {
         let task = current_task();
 
         self.writer_wait_queue.add_task(task.clone());
@@ -167,7 +167,7 @@ impl<T> RwMutex<T> {
         }
     }
 
-    pub fn write_irq(&self) -> RwMutexWriteGuard<T> {
+    pub fn write_irq(&self) -> RwMutexWriteGuard<'_, T> {
         let task = current_task();
 
         self.writer_wait_queue.add_task(task.clone());

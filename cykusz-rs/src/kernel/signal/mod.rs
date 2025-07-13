@@ -216,7 +216,7 @@ pub enum TriggerResult {
 }
 
 impl Signals {
-    pub fn entries(&self) -> SpinGuard<Entries> {
+    pub fn entries(&self) -> SpinGuard<'_, Entries> {
         self.entries.lock_irq()
     }
 

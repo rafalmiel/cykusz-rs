@@ -111,7 +111,7 @@ impl Ext2Filesystem {
             .update_cached_synced(block * self.sectors_per_block() * 512, buf, sync)
     }
 
-    pub fn dir_lock(&self) -> MutexGuard<()> {
+    pub fn dir_lock(&self) -> MutexGuard<'_, ()> {
         self.dir_lock.lock()
     }
 

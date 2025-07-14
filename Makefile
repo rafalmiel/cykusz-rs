@@ -41,23 +41,39 @@ purge: clean
 	rm -rf build
 	rm -rf target
 
+ifndef no_kvm
+kvm_params := -cpu host -enable-kvm
+else
+kvm_params :=
+endif
+
+ifdef debug
+debug_params := -no-reboot -s -S
+else
+debug_params :=
+endif
+
+ifndef cpus
+cpus := 4
+endif
+
 run: $(disk)
 	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -m 512 -smp cpus=1  -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 5811 -smp cpus=4 -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000e,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host --enable-kvm
 	#/home/ck/code/qemu/build/qemu-system-x86_64
 	#tap options: -device e1000e,netdev=mynet0,id=ck_nic0
 	qemu-system-x86_64 \
-        -cpu host \
-        -serial stdio \
-        -no-reboot \
-        -m 5811 \
-        -audio driver=pipewire,model=hda \
-        -smp cpus=4 \
-        -device e1000e,netdev=mynet0,id=ck_nic0 \
-        -netdev user,id=mynet0,net=192.168.76.0/24,dhcpstart=192.168.76.9 \
-        -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 \
-        -rtc base=utc,clock=host \
-        -enable-kvm
+		-serial stdio \
+		-no-reboot \
+		-m 5811 \
+		-audio driver=pipewire,model=hda \
+		-smp cpus=$(cpus) \
+		-device e1000e,netdev=mynet0,id=ck_nic0 \
+		-netdev user,id=mynet0,net=192.168.76.0/24,dhcpstart=192.168.76.9 \
+		-drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 \
+		-rtc base=utc,clock=host \
+		$(kvm_params) \
+		$(debug_params)
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 5811 -smp cpus=4 -audio driver=pipewire,model=hda -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host --enable-kvm
 	#qemu-system-x86_64 -serial stdio -no-reboot -m 512 -smp cpus=4 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -rtc base=utc,clock=host
 
@@ -84,11 +100,6 @@ vbox_debug: $(disk) vdi
 ifdef logs
 	less +F --exit-follow-on-close ./vbox_serial.log
 endif
-
-debug: $(disk)
-	#qemu-system-x86_64 -drive format=raw,file=$(iso) -serial stdio -no-reboot -s -S -smp cpus=4 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=ck_net0 -device e1000,netdev=ck_net0,id=ck_nic0
-	#qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 5811 -smp cpus=4 -no-shutdown -netdev user,id=mynet0,net=192.168.1.0/24,dhcpstart=192.168.1.128,hostfwd=tcp::4444-:80 -device e1000e,netdev=mynet0,id=ck_nic0 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -monitor /dev/stdout
-	qemu-system-x86_64 -serial stdio -no-reboot -s -S -m 5811 -smp cpus=4 -no-shutdown -netdev tap,helper=/usr/lib/qemu/qemu-bridge-helper,id=hn0 -device e1000,netdev=hn0,id=nic1 -drive format=raw,file=disk.img,if=none,id=test-img -device ich9-ahci,id=ahci -device ide-hd,drive=test-img,bus=ahci.0 -audio driver=pipewire,model=hda -monitor /dev/stdout --enable-kvm
 
 gdb:
 	@rust-gdb "$(kernel)" -ex "target remote :1234"

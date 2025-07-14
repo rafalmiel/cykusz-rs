@@ -39,6 +39,7 @@ use syscall_defs::OpenFlags;
 #[global_allocator]
 static mut HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
 
+mod externs;
 #[macro_use]
 pub mod arch;
 #[macro_use]

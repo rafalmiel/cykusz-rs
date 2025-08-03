@@ -1139,7 +1139,7 @@ function _cykusz_python {
 
     cd $PYTHON_CYKUSZ_BUILD_DIR
     export CONFIG_SITE=$SPATH/cfg/python-config-site
-    $PYTHON_SRC_DIR/configure --with-build-python=python3.11 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython --without-ensurepip
+    $PYTHON_SRC_DIR/configure --with-build-python=python3.12 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython --without-ensurepip
 
     make -j6 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install

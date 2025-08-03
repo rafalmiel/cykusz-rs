@@ -10,7 +10,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use intrusive_collections::{LinkedList, LinkedListLink};
 use lru::LruCache;
 
-use crate::kernel::sync::{LockApi, Mutex, MutexGuard, Spin};
+use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 pub trait DropHandler {
     fn handle_drop(&self, arc: Arc<Self>);
@@ -341,14 +341,14 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
 }
 
 pub struct Cache<K: IsCacheKey, T: Cacheable<K>> {
-    data: Mutex<CacheData<K, T>>,
+    data: Spin<CacheData<K, T>>,
     sref: Weak<Cache<K, T>>,
 }
 
 impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     pub fn new(capacity: usize) -> Arc<Cache<K, T>> {
         Arc::new_cyclic(|me| Cache::<K, T> {
-            data: Mutex::new(CacheData::<K, T> {
+            data: Spin::new(CacheData::<K, T> {
                 unused: LruCache::new(NonZeroUsize::new(capacity).unwrap()),
                 used: hashbrown::HashMap::new(),
             }),
@@ -381,7 +381,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     pub fn make_item_locked(
         &self,
         item: T,
-        lock: &mut MutexGuard<CacheData<K, T>>,
+        lock: &mut SpinGuard<CacheData<K, T>>,
     ) -> ArcWrap<CacheItem<K, T>> {
         let item = CacheItem::<K, T>::new(&self.sref, item);
 

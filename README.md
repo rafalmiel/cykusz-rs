@@ -1,4 +1,4 @@
-[![CI](https://github.com/rafalmiel/cykusz-rs/actions/workflows/main.yml/badge.svg)](https://github.com/rafalmiel/cykusz-rs/actions/workflows/main.yml) [![CI](https://github.com/rafalmiel/cykusz-rs/actions/workflows/toolchain.yml/badge.svg)](https://github.com/rafalmiel/cykusz-rs/actions/workflows/toolchain_docker.yml)
+[![CI](https://github.com/rafalmiel/cykusz-rs/actions/workflows/main.yml/badge.svg)](https://github.com/rafalmiel/cykusz-rs/actions/workflows/main.yml) [![CI](https://github.com/rafalmiel/cykusz-rs/actions/workflows/toolchain_docker.yml/badge.svg)](https://github.com/rafalmiel/cykusz-rs/actions/workflows/toolchain_docker.yml)
 
 # cykusz-rs
 

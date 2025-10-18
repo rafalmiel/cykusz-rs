@@ -132,9 +132,9 @@ pub fn write(seg: u16, bus: u16, dev: u16, fun: u16, reg: u32, val: u64, width: 
 
 #[allow(dead_code)]
 pub fn read_u32(bus: u8, slot: u8, func: u8, offset: u8) -> u32 {
-    if let Some(ref mut pci) = *PCI.lock() {
+    match *PCI.lock() { Some(ref mut pci) => {
         pci.read_u32(bus, slot, func, offset)
-    } else {
+    } _ => {
         panic!("PCI read failed");
-    }
+    }}
 }

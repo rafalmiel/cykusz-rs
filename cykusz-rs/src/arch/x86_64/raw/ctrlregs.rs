@@ -62,52 +62,52 @@ bitflags! {
 }
 
 /// Read cr0
-pub unsafe fn cr0() -> Cr0 {
+pub unsafe fn cr0() -> Cr0 { unsafe {
     let ret: u64;
     asm!("mov {ret}, cr0", ret = lateout(reg) ret);
     Cr0::from_bits_truncate(ret)
-}
+}}
 
 /// Write cr0.
-pub unsafe fn cr0_write(val: Cr0) {
+pub unsafe fn cr0_write(val: Cr0) { unsafe {
     asm!("mov cr0, {0}", in(reg) val.bits());
-}
+}}
 
 /// Contains page-fault linear address.
-pub unsafe fn cr2() -> usize {
+pub unsafe fn cr2() -> usize { unsafe {
     let ret: usize;
     asm!("mov {ret}, cr2", ret = lateout(reg) ret);
     ret
-}
+}}
 
 /// Contains page-table root pointer.
-pub unsafe fn cr3() -> u64 {
+pub unsafe fn cr3() -> u64 { unsafe {
     let ret: u64;
     asm!("mov {ret}, cr3", ret = lateout(reg) ret);
     ret
-}
+}}
 
 /// Switch page-table PML4 pointer.
-pub unsafe fn cr3_write(val: u64) {
+pub unsafe fn cr3_write(val: u64) { unsafe {
     asm!("mov cr3, {0}", in(reg) val);
-}
+}}
 
 /// Contains various flags to control operations in protected mode.
-pub unsafe fn cr4() -> Cr4 {
+pub unsafe fn cr4() -> Cr4 { unsafe {
     let ret: u64;
     asm!("mov {ret}, cr4", ret = out(reg) ret);
     Cr4::from_bits_truncate(ret)
-}
+}}
 
 /// Write cr4.
-pub unsafe fn cr4_write(val: Cr4) {
+pub unsafe fn cr4_write(val: Cr4) { unsafe {
     asm!("mov cr4, {0}", in(reg) val.bits());
-}
+}}
 
-pub unsafe fn xcr0_read() -> XCr0 {
+pub unsafe fn xcr0_read() -> XCr0 { unsafe {
     XCr0::from_bits_truncate(_xgetbv(0))
-}
+}}
 
-pub unsafe fn xcr0_write(val: XCr0) {
+pub unsafe fn xcr0_write(val: XCr0) { unsafe {
     _xsetbv(0, val.bits());
-}
+}}

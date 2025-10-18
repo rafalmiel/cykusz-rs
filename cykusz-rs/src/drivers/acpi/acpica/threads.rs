@@ -5,13 +5,13 @@ use acpica::*;
 
 use crate::kernel::timer::busy_sleep;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsGetThreadId() -> UINT64 {
     crate::kernel::sched::current_id() as i64 + 1
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsExecute(
     Type: ACPI_EXECUTE_TYPE,
@@ -23,13 +23,13 @@ extern "C" fn AcpiOsExecute(
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsWaitEventsComplete() {
     unimplemented!()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsSleep(Milliseconds: UINT64) {
     use crate::kernel::sched::current_task;
@@ -39,7 +39,7 @@ extern "C" fn AcpiOsSleep(Milliseconds: UINT64) {
         .expect("Unexpected signal in acpica thread");
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsStall(Microseconds: UINT32) {
     busy_sleep(Microseconds as u64 * 1000)

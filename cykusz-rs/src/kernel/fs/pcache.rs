@@ -327,7 +327,7 @@ pub trait CachedAccess: RawAccess {
             if current_task_ref().locks() > 0 {
                 logln!("read_cached: locks > 0");
             }
-            if let Some(MMapPageStruct(MMapPage::Cached(page))) = self.get_mmap_page(offset, true) {
+            match self.get_mmap_page(offset, true) { Some(MMapPageStruct(MMapPage::Cached(page))) => {
                 use core::cmp::min;
 
                 let page_offset = offset % PAGE_SIZE;
@@ -338,9 +338,9 @@ pub trait CachedAccess: RawAccess {
 
                 dest_offset += to_copy;
                 offset = (offset + PAGE_SIZE).align(PAGE_SIZE);
-            } else {
+            } _ => {
                 break;
-            }
+            }}
         }
 
         Some(dest_offset)
@@ -370,7 +370,7 @@ pub trait CachedAccess: RawAccess {
             if current_task_ref().locks() > 0 {
                 logln!("update_cached_synced: locks > 0");
             }
-            if let Some(MMapPageStruct(MMapPage::Cached(page))) = self.get_mmap_page(offset, true) {
+            match self.get_mmap_page(offset, true) { Some(MMapPageStruct(MMapPage::Cached(page))) => {
                 use core::cmp::min;
 
                 let page_offset = offset % PAGE_SIZE;
@@ -385,9 +385,9 @@ pub trait CachedAccess: RawAccess {
                 if sync {
                     page.sync_to_storage(&page);
                 }
-            } else {
+            } _ => {
                 break;
-            }
+            }}
         }
 
         Some(copied)

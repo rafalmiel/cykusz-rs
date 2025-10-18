@@ -3,7 +3,7 @@
 
 use acpica::*;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsReadPciConfiguration(
     PciId: *mut ACPI_PCI_ID,
@@ -25,7 +25,7 @@ extern "C" fn AcpiOsReadPciConfiguration(
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsWritePciConfiguration(
     PciId: *mut ACPI_PCI_ID,

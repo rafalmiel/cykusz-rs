@@ -62,9 +62,9 @@ impl PhysPage {
         }
     }
 
-    unsafe fn this(&self) -> &mut PhysPageData {
+    unsafe fn this(&self) -> &mut PhysPageData { unsafe {
         self.data.get().as_mut().unwrap()
-    }
+    }}
 
     pub fn link_page_cache(&self, page: &PageCacheItemArc) {
         let _lock = self.lock_pt();

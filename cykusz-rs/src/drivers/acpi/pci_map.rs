@@ -46,7 +46,7 @@ fn call_pic1() {
 unsafe extern "C" fn get_irq_resource(
     Resource: *mut ACPI_RESOURCE,
     Context: *mut ::core::ffi::c_void,
-) -> ACPI_STATUS {
+) -> ACPI_STATUS { unsafe {
     let res = &*Resource;
     let data = &*(Context as *mut ResData);
 
@@ -88,7 +88,7 @@ unsafe extern "C" fn get_irq_resource(
     }
 
     AE_OK
-}
+}}
 
 #[allow(non_snake_case)]
 #[allow(unused_variables)]
@@ -97,7 +97,7 @@ unsafe extern "C" fn add_pci_dev(
     NestingLevel: UINT32,
     Context: *mut ::core::ffi::c_void,
     ReturnValue: *mut *mut ::core::ffi::c_void,
-) -> ACPI_STATUS {
+) -> ACPI_STATUS { unsafe {
     let bridge = &mut *(Context as *mut PciBridge);
     let mut parent: ACPI_HANDLE = null_mut();
 
@@ -140,7 +140,7 @@ unsafe extern "C" fn add_pci_dev(
     }
 
     return AE_OK;
-}
+}}
 
 #[derive(Copy, Clone)]
 struct AcpiHandle(ACPI_HANDLE);

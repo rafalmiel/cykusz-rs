@@ -613,13 +613,13 @@ impl INode for Tty {
 
                 if let Some(ctrl) = self.ctrl_task.lock_irq().as_ref() {
                     if ctrl.sid() == task.sid() {
-                        if let Some(group) = sessions().get_group(task.sid(), gid as usize) {
+                        match sessions().get_group(task.sid(), gid as usize) { Some(group) => {
                             self.set_fg_group(group);
 
                             return Ok(0);
-                        } else {
+                        } _ => {
                             logln2!("group {} not found", gid);
-                        }
+                        }}
                     } else {
                         logln2!("diff sid {} {}", ctrl.sid(), task.sid());
                     }

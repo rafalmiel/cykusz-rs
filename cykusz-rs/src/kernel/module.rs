@@ -8,7 +8,7 @@ unsafe impl Sync for ModuleFun {}
 macro_rules! module_init {
     ($name: ident) => {
         #[used]
-        #[link_section = ".devinit.drv"]
+        #[unsafe(link_section = ".devinit.drv")]
         static __PTR_INIT: crate::kernel::module::ModuleFun =
             crate::kernel::module::ModuleFun($name as *const ());
     };
@@ -28,7 +28,7 @@ macro_rules! module_fini {
 macro_rules! platform_init {
     ($name: ident) => {
         #[used]
-        #[link_section = ".devinit.plat"]
+        #[unsafe(link_section = ".devinit.plat")]
         static __PTR_INIT: crate::kernel::module::ModuleFun =
             crate::kernel::module::ModuleFun($name as *const ());
     };
@@ -48,7 +48,7 @@ macro_rules! platform_fini {
 macro_rules! platform_2_init {
     ($name: ident) => {
         #[used]
-        #[link_section = ".devinit.plat_2"]
+        #[unsafe(link_section = ".devinit.plat_2")]
         static __PTR_INIT: crate::kernel::module::ModuleFun =
             crate::kernel::module::ModuleFun($name as *const ());
     };
@@ -64,15 +64,15 @@ macro_rules! platform_2_fini {
     };
 }
 
-unsafe fn run_range(start: VirtAddr, end: VirtAddr) {
+unsafe fn run_range(start: VirtAddr, end: VirtAddr) { unsafe {
     (start..end).step_by(8).for_each(|ptr| {
         let f = ptr.read::<fn()>();
         f();
     });
-}
+}}
 
 pub fn init_all() {
-    extern "C" {
+    unsafe extern "C" {
         static __kernel_devinit_start: usize;
         static __kernel_devinit_end: usize;
     }
@@ -87,7 +87,7 @@ pub fn init_all() {
 }
 
 pub fn fini_all() {
-    extern "C" {
+    unsafe extern "C" {
         static __kernel_devfini_start: usize;
         static __kernel_devfini_end: usize;
     }

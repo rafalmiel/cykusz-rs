@@ -64,7 +64,7 @@ pub fn init() {
 }
 
 pub fn start() {
-    extern "C" {
+    unsafe extern "C" {
         static apinit_start: u8;
         static apinit_end: u8;
         static trampoline: u8;

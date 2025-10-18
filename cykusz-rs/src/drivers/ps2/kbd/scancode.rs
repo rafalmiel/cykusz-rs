@@ -1,7 +1,7 @@
 use syscall_defs::events::keys::KeyCode;
 
 macro_rules! init_arr (
-    ($a: ident, $([$k: expr, $v: expr]),+) => {
+    ($a: ident, $([$k: expr_2021, $v: expr_2021]),+) => {
         $($a[$k] = $v;)*
     };
 );

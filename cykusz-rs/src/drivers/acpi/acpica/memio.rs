@@ -5,7 +5,7 @@ use acpica::*;
 
 use crate::kernel::mm::*;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsReadMemory(
     Address: ACPI_PHYSICAL_ADDRESS,
@@ -25,7 +25,7 @@ extern "C" fn AcpiOsReadMemory(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsWriteMemory(
     Address: ACPI_PHYSICAL_ADDRESS,

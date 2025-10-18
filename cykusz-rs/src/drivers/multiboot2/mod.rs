@@ -12,9 +12,9 @@ pub struct Info {
     pub tag: tags::Tag,
 }
 
-pub unsafe fn load(addr: MappedAddr) -> &'static Info {
+pub unsafe fn load(addr: MappedAddr) -> &'static Info { unsafe {
     &*(addr.0 as *const Info)
-}
+}}
 
 impl Info {
     pub fn kernel_start_addr(&self) -> PhysAddr {

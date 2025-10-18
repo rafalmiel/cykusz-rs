@@ -134,9 +134,9 @@ impl<T: RsdtPtrType> Iterator for RsdtIter<T> {
 }
 
 impl AcpiStdHeader {
-    unsafe fn to<T>(&'static self) -> &'static T {
+    unsafe fn to<T>(&'static self) -> &'static T { unsafe {
         &*(self as *const _ as *const T)
-    }
+    }}
 
     pub fn into_rsdt(&'static self) -> &'static Rsdt<u32> {
         if self.is_valid() && &self.signature == b"RSDT" {

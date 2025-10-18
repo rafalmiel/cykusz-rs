@@ -41,7 +41,7 @@ fn c_string_to_str<'a>(ptr: *const i8) -> &'a str {
     fmt
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 #[allow(dead_code)]
 extern "C" fn AcpiOsVprintf(Format: *const i8, mut Args: core::ffi::VaList) {

@@ -60,11 +60,11 @@ pub fn get_tty_by_path(path: &str) -> Result<Arc<dyn TerminalDevice>, FsError> {
 
     let device = entry.inode().device_id().ok_or(FsError::EntryNotFound)?;
 
-    if let Some(tty) = get_tty_by_id(device) {
+    match get_tty_by_id(device) { Some(tty) => {
         Ok(tty)
-    } else {
+    } _ => {
         Err(FsError::EntryNotFound)
-    }
+    }}
 }
 
 impl Terminal {
@@ -100,7 +100,7 @@ impl Terminal {
         } else {
             let is_leader = task.is_session_leader();
 
-            if let Some(ctrl) = &terminal.ctrl_process() {
+            match &terminal.ctrl_process() { Some(ctrl) => {
                 if !is_leader && ctrl.sid() == task.sid() {
                     *term = Some(terminal);
 
@@ -108,7 +108,7 @@ impl Terminal {
                 }
 
                 false
-            } else if is_leader {
+            } _ => if is_leader {
                 if !terminal.attach(task) {
                     return false;
                 }
@@ -118,7 +118,7 @@ impl Terminal {
                 true
             } else {
                 false
-            }
+            }}
         }
     }
 

@@ -285,12 +285,12 @@ fn lookup_by_path_from(
         }
         //println!("is cur mountpoint? {}", cur.is_mountpoint());
         if cur.is_mountpoint() {
-            if let Ok(mp) = mount::find_mount(&cur) {
+            match mount::find_mount(&cur) { Ok(mp) => {
                 cur = mp.root_entry();
             //println!("is mountpoint");
-            } else {
+            } _ => {
                 panic!("No mountpoint?");
-            }
+            }}
         }
     }
 
@@ -303,38 +303,38 @@ pub fn lookup_by_path_at(
     lookup_mode: LookupMode,
     get_symlink_entry: bool,
 ) -> Result<DirEntryItem> {
-    if let Some(cur) = if !path.is_absolute() {
+    match if !path.is_absolute() {
         Some(dir)
     } else {
         root_dentry().cloned()
-    } {
+    } { Some(cur) => {
         //dbgln!(getdir, "lookup {}", path.str());
         lookup_by_path_from(path, lookup_mode, cur, get_symlink_entry, 0)
-    } else {
+    } _ => {
         return Err(FsError::NotSupported);
-    }
+    }}
 }
 
 pub fn lookup_by_path(path: &Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
-    if let Some(cur) = if !path.is_absolute() {
+    match if !path.is_absolute() {
         current_task().get_dent()
     } else {
         root_dentry().cloned()
-    } {
+    } { Some(cur) => {
         lookup_by_path_from(path, lookup_mode, cur, false, 0)
-    } else {
+    } _ => {
         return Err(FsError::NotSupported);
-    }
+    }}
 }
 
 pub fn lookup_by_real_path(path: &Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
-    if let Some(cur) = if !path.is_absolute() {
+    match if !path.is_absolute() {
         current_task().get_dent()
     } else {
         root_dentry().cloned()
-    } {
+    } { Some(cur) => {
         lookup_by_path_from(path, lookup_mode, cur, true, 0)
-    } else {
+    } _ => {
         return Err(FsError::NotSupported);
-    }
+    }}
 }

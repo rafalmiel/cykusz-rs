@@ -195,7 +195,7 @@ impl Irqs {
     }
 }
 
-extern "C" {
+unsafe extern "C" {
     static interrupt_handlers: [*const u8; 256];
 }
 
@@ -220,7 +220,7 @@ pub struct RegsFrame {
     pub r15: u64,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn isr_handler(
     int: usize,
     err: usize,

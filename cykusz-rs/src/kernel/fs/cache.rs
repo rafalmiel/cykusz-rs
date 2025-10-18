@@ -252,15 +252,15 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
                 None
             }
         } else {
-            if let Some(e) = self.unused.pop(&key) {
+            match self.unused.pop(&key) { Some(e) => {
                 e.mark_used();
 
                 self.used.insert(key, Arc::downgrade(&e));
 
                 Some(e.into())
-            } else {
+            } _ => {
                 None
-            }
+            }}
         }
     }
 
@@ -291,15 +291,15 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
     fn move_to_unused(&mut self, ent: ArcWrap<CacheItem<K, T>>) -> bool {
         let key = { ent.cache_key() };
 
-        if let Some(_e) = self.used.remove(&key) {
+        match self.used.remove(&key) { Some(_e) => {
             self.unused.put(key, ent.0.clone());
 
             true
-        } else {
+        } _ => {
             //println!("move_to_unused missing entry");
 
             false
-        }
+        }}
     }
 
     pub fn rehash(

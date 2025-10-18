@@ -71,9 +71,9 @@ impl<T: Uid> ArcType<T> {
     pub fn weak_count(task: &ArcType<T>) -> usize {
         Arc::weak_count(&task.0)
     }
-    pub unsafe fn decrement_strong_count(ptr: *const T) {
+    pub unsafe fn decrement_strong_count(ptr: *const T) { unsafe {
         Arc::decrement_strong_count(ptr)
-    }
+    }}
 }
 
 impl<T: ?Sized + Uid> ArcType<T> {

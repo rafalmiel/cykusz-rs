@@ -34,23 +34,23 @@ impl Default for FpuState {
 }
 
 impl FpuState {
-    pub unsafe fn save(&mut self) {
+    pub unsafe fn save(&mut self) { unsafe {
         let info = fpu_info();
         if info.has_xsave() {
             _xsave64(self.0.as_mut_ptr(), u64::MAX);
         } else if info.has_fxsave() {
             _fxsave64(self.0.as_mut_ptr());
         }
-    }
+    }}
 
-    pub unsafe fn restore(&self) {
+    pub unsafe fn restore(&self) { unsafe {
         let info = fpu_info();
         if info.has_xsave() {
             _xrstor64(self.0.as_ptr(), u64::MAX);
         } else if info.has_fxsave() {
             _fxrstor64(self.0.as_ptr());
         }
-    }
+    }}
 }
 
 pub fn init() {

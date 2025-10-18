@@ -13,13 +13,13 @@ const SERIAL_COM1_BASE: u16 = 0x3F8;
 const SERIAL_LINE_ENABLE_DLAB: u8 = 0x80;
 
 impl Serial {
-    unsafe fn new(base: u16) -> Serial {
+    unsafe fn new(base: u16) -> Serial { unsafe {
         Serial {
             data: Port::new(base),
             line_cmd: Port::new(base + 3),
             line_status: Port::new(base + 5),
         }
-    }
+    }}
 
     fn configure_baud_rate(&mut self, divisor: u16) {
         self.line_cmd.write(SERIAL_LINE_ENABLE_DLAB);

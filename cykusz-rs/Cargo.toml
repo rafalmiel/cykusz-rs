@@ -1,6 +1,6 @@
 [package]
 authors = ["Rafal Mielniczuk <rafal.mielniczuk2@gmail.com>"]
-edition = "2021"
+edition = "2024"
 name = "cykusz-rs"
 version = "0.1.0"
 

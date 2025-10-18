@@ -349,11 +349,11 @@ impl BlockGroupDescriptors {
     }
 
     pub fn sync_d_inode(&self, id: usize) {
-        if let Some(ind) = self.try_get_d_inode(id) {
+        match self.try_get_d_inode(id) { Some(ind) => {
             ind.sync();
-        } else {
+        } _ => {
             self.fs().sync_block(self.get_inode_block(id));
-        }
+        }}
     }
 
     pub fn debug(&self) {

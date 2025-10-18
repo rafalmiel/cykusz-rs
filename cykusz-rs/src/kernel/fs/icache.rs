@@ -42,11 +42,11 @@ impl INodeItemStruct {
     }
 
     pub fn try_as_arc<T: INode>(&self) -> Option<Arc<T>> {
-        if let Ok(s) = self.inode.clone().downcast_arc::<T>() {
+        match self.inode.clone().downcast_arc::<T>() { Ok(s) => {
             Some(s)
-        } else {
+        } _ => {
             None
-        }
+        }}
     }
 
     pub fn make_key(fs: &Weak<dyn Filesystem>, id: usize) -> ICacheKey {

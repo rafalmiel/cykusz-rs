@@ -14,19 +14,19 @@ mod print;
 mod sync;
 mod threads;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsInitialize() -> ACPI_STATUS {
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsTerminate() -> ACPI_STATUS {
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
     let mut val = 0;
@@ -43,7 +43,7 @@ extern "C" fn AcpiOsGetRootPointer() -> ACPI_PHYSICAL_ADDRESS {
     val as ACPI_PHYSICAL_ADDRESS
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsPredefinedOverride(
     InitVal: *const ACPI_PREDEFINED_NAMES,
@@ -55,7 +55,7 @@ extern "C" fn AcpiOsPredefinedOverride(
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsTableOverride(
     ExistingTable: *mut ACPI_TABLE_HEADER,
@@ -67,7 +67,7 @@ extern "C" fn AcpiOsTableOverride(
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsPhysicalTableOverride(
     ExistingTable: *mut ACPI_TABLE_HEADER,

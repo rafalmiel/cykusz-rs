@@ -2,11 +2,11 @@ use crate::arch::raw::msr;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 
-extern "C" {
+unsafe extern "C" {
     pub fn asm_update_kern_fs_base();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn restore_user_fs() {
     let task = current_task_ref();
 
@@ -19,9 +19,9 @@ struct ThreadPtr {
 }
 
 impl ThreadPtr {
-    pub unsafe fn new_at(addr: VirtAddr) -> &'static mut ThreadPtr {
+    pub unsafe fn new_at(addr: VirtAddr) -> &'static mut ThreadPtr { unsafe {
         addr.read_mut::<ThreadPtr>()
-    }
+    }}
 
     pub fn setup(&mut self) {
         self.self_ptr = VirtAddr(self as *mut _ as usize);
@@ -38,7 +38,7 @@ pub fn update_fs_base(ptr: usize) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn update_kern_fs_base() {
     if crate::kernel::tls::is_ready() {
         unsafe {
@@ -48,7 +48,7 @@ pub extern "C" fn update_kern_fs_base() {
 }
 
 pub fn init(stack_top: VirtAddr) {
-    extern "C" {
+    unsafe extern "C" {
         static __tdata_start: u8;
         static __tdata_end: u8;
     }

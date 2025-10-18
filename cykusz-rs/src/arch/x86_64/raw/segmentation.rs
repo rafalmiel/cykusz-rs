@@ -52,35 +52,35 @@ pub fn ds() -> SegmentSelector {
     SegmentSelector::from_raw(segment)
 }
 
-pub unsafe fn set_cs(sel: SegmentSelector) {
+pub unsafe fn set_cs(sel: SegmentSelector) { unsafe {
     asm!("pushq {};\
         leaq 1f(%rip), %rax;\
         pushq %rax;\
         lretq;\
         1:", in(reg) sel.bits() as usize, options(att_syntax))
-}
+}}
 
 /// Reload stack segment register.
-pub unsafe fn load_ss(sel: SegmentSelector) {
+pub unsafe fn load_ss(sel: SegmentSelector) { unsafe {
     asm!("mov ss, {0:x} ", in(reg) sel.bits());
-}
+}}
 
 /// Reload data segment register.
-pub unsafe fn load_ds(sel: SegmentSelector) {
+pub unsafe fn load_ds(sel: SegmentSelector) { unsafe {
     asm!("mov ds, {0:x} ", in(reg) sel.bits());
-}
+}}
 
 /// Reload es segment register.
-pub unsafe fn load_es(sel: SegmentSelector) {
+pub unsafe fn load_es(sel: SegmentSelector) { unsafe {
     asm!("mov es, {0:x} ", in(reg) sel.bits());
-}
+}}
 
 /// Reload fs segment register.
-pub unsafe fn load_fs(sel: SegmentSelector) {
+pub unsafe fn load_fs(sel: SegmentSelector) { unsafe {
     asm!("mov fs, {0:x} ", in(reg) sel.bits());
-}
+}}
 
 /// Reload gs segment register.
-pub unsafe fn load_gs(sel: SegmentSelector) {
+pub unsafe fn load_gs(sel: SegmentSelector) { unsafe {
     asm!("mov gs, {0:x} ", in(reg) sel.bits());
-}
+}}

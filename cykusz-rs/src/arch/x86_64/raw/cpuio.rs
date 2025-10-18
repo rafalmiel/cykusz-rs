@@ -8,30 +8,30 @@ pub trait InOut {
 }
 
 impl InOut for u8 {
-    unsafe fn port_in(port: u16) -> u8 {
+    unsafe fn port_in(port: u16) -> u8 { unsafe {
         io::inb(port)
-    }
-    unsafe fn port_out(port: u16, value: u8) {
+    }}
+    unsafe fn port_out(port: u16, value: u8) { unsafe {
         io::outb(port, value);
-    }
+    }}
 }
 
 impl InOut for u16 {
-    unsafe fn port_in(port: u16) -> u16 {
+    unsafe fn port_in(port: u16) -> u16 { unsafe {
         io::inw(port)
-    }
-    unsafe fn port_out(port: u16, value: u16) {
+    }}
+    unsafe fn port_out(port: u16, value: u16) { unsafe {
         io::outw(port, value);
-    }
+    }}
 }
 
 impl InOut for u32 {
-    unsafe fn port_in(port: u16) -> u32 {
+    unsafe fn port_in(port: u16) -> u32 { unsafe {
         io::inl(port)
-    }
-    unsafe fn port_out(port: u16, value: u32) {
+    }}
+    unsafe fn port_out(port: u16, value: u32) { unsafe {
         io::outl(port, value);
-    }
+    }}
 }
 
 pub struct Port<T: InOut> {
@@ -88,13 +88,13 @@ impl<T: InOut> UnsafePort<T> {
         }
     }
 
-    pub unsafe fn read(&mut self) -> T {
+    pub unsafe fn read(&mut self) -> T { unsafe {
         T::port_in(self.port)
-    }
+    }}
 
-    pub unsafe fn write(&mut self, value: T) {
+    pub unsafe fn write(&mut self, value: T) { unsafe {
         T::port_out(self.port, value)
-    }
+    }}
 }
 
 impl<T> !Sync for UnsafePort<T> {}

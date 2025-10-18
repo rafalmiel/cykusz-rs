@@ -1094,7 +1094,7 @@ pub trait NodeCommandConstData: Command {
 }
 
 macro_rules! impl_nodecommand (
-    ($name:ident, $command:expr $(, p:$payload:expr)? $(, d:$data:ty)? $(, o:$output:ty)?) => (
+    ($name:ident, $command:expr_2021 $(, p:$payload:expr_2021)? $(, d:$data:ty)? $(, o:$output:ty)?) => (
         pub struct $name;
         impl Command for $name {}
         impl NodeCommand for $name {
@@ -1106,7 +1106,7 @@ macro_rules! impl_nodecommand (
     );
 );
 macro_rules! impl_const_nodecommand (
-    ($name:ident, $command:expr $(, p:$payload:expr)? $(, d:$data:expr)? $(, o:$output:ty)?) => (
+    ($name:ident, $command:expr_2021 $(, p:$payload:expr_2021)? $(, d:$data:expr_2021)? $(, o:$output:ty)?) => (
         pub struct $name;
         impl Command for $name {}
         impl NodeCommandConstData for $name {
@@ -1119,11 +1119,11 @@ macro_rules! impl_const_nodecommand (
 );
 
 macro_rules! impl_nodes {
-    (const $name:ident($command:expr $(, p:$payload:expr)? $(, d:$data:expr)? $(, o:$output:ident)?)) => {
+    (const $name:ident($command:expr_2021 $(, p:$payload:expr_2021)? $(, d:$data:expr_2021)? $(, o:$output:ident)?)) => {
         impl_const_nodecommand!($name, $command $(, p:$payload)? $(, d:$data)? $(, o:WrapLocal<u64, $output::Register>)?
         );
     };
-    (data $name:ident($command:expr $(, p:$payload:expr)? $(, d:$data:ident)? $(, o:$output:ident)?)) => {
+    (data $name:ident($command:expr_2021 $(, p:$payload:expr_2021)? $(, d:$data:ident)? $(, o:$output:ident)?)) => {
         impl_nodecommand!($name, $command $(, p:$payload)? $(, d:WrapLocal<u64, $data::Register>)? $(, o:WrapLocal<u64, $output::Register>)?
         );
     };

@@ -47,9 +47,9 @@ impl Entry {
         return res;
     }
 
-    pub unsafe fn from_addr(addr: MappedAddr) -> Entry {
+    pub unsafe fn from_addr(addr: MappedAddr) -> Entry { unsafe {
         Entry::from_bits_retain(addr.read::<usize>())
-    }
+    }}
 
     pub fn clear(&mut self) {
         *self = Entry::empty();

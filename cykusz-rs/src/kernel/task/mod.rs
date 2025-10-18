@@ -324,13 +324,13 @@ impl Task {
     }
 
     pub fn me(&self) -> ArcTask {
-        if let Some(t) = self.sref.upgrade() {
+        match self.sref.upgrade() { Some(t) => {
             t
-        } else {
+        } _ => {
             dbgln!(sched_v, "Task::me == nullptr");
             crate::lang_items::print_current_backtrace();
             loop {}
-        }
+        }}
     }
 
     pub fn remove_child(&self, child: &Task) {
@@ -364,7 +364,7 @@ impl Task {
     }
 
     pub fn remove_from_parent(&self) {
-        if let Some(parent) = self.get_parent() {
+        match self.get_parent() { Some(parent) => {
             dbgln!(
                 task,
                 "task {} remove from parent {}",
@@ -372,9 +372,9 @@ impl Task {
                 parent.tid()
             );
             parent.remove_child(self);
-        } else {
+        } _ => {
             dbgln!(task, "task {} remove from parent NOT FOUND", self.tid());
-        }
+        }}
     }
 
     pub fn add_child(&self, child: ArcTask) {
@@ -583,11 +583,11 @@ impl Task {
         if self.is_process_leader() {
             false
         } else {
-            if let Some(p) = self.get_parent() {
+            match self.get_parent() { Some(p) => {
                 p.is_terminatng()
-            } else {
+            } _ => {
                 false
-            }
+            }}
         }
     }
 
@@ -713,11 +713,11 @@ impl Task {
                     poweroff,
                     "sigkill to {} {}",
                     c.pid(),
-                    if let Some(e) = c.exe() {
+                    match c.exe() { Some(e) => {
                         e.full_path()
-                    } else {
+                    } _ => {
                         String::new()
-                    }
+                    }}
                 );
                 to_kill.push(c.me());
             }
@@ -790,11 +790,11 @@ impl Task {
                     task,
                     "sigkillthr to {} {}",
                     c.tid(),
-                    if let Some(e) = c.exe() {
+                    match c.exe() { Some(e) => {
                         e.full_path()
-                    } else {
+                    } _ => {
                         String::new()
-                    }
+                    }}
                 );
                 c.signal_thread(crate::kernel::signal::KSIGKILLTHR);
             }
@@ -931,13 +931,13 @@ impl Task {
         crate::kernel::sched::wake_as_next(self.me());
     }
 
-    pub unsafe fn arch_task_mut(&self) -> &mut ArchTask {
+    pub unsafe fn arch_task_mut(&self) -> &mut ArchTask { unsafe {
         &mut (*self.arch_task.get())
-    }
+    }}
 
-    pub unsafe fn arch_task(&self) -> &ArchTask {
+    pub unsafe fn arch_task(&self) -> &ArchTask { unsafe {
         &(*self.arch_task.get())
-    }
+    }}
 
     pub fn sleep(&self, time_ns: usize) -> SignalResult<()> {
         crate::kernel::sched::sleep(Some(time_ns), SleepFlags::empty())

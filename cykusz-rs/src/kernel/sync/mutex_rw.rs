@@ -83,15 +83,15 @@ impl<T> RwMutex<T> {
         self.reader_wait_queue.add_task(task.clone());
 
         loop {
-            if let Some(g) = self.mutex.try_read() {
+            match self.mutex.try_read() { Some(g) => {
                 self.reader_wait_queue.remove_task(task);
                 return RwMutexReadGuard::<T> {
                     g: Some(g),
                     m: &self,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait();
-            }
+            }}
         }
     }
 
@@ -101,15 +101,15 @@ impl<T> RwMutex<T> {
         self.reader_wait_queue.add_task(task.clone());
 
         loop {
-            if let Some(g) = self.mutex.try_read_irq() {
+            match self.mutex.try_read_irq() { Some(g) => {
                 self.reader_wait_queue.remove_task(task);
                 return RwMutexReadGuard::<T> {
                     g: Some(g),
                     m: &self,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait();
-            }
+            }}
         }
     }
 
@@ -119,15 +119,15 @@ impl<T> RwMutex<T> {
         self.reader_wait_queue.add_task(task.clone());
 
         loop {
-            if let Some(g) = self.mutex.try_read_upgradeable() {
+            match self.mutex.try_read_upgradeable() { Some(g) => {
                 self.reader_wait_queue.remove_task(task);
                 return RwMutexUpgradeableGuard::<T> {
                     g: Some(g),
                     m: &self,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait();
-            }
+            }}
         }
     }
 
@@ -137,15 +137,15 @@ impl<T> RwMutex<T> {
         self.reader_wait_queue.add_task(task.clone());
 
         loop {
-            if let Some(g) = self.mutex.try_read_upgradeable_irq() {
+            match self.mutex.try_read_upgradeable_irq() { Some(g) => {
                 self.reader_wait_queue.remove_task(task);
                 return RwMutexUpgradeableGuard::<T> {
                     g: Some(g),
                     m: &self,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait();
-            }
+            }}
         }
     }
 
@@ -155,15 +155,15 @@ impl<T> RwMutex<T> {
         self.writer_wait_queue.add_task(task.clone());
 
         loop {
-            if let Some(g) = self.mutex.try_write() {
+            match self.mutex.try_write() { Some(g) => {
                 self.writer_wait_queue.remove_task(task);
                 return RwMutexWriteGuard::<T> {
                     g: Some(g),
                     m: &self,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait();
-            }
+            }}
         }
     }
 
@@ -173,15 +173,15 @@ impl<T> RwMutex<T> {
         self.writer_wait_queue.add_task(task.clone());
 
         loop {
-            if let Some(g) = self.mutex.try_write_irq() {
+            match self.mutex.try_write_irq() { Some(g) => {
                 self.writer_wait_queue.remove_task(task);
                 return RwMutexWriteGuard::<T> {
                     g: Some(g),
                     m: &self,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait();
-            }
+            }}
         }
     }
 }

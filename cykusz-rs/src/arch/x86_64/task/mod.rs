@@ -209,7 +209,7 @@ impl Task {
         sp: usize,
         cr3: PhysAddr,
         param: usize,
-    ) -> Unique<Context> {
+    ) -> Unique<Context> { unsafe {
         let mut sp_tmp = sp as u64;
 
         let mut helper = StackHelper::new(&mut sp_tmp);
@@ -231,7 +231,7 @@ impl Task {
         ctx.cr3 = cr3.0;
 
         Unique::new_unchecked(ctx as *mut Context)
-    }
+    }}
 
     unsafe fn prepare_sysretq_ctx(
         fun: usize,
@@ -239,7 +239,7 @@ impl Task {
         user_stack: Option<usize>,
         sp: usize,
         cr3: PhysAddr,
-    ) -> Unique<Context> {
+    ) -> Unique<Context> { unsafe {
         let mut sp = sp as u64;
 
         let mut helper = StackHelper::new(&mut sp);
@@ -257,21 +257,21 @@ impl Task {
         ctx.cr3 = cr3.0;
 
         Unique::new_unchecked(ctx as *mut Context)
-    }
+    }}
 
-    unsafe fn syscall_frame(&self) -> &SyscallFrame {
+    unsafe fn syscall_frame(&self) -> &SyscallFrame { unsafe {
         VirtAddr(self.stack_top + self.stack_size - size_of::<SyscallFrame>())
             .read_ref::<SyscallFrame>()
-    }
+    }}
 
-    unsafe fn syscall_regs(&self) -> &RegsFrame {
+    unsafe fn syscall_regs(&self) -> &RegsFrame { unsafe {
         VirtAddr(
             self.stack_top + self.stack_size - size_of::<SyscallFrame>() - size_of::<RegsFrame>(),
         )
         .read_ref::<RegsFrame>()
-    }
+    }}
 
-    unsafe fn fork_ctx(&self, sp: usize, cr3: usize) -> Unique<Context> {
+    unsafe fn fork_ctx(&self, sp: usize, cr3: usize) -> Unique<Context> { unsafe {
         let parent_sys_frame = self.syscall_frame();
         let parent_regs_frame = self.syscall_regs();
 
@@ -292,14 +292,14 @@ impl Task {
         ctx.cr3 = cr3;
 
         Unique::new_unchecked(ctx as *mut Context)
-    }
+    }}
 
     unsafe fn fork_thread_ctx(
         &self,
         entry: usize,
         user_stack: usize,
         sp: usize,
-    ) -> Unique<Context> {
+    ) -> Unique<Context> { unsafe {
         let mut sp = sp as u64;
 
         let mut helper = StackHelper::new(&mut sp);
@@ -320,7 +320,7 @@ impl Task {
         ctx.cr3 = self.cr3;
 
         Unique::new_unchecked(ctx as *mut Context)
-    }
+    }}
 
     fn new_sp(
         fun: usize,
@@ -613,7 +613,7 @@ impl Task {
     }
 }
 
-extern "C" {
+unsafe extern "C" {
     pub fn switch_to(old_ctx: &mut Unique<Context>, new_ctx: &Context);
     pub fn activate_to(new_ctx: &Context);
     fn isr_return();

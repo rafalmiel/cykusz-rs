@@ -18,13 +18,13 @@ use crate::kernel::task::{ArcTask, Task};
 
 #[macro_export]
 macro_rules! switch {
-    ($ctx1: expr, $ctx2: expr) => {
+    ($ctx1: expr_2021, $ctx2: expr_2021) => {
         $crate::arch::task::switch(&mut $ctx1.arch_task_mut(), &$ctx2.arch_task());
     };
 }
 #[macro_export]
 macro_rules! activate_task {
-    ($ctx1: expr) => {
+    ($ctx1: expr_2021) => {
         $crate::arch::task::activate_task(&$ctx1.arch_task());
     };
 }
@@ -181,9 +181,9 @@ impl Scheduler {
         if task.is_process_leader() {
             dbgln!(task_stop, "cont threads!");
             self.sched.cont(task.clone());
-        } else if let Some(parent) = task.get_parent() {
+        } else { match task.get_parent() { Some(parent) => {
             cont(parent);
-        }
+        } _ => {}}}
     }
 
     fn debug(&self) {

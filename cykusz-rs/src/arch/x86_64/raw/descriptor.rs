@@ -98,14 +98,14 @@ impl<T> DescriptorTablePointer<T> {
     }
 }
 
-pub unsafe fn lidt(idt: &DescriptorTablePointer<idt::IdtEntry>) {
+pub unsafe fn lidt(idt: &DescriptorTablePointer<idt::IdtEntry>) { unsafe {
     asm!("lidt [{0}]", in(reg) idt);
-}
+}}
 
-pub unsafe fn lgdt(gdt: *const DescriptorTablePointer<gdt::GdtEntry>) {
+pub unsafe fn lgdt(gdt: *const DescriptorTablePointer<gdt::GdtEntry>) { unsafe {
     asm!("lgdt [{0}]", in(reg) gdt);
-}
+}}
 
-pub unsafe fn load_tr(tr: &crate::arch::raw::segmentation::SegmentSelector) {
+pub unsafe fn load_tr(tr: &crate::arch::raw::segmentation::SegmentSelector) { unsafe {
     asm!("ltr {0:x}", in(reg) tr.bits());
-}
+}}

@@ -6,7 +6,7 @@ use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::IrqGuard;
 
-extern "C" {
+unsafe extern "C" {
     fn asm_syscall_handler();
 }
 
@@ -37,7 +37,7 @@ pub struct SyscallFrame {
     pub rsp: u64,    // rsp
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn fast_syscall_handler(sys_frame: &mut SyscallFrame, regs: &mut RegsFrame) {
     if regs.rax == syscall_defs::SYS_SIGRETURN as u64 {
         // Store syscall result in rax

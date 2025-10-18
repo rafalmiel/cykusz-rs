@@ -98,16 +98,16 @@ impl UserAddr {
     }
 }
 
-pub unsafe fn flush(addr: usize) {
+pub unsafe fn flush(addr: usize) { unsafe {
     asm!("invlpg [{0}]", in(reg) addr);
-}
+}}
 
 /// Invalidate the TLB completely by reloading the CR3 register.
 ///
 /// # Safety
 /// This function is unsafe as it causes a general protection fault (GP) if the current privilege
 /// level is not 0.
-pub unsafe fn flush_all() {
+pub unsafe fn flush_all() { unsafe {
     use crate::arch::raw::ctrlregs::{cr3, cr3_write};
     cr3_write(cr3())
-}
+}}

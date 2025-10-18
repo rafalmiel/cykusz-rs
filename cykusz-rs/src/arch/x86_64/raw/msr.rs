@@ -1,19 +1,19 @@
 use core::arch::asm;
 
 /// Write 64 bits to msr register.
-pub unsafe fn wrmsr(msr: u32, value: u64) {
+pub unsafe fn wrmsr(msr: u32, value: u64) { unsafe {
     let low = value as u32;
     let high = (value >> 32) as u32;
     asm!("wrmsr", in("ecx") msr, in("eax") low, in("edx") high);
-}
+}}
 
 /// Read 64 bits msr register.
 #[allow(unused_mut)]
-pub unsafe fn rdmsr(msr: u32) -> u64 {
+pub unsafe fn rdmsr(msr: u32) -> u64 { unsafe {
     let (high, low): (u32, u32);
     asm!("rdmsr", in("ecx") msr, out("eax") low, out("edx") high);
     ((high as u64) << 32) | (low as u64)
-}
+}}
 
 /// See Section 35.16, MSRs in Pentium Processors,  and see  Table 35-2.
 pub const P5_MC_ADDR: u32 = 0x0;

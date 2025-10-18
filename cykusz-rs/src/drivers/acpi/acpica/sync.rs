@@ -7,7 +7,7 @@ use acpica::*;
 
 use crate::kernel::sync::{Semaphore, Spin};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsCreateLock(OutHandle: *mut *mut ::core::ffi::c_void) -> ACPI_STATUS {
     unsafe {
@@ -17,7 +17,7 @@ extern "C" fn AcpiOsCreateLock(OutHandle: *mut *mut ::core::ffi::c_void) -> ACPI
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsDeleteLock(Handle: *mut ::core::ffi::c_void) {
     unsafe {
@@ -26,7 +26,7 @@ extern "C" fn AcpiOsDeleteLock(Handle: *mut ::core::ffi::c_void) {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsAcquireLock(Handle: *mut ::core::ffi::c_void) -> ACPI_SIZE {
     unsafe {
@@ -36,7 +36,7 @@ extern "C" fn AcpiOsAcquireLock(Handle: *mut ::core::ffi::c_void) -> ACPI_SIZE {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsReleaseLock(Handle: *mut ::core::ffi::c_void, Flags: ACPI_SIZE) {
     unsafe {
@@ -45,7 +45,7 @@ extern "C" fn AcpiOsReleaseLock(Handle: *mut ::core::ffi::c_void, Flags: ACPI_SI
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsCreateSemaphore(
     MaxUnits: UINT32,
@@ -60,7 +60,7 @@ extern "C" fn AcpiOsCreateSemaphore(
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsDeleteSemaphore(Handle: *mut ::core::ffi::c_void) -> ACPI_STATUS {
     unsafe {
@@ -71,7 +71,7 @@ extern "C" fn AcpiOsDeleteSemaphore(Handle: *mut ::core::ffi::c_void) -> ACPI_ST
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsWaitSemaphore(
     Handle: *mut ::core::ffi::c_void,
@@ -86,7 +86,7 @@ extern "C" fn AcpiOsWaitSemaphore(
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsSignalSemaphore(
     Handle: *mut ::core::ffi::c_void,

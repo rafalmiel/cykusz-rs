@@ -364,8 +364,8 @@ impl Mapping {
 
             let mappable = f.file.get_dir_item().inode().as_mappable().unwrap();
 
-            if let Some(MMapPageStruct(MMapPage::Cached(p))) = mappable.get_mmap_page(offset, false)
-            {
+            match mappable.get_mmap_page(offset, false)
+            { Some(MMapPageStruct(MMapPage::Cached(p))) => {
                 if !reason.contains(PageFaultReason::WRITE)
                     && !reason.contains(PageFaultReason::PRESENT)
                 {
@@ -416,11 +416,11 @@ impl Mapping {
                 }
 
                 true
-            } else {
+            } _ => {
                 //println!("failed to get mmap page");
                 //map_flags(addr.align_down(PAGE_SIZE), PageFlags::USER | self.prot.into());
                 false
-            }
+            }}
         } else {
             false
         }
@@ -1013,7 +1013,7 @@ impl VMData {
                 let interp = data
                     .iter()
                     .enumerate()
-                    .find(|(_, &e)| e == b'\n')
+                    .find(|&(_, &e)| e == b'\n')
                     .and_then(|(idx, _)| Some(&data[2..idx]))?;
 
                 let path = core::str::from_utf8(interp)
@@ -1061,13 +1061,13 @@ impl VMData {
                 .filter(|p| p.p_type == ProgramType::Load || /*p.p_type == ProgramType::TLS || */p.p_type == ProgramType::Interp)
             {
                 if p.p_type == ProgramType::Interp {
-                    if let Ok(interp) = lookup_by_path(&Path::new("/usr/lib/ld.so"), LookupMode::None) {
+                    match lookup_by_path(&Path::new("/usr/lib/ld.so"), LookupMode::None) { Ok(interp) => {
                         if let Some((_base_addr, entry, _elf, _tls, _)) = self.load_bin(interp) {
                             entry_addr = entry;
                         }
-                    } else {
+                    } _ => {
                         return None;
-                    }
+                    }}
 
                 } else if p.p_type == ProgramType::Load {
                     let virt_begin = load_offset + VirtAddr(p.p_vaddr as usize).align_down(PAGE_SIZE);

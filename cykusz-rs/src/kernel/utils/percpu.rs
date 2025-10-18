@@ -35,9 +35,9 @@ impl<T> PerCpu<T> {
         this
     }
 
-    unsafe fn ptr(&self) -> *mut T {
+    unsafe fn ptr(&self) -> *mut T { unsafe {
         (&mut *self.data.get()).as_mut()
-    }
+    }}
 
     pub fn cpu(&self, cpu: isize) -> &T {
         unsafe { &*self.ptr().offset(cpu) }

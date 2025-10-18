@@ -138,57 +138,57 @@ macro_rules! enable_unsigned_ops {
         }
 
         impl $type_ {
-            pub unsafe fn store<T: Copy>(self, v: T) {
+            pub unsafe fn store<T: Copy>(self, v: T) { unsafe {
                 *(self.0 as *mut T) = v;
-            }
+            }}
 
-            pub unsafe fn store_volatile<T: Copy>(self, v: T) {
+            pub unsafe fn store_volatile<T: Copy>(self, v: T) { unsafe {
                 core::ptr::write_volatile(self.0 as *mut T, v);
-            }
+            }}
 
-            pub unsafe fn read<T: Copy>(self) -> T {
+            pub unsafe fn read<T: Copy>(self) -> T { unsafe {
                 return *(self.0 as *mut T);
-            }
+            }}
 
-            pub unsafe fn read_volatile<T: Copy>(self) -> T {
+            pub unsafe fn read_volatile<T: Copy>(self) -> T { unsafe {
                 return ::core::ptr::read_volatile(self.0 as *const T);
-            }
+            }}
 
-            pub unsafe fn read_ref<'a, T>(self) -> &'a T {
+            pub unsafe fn read_ref<'a, T>(self) -> &'a T { unsafe {
                 return &*(self.0 as *mut T);
-            }
+            }}
 
-            pub unsafe fn read_mut<'a, T>(self) -> &'a mut T {
+            pub unsafe fn read_mut<'a, T>(self) -> &'a mut T { unsafe {
                 return &mut *(self.0 as *mut T);
-            }
+            }}
 
-            pub unsafe fn copy_to(self, to: usize, count: usize) {
+            pub unsafe fn copy_to(self, to: usize, count: usize) { unsafe {
                 (self.0 as *const u8).copy_to(to as *mut u8, count);
-            }
+            }}
 
-            pub unsafe fn copy_page_from(self, src: $type_) {
+            pub unsafe fn copy_page_from(self, src: $type_) { unsafe {
                 self.align_down(PAGE_SIZE).as_bytes_mut(PAGE_SIZE).copy_from_slice(src.align_down(PAGE_SIZE).as_bytes(PAGE_SIZE));
-            }
+            }}
 
-            pub unsafe fn copy_page_from_bytes(self, src: $type_, bytes: usize) {
+            pub unsafe fn copy_page_from_bytes(self, src: $type_, bytes: usize) { unsafe {
                 self.align_down(PAGE_SIZE).as_bytes_mut(bytes).copy_from_slice(src.align_down(PAGE_SIZE).as_bytes(bytes));
-            }
+            }}
 
-            pub unsafe fn as_bytes<'a>(self, size: usize) -> &'a [u8] {
+            pub unsafe fn as_bytes<'a>(self, size: usize) -> &'a [u8] { unsafe {
                 core::slice::from_raw_parts(self.0 as *const u8, size)
-            }
+            }}
 
-            pub unsafe fn as_bytes_mut<'a>(self, size: usize) -> &'a mut [u8] {
+            pub unsafe fn as_bytes_mut<'a>(self, size: usize) -> &'a mut [u8] { unsafe {
                 core::slice::from_raw_parts_mut(self.0 as *mut u8, size)
-            }
+            }}
 
-            pub unsafe fn as_slice<'a, T>(self, count: usize) -> &'a [T] {
+            pub unsafe fn as_slice<'a, T>(self, count: usize) -> &'a [T] { unsafe {
                 core::slice::from_raw_parts(self.0 as *const T, count)
-            }
+            }}
 
-            pub unsafe fn as_slice_mut<'a, T>(self, count: usize) -> &'a mut [T] {
+            pub unsafe fn as_slice_mut<'a, T>(self, count: usize) -> &'a mut [T] { unsafe {
                 core::slice::from_raw_parts_mut(self.0 as *mut T, count)
-            }
+            }}
         }
 
         impl ::core::iter::Step for $type_ {

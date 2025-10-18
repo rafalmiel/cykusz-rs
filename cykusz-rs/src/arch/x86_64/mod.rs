@@ -23,7 +23,7 @@ pub mod timer;
 pub mod tls;
 pub mod utils;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr) {
     cpu::init();
 
@@ -75,7 +75,7 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
     crate::rust_main(stack_top);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn x86_64_rust_main_ap() {
     cpu::init();
 

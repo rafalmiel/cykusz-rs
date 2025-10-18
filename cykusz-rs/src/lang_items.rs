@@ -17,7 +17,7 @@ pub fn panic_impl(pi: &PanicInfo) -> ! {
 }
 
 #[allow(non_snake_case)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _Unwind_Resume() -> ! {
     loop {}
 }

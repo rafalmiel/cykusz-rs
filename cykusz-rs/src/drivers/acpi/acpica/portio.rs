@@ -5,7 +5,7 @@ use acpica::*;
 
 use crate::arch::raw::cpuio::Port;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsReadPort(
     Address: ACPI_IO_ADDRESS,
@@ -25,7 +25,7 @@ extern "C" fn AcpiOsReadPort(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsWritePort(
     Address: ACPI_IO_ADDRESS,

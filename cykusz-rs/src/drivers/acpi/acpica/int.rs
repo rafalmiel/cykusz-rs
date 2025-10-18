@@ -28,7 +28,7 @@ unsafe impl Send for Ctx {}
 
 static CTX: Spin<Option<Ctx>> = Spin::new(None);
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsInstallInterruptHandler(
     InterruptNumber: UINT32,
@@ -62,7 +62,7 @@ extern "C" fn AcpiOsInstallInterruptHandler(
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsRemoveInterruptHandler(
     InterruptNumber: UINT32,

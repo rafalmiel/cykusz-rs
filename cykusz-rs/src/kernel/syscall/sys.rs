@@ -179,17 +179,17 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     dbgln!(sys_write, "task {} fd {}", task.tid(), fd);
 
-    return if let Some(f) = task.get_handle(fd) {
+    return match task.get_handle(fd) { Some(f) => {
         if f.flags().is_writable() {
             Ok(f.write(make_buf(buf, len))?)
         } else {
             logln4!("write fd {} = EACCESS", fd);
             Err(SyscallError::EACCES)
         }
-    } else {
+    } _ => {
         logln4!("write fd {} = EBADFD", fd);
         Err(SyscallError::EBADFD)
-    };
+    }};
 }
 
 pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
@@ -199,17 +199,17 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     logln4!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
 
-    return if let Some(f) = task.get_handle(fd) {
+    return match task.get_handle(fd) { Some(f) => {
         if f.flags().is_readable() {
             Ok(f.read(make_buf_mut(buf, len))?)
         } else {
             logln2!("eaccess");
             Err(SyscallError::EACCES)
         }
-    } else {
+    } _ => {
         logln2!("ebadfd");
         Err(SyscallError::EBADFD)
-    };
+    }};
 }
 
 pub fn sys_readlink(
@@ -253,22 +253,22 @@ pub fn sys_pread(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    if let Some(f) = task.get_handle(fd) {
+    match task.get_handle(fd) { Some(f) => {
         if f.flags().is_readable() {
             Ok(f.read_at(make_buf_mut(buf, len), offset as usize)?)
         } else {
             Err(SyscallError::EACCES)
         }
-    } else {
+    } _ => {
         Err(SyscallError::EBADFD)
-    }
+    }}
 }
 
 pub fn sys_pwrite(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
-    if let Some(f) = task.get_handle(fd) {
+    match task.get_handle(fd) { Some(f) => {
         if f.flags().is_writable() {
             logln4!("pwrite fd {}", fd);
             Ok(f.write_at(make_buf(buf, len), offset as usize)?)
@@ -276,10 +276,10 @@ pub fn sys_pwrite(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
             logln4!("pwrite fd {} = EACCESS", fd);
             Err(SyscallError::EACCES)
         }
-    } else {
+    } _ => {
         logln4!("pwrite fd {} = EBADFD", fd);
         Err(SyscallError::EBADFD)
-    }
+    }}
 }
 
 pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
@@ -287,11 +287,11 @@ pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
     let off = off as isize;
 
     let task = current_task_ref();
-    if let Some(f) = task.get_handle(fd) {
+    match task.get_handle(fd) { Some(f) => {
         Ok(f.seek(off, syscall_defs::SeekWhence::from(whence))?)
-    } else {
+    } _ => {
         Err(SyscallError::EBADFD)
-    }
+    }}
 }
 
 pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) -> SyscallResult {
@@ -517,11 +517,11 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
-    if let Some(f) = task.get_handle(fd) {
+    match task.get_handle(fd) { Some(f) => {
         Ok(f.get_dents(make_buf_mut(buf, len))?)
-    } else {
+    } _ => {
         Err(SyscallError::EBADFD)
-    }
+    }}
 }
 
 pub fn sys_symlink(
@@ -598,7 +598,7 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
 
     let (_, name) = path.containing_dir();
 
-    if let Some(dir) = file.parent() {
+    match file.parent() { Some(dir) => {
         if dir.inode().ftype()? == FileType::Dir && file.inode().ftype()? != FileType::Dir {
             dir.inode().unlink(name.str())?;
 
@@ -606,9 +606,9 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
         }
 
         Ok(0)
-    } else {
+    } _ => {
         Err(SyscallError::EFAULT)
-    }
+    }}
 }
 
 pub fn sys_mknode(at: u64, path: u64, path_len: u64, mode: u64, devid: u64) -> SyscallResult {
@@ -1150,7 +1150,7 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
                 fd.revents = PollEventFlags::empty();
                 continue;
             }
-            if let Some(handle) = task.get_handle(fd.fd as usize) {
+            match task.get_handle(fd.fd as usize) { Some(handle) => {
                 let f = handle.poll(if first { Some(&mut poll_table) } else { None }, fd.events)?;
                 fd.revents = f;
                 if !f.is_empty() {
@@ -1158,9 +1158,9 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
 
                     dbgln!(poll, "found {}: {:?}", fd.fd, fd.revents);
                 }
-            } else {
+            } _ => {
                 fd.revents = PollEventFlags::NVAL;
-            }
+            }}
         }
 
         if found == 0 && !timed_out {
@@ -1315,11 +1315,11 @@ pub fn sys_getpid() -> SyscallResult {
 }
 
 pub fn sys_getppid() -> SyscallResult {
-    if let Some(p) = &current_task_ref().get_parent() {
+    match &current_task_ref().get_parent() { Some(p) => {
         Ok(p.pid())
-    } else {
+    } _ => {
         Ok(0)
-    }
+    }}
 }
 
 pub fn sys_getpgid(_pid: u64) -> SyscallResult {
@@ -1351,11 +1351,11 @@ pub fn sys_exit_thread() -> ! {
 pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
     let current = current_task_ref();
 
-    if let Some(handle) = current.get_handle(fd as usize) {
+    match current.get_handle(fd as usize) { Some(handle) => {
         Ok(handle.ioctl(cmd as usize, arg as usize)?)
-    } else {
+    } _ => {
         Err(SyscallError::EBADFD)
-    }
+    }}
 }
 
 pub fn sys_sigaction(sig: u64, sigact: u64, old: u64) -> SyscallResult {

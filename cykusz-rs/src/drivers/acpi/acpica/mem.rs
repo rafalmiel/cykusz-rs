@@ -5,7 +5,7 @@ use acpica::*;
 
 use crate::kernel::mm::*;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsAllocate(Size: ACPI_SIZE) -> *mut ::core::ffi::c_void {
     let a = crate::kernel::mm::heap::allocate(Size as usize + core::mem::size_of::<usize>())
@@ -17,7 +17,7 @@ extern "C" fn AcpiOsAllocate(Size: ACPI_SIZE) -> *mut ::core::ffi::c_void {
     return unsafe { a.offset(1) } as *mut ::core::ffi::c_void;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsFree(Memory: *mut ::core::ffi::c_void) {
     let a = Memory as *mut usize;
@@ -29,7 +29,7 @@ extern "C" fn AcpiOsFree(Memory: *mut ::core::ffi::c_void) {
     crate::kernel::mm::heap::deallocate(ptr as *mut u8, size);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsMapMemory(
     Where: ACPI_PHYSICAL_ADDRESS,
@@ -38,11 +38,11 @@ extern "C" fn AcpiOsMapMemory(
     PhysAddr(Where as usize).to_mapped().0 as *mut core::ffi::c_void
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsUnmapMemory(LogicalAddress: *mut ::core::ffi::c_void, Size: ACPI_SIZE) {}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsGetPhysicalAddress(
     LogicalAddress: *mut ::core::ffi::c_void,
@@ -56,13 +56,13 @@ extern "C" fn AcpiOsGetPhysicalAddress(
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsReadable(Pointer: *mut ::core::ffi::c_void, Length: ACPI_SIZE) -> BOOLEAN {
     true
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsWritable(Pointer: *mut ::core::ffi::c_void, Length: ACPI_SIZE) -> BOOLEAN {
     true

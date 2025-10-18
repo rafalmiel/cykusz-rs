@@ -47,9 +47,9 @@ impl LockedExt2INode {
 
         let fsg: Weak<dyn Filesystem> = fs.clone();
 
-        if let Some(e) = cache.get(INodeItemStruct::make_key(&fsg, id)) {
+        match cache.get(INodeItemStruct::make_key(&fsg, id)) { Some(e) => {
             e
-        } else {
+        } _ => {
             cache.make_item(INodeItemStruct::from(Arc::new_cyclic(|me| {
                 LockedExt2INode {
                     node: RwMutex::new(Ext2INode::new(fs.clone(), id)),
@@ -61,7 +61,7 @@ impl LockedExt2INode {
                     device_lock: Mutex::new(()),
                 }
             })))
-        }
+        }}
     }
 
     pub fn mk_dirent(&self, parent: DirEntryItem, de: &disk::dirent::DirEntry) -> DirEntryItem {
@@ -692,17 +692,17 @@ impl INode for LockedExt2INode {
 
         let mut iter = DirEntIter::new(self.self_ref());
 
-        if let Some(e) = iter.find_map(|e| {
+        match iter.find_map(|e| {
             if e.name() == name {
                 Some(self.mk_dirent(parent.clone(), e))
             } else {
                 None
             }
-        }) {
+        }) { Some(e) => {
             Ok(e)
-        } else {
+        } _ => {
             Err(FsError::EntryNotFound)
-        }
+        }}
     }
 
     fn mkdir(&self, name: &str) -> Result<INodeItem> {
@@ -762,11 +762,11 @@ impl INode for LockedExt2INode {
         }
 
         if let Some(parent) =
-            if let Some(e) = DirEntIter::new(self.self_ref()).find(|e| e.name() == "..") {
+            match DirEntIter::new(self.self_ref()).find(|e| e.name() == "..") { Some(e) => {
                 Some(self.ext2_fs().get_inode(e.inode() as usize))
-            } else {
+            } _ => {
                 None
-            }
+            }}
         {
             let mut iter = DirEntIter::new(self.self_ref());
 
@@ -1016,7 +1016,7 @@ impl INode for LockedExt2INode {
             return Err(FsError::EntryExists);
         }
 
-        if let Some(old_parent) = old.parent() {
+        match old.parent() { Some(old_parent) => {
             if old_parent.inode().ftype()? != FileType::Dir {
                 return Err(FsError::NotDir);
             }
@@ -1028,9 +1028,9 @@ impl INode for LockedExt2INode {
             iter = DirEntIter::new_no_skip(old_parent.inode().as_ext2_inode_arc());
 
             iter.remove_dir_entry(old.name().as_str())?;
-        } else {
+        } _ => {
             return Err(FsError::NotSupported);
-        }
+        }}
 
         Ok(())
     }

@@ -25,10 +25,10 @@ impl Pic {
         self.offset <= int_id && (int_id < self.offset + 8)
     }
 
-    unsafe fn end_of_interrupt(&mut self) {
+    unsafe fn end_of_interrupt(&mut self) { unsafe {
         //println!("EOI 0x{:x}", self.offset);
         self.command.write(CMD_END_OF_INTERRUPT);
-    }
+    }}
 }
 
 pub struct ChainedPics {
@@ -36,7 +36,7 @@ pub struct ChainedPics {
 }
 
 impl ChainedPics {
-    pub const unsafe fn new(offset1: u8, offset2: u8) -> ChainedPics {
+    pub const unsafe fn new(offset1: u8, offset2: u8) -> ChainedPics { unsafe {
         ChainedPics {
             pics: [
                 Pic {
@@ -51,9 +51,9 @@ impl ChainedPics {
                 },
             ],
         }
-    }
+    }}
 
-    unsafe fn configure(&mut self) {
+    unsafe fn configure(&mut self) { unsafe {
         let mut wait_port: Port<u8> = Port::new(0x80);
         let mut wait = || wait_port.write(0);
 
@@ -87,7 +87,7 @@ impl ChainedPics {
 
         self.pics[0].data.write(saved_mask1 | 0b00000001); //disable timer?
         self.pics[1].data.write(saved_mask2);
-    }
+    }}
 
     pub fn disable(&mut self) {
         unsafe {
@@ -124,12 +124,12 @@ impl ChainedPics {
         self.pics.iter().any(|p| p.handles_interrupt(interrupt_id))
     }
 
-    unsafe fn get_irq_reg(&mut self, cmd: u8) -> u16 {
+    unsafe fn get_irq_reg(&mut self, cmd: u8) -> u16 { unsafe {
         self.pics[1].command.write(cmd);
         self.pics[0].command.write(cmd);
 
         return ((self.pics[1].command.read() as u16) << 8) | (self.pics[0].command.read() as u16);
-    }
+    }}
 
     pub fn get_isr(&mut self) -> u16 {
         unsafe { self.get_irq_reg(CMD_READ_ISR) }

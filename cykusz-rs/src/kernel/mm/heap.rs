@@ -140,7 +140,7 @@ impl LockedHeap {
         LockedHeap(Spin::new(Heap::empty()))
     }
 
-    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, ()> {
+    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, ()> { unsafe {
         ALLOCED_MEM.fetch_add(layout.size(), Ordering::SeqCst);
         heap.allocate_first_fit(layout.clone()).or_else(|_| {
             let _ = &heap;
@@ -158,7 +158,7 @@ impl LockedHeap {
 
             heap.allocate_first_fit(layout)
         })
-    }
+    }}
 }
 
 impl Deref for LockedHeap {
@@ -196,7 +196,7 @@ impl Drop for HeapDebug {
 }
 
 unsafe impl GlobalAlloc for LockedHeap {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 { unsafe {
         //let _sw = if crate::kernel::smp::is_smp_initialised() {
         //    Some(crate::kernel::utils::stopwatch::StopWatch::new("alloc"))
         //} else {
@@ -213,9 +213,9 @@ unsafe impl GlobalAlloc for LockedHeap {
         };
 
         ptr
-    }
+    }}
 
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { unsafe {
         //let _sw = if crate::kernel::smp::is_smp_initialised() {
         //    Some(crate::kernel::utils::stopwatch::StopWatch::new("dealloc"))
         //} else {
@@ -229,7 +229,7 @@ unsafe impl GlobalAlloc for LockedHeap {
         self.0
             .lock_irq()
             .deallocate(NonNull::new_unchecked(ptr), layout)
-    }
+    }}
 }
 
 fn heap() -> &'static LockedHeap {

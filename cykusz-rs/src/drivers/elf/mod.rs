@@ -7,7 +7,7 @@ pub mod headers;
 pub mod types;
 
 impl ElfHeader {
-    pub unsafe fn load(exe: &[u8]) -> Option<&ElfHeader> {
+    pub unsafe fn load(exe: &[u8]) -> Option<&ElfHeader> { unsafe {
         let hdr = &*(exe.as_ptr() as *const ElfHeader);
 
         if !hdr.is_valid() {
@@ -15,7 +15,7 @@ impl ElfHeader {
         }
 
         Some(hdr)
-    }
+    }}
 
     pub fn is_valid(&self) -> bool {
         &self.ei_magic == b"\x7FELF"

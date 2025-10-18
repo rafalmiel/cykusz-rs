@@ -1,4 +1,4 @@
-pub unsafe fn checksum(addr: *const u8, size: isize) -> bool {
+pub unsafe fn checksum(addr: *const u8, size: isize) -> bool { unsafe {
     let mut s: u32 = 0;
 
     for i in 0..size {
@@ -6,4 +6,4 @@ pub unsafe fn checksum(addr: *const u8, size: isize) -> bool {
     }
 
     (s & 0xFF) == 0
-}
+}}

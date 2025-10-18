@@ -35,9 +35,9 @@ unsafe impl PointerOps for TaskPointerOps<ArcType<Task>> {
     type Pointer = ArcType<Task>;
 
     #[inline]
-    unsafe fn from_raw(&self, raw: *const Task) -> ArcType<Task> {
+    unsafe fn from_raw(&self, raw: *const Task) -> ArcType<Task> { unsafe {
         ArcType::<Task>::new(Arc::from_raw(raw))
-    }
+    }}
 
     #[inline]
     fn into_raw(&self, ptr: ArcType<Task>) -> *const Task {
@@ -92,12 +92,12 @@ macro_rules! task_intrusive_adapter {
                 container_of!(link.as_ptr(), $value, $field)
             }
             #[inline]
-            unsafe fn get_link(&self, value: *const <Self::PointerOps as intrusive_collections::PointerOps>::Value) -> <Self::LinkOps as intrusive_collections::LinkOps>::LinkPtr {
+            unsafe fn get_link(&self, value: *const <Self::PointerOps as intrusive_collections::PointerOps>::Value) -> <Self::LinkOps as intrusive_collections::LinkOps>::LinkPtr { unsafe {
                 // We need to do this instead of just accessing the field directly
                 // to strictly follow the stack borrow rules.
                 let ptr = (value as *const u8).add(offset_of!($value, $field));
                 core::ptr::NonNull::new_unchecked(ptr as *mut _)
-            }
+            }}
             #[inline]
             fn link_ops(&self) -> &Self::LinkOps {
                 &self.link_ops

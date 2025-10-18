@@ -39,7 +39,7 @@ pub unsafe extern "C" fn embedded_ctl(
     Value: *mut acpica::UINT64,
     _HandlerContext: *mut ::core::ffi::c_void,
     _RegionContext: *mut ::core::ffi::c_void,
-) -> acpica::ACPI_STATUS {
+) -> acpica::ACPI_STATUS { unsafe {
     let mut data = Port::<u8>::new(62);
     let mut cmd = Port::<u8>::new(66);
 
@@ -97,7 +97,7 @@ pub unsafe extern "C" fn embedded_ctl(
     }
 
     acpica::AE_OK
-}
+}}
 
 #[allow(non_snake_case)]
 #[allow(unused_variables)]

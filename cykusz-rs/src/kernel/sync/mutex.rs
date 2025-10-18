@@ -33,16 +33,16 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
         self.wait_queue.add_task(task.clone());
 
         loop {
-            if let Some(g) = self.mutex.try_lock() {
+            match self.mutex.try_lock() { Some(g) => {
                 self.wait_queue.remove_task(task);
                 return MutexGuard {
                     g: Some(g),
                     m: &self,
                     debug: 0,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait_flags(SleepFlags::NON_INTERRUPTIBLE);
-            }
+            }}
         }
     }
 
@@ -53,7 +53,7 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
 
         loop {
             dbgln!(lock, "l: - {}", id);
-            if let Some(g) = self.mutex.try_lock() {
+            match self.mutex.try_lock() { Some(g) => {
                 dbgln!(lock, "l: + {}", id);
                 self.wait_queue.remove_task(task);
                 return MutexGuard {
@@ -61,23 +61,23 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
                     m: &self,
                     debug: id,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait_flags(SleepFlags::NON_INTERRUPTIBLE);
-            }
+            }}
         }
     }
 
     fn try_lock(&'a self) -> Option<Self::Guard> {
         loop {
-            return if let Some(g) = self.mutex.try_lock() {
+            return match self.mutex.try_lock() { Some(g) => {
                 Some(MutexGuard {
                     g: Some(g),
                     m: &self,
                     debug: 0,
                 })
-            } else {
+            } _ => {
                 None
-            };
+            }};
         }
     }
 
@@ -87,30 +87,30 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Mutex<T> {
         self.wait_queue.add_task(task.clone());
 
         loop {
-            if let Some(g) = self.mutex.try_lock_irq() {
+            match self.mutex.try_lock_irq() { Some(g) => {
                 self.wait_queue.remove_task(task);
                 return MutexGuard {
                     g: Some(g),
                     m: &self,
                     debug: 0,
                 };
-            } else {
+            } _ => {
                 let _ = WaitQueue::task_wait_flags(SleepFlags::NON_INTERRUPTIBLE);
-            }
+            }}
         }
     }
 
     fn try_lock_irq(&'a self) -> Option<Self::Guard> {
         loop {
-            return if let Some(g) = self.mutex.try_lock_irq() {
+            return match self.mutex.try_lock_irq() { Some(g) => {
                 Some(MutexGuard {
                     g: Some(g),
                     m: &self,
                     debug: 0,
                 })
-            } else {
+            } _ => {
                 None
-            };
+            }};
         }
     }
 }

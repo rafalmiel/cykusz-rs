@@ -3,14 +3,14 @@
 
 use acpica::*;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsGetTimer() -> UINT64 {
     //100s ns
     crate::arch::dev::hpet::current_ns() as i64 / 100
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsSignal(Function: UINT32, Info: *mut ::core::ffi::c_void) -> ACPI_STATUS {
     if Function == ACPI_SIGNAL_FATAL as i32 {
@@ -20,7 +20,7 @@ extern "C" fn AcpiOsSignal(Function: UINT32, Info: *mut ::core::ffi::c_void) -> 
     AE_OK
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[linkage = "external"]
 extern "C" fn AcpiOsEnterSleep(
     SleepState: UINT8,

@@ -1,7 +1,7 @@
 #![feature(seek_stream_len)]
 #![feature(raw_ref_op)]
 
-use fon::samp::{Samp16, Samp32};
+use fon::chan::{Samp16, Samp32};
 use kittyaudio::Frame;
 use std::process::ExitCode;
 

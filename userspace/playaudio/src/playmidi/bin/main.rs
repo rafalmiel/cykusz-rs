@@ -93,11 +93,11 @@ fn main() -> Result<(), ExitCode> {
 
     println!("Convert...");
 
-    let left = fon::Audio::<fon::samp::Samp32, 1>::with_f32_buffer(44100, left);
-    let right = fon::Audio::<fon::samp::Samp32, 1>::with_f32_buffer(44100, right);
+    let left = fon::Audio::<fon::chan::Samp32, 1>::with_f32_buffer(44100, left);
+    let right = fon::Audio::<fon::chan::Samp32, 1>::with_f32_buffer(44100, right);
 
-    let mut left = fon::Audio::<fon::samp::Samp16, 1>::with_audio(44100, &left);
-    let mut right = fon::Audio::<fon::samp::Samp16, 1>::with_audio(44100, &right);
+    let mut left = fon::Audio::<fon::chan::Samp16, 1>::with_audio(44100, &left);
+    let mut right = fon::Audio::<fon::chan::Samp16, 1>::with_audio(44100, &right);
 
     println!("Collect...");
 

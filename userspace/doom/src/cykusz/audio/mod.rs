@@ -2,7 +2,7 @@ mod music;
 mod sounds;
 
 use crate::cykusz::audio::music::Music;
-use fon::samp::{Samp16, Samp32};
+use fon::chan::{Samp16, Samp32};
 use kittyaudio::Frame;
 use sounds::Sounds;
 use std::os::unix::net::UnixStream;

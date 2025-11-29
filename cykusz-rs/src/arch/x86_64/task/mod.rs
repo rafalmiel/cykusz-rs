@@ -58,7 +58,7 @@ impl Context {
         let mut rbp = VirtAddr(unsafe { (&raw const self.rbp).read_unaligned() });
 
         while !rbp.is_user() {
-            dbgln!(sched_v, "{:#x}", (rbp + 8).read::<u64>());
+            dbgln!(sched_v, "{:#x}", unsafe {(rbp + 8).read::<u64>()});
 
             rbp = VirtAddr(unsafe { rbp.read::<usize>() });
         }
@@ -216,7 +216,7 @@ impl Task {
 
         let frame = helper.next::<KTaskInitFrame>();
 
-        frame.task_finished_fun = task_finished as usize;
+        frame.task_finished_fun = task_finished as *const () as usize;
         frame.int.ss = ds.bits() as u64;
         frame.int.sp = (sp - 8) as u64;
         frame.int.cf = if int_enabled { 0x200 } else { 0x0 };
@@ -227,7 +227,7 @@ impl Task {
         let ctx = helper.next::<Context>();
 
         *ctx = Context::empty();
-        ctx.rip = isr_return as usize;
+        ctx.rip = isr_return as *const () as usize;
         ctx.cr3 = cr3.0;
 
         Unique::new_unchecked(ctx as *mut Context)
@@ -253,7 +253,7 @@ impl Task {
         let ctx = helper.next::<Context>();
 
         *ctx = Context::empty();
-        ctx.rip = asm_sysretq_userinit as usize;
+        ctx.rip = asm_sysretq_userinit as *const () as usize;
         ctx.cr3 = cr3.0;
 
         Unique::new_unchecked(ctx as *mut Context)
@@ -288,7 +288,7 @@ impl Task {
         let ctx = helper.next::<Context>();
 
         *ctx = Context::empty();
-        ctx.rip = asm_sysretq_forkinit as usize;
+        ctx.rip = asm_sysretq_forkinit as *const () as usize;
         ctx.cr3 = cr3;
 
         Unique::new_unchecked(ctx as *mut Context)
@@ -316,7 +316,7 @@ impl Task {
         let ctx = helper.next::<Context>();
 
         *ctx = Context::empty();
-        ctx.rip = asm_sysretq_forkinit as usize;
+        ctx.rip = asm_sysretq_forkinit as *const () as usize;
         ctx.cr3 = self.cr3;
 
         Unique::new_unchecked(ctx as *mut Context)

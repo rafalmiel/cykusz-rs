@@ -152,9 +152,9 @@ vdi: $(vdi)
 cargo_kernel:
 ifdef dev
 ifdef logs
-	cd cykusz-rs && cargo build --verbose -F logs && cd ../
+	cd cykusz-rs && cargo build --verbose -F logs -F debug_build && cd ../
 else
-	cd cykusz-rs && cargo build --verbose && cd ../
+	cd cykusz-rs && cargo build --verbose -F debug_build && cd ../
 endif
 else
 ifdef logs

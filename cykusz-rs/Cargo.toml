@@ -12,6 +12,7 @@ bench = false
 
 [features]
 logs = []
+debug_build = []
 default = ["logs"]
 
 [dependencies]

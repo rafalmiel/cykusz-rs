@@ -1,6 +1,4 @@
 #![allow(non_snake_case)]
-#![feature(raw_ref_op)]
-#![feature(const_mut_refs)]
 #![feature(ptr_as_ref_unchecked)]
 #![feature(duration_millis_float)]
 
@@ -44,6 +42,7 @@ fn doom<'a>() -> &'a mut cykusz::CykuszDoom {
     }
 }
 
+#[allow(static_mut_refs)]
 fn doom_screen() -> &'static DoomScreen {
     unsafe { DOOM_SCREEN.as_mut().unwrap_unchecked() }
 }

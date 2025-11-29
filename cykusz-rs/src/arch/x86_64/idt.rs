@@ -279,6 +279,7 @@ pub extern "C" fn isr_handler(
 }
 
 pub fn init() {
+    crate::bochs();
     let mut idt = IDT.lock_irq();
 
     unsafe {
@@ -311,6 +312,7 @@ pub fn init() {
     SHARED_IRQS.set_virtualisation_exception(virtualisation_exception);
     SHARED_IRQS.set_security_exception(security_exception);
 
+    crate::bochs();
     idt.load();
 }
 
@@ -451,7 +453,7 @@ fn invalid_opcode(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        logln!(
+        dbgln!(exc,
             "[ SIGILL ] Task {} invalid_opcode error {:#x}",
             task.tid(),
             frame.ip
@@ -488,7 +490,7 @@ fn segment_not_present(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, e
     if frame.is_user() {
         let task = current_task_ref();
 
-        logln!("[ SIGSEGV ] Task {} segment_not_present error", task.tid());
+        dbgln!(exc, "[ SIGSEGV ] Task {} segment_not_present error", task.tid());
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -501,7 +503,7 @@ fn stack_segment_fault(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, e
     if frame.is_user() {
         let task = current_task_ref();
 
-        logln!("[ SIGSEGV ] Task {} stack_segment error", task.tid());
+        dbgln!(exc, "[ SIGSEGV ] Task {} stack_segment error", task.tid());
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -514,7 +516,7 @@ fn general_protection_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFram
     if frame.is_user() {
         let task = current_task_ref();
 
-        logln!(
+        dbgln!(exc,
             "[ SIGBUS ] Task {} general_protecion error {:#x} {:?}",
             task.tid(),
             frame.ip,
@@ -548,11 +550,11 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
         } else {
             dbgln!(
                 page_fault,
-                "[ SIGSEGV ] Task {} page_fault error addr: {}, ip: {:#x}, err: {}",
+                "[ SIGSEGV ] Task {} page_fault error addr: {}, ip: {:#x}, err: {:?}",
                 task.tid(),
                 virt,
                 frame.ip,
-                err
+                reason
             );
         }
     //println!("user pagefault failed");
@@ -573,6 +575,7 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
 
     if VirtAddr(frame.ip as usize).is_user() {
         let task = current_task_ref();
+        dbgln!(exc, "[ SIGSEGV ] page fault");
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;

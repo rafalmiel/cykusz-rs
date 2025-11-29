@@ -1,8 +1,8 @@
 display_library: x
-megs:            256
+megs:            2048
 magic_break: enabled=1
 romimage:        file=/usr/share/bochs/BIOS-bochs-latest
-vgaromimage:     file=/usr/share/bochs/VGABIOS-lgpl-latest-debug.bin
+vgaromimage:     file=/usr/share/bochs/VGABIOS-lgpl-latest.bin
 boot:            disk
 log:             bochslog.txt
 clock:           sync=realtime, rtc_sync=1, time0=local

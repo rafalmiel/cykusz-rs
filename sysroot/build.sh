@@ -123,8 +123,8 @@ function _prepare_rust {
         pushd .
 
         cd $RUST_SRC_DIR
-        cat > config.toml <<EOL
-change-id = 124501
+        cat > bootstrap.toml <<EOL
+change-id = 146435
 
 [llvm]
 download-ci-llvm = false
@@ -140,6 +140,7 @@ prefix = ""
 sysconfdir = "etc"
 
 [rust]
+debug = false
 codegen-tests = false
 deny-warnings = false # work around rust-num-cpus warning
 channel = "nightly"
@@ -565,6 +566,7 @@ function _rust {
     INSTALL_PATH="$SPATH/cross"
 
     rustup component add rust-src
+
     CARGO_HOME=$CARGO_HOME ./x.py build --stage 2 -j12
     CARGO_HOME=$CARGO_HOME DESTDIR="$INSTALL_PATH/usr/local" ./x.py install
     CARGO_HOME=$CARGO_HOME DESTDIR="$INSTALL_PATH/usr/local" ./x.py dist
@@ -589,7 +591,7 @@ function _llvm {
 
     cd $LLVM_BUILD_DIR
 
-    cmake -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DDEFAULT_SYSROOT=$SYSROOT -DCMAKE_INSTALL_PREFIX="$CROSS" -DCMAKE_BUILD_TYPE=Release -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_TARGET_ARCH=x86_64 -DLLVM_DEFAULT_TARGET_TRIPLE=$TRIPLE -Wno-dev $LLVM_SRC_DIR/llvm
+    cmake -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld" -DDEFAULT_SYSROOT=$SYSROOT -DCMAKE_INSTALL_PREFIX="$CROSS" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_ENABLE_RTTI=ON -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_TARGET_ARCH=x86_64 -DLLVM_DEFAULT_TARGET_TRIPLE=$TRIPLE -Wno-dev $LLVM_SRC_DIR/llvm
 
     VERBOSE=1 make -j12
     make install
@@ -1166,7 +1168,8 @@ function _cykusz_readline {
 }
 
 function _cykusz_apps {
-    $TRIPLE-gcc $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
+    clang $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/testgcc
     $TRIPLE-gcc $SRC_DIR/cykusz_apps/open_sleep.c -o $BUILD_DIR/open_sleep
     $TRIPLE-gcc  $SRC_DIR/cykusz_apps/stack.c -o $BUILD_DIR/stack
     $TRIPLE-g++ $SRC_DIR/cykusz_apps/hello.cpp -o $BUILD_DIR/hello

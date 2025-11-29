@@ -1,5 +1,4 @@
 #![feature(seek_stream_len)]
-#![feature(raw_ref_op)]
 
 use fon::chan::{Samp16, Samp32};
 use kittyaudio::Frame;

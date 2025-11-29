@@ -25,11 +25,14 @@ pub mod utils;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr) {
+    crate::bochs();
     cpu::init();
+    crate::bochs();
 
     let mboot = unsafe { multiboot2::load(mboot_addr.to_mapped()) };
 
     output::init(mboot.framebuffer_info_tag());
+    crate::bochs();
     let fb_info = mboot.framebuffer_info_tag().unwrap();
 
     logln!(
@@ -45,14 +48,17 @@ pub extern "C" fn x86_64_rust_main(mboot_addr: mm::PhysAddr, stack_top: VirtAddr
     );
 
     gdt::early_init();
+    crate::bochs();
 
-    println!("[ OK ] GDT Initialised");
+    //println!("[ OK ] GDT Initialised");
 
     idt::init();
+    crate::bochs();
 
     println!("[ OK ] IDT Initialised");
 
     mm::init(&mboot);
+    crate::bochs();
 
     crate::kernel::mm::init();
 

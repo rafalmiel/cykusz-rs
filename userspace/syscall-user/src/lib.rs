@@ -1,10 +1,8 @@
-#![feature(naked_functions)]
-#![feature(asm_const)]
-
 pub mod print;
 pub mod util;
 
 use std::arch::asm;
+use std::arch::naked_asm;
 use std::sync::atomic::AtomicU32;
 
 use syscall_defs::net::{MsgHdr, SockAddrPtr, SockDomain, SockTypeFlags};
@@ -530,14 +528,12 @@ pub fn bochs() {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 extern "C" fn sigreturn() {
-    unsafe {
-        asm!("mov rax, {sys}",
-             "syscall",
-            sys = const SYS_SIGRETURN,
-            options(noreturn));
-    }
+    naked_asm!("mov rax, {sys}",
+         "syscall",
+        sys = const SYS_SIGRETURN
+        );
 }
 
 pub fn futex_wait(val: &AtomicU32, expected: u32) -> SyscallResult {

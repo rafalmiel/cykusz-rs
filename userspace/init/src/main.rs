@@ -1,5 +1,3 @@
-#![feature(raw_ref_op)]
-
 use syscall_user as syscall;
 
 use syscall_defs::waitpid::WaitPidFlags;

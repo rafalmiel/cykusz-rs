@@ -16,7 +16,7 @@ fn enable_syscall_extension() {
         msr::wrmsr(msr::IA32_EFER, msr::rdmsr(msr::IA32_EFER) | 1);
 
         msr::wrmsr(msr::IA32_STAR, 0x0013_0008_0000_0000);
-        msr::wrmsr(msr::IA32_LSTAR, asm_syscall_handler as u64);
+        msr::wrmsr(msr::IA32_LSTAR, asm_syscall_handler as *const () as u64);
         msr::wrmsr(msr::IA32_FMASK, 0x200);
     }
 }

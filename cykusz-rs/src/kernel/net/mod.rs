@@ -166,7 +166,7 @@ pub fn register_net_driver(driver: Arc<dyn NetDriver>) {
         *def = Some(dev);
     }
 
-    create_param_task(recv_thread as usize, drivers.len() - 1);
+    create_param_task(recv_thread as *const () as usize, drivers.len() - 1);
 }
 
 pub fn init() {

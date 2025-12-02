@@ -10,6 +10,7 @@ GCC_SRC_DIR=$SRC_DIR/gcc
 RUST_SRC_DIR=$SRC_DIR/rust
 AUTOMAKE_SRC_DIR=$SRC_DIR/automake
 AUTOCONF_SRC_DIR=$SRC_DIR/autoconf
+AUTOCONF_269_SRC_DIR=$SRC_DIR/autoconf_269
 LIBTOOL_SRC_DIR=$SRC_DIR/libtool
 PKGCONF_SRC_DIR=$SRC_DIR/pkgconf
 MLIBC_SRC_DIR=$SRC_DIR/mlibc
@@ -46,6 +47,7 @@ BINUTILS_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-binutils-gdb
 GCC_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-gcc
 AUTOMAKE_BUILD_DIR=$BUILD_DIR/automake
 AUTOCONF_BUILD_DIR=$BUILD_DIR/autoconf
+AUTOCONF_269_BUILD_DIR=$BUILD_DIR/autoconf_269
 LIBTOOL_BUILD_DIR=$BUILD_DIR/libtool
 PKGCONF_BUILD_DIR=$BUILD_DIR/pkgconf
 NCURSES_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-ncurses
@@ -75,6 +77,7 @@ MLIBC_BUILD_DIR=$BUILD_DIR/mlibc
 
 SYSROOT=$CYKUSZ_DIR/sysroot/cykusz
 CROSS=$CYKUSZ_DIR/sysroot/cross/usr
+CROSSOPT=$CYKUSZ_DIR/sysroot/cross/opt
 
 TRIPLE=x86_64-cykusz
 
@@ -110,6 +113,13 @@ function _prepare_gcc {
         cd $GCC_SRC_DIR
         ./contrib/download_prerequisites
         git apply patch-01.patch
+
+        cd libstdc++-v3/
+        $CROSSOPT/autoconf-2.69/bin/autoreconf -i
+        cd ../lto-plugin
+        $CROSSOPT/autoconf-2.69/bin/autoreconf -i
+        cd ../libbacktrace
+        $CROSSOPT/autoconf-2.69/bin/autoreconf -i
 
         popd
     fi
@@ -189,6 +199,14 @@ function _prepare_autoconf {
         cp -r autoconf-archive-${ARCHIVE_VER}/m4/* $CROSS/share/aclocal/
 
         popd
+    fi
+}
+
+
+function _prepare_autoconf_269 {
+    if [ ! -d $AUTOCONF_269_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone -b cykusz https://github.com/rafalmiel/autoconf-2.69.git $AUTOCONF_269_SRC_DIR
     fi
 }
 
@@ -631,6 +649,21 @@ function _autoconf {
     popd
 }
 
+function _autoconf_269 {
+    _prepare_autoconf_269
+
+    mkdir -p $AUTOCONF_269_BUILD_DIR
+
+    pushd .
+
+    cd $AUTOCONF_269_BUILD_DIR
+    $AUTOCONF_269_SRC_DIR/configure --prefix=$CROSSOPT/autoconf-2.69
+
+    make install
+
+    popd
+}
+
 function _libtool {
     _prepare_libtool
 
@@ -1049,7 +1082,7 @@ function _cykusz_bash {
     pushd .
 
     cd $BASH_CYKUSZ_BUILD_DIR
-    $BASH_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-bash-malloc --disable-nls
+    $BASH_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-bash-malloc --disable-nls CFLAGS="-O2 -g -std=gnu89"
 
     popd
 
@@ -1168,8 +1201,7 @@ function _cykusz_readline {
 }
 
 function _cykusz_apps {
-    clang $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
-    $TRIPLE-gcc $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/testgcc
+    $TRIPLE-gcc $SRC_DIR/cykusz_apps/test.c -o $BUILD_DIR/test
     $TRIPLE-gcc $SRC_DIR/cykusz_apps/open_sleep.c -o $BUILD_DIR/open_sleep
     $TRIPLE-gcc  $SRC_DIR/cykusz_apps/stack.c -o $BUILD_DIR/stack
     $TRIPLE-g++ $SRC_DIR/cykusz_apps/hello.cpp -o $BUILD_DIR/hello

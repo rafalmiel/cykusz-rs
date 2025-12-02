@@ -19,6 +19,9 @@ $SPATH/build.sh automake > $LOGDIR/automake.log 2>&1
 echo "Building autoconf..."
 $SPATH/build.sh autoconf > $LOGDIR/autoconf.log 2>&1
 
+echo "Building autoconf 2.69..."
+$SPATH/build.sh autoconf_269 > $LOGDIR/autoconf_269.log 2>&1
+
 echo "Building libtool..."
 $SPATH/build.sh libtool > $LOGDIR/libtool.log 2>&1
 

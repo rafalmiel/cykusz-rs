@@ -33,6 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     cc::Build::new()
         .flag("-w") // Disable warnings
+        .flag("-std=gnu99")
         .define("FEATURE_SOUND", "1")
         .define("__CYKUSZ__", "1")
         .files(dg_c_paths)

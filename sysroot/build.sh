@@ -1082,7 +1082,7 @@ function _cykusz_bash {
     pushd .
 
     cd $BASH_CYKUSZ_BUILD_DIR
-    $BASH_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-bash-malloc --disable-nls CFLAGS="-O2 -g -std=gnu89"
+    $BASH_SRC_DIR/configure --host=$TRIPLE --target=$TRIPLE --prefix=/usr --without-bash-malloc --disable-nls --with-installed-readline CFLAGS="-O2 -g -std=gnu89"
 
     popd
 

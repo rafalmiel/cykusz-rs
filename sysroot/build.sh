@@ -383,13 +383,11 @@ function _prepare_libidn2 {
 function _prepare_pcre2 {
     if [ ! -d $PCRE2_SRC_DIR ]; then
         mkdir -p $SRC_DIR
-        git clone --depth 1 -b cykusz https://github.com/rafalmiel/pcre2.git $PCRE2_SRC_DIR
+        git clone --depth 1 -b cykusz --recursive https://github.com/rafalmiel/pcre2.git $PCRE2_SRC_DIR
 
         pushd .
         cd $PCRE2_SRC_DIR
         ./autogen.sh
-        rm config.sub
-        mv config.sub.cykusz config.sub
         popd
     fi
 }
@@ -870,7 +868,7 @@ function _cykusz_less {
     pushd .
 
     cd $LESS_CYKUSZ_BUILD_DIR
-    $LESS_SRC_DIR/configure --host=$TRIPLE --prefix=/usr
+    $LESS_SRC_DIR/configure --host=$TRIPLE --prefix=/usr CFLAGS="-O2 -g -std=gnu89"
 
     popd
 
@@ -1066,7 +1064,7 @@ function _cykusz_pcre2 {
 
     cd $PCRE2_CYKUSZ_BUILD_DIR
 
-    $PCRE2_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --docdir=/usr/share/doc/pcre2-10.42 --enable-unicode --enable-jit --enable-pcre2-16 --enable-pcre2-32 --enable-pcre2grep-libz --enable-pcre2test-libreadline --disable-static
+    $PCRE2_SRC_DIR/configure --host=$TRIPLE  --prefix=/usr --with-sysroot=$SYSROOT --docdir=/usr/share/doc/pcre2-10.47 --enable-unicode --enable-jit --enable-pcre2-16 --enable-pcre2-32 --enable-pcre2grep-libz --enable-pcre2test-libreadline --disable-static
 
     make DESTDIR=$SYSROOT -j4
     make DESTDIR=$SYSROOT install

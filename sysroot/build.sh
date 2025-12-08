@@ -292,8 +292,6 @@ function _prepare_wget {
         pushd .
         cd $WGET_SRC_DIR
         ./bootstrap
-        rm build-aux/config.sub
-        cp config.sub.cykusz build-aux/config.sub
         popd
     fi
 }

@@ -117,7 +117,7 @@ fn get_dir_entry(
 }
 
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
-    logln!("sys_open {} {} {:x}", at, make_str(path, len), mode);
+    dbgln!(sys_open, "sys_open {} {} {:x}", at, make_str(path, len), mode);
     let flags = OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
 
     let at = OpenFD::try_from(at)?;

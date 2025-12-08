@@ -33,6 +33,7 @@ ZLIB_SRC_DIR=$SRC_DIR/zlib
 PYTHON_SRC_DIR=$SRC_DIR/cpython
 READLINE_SRC_DIR=$SRC_DIR/readline
 WGET_SRC_DIR=$SRC_DIR/wget
+WGET2_SRC_DIR=$SRC_DIR/wget2
 LIBPSL_SRC_DIR=$SRC_DIR/libpsl
 PCRE2_SRC_DIR=$SRC_DIR/pcre2
 LIBUNISTRING_SRC_DIR=$SRC_DIR/libunistring
@@ -64,6 +65,7 @@ ZLIB_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-zlib
 PYTHON_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-python
 READLINE_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-readline
 WGET_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-wget
+WGET2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-wget2
 LIBPSL_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libpsl
 PCRE2_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-pcre2
 LIBUNISTRING_CYKUSZ_BUILD_DIR=$BUILD_DIR/cykusz-libunistring
@@ -292,6 +294,18 @@ function _prepare_wget {
         ./bootstrap
         rm build-aux/config.sub
         cp config.sub.cykusz build-aux/config.sub
+        popd
+    fi
+}
+
+function _prepare_wget2 {
+    if [ ! -d $WGET2_SRC_DIR ]; then
+        mkdir -p $SRC_DIR
+        git clone --depth 1 -b cykusz https://github.com/rafalmiel/wget2.git $WGET2_SRC_DIR
+
+        pushd .
+        cd $WGET2_SRC_DIR
+        ./bootstrap
         popd
     fi
 }
@@ -926,6 +940,23 @@ function _cykusz_wget {
     $WGET_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --sysconfdir=/etc --disable-nls --with-ssl=openssl --with-openssl
 
     make DESTDIR=$SYSROOT -j4
+    make DESTDIR=$SYSROOT install
+
+    popd
+}
+
+function _cykusz_wget2 {
+    _prepare_wget2
+
+    mkdir -p $WGET2_CYKUSZ_BUILD_DIR
+
+    pushd .
+
+    cd $WGET2_CYKUSZ_BUILD_DIR
+
+    $WGET2_SRC_DIR/configure --host=$TRIPLE --exec-prefix=/usr --prefix=/usr --sysconfdir=/etc --disable-nls --with-ssl=openssl --with-openssl
+
+    make DESTDIR=$SYSROOT -j4 VERBOSE=1
     make DESTDIR=$SYSROOT install
 
     popd

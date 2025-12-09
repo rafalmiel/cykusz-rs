@@ -471,8 +471,6 @@ function _prepare_nano {
         pushd .
         cd $NANO_SRC_DIR
         ./autogen.sh
-        rm config.sub
-        mv config.sub.cykusz config.sub
         popd
     fi
 }
@@ -864,11 +862,11 @@ function _cykusz_nano {
     pushd .
 
     cd $NANO_CYKUSZ_BUILD_DIR
-    $NANO_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --disable-nanorc
+    $NANO_SRC_DIR/configure --host=$TRIPLE --prefix=/usr
 
     popd
 
-    make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT LIBS="-lncursesw" -j4
+    make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
     make -C $NANO_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 }
 

@@ -133,7 +133,7 @@ impl Queues {
                 sched_v,
                 "{} {:x} {:p}",
                 t.tid(),
-                t.arch_task().stack_top + t.arch_task().stack_size,
+                unsafe { t.arch_task().stack_top + t.arch_task().stack_size },
                 ptr
             );
             unsafe {
@@ -147,7 +147,7 @@ impl Queues {
                 sched_v,
                 "{} {:x} {:p}",
                 t.tid(),
-                t.arch_task().stack_top + t.arch_task().stack_size,
+                unsafe { t.arch_task().stack_top + t.arch_task().stack_size },
                 ptr
             );
             unsafe {

@@ -19,7 +19,7 @@ fn spawn_shell() -> usize {
             if let Err(e) = syscall::exec(
                 "/usr/bin/sh",
                 None,
-                Some(&["PATH=/bin:/usr/bin", "TERM=cykusz"]),
+                Some(&["PATH=/bin:/usr/bin", "TERM=cykusz", "HOME=/home/root"]),
             ) {
                 panic!("Failed to spawn shell {:?}", e);
             }

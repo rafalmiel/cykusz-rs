@@ -9,6 +9,7 @@ pub struct OutputBuffer {
     buffer: Vec<ScreenChar>,
 
     color: ColorCode,
+    reverse_colors: bool,
 
     viewport_y: usize,
     buffer_start_y: usize,
@@ -131,6 +132,7 @@ impl OutputBuffer {
             buffer,
 
             color: ColorCode::new(fg, bg),
+            reverse_colors: false,
 
             viewport_y: 0,
             buffer_start_y: 0,
@@ -609,6 +611,7 @@ impl<'a> AnsiEscape<'a> {
     }
 }
 
+#[derive(Debug)]
 enum ParsedColor {
     Unknown,
     Foreground(Color),
@@ -657,6 +660,7 @@ fn to_color(code: u16) -> ParsedColor {
 
 impl<'a> vte::Perform for AnsiEscape<'a> {
     fn print(&mut self, c: char) {
+        dbg!(vti, "{}", c);
         self.output.store_char(c as u8, &mut self.update);
     }
 
@@ -685,13 +689,6 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
         action: char,
     ) {
         use core::cmp::min;
-
-        //logln4!(
-        //    "CSI DISPATCH: action: {}, params: {:?}, intermediates: {:?}",
-        //    action,
-        //    params,
-        //    intermediates
-        //);
 
         if ignore {
             return;
@@ -785,6 +782,8 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                             0 => {
                                 bright = false;
                                 dim = false;
+                                self.output.reverse_colors = false;
+                                dbgln!(vti, "Reset colors");
                                 self.output.color = ColorCode::new(Color::LightGreen, Color::Black);
                             }
                             1 => {
@@ -796,11 +795,13 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                                 bright = false;
                             }
                             7 => {
+                                self.output.reverse_colors = true;
                                 let fg = self.output.color.fg();
                                 let bg = self.output.color.bg();
 
                                 self.output.color.set_fg(bg);
                                 self.output.color.set_bg(fg);
+                                dbgln!(vti, "Reverse");
                             }
                             m => match to_color(m) {
                                 ParsedColor::Background(mut c) => {
@@ -810,7 +811,12 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                                         c = c.brighten();
                                     }
 
-                                    self.output.color.set_bg(c);
+                                    if !self.output.reverse_colors {
+                                        self.output.color.set_bg(c);
+                                    } else {
+                                        self.output.color.set_fg(c);
+                                    }
+                                    dbgln!(vti, "Set background: {:?}", c);
                                 }
                                 ParsedColor::Foreground(mut c) => {
                                     if dim {
@@ -819,9 +825,16 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                                         c = c.brighten();
                                     }
 
-                                    self.output.color.set_fg(c);
+                                    if !self.output.reverse_colors {
+                                        self.output.color.set_fg(c);
+                                    } else {
+                                        self.output.color.set_bg(c);
+                                    }
+                                    dbgln!(vti, "Set foreground: {:?}", c);
                                 }
-                                ParsedColor::Unknown => {}
+                                ParsedColor::Unknown => {
+                                    dbgln!(vti, "Failed to parse colors");
+                                }
                             },
                         }
                     }

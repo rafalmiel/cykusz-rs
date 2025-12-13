@@ -77,7 +77,7 @@ impl INode for LockedRamINode {
         let content = self.0.read();
 
         stat.st_rdev = if let Content::DevNode(id) = &content.content {
-            *id
+            *id as i64
         } else {
             0
         };
@@ -87,8 +87,8 @@ impl INode for LockedRamINode {
             let bytes = b.lock();
 
             stat.st_nlink = 1;
-            stat.st_blksize = PAGE_SIZE as u64;
-            stat.st_blocks = bytes.len().ceil_div(PAGE_SIZE) as u64;
+            stat.st_blksize = PAGE_SIZE as i64;
+            stat.st_blocks = bytes.len().ceil_div(PAGE_SIZE) as i64;
             stat.st_size = bytes.len() as i64;
         }
 

@@ -649,9 +649,9 @@ impl INode for LockedExt2INode {
 
         stat.st_ino = inode.id as u64;
         stat.st_dev = self.ext2_fs().dev().id() as u64;
-        stat.st_nlink = inode.d_inode.hl_count() as u32;
-        stat.st_blksize = self.ext2_fs().superblock().block_size() as u64;
-        stat.st_blocks = inode.d_inode.sector_count() as u64;
+        stat.st_nlink = inode.d_inode.hl_count() as u64;
+        stat.st_blksize = self.ext2_fs().superblock().block_size() as i64;
+        stat.st_blocks = inode.d_inode.sector_count() as i64;
         stat.st_size = inode.d_inode.size_lower() as i64;
 
         stat.st_atim =
@@ -666,7 +666,7 @@ impl INode for LockedExt2INode {
 
         match ftype {
             FileType::Block | FileType::Char => {
-                stat.st_rdev = inode.d_inode().get_rdevid();
+                stat.st_rdev = inode.d_inode().get_rdevid() as i64;
             }
             _ => {
                 stat.st_rdev = 0;

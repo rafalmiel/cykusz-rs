@@ -86,9 +86,9 @@ TRIPLE=x86_64-cykusz
 export PATH=$CYKUSZ_DIR/sysroot/bin:$CROSS/bin:$PATH
 export ACLOCAL_PATH=$CROSS/share/aclocal
 
-export PKG_CONFIG_PATH=$SYSROOT/usr/lib/pkgconfig
 export PKG_CONFIG=$CROSS/bin/pkgconf
 export PKG_CONFIG_SYSROOT_DIR=$SYSROOT
+export PKG_CONFIG_PATH=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
 export PKG_CONFIG_LIBDIR=$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig
 
 function _prepare_mlibc {
@@ -278,8 +278,7 @@ function _prepare_coreutils {
         pushd .
         cd $COREUTILS_SRC_DIR
         ./bootstrap
-        rm build-aux/config.sub
-        mv config.sub.cykusz build-aux/config.sub
+        ln -sf ../gnulib/build-aux/config.sub build-aux/config.sub
         popd
     fi
 }
@@ -844,14 +843,22 @@ function _cykusz_ncurses {
     pushd .
 
     cd $NCURSES_CYKUSZ_BUILD_DIR
-    $NCURSES_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --disable-stripping --with-debug --enable-widec
+    $NCURSES_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --without-tests --without-ada --with-shared --disable-stripping --with-debug --enable-widec --enable-pc-files --with-pkg-config-libdir=/usr/lib/pkgconfig --with-termlib
 
     popd
 
     make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT -j4
     make -C $NCURSES_CYKUSZ_BUILD_DIR DESTDIR=$SYSROOT install
 
-    ln -sf libncursesw.so $SYSROOT/usr/lib/libncurses.so
+    for lib in ncurses form panel menu tinfo; do
+        rm -vf ${SYSROOT}/usr/lib/lib${lib}.so
+        echo "INPUT(-l${lib}w)" > ${SYSROOT}/usr/lib/lib${lib}.so
+        ln -svf ${lib}w.pc "${SYSROOT}/usr/lib/pkgconfig/${lib}.pc"
+    done
+
+    rm -vf ${SYSROOT}/usr/lib/libcursesw.so
+    echo "INPUT(-lncursesw)" > ${SYSROOT}/usr/lib/libcursesw.so
+    ln -svf libncurses.so "${SYSROOT}/usr/lib/libcurses.so"
 }
 
 function _cykusz_nano {
@@ -862,7 +869,7 @@ function _cykusz_nano {
     pushd .
 
     cd $NANO_CYKUSZ_BUILD_DIR
-    $NANO_SRC_DIR/configure --host=$TRIPLE --prefix=/usr
+    $NANO_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --enable-nanorc --enable-color
 
     popd
 
@@ -1199,7 +1206,7 @@ function _cykusz_python {
 
     cd $PYTHON_CYKUSZ_BUILD_DIR
     export CONFIG_SITE=$SPATH/cfg/python-config-site
-    $PYTHON_SRC_DIR/configure --with-build-python=python3.12 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython --without-ensurepip
+    $PYTHON_SRC_DIR/configure --with-build-python=python3.12 --host=$TRIPLE --build=x86_64-linux-gnu --prefix=/usr --enable-shared --disable-ipv6 --without-static-libpython --without-ensurepip --with-readline=readline
 
     make -j6 DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install
@@ -1217,9 +1224,9 @@ function _cykusz_readline {
     mkdir -p $READLINE_CYKUSZ_BUILD_DIR
 
     cd $READLINE_CYKUSZ_BUILD_DIR
-    $READLINE_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --disable-static --enable-multibyte
+    $READLINE_SRC_DIR/configure --host=$TRIPLE --prefix=/usr --disable-static --enable-multibyte --with-curses
 
-    make -j6 DESTDIR=$SYSROOT
+    make -j6 SHLIB_LIBS="-lncurses -ltinfo" DESTDIR=$SYSROOT
     make DESTDIR=$SYSROOT install
 
     popd

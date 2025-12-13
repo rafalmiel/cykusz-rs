@@ -16,7 +16,7 @@ use bit_field::BitField;
 use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum Color {
     Black = 0,

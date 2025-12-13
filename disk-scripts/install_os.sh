@@ -72,4 +72,11 @@ echo "$(blkid -s UUID -o value "$lo"p3)" /home >> mnt/etc/fstab
 
 sudo umount mnt
 
+sudo mount "$lo"p3 mnt
+sudo chown -R $u:$u mnt
+
+mkdir -p mnt/root
+
+sudo umount mnt
+
 losetup -d $lo

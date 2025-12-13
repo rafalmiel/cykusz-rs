@@ -529,6 +529,7 @@ function _sysroot {
 
     mkdir -p $SYSROOT/etc
     cp $SPATH/cfg/resolv.conf $SYSROOT/etc/
+    cp $SPATH/cfg/services $SYSROOT/etc/
 }
 
 function _sysroot_rust_bindings {

@@ -76,6 +76,8 @@ sudo mount "$lo"p3 mnt
 sudo chown -R $u:$u mnt
 
 mkdir -p mnt/root
+cp sysroot/cfg/.bashrc mnt/root
+cp sysroot/cfg/.nanorc mnt/root
 
 sudo umount mnt
 

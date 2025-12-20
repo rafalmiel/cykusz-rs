@@ -2,13 +2,14 @@ use alloc::vec::Vec;
 use core::cmp::max;
 use core::ops::Range;
 
-use crate::arch::output::{video, Color, ColorCode, ScreenChar};
+use crate::arch::output::{video, Character, CharacterColor};
+use crate::drivers::tty::color::{ColorCode, RGB, Ansi16, Ansi256};
 use crate::kernel::utils::types::Align;
 
 pub struct OutputBuffer {
-    buffer: Vec<ScreenChar>,
+    buffer: Vec<Character>,
 
-    color: ColorCode,
+    color: CharacterColor,
     reverse_colors: bool,
 
     viewport_y: usize,
@@ -116,22 +117,22 @@ impl DoubleEndedIterator for BufRangeIter {
 }
 
 impl OutputBuffer {
-    fn blank(&self) -> ScreenChar {
-        ScreenChar::new(b' ', self.color)
+    fn blank(&self) -> Character {
+        Character::new(b' ', self.color)
     }
 
-    pub fn new(size_x: usize, size_y: usize, backlog: usize, fg: Color, bg: Color) -> OutputBuffer {
+    pub fn new(size_x: usize, size_y: usize, backlog: usize, fg: ColorCode, bg: ColorCode) -> OutputBuffer {
         let y = max(size_y, backlog);
 
         let buf_size = size_x * y;
 
-        let mut buffer = Vec::<ScreenChar>::with_capacity(buf_size);
-        buffer.resize(buf_size, ScreenChar::new(b' ', ColorCode::new(fg, bg)));
+        let mut buffer = Vec::<Character>::with_capacity(buf_size);
+        buffer.resize(buf_size, Character::new(b' ', CharacterColor::new_vga16(fg, bg)));
 
         OutputBuffer {
             buffer,
 
-            color: ColorCode::new(fg, bg),
+            color: CharacterColor::new_vga16(fg, bg),
             reverse_colors: false,
 
             viewport_y: 0,
@@ -214,7 +215,7 @@ impl OutputBuffer {
 
                 let pos = self.cursor_buf_pos();
 
-                self.buffer[pos] = ScreenChar::new(c, self.color);
+                self.buffer[pos] = Character::new(c, self.color);
 
                 self.cursor_x += 1;
             }
@@ -259,13 +260,13 @@ impl OutputBuffer {
         pos
     }
 
-    fn get_buffer_line_mut(&mut self, line: usize) -> &mut [ScreenChar] {
+    fn get_buffer_line_mut(&mut self, line: usize) -> &mut [Character] {
         let buf = (self.viewport_y * self.size_x + line * self.size_x) % self.buffer.len();
 
         &mut self.buffer[buf..buf + self.size_x]
     }
 
-    fn get_buffer_line(&self, line: usize) -> &[ScreenChar] {
+    fn get_buffer_line(&self, line: usize) -> &[Character] {
         let buf = (self.viewport_y * self.size_x + line * self.size_x) % self.buffer.len();
 
         &self.buffer[buf..buf + self.size_x]
@@ -614,44 +615,44 @@ impl<'a> AnsiEscape<'a> {
 #[derive(Debug)]
 enum ParsedColor {
     Unknown,
-    Foreground(Color),
-    Background(Color),
+    Foreground(RGB),
+    Background(RGB),
 }
 
 fn to_color(code: u16) -> ParsedColor {
     match code {
-        30 => return ParsedColor::Foreground(Color::Black),
-        31 => return ParsedColor::Foreground(Color::Red),
-        32 => return ParsedColor::Foreground(Color::Green),
-        33 => return ParsedColor::Foreground(Color::Brown),
-        34 => return ParsedColor::Foreground(Color::Blue),
-        35 => return ParsedColor::Foreground(Color::Magenta),
-        36 => return ParsedColor::Foreground(Color::Cyan),
-        37 => return ParsedColor::Foreground(Color::LightGray),
-        40 => return ParsedColor::Background(Color::Black),
-        41 => return ParsedColor::Background(Color::Red),
-        42 => return ParsedColor::Background(Color::Green),
-        43 => return ParsedColor::Background(Color::Brown),
-        44 => return ParsedColor::Background(Color::Blue),
-        45 => return ParsedColor::Background(Color::Magenta),
-        46 => return ParsedColor::Background(Color::Cyan),
-        47 => return ParsedColor::Background(Color::LightGray),
-        90 => return ParsedColor::Foreground(Color::DarkGray),
-        91 => return ParsedColor::Foreground(Color::LightRed),
-        92 => return ParsedColor::Foreground(Color::LightGreen),
-        93 => return ParsedColor::Foreground(Color::Yellow),
-        94 => return ParsedColor::Foreground(Color::LightBlue),
-        95 => return ParsedColor::Foreground(Color::Pink),
-        96 => return ParsedColor::Foreground(Color::LightCyan),
-        97 => return ParsedColor::Foreground(Color::White),
-        100 => return ParsedColor::Background(Color::DarkGray),
-        101 => return ParsedColor::Background(Color::LightRed),
-        102 => return ParsedColor::Background(Color::LightGreen),
-        103 => return ParsedColor::Background(Color::Yellow),
-        104 => return ParsedColor::Background(Color::LightBlue),
-        105 => return ParsedColor::Background(Color::Pink),
-        106 => return ParsedColor::Background(Color::LightCyan),
-        107 => return ParsedColor::Background(Color::White),
+        30 => return ParsedColor::Foreground(Ansi16::new(ColorCode::Black).into()),
+        31 => return ParsedColor::Foreground(Ansi16::new(ColorCode::Red).into()),
+        32 => return ParsedColor::Foreground(Ansi16::new(ColorCode::Green).into()),
+        33 => return ParsedColor::Foreground(Ansi16::new(ColorCode::Yellow).into()),
+        34 => return ParsedColor::Foreground(Ansi16::new(ColorCode::Blue).into()),
+        35 => return ParsedColor::Foreground(Ansi16::new(ColorCode::Magenta).into()),
+        36 => return ParsedColor::Foreground(Ansi16::new(ColorCode::Cyan).into()),
+        37 => return ParsedColor::Foreground(Ansi16::new(ColorCode::White).into()),
+        40 => return ParsedColor::Background(Ansi16::new(ColorCode::Black).into()),
+        41 => return ParsedColor::Background(Ansi16::new(ColorCode::Red).into()),
+        42 => return ParsedColor::Background(Ansi16::new(ColorCode::Green).into()),
+        43 => return ParsedColor::Background(Ansi16::new(ColorCode::Yellow).into()),
+        44 => return ParsedColor::Background(Ansi16::new(ColorCode::Blue).into()),
+        45 => return ParsedColor::Background(Ansi16::new(ColorCode::Magenta).into()),
+        46 => return ParsedColor::Background(Ansi16::new(ColorCode::Cyan).into()),
+        47 => return ParsedColor::Background(Ansi16::new(ColorCode::White).into()),
+        90 => return ParsedColor::Foreground(Ansi16::new(ColorCode::LightBlack).into()),
+        91 => return ParsedColor::Foreground(Ansi16::new(ColorCode::LightRed).into()),
+        92 => return ParsedColor::Foreground(Ansi16::new(ColorCode::LightGreen).into()),
+        93 => return ParsedColor::Foreground(Ansi16::new(ColorCode::LightYellow).into()),
+        94 => return ParsedColor::Foreground(Ansi16::new(ColorCode::LightBlue).into()),
+        95 => return ParsedColor::Foreground(Ansi16::new(ColorCode::LightMagenta).into()),
+        96 => return ParsedColor::Foreground(Ansi16::new(ColorCode::LightCyan).into()),
+        97 => return ParsedColor::Foreground(Ansi16::new(ColorCode::LightWhite).into()),
+        100 => return ParsedColor::Background(Ansi16::new(ColorCode::LightBlack).into()),
+        101 => return ParsedColor::Background(Ansi16::new(ColorCode::LightRed).into()),
+        102 => return ParsedColor::Background(Ansi16::new(ColorCode::LightGreen).into()),
+        103 => return ParsedColor::Background(Ansi16::new(ColorCode::LightYellow).into()),
+        104 => return ParsedColor::Background(Ansi16::new(ColorCode::LightBlue).into()),
+        105 => return ParsedColor::Background(Ansi16::new(ColorCode::LightMagenta).into()),
+        106 => return ParsedColor::Background(Ansi16::new(ColorCode::LightCyan).into()),
+        107 => return ParsedColor::Background(Ansi16::new(ColorCode::LightWhite).into()),
         _ => {}
     };
 
@@ -660,7 +661,6 @@ fn to_color(code: u16) -> ParsedColor {
 
 impl<'a> vte::Perform for AnsiEscape<'a> {
     fn print(&mut self, c: char) {
-        dbg!(vti, "{}", c);
         self.output.store_char(c as u8, &mut self.update);
     }
 
@@ -693,6 +693,8 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
         if ignore {
             return;
         }
+
+        dbgln!(vti, "csi_dispatch: {:?} {:?} {} {}", params, _intermediates, ignore, action);
 
         match action {
             'H' | 'f' => {
@@ -769,73 +771,115 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 }
             }
             'm' => {
-                let iter = params.iter();
+                let mut iter = params.iter();
+
+                dbgln!(vti, "param_len {}", params.len());
 
                 let mut bright = false;
                 let mut dim = false;
 
-                for m in iter {
-                    if !m.is_empty() {
-                        let m = m[0];
-
-                        match m {
-                            0 => {
-                                bright = false;
-                                dim = false;
-                                self.output.reverse_colors = false;
-                                dbgln!(vti, "Reset colors");
-                                self.output.color = ColorCode::new(Color::LightGreen, Color::Black);
-                            }
-                            1 => {
-                                bright = true;
-                                dim = false;
-                            }
-                            2 => {
-                                dim = true;
-                                bright = false;
-                            }
-                            7 => {
-                                self.output.reverse_colors = true;
-                                let fg = self.output.color.fg();
-                                let bg = self.output.color.bg();
-
-                                self.output.color.set_fg(bg);
-                                self.output.color.set_bg(fg);
-                                dbgln!(vti, "Reverse");
-                            }
-                            m => match to_color(m) {
-                                ParsedColor::Background(mut c) => {
-                                    if dim {
-                                        c = c.dim();
-                                    } else if bright {
-                                        c = c.brighten();
+                while let Some(m) = iter.next() {
+                    match m[0] {
+                        0 => {
+                            bright = false;
+                            dim = false;
+                            self.output.reverse_colors = false;
+                            dbgln!(vti, "Reset colors");
+                            self.output.color = CharacterColor::new_vga16(ColorCode::White, ColorCode::Black);
+                        }
+                        1 => {
+                            bright = true;
+                            dim = false;
+                        }
+                        2 => {
+                            dim = true;
+                            bright = false;
+                        }
+                        v if v == 38 || v == 48 => {
+                            match (iter.next(), iter.next(), iter.next(), iter.next()) {
+                                (Some(&[5]), Some(&[m3]), _, _) => {
+                                    if v == 38 {
+                                        if !self.output.reverse_colors {
+                                            self.output.color.set_foreground(Ansi256::new(m3 as u8).into())
+                                        } else {
+                                            self.output.color.set_background(Ansi256::new(m3 as u8).into())
+                                        }
                                     }
-
-                                    if !self.output.reverse_colors {
-                                        self.output.color.set_bg(c);
-                                    } else {
-                                        self.output.color.set_fg(c);
+                                    else if v == 48 {
+                                        if !self.output.reverse_colors {
+                                            self.output.color.set_background(Ansi256::new(m3 as u8).into())
+                                        } else {
+                                            self.output.color.set_foreground(Ansi256::new(m3 as u8).into())
+                                        }
                                     }
-                                    dbgln!(vti, "Set background: {:?}", c);
                                 }
-                                ParsedColor::Foreground(mut c) => {
-                                    if dim {
-                                        c = c.dim();
-                                    } else if bright {
-                                        c = c.brighten();
+                                (Some(&[2]), Some(&[r]), Some(&[g]), Some(&[b])) => {
+                                    let rgb = RGB::new(r as u8, g as u8, b as u8);
+                                    if v == 38 {
+                                        if !self.output.reverse_colors {
+                                            self.output.color.set_foreground(rgb)
+                                        } else {
+                                            self.output.color.set_background(rgb)
+                                        }
                                     }
+                                    else if v == 48 {
+                                        if !self.output.reverse_colors {
+                                            self.output.color.set_background(rgb)
+                                        } else {
+                                            self.output.color.set_foreground(rgb)
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        7 => {
+                            self.output.reverse_colors = true;
+                            let fg = self.output.color.foreground();
+                            let bg = self.output.color.background();
 
-                                    if !self.output.reverse_colors {
-                                        self.output.color.set_fg(c);
-                                    } else {
-                                        self.output.color.set_bg(c);
-                                    }
-                                    dbgln!(vti, "Set foreground: {:?}", c);
+                            self.output.color.set_foreground(bg);
+                            self.output.color.set_background(fg);
+                            dbgln!(vti, "Reverse");
+                        }
+                        v if (v >= 30 && v <= 37)
+                            || (v >= 40 && v <= 47)
+                            || (v >= 90 && v <= 97)
+                            || (v >= 100 && v <= 107) => match to_color(v) {
+                            ParsedColor::Background(mut c) => {
+                                if dim {
+                                    c = c.dim();
+                                } else if bright {
+                                    c = c.brighten();
                                 }
-                                ParsedColor::Unknown => {
-                                    dbgln!(vti, "Failed to parse colors");
+
+                                if !self.output.reverse_colors {
+                                    self.output.color.set_background(c);
+                                } else {
+                                    self.output.color.set_foreground(c);
                                 }
-                            },
+                                dbgln!(vti, "Set background: {:?}", c);
+                            }
+                            ParsedColor::Foreground(mut c) => {
+                                if dim {
+                                    c = c.dim();
+                                } else if bright {
+                                    c = c.brighten();
+                                }
+
+                                if !self.output.reverse_colors {
+                                    self.output.color.set_foreground(c);
+                                } else {
+                                    self.output.color.set_background(c);
+                                }
+                                dbgln!(vti, "Set foreground: {:?}", c);
+                            }
+                            ParsedColor::Unknown => {
+                                dbgln!(vti, "Failed to parse colors");
+                            }
+                        },
+                        _ => {
+                            dbgln!(vti, "Unhandled mode: {:?}", m)
                         }
                     }
                 }

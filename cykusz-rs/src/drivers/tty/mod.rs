@@ -10,7 +10,8 @@ use syscall_defs::poll::PollEventFlags;
 use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT, SIGTSTP};
 use syscall_defs::OpenFlags;
 
-use crate::arch::output::{video, Color, ConsoleWriter};
+use crate::arch::output::{video, ConsoleWriter};
+use color::ColorCode;
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
@@ -32,6 +33,8 @@ use self::output::OutputBuffer;
 mod input;
 mod keymap;
 mod output;
+pub mod color;
+pub mod palette;
 
 const BACKLOG_SIZE: usize = 0;
 
@@ -119,7 +122,7 @@ impl Tty {
     fn new() -> Arc<Tty> {
         let video = video();
         let (sx, sy) = video.dimensions();
-        let output = OutputBuffer::new(sx, sy, BACKLOG_SIZE, Color::LightGreen, Color::Black);
+        let output = OutputBuffer::new(sx, sy, BACKLOG_SIZE, ColorCode::White, ColorCode::Black);
         Arc::new_cyclic(|me| Tty {
             dev_id: crate::kernel::device::alloc_id(),
             state: Spin::new(State::new()),

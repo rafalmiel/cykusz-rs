@@ -128,9 +128,7 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     println!("[ OK ] Local Timer Started");
 
-    let current = crate::kernel::sched::create_task(init_task);
-
-    drop(current);
+    crate::kernel::sched::create_task(init_task);
 
     idle();
 }

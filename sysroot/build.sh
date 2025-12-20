@@ -136,7 +136,7 @@ function _prepare_rust {
 
         cd $RUST_SRC_DIR
         cat > bootstrap.toml <<EOL
-change-id = 146435
+change-id = 147888
 
 [llvm]
 download-ci-llvm = false

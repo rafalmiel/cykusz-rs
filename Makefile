@@ -63,6 +63,7 @@ run: $(disk)
 	#/home/ck/code/qemu/build/qemu-system-x86_64
 	#tap options: -device e1000e,netdev=mynet0,id=ck_nic0
 	qemu-system-x86_64 \
+		-display sdl \
 		-serial stdio \
 		-no-reboot \
 		-m 5811 \

@@ -6,8 +6,9 @@ use bit_field::BitField;
 use spin::Once;
 
 use crate::arch::mm::VirtAddr;
-use crate::arch::output::{register_video_driver, Color, ColorCode, ScreenChar, VideoDriver};
+use crate::arch::output::{register_video_driver, Character, VideoDriver};
 use crate::drivers::multiboot2::framebuffer_info::{FramebufferInfo, FramebufferType};
+use crate::drivers::tty::color::{ColorCode, RGB, Ansi16};
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
 use crate::kernel::fs::inode::INode;
@@ -292,50 +293,21 @@ struct State {
     cursor_visible: bool,
     cursor_blink_shown: bool,
     cursor_timer: Option<Arc<crate::kernel::timer::Timer>>,
-    char_cache: Vec<ScreenChar>,
+    char_cache: Vec<Character>,
     buffer: &'static mut [u32],
 }
 
-struct FbColor {
-    red: u8,
-    green: u8,
-    blue: u8,
+trait FbColor {
+    fn make_u32(&self, info: &FramebufferType) -> u32;
 }
 
-impl FbColor {
-    const fn from_u32(v: u32) -> FbColor {
-        FbColor {
-            red: (v >> 16) as u8,
-            green: (v >> 8) as u8,
-            blue: v as u8,
-        }
-    }
-
+impl FbColor for RGB {
     fn make_u32(&self, info: &FramebufferType) -> u32 {
-        (((self.blue as u64) & info.blue_mask()) << info.blue_field_pos()
-            | ((self.red as u64) & info.red_mask()) << info.red_field_pos()
-            | ((self.green as u64) & info.green_mask()) << info.green_field_pos()) as u32
+        (((self.blue() as u64) & info.blue_mask()) << info.blue_field_pos()
+            | ((self.red() as u64) & info.red_mask()) << info.red_field_pos()
+            | ((self.green() as u64) & info.green_mask()) << info.green_field_pos()) as u32
     }
 }
-
-static COLORS: &'static [FbColor] = &[
-    FbColor::from_u32(0x0),
-    FbColor::from_u32(0x00_00_A8),
-    FbColor::from_u32(0x00_A8_00),
-    FbColor::from_u32(0x00_A8_A8),
-    FbColor::from_u32(0xa8_00_00),
-    FbColor::from_u32(0xA8_00_A8),
-    FbColor::from_u32(0xA8_A8_00),
-    FbColor::from_u32(0xD0_D0_D0),
-    FbColor::from_u32(0xA8_A8_A8),
-    FbColor::from_u32(0x00_00_FC),
-    FbColor::from_u32(0x00_FC_00),
-    FbColor::from_u32(0x00_FC_FC),
-    FbColor::from_u32(0xFC_00_00),
-    FbColor::from_u32(0xFC_00_FC),
-    FbColor::from_u32(0xFC_FC_00),
-    FbColor::from_u32(0xFC_FC_FC),
-];
 
 impl State {
     fn new(width: u32, height: u32, pitch: u32, fb_type: FramebufferType, buf: PhysAddr) -> State {
@@ -353,7 +325,7 @@ impl State {
             cursor_visible: false,
             cursor_blink_shown: false,
             cursor_timer: None,
-            char_cache: Vec::<ScreenChar>::new(),
+            char_cache: Vec::<Character>::new(),
             buffer: unsafe {
                 buf.to_mapped()
                     .as_slice_mut::<u32>(pitch as usize / 4usize * height as usize)
@@ -385,7 +357,7 @@ impl State {
         }
     }
 
-    fn print_char(&mut self, ch: ScreenChar, x: usize, y: usize) {
+    fn print_char(&mut self, ch: Character, x: usize, y: usize) {
         if x >= self.txt_width || y >= self.txt_height {
             return;
         }
@@ -395,10 +367,10 @@ impl State {
             self.char_cache[pos] = ch;
         }
 
-        let data = &FONT[ch.char() as usize * 16..ch.char() as usize * 16 + 16];
+        let data = &FONT[ch.character() as usize * 16..ch.character() as usize * 16 + 16];
 
-        let fg = COLORS[ch.fg() as usize].make_u32(&self.fb_type);
-        let bg = COLORS[ch.bg() as usize].make_u32(&self.fb_type);
+        let fg = ch.foreground().make_u32(&self.fb_type);
+        let bg = ch.background().make_u32(&self.fb_type);
 
         let mut pos = (y * 16 * self.pitch) + x * 8;
 
@@ -426,7 +398,7 @@ impl State {
             return;
         }
 
-        let lg_color = COLORS[Color::LightGreen as usize].make_u32(&self.fb_type);
+        let lg_color = RGB::from(Ansi16::new(ColorCode::White)).make_u32(&self.fb_type);
 
         let mut pos = (y * 16 * self.pitch) + x * 8;
         pos += 14 * self.pitch;
@@ -448,7 +420,7 @@ impl State {
             b'\n' => self.new_line(),
             byte => {
                 self.print_char(
-                    ScreenChar::new(byte, ColorCode::new(Color::LightGreen, Color::Black)),
+                    Character::new_vga16(byte, ColorCode::White, ColorCode::Black),
                     self.column,
                     self.row,
                 );
@@ -474,10 +446,10 @@ impl State {
 
     fn clear(&mut self) {
         self.buffer.fill(0);
-        self.char_cache.fill(ScreenChar::new(
+        self.char_cache.fill(Character::new_vga16(
             b' ',
-            ColorCode::new(Color::LightGreen, Color::Black),
-        ));
+            ColorCode::Black, ColorCode::Black)
+        );
     }
 
     fn cursor_blink_timer(&mut self) {
@@ -499,7 +471,7 @@ impl State {
         if vis && self.char_cache.is_empty() {
             self.char_cache.resize(
                 self.txt_width * self.txt_height,
-                ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)),
+                Character::new_vga16(b' ', ColorCode::White, ColorCode::Black),
             );
         }
         let timer = if self.cursor_timer.is_none() {
@@ -612,7 +584,7 @@ impl VideoDriver for Fb {
         (self.width as usize / 8, self.height as usize / 16)
     }
 
-    fn copy_txt_buffer(&self, mut x: usize, mut y: usize, buf: &[ScreenChar]) {
+    fn copy_txt_buffer(&self, mut x: usize, mut y: usize, buf: &[Character]) {
         let (tw, th) = self.dimensions();
         if x >= tw || y >= th {
             return;

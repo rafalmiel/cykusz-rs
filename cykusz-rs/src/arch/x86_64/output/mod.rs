@@ -11,109 +11,74 @@ pub use debug_disabled as debug;
 
 use core::fmt::Error;
 
-use bit_field::BitField;
-
 use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
+use crate::drivers::tty::color::{ColorCode, RGB, Ansi16};
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 #[derive(Copy, Clone, Debug)]
-#[repr(u8)]
-pub enum Color {
-    Black = 0,
-    Blue = 1,
-    Green = 2,
-    Cyan = 3,
-    Red = 4,
-    Magenta = 5,
-    Brown = 6,
-    LightGray = 7,
-    DarkGray = 8,
-    LightBlue = 9,
-    LightGreen = 10,
-    LightCyan = 11,
-    LightRed = 12,
-    Pink = 13,
-    Yellow = 14,
-    White = 15,
-}
-
-impl Color {
-    pub fn brighten(self) -> Color {
-        match self {
-            Color::Black => Color::DarkGray,
-            Color::Blue => Color::LightBlue,
-            Color::Green => Color::LightGreen,
-            Color::Cyan => Color::LightCyan,
-            Color::Red => Color::LightRed,
-            Color::Magenta => Color::Pink,
-            Color::Brown => Color::Yellow,
-            Color::LightGray => Color::White,
-            _ => self,
-        }
-    }
-
-    pub fn dim(self) -> Color {
-        match self {
-            Color::DarkGray => Color::Black,
-            Color::LightBlue => Color::Blue,
-            Color::LightGreen => Color::Green,
-            Color::LightCyan => Color::Cyan,
-            Color::LightRed => Color::Red,
-            Color::Pink => Color::Magenta,
-            Color::Yellow => Color::Brown,
-            Color::White => Color::LightGray,
-            _ => self,
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub struct ColorCode(u8);
-
-impl ColorCode {
-    pub const fn new(foreground: Color, background: Color) -> ColorCode {
-        ColorCode((background as u8) << 4 | (foreground as u8))
-    }
-
-    pub fn set_fg(&mut self, c: Color) {
-        self.0.set_bits(0..=3, c as u8);
-    }
-
-    pub fn set_bg(&mut self, c: Color) {
-        self.0.set_bits(4..=7, c as u8);
-    }
-
-    pub fn fg(&self) -> Color {
-        unsafe { core::mem::transmute::<u8, Color>(self.0.get_bits(0..=3)) }
-    }
-
-    pub fn bg(&self) -> Color {
-        unsafe { core::mem::transmute::<u8, Color>(self.0.get_bits(4..=7)) }
-    }
-}
-
 #[repr(C)]
-#[derive(Clone, Copy)]
-pub struct ScreenChar {
+pub struct Character {
     char: u8,
-    color: ColorCode,
+    character_color: CharacterColor,
+    _pad: u8,
 }
 
-impl ScreenChar {
-    pub fn new(char: u8, color: ColorCode) -> ScreenChar {
-        ScreenChar { char, color }
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct CharacterColor {
+    foreground: RGB,
+    background: RGB,
+}
+
+impl CharacterColor {
+    pub fn new_vga16(foreground: ColorCode, background: ColorCode) -> CharacterColor {
+        CharacterColor {
+            foreground: RGB::from(Ansi16::new(foreground)),
+            background: RGB::from(Ansi16::new(background)),
+        }
     }
 
-    pub fn char(&self) -> u8 {
+    pub const fn foreground(&self) -> RGB {
+        self.foreground
+    }
+
+    pub const fn background(&self) -> RGB {
+        self.background
+    }
+
+    pub fn set_foreground(&mut self, fg: RGB) {
+        self.foreground = fg;
+    }
+
+    pub fn set_background(&mut self, bg: RGB) {
+        self.background = bg;
+    }
+}
+
+impl Character {
+    pub fn new(char: u8, color: CharacterColor) -> Character {
+        Character {
+            char, character_color: color, _pad: 0
+        }
+    }
+
+    pub fn new_vga16(char: u8, foreground: ColorCode, background: ColorCode) -> Character {
+        Character {
+            char,
+            character_color: CharacterColor::new_vga16(foreground, background),
+            _pad: 0,
+        }
+    }
+    pub fn character(&self) -> u8 {
         self.char
     }
 
-    pub fn fg(&self) -> Color {
-        self.color.fg()
+    pub const fn foreground(&self) -> RGB {
+        self.character_color.foreground()
     }
 
-    pub fn bg(&self) -> Color {
-        self.color.bg()
+    pub const fn background(&self) -> RGB {
+        self.character_color.background()
     }
 }
 
@@ -128,7 +93,7 @@ pub trait VideoDriver: Sync + Send {
     fn dimensions(&self) -> (usize, usize) {
         (0, 0)
     }
-    fn copy_txt_buffer(&self, _x: usize, _y: usize, _buf: &[ScreenChar]) {}
+    fn copy_txt_buffer(&self, _x: usize, _y: usize, _buf: &[Character]) {}
 
     fn init_dev(&self) {}
 }
@@ -169,15 +134,7 @@ pub fn register_output_driver(driver: &'static dyn ConsoleWriter) {
 
 pub fn init(fb_info: Option<&'static FramebufferInfo>) {
     crate::arch::dev::serial::init();
-    if let Some(fb) = fb_info {
-        if fb.typ() == 2 {
-            crate::drivers::video::vga::init();
-        } else {
-            crate::drivers::video::fb::init(fb);
-        }
-    }
-    let w = video();
-    w.clear()
+    crate::drivers::video::init(fb_info);
 }
 
 struct Writer {}

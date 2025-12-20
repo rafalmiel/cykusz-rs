@@ -3,8 +3,9 @@ use core::ptr::Unique;
 use bit_field::BitField;
 
 use crate::arch::mm::PhysAddr;
-use crate::arch::output::{Color, ColorCode, ScreenChar, VideoDriver};
+use crate::arch::output::{Character, VideoDriver};
 use crate::arch::raw::cpuio::Port;
+use crate::drivers::tty::color::{ColorCode as AnsiColorCode, Ansi16};
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sync::{LockApi, Spin};
 
@@ -27,6 +28,60 @@ fn update_cursor(offset: u16) {
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct ColorCode(u8);
+
+const fn map_to_vga(color: Ansi16) -> u8 {
+    match color.color() {
+        AnsiColorCode::Black => { 0 }
+        AnsiColorCode::Red => { 4 }
+        AnsiColorCode::Green => { 2 }
+        AnsiColorCode::Yellow => { 6 }
+        AnsiColorCode::Blue => { 1 }
+        AnsiColorCode::Magenta => { 5 }
+        AnsiColorCode::Cyan => { 3 }
+        AnsiColorCode::White => { 7 }
+        AnsiColorCode::LightBlack => { 8 }
+        AnsiColorCode::LightRed => { 12 }
+        AnsiColorCode::LightGreen => { 10 }
+        AnsiColorCode::LightYellow => { 14 }
+        AnsiColorCode::LightBlue => { 9 }
+        AnsiColorCode::LightMagenta => { 13 }
+        AnsiColorCode::LightCyan => { 11 }
+        AnsiColorCode::LightWhite => { 15 }
+    }
+}
+
+
+impl ColorCode {
+    pub const fn new(foreground: Ansi16, background: Ansi16) -> ColorCode {
+        ColorCode(map_to_vga(background) << 4 | map_to_vga(foreground))
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct ScreenChar {
+    char: u8,
+    color: ColorCode,
+}
+
+impl ScreenChar {
+    pub fn new(char: u8, color: ColorCode) -> ScreenChar {
+        ScreenChar { char, color }
+    }
+}
+
+impl From<Character> for ScreenChar {
+    fn from(value: Character) -> Self {
+        ScreenChar {
+            char: value.character(),
+            color: ColorCode::new(value.foreground().into(), value.background().into())
+        }
+    }
+}
+
 struct Buffer {
     chars: [ScreenChar; BUFFER_WIDTH * BUFFER_HEIGHT],
 }
@@ -47,7 +102,7 @@ fn mk_scr_char(c: u8, clr: ColorCode) -> ScreenChar {
 }
 
 impl State {
-    pub const fn new(fg: Color, bg: Color, buf: MappedAddr) -> State {
+    pub const fn new(fg: Ansi16, bg: Ansi16, buf: MappedAddr) -> State {
         State {
             column: 0,
             row: 0,
@@ -137,7 +192,7 @@ impl State {
 }
 
 impl Writer {
-    pub const fn new(fg: Color, bg: Color, buf: MappedAddr) -> Writer {
+    pub const fn new(fg: Ansi16, bg: Ansi16, buf: MappedAddr) -> Writer {
         Writer {
             state: Spin::new(State::new(fg, bg, buf)),
         }
@@ -165,7 +220,7 @@ impl VideoDriver for Writer {
         (BUFFER_WIDTH, BUFFER_HEIGHT)
     }
 
-    fn copy_txt_buffer(&self, x: usize, y: usize, buf: &[ScreenChar]) {
+    fn copy_txt_buffer(&self, x: usize, y: usize, buf: &[Character]) {
         if x >= BUFFER_WIDTH || y >= BUFFER_HEIGHT {
             return;
         }
@@ -174,13 +229,17 @@ impl VideoDriver for Writer {
         let len = core::cmp::min(BUFFER_HEIGHT * BUFFER_WIDTH - offset, buf.len());
 
         let mut state = self.state.lock();
-        unsafe {
-            state.buffer.as_mut().chars[offset..offset + len].copy_from_slice(buf);
+        let chars = unsafe {
+            &mut state.buffer.as_mut().chars
+        };
+        for (buf_i, dest_i) in (offset..offset + len).enumerate() {
+            chars[dest_i] = buf[buf_i].into();
         }
     }
 }
 
-static VGA: Writer = Writer::new(Color::LightGreen, Color::Black, VGA_BUFFER);
+static VGA: Writer = Writer::new(Ansi16::new(AnsiColorCode::LightGreen),
+                                 Ansi16::new(AnsiColorCode::Black), VGA_BUFFER);
 
 // References:
 // - http://www.osdever.net/FreeVGA/vga/attrreg.htm#10

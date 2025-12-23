@@ -23,6 +23,12 @@ pub enum ColorCode {
 
 impl From<usize> for ColorCode {
     fn from(value: usize) -> Self {
+        (value as u8).into()
+    }
+}
+
+impl From<u8> for ColorCode {
+    fn from(value: u8) -> Self {
         if value > 15 {
             panic!("Invalid usize to ColorCode conversion, value: {}", value)
         }

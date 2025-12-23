@@ -1,9 +1,9 @@
 use crate::doomgeneric::{boolean, music_module_t, sfxinfo_t, snddevice_t, sound_module_t};
 use std::os::raw::{c_int, c_void};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut use_libsamplerate: i32 = 0;
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut libsamplerate_scale: f32 = 0.65;
 
 unsafe impl Sync for music_module_t {}
@@ -70,7 +70,7 @@ extern "C" fn music_poll() {
     crate::doom().audio().poll()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 static DG_music_module: music_module_t = music_module_t {
     sound_devices: unsafe { SOUND_DEVICES }.as_ptr() as *mut snddevice_t,
     num_sound_devices: unsafe { SOUND_DEVICES }.len() as c_int,
@@ -141,7 +141,7 @@ extern "C" fn sound_cache(sounds: *mut sfxinfo_t, num: c_int) {
     crate::doom().audio().sound().cache(sounds);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 static DG_sound_module: sound_module_t = sound_module_t {
     sound_devices: unsafe { SOUND_DEVICES }.as_ptr() as *mut snddevice_t,
     num_sound_devices: unsafe { SOUND_DEVICES }.len() as c_int,

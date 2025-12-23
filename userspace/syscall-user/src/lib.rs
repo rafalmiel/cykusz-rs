@@ -11,7 +11,7 @@ use syscall_defs::signal::SigAction;
 use syscall_defs::time::Timespec;
 use syscall_defs::*;
 
-pub unsafe fn syscall0(mut a: usize) -> SyscallResult {
+pub unsafe fn syscall0(mut a: usize) -> SyscallResult { unsafe {
     asm!("syscall",
          in("rax") a,
          out("rcx") _,
@@ -19,9 +19,9 @@ pub unsafe fn syscall0(mut a: usize) -> SyscallResult {
          lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
-}
+}}
 
-pub unsafe fn syscall1(mut a: usize, b: usize) -> SyscallResult {
+pub unsafe fn syscall1(mut a: usize, b: usize) -> SyscallResult { unsafe {
     asm!("syscall",
          in("rax") a,
          in("rdi") b,
@@ -30,9 +30,9 @@ pub unsafe fn syscall1(mut a: usize, b: usize) -> SyscallResult {
          lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
-}
+}}
 
-pub unsafe fn syscall2(mut a: usize, b: usize, c: usize) -> SyscallResult {
+pub unsafe fn syscall2(mut a: usize, b: usize, c: usize) -> SyscallResult { unsafe {
     asm!("syscall",
          in("rax") a,
          in("rdi") b,
@@ -42,9 +42,9 @@ pub unsafe fn syscall2(mut a: usize, b: usize, c: usize) -> SyscallResult {
          lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
-}
+}}
 
-pub unsafe fn syscall3(mut a: usize, b: usize, c: usize, d: usize) -> SyscallResult {
+pub unsafe fn syscall3(mut a: usize, b: usize, c: usize, d: usize) -> SyscallResult { unsafe {
     asm!("syscall",
          in("rax") a,
          in("rdi") b,
@@ -55,9 +55,9 @@ pub unsafe fn syscall3(mut a: usize, b: usize, c: usize, d: usize) -> SyscallRes
          lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
-}
+}}
 
-pub unsafe fn syscall4(mut a: usize, b: usize, c: usize, d: usize, e: usize) -> SyscallResult {
+pub unsafe fn syscall4(mut a: usize, b: usize, c: usize, d: usize, e: usize) -> SyscallResult { unsafe {
     asm!("syscall",
          in("rax") a,
          in("rdi") b,
@@ -69,7 +69,7 @@ pub unsafe fn syscall4(mut a: usize, b: usize, c: usize, d: usize, e: usize) -> 
          lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
-}
+}}
 
 pub unsafe fn syscall5(
     mut a: usize,
@@ -78,7 +78,7 @@ pub unsafe fn syscall5(
     d: usize,
     e: usize,
     f: usize,
-) -> SyscallResult {
+) -> SyscallResult { unsafe {
     asm!("syscall",
          in("rax") a,
          in("rdi") b,
@@ -91,7 +91,7 @@ pub unsafe fn syscall5(
          lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
-}
+}}
 
 pub unsafe fn syscall6(
     mut a: usize,
@@ -101,7 +101,7 @@ pub unsafe fn syscall6(
     e: usize,
     f: usize,
     g: usize,
-) -> SyscallResult {
+) -> SyscallResult { unsafe {
     asm!("syscall",
          in("rax") a,
          in("rdi") b,
@@ -115,7 +115,7 @@ pub unsafe fn syscall6(
          lateout("rax") a);
 
     SyscallResult::syscall_from(a as isize)
-}
+}}
 
 pub fn read(fd: usize, buf: &mut [u8]) -> SyscallResult {
     unsafe { syscall3(SYS_READ, fd, buf.as_mut_ptr() as usize, buf.len()) }

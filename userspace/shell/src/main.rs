@@ -438,11 +438,11 @@ fn exec(cmd: &str) {
         split.next();
 
         if let Some(path) = split.next() {
-            if let Some(_) = File::new(path, OpenFlags::RDWR | OpenFlags::CREAT) {
+            match File::new(path, OpenFlags::RDWR | OpenFlags::CREAT) { Some(_) => {
                 println!("Created file {}", path);
-            } else {
+            } _ => {
                 println!("Failed to create file {}", path);
-            }
+            }}
         }
     } else if cmd.starts_with("rmdir ") {
         let mut split = cmd.split_whitespace();

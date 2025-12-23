@@ -47,29 +47,29 @@ fn doom_screen() -> &'static DoomScreen {
     unsafe { DOOM_SCREEN.as_mut().unwrap_unchecked() }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn DG_Init() {
     unsafe {
         (&raw mut DOOM_SCREEN).write(Some(DoomScreen::new()));
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn DG_DrawFrame() {
     doom().draw_frame(doom_screen())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn DG_SleepMs(ms: c_uint) {
     doom().sleep_ms(ms as u32);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn DG_GetTicksMs() -> c_uint {
     doom().get_ticks_ms()
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn DG_GetKey(pressed: *mut c_int, doomkey: *mut c_uchar) -> c_int {
     if let Some((p, key)) = doom().get_key() {
         unsafe {
@@ -83,7 +83,7 @@ extern "C" fn DG_GetKey(pressed: *mut c_int, doomkey: *mut c_uchar) -> c_int {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn DG_GetMouse(buttons: *mut c_int, rel_x: *mut c_int, rel_y: *mut c_int) -> c_int {
     if let Some(((left, right, mid), relx, rely)) = doom().get_mouse() {
         let mut btns: c_int = 0;
@@ -109,7 +109,7 @@ extern "C" fn DG_GetMouse(buttons: *mut c_int, rel_x: *mut c_int, rel_y: *mut c_
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn DG_SetWindowTitle(_title: *const c_char) {}
 
 static PANICKED: AtomicBool = AtomicBool::new(false);

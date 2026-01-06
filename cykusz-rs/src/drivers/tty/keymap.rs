@@ -99,7 +99,7 @@ pub static CTRL_ALT_MAP: [u16; 128] = [
 ];
 
 macro_rules! init_arr (
-    ($a: ident, $([$k: expr_2021, $v: expr_2021]),+) => {
+    ($a: ident, $([$k: expr, $v: expr]),+) => {
         $($a[$k as usize] = Some($v);)*
     };
 );

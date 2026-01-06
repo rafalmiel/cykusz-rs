@@ -72,6 +72,6 @@ macro_rules! dbg {
 
 #[macro_export]
 macro_rules! dbgln {
-    ($($log:ident)|+, $fmt:expr_2021) => (dbg!($($log)|+, concat!(stringify!($($log)|+), ": ", $fmt, "\n")));
-    ($($log:ident)|+, $fmt:expr_2021, $($arg:tt)*) => (dbg!($($log)|+, concat!(stringify!($($log)|+), ": ", $fmt, "\n"), $($arg)*));
+    ($($log:ident)|+, $fmt:expr) => (dbg!($($log)|+, concat!(stringify!($($log)|+), ": ", $fmt, "\n")));
+    ($($log:ident)|+, $fmt:expr, $($arg:tt)*) => (dbg!($($log)|+, concat!(stringify!($($log)|+), ": ", $fmt, "\n"), $($arg)*));
 }

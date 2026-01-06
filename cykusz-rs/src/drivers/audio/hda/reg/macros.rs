@@ -6,25 +6,25 @@ macro_rules! or_default {
     (type $_default:ty, $value:ty) => {
         $value
     };
-    (expr $default:expr_2021) => {
+    (expr $default:expr) => {
         $default
     };
-    (expr $_default:expr_2021, $value:expr_2021) => {
+    (expr $_default:expr, $value:expr) => {
         $value
     };
 }
 macro_rules! impl_get_method {
-    ($name:ident, $f:expr_2021 => bool) => {
+    ($name:ident, $f:path => bool) => {
         pub fn $name(&self) -> bool {
             self.is_set($f)
         }
     };
-    ($name:ident, $f:expr_2021 => $out:ty) => {
+    ($name:ident, $f:path => $out:ty) => {
         pub fn $name(&self) -> $out {
             self.read($f).into()
         }
     };
-    ($name:ident, $f:expr_2021 => enum $out:ty ) => {
+    ($name:ident, $f:path => enum $out:ty ) => {
         pub fn $name(&self) -> Option<$out> {
             self.read_as_enum($f)
         }
@@ -32,12 +32,12 @@ macro_rules! impl_get_method {
 }
 
 macro_rules! impl_set_method {
-    ($name:ident, $field:expr_2021 => as $utyp:ty) => {
+    ($name:ident, $field:expr => as $utyp:ty) => {
         pub fn $name(&mut self, value: $utyp) {
             self.modify($field.val(value as $utyp))
         }
     };
-    ($name:ident, $field:expr_2021 => into $val_type:ty) => {
+    ($name:ident, $field:expr => into $val_type:ty) => {
         pub fn $name(&mut self, value: $val_type) {
             self.modify($field.val(value.into()))
         }
@@ -57,12 +57,12 @@ macro_rules! impl_set_method {
 }
 
 macro_rules! impl_const_set_method {
-    ($name:ident, $field:expr_2021 => as $utyp:ty) => {
+    ($name:ident, $field:expr => as $utyp:ty) => {
         pub fn $name(&self, value: $utyp) {
             self.modify($field.val(value as $utyp))
         }
     };
-    ($name:ident, $field:expr_2021 => into $val_type:ty) => {
+    ($name:ident, $field:expr => into $val_type:ty) => {
         pub fn $name(&self, value: $val_type) {
             self.modify($field.val(value.into()))
         }
@@ -82,20 +82,20 @@ macro_rules! impl_const_set_method {
 }
 
 macro_rules! impl_ints {
-    (mut set $name:ident($f:expr_2021 => as $utyp:ty)) => {
+    (mut set $name:ident($f:path => as $utyp:ty)) => {
         paste::paste! {
             impl_set_method!([<set_ $name>], $f => as $utyp);
         }
     };
-    (const set $name:ident($f:expr_2021 => as $utyp:ty)) => {
+    (const set $name:ident($f:path => as $utyp:ty)) => {
         paste::paste! {
             impl_const_set_method!([<set_ $name>], $f => as $utyp);
         }
     };
-    ($cm:ident get $name:ident($f:expr_2021 => as $utyp:ty)) => {
+    ($cm:ident get $name:ident($f:path => as $utyp:ty)) => {
         impl_get_method!($name, $f => $utyp);
     };
-    ($cm:ident get_set $name:ident($f:expr_2021 => as $utyp:ty)) => {
+    ($cm:ident get_set $name:ident($f:path => as $utyp:ty)) => {
         impl_ints!($cm get $name($f => as $utyp));
         impl_ints!($cm set $name($f => as $utyp));
     };
@@ -111,20 +111,20 @@ macro_rules! impl_ints {
 }
 
 macro_rules! impl_bools {
-    (mut set $name:ident($f:expr_2021)) => {
+    (mut set $name:ident($f:path)) => {
         paste::paste! {
             impl_set_method!([<set_ $name>], bool $f);
         }
     };
-    (const set $name:ident($f:expr_2021)) => {
+    (const set $name:ident($f:path)) => {
         paste::paste! {
             impl_const_set_method!([<set_ $name>], bool $f);
         }
     };
-    ($cm:ident get $name:ident($f:expr_2021)) => {
+    ($cm:ident get $name:ident($f:path)) => {
         impl_get_method!($name, $f => bool);
     };
-    ($cm:ident get_set $name:ident($f:expr_2021)) => {
+    ($cm:ident get_set $name:ident($f:path)) => {
         impl_bools!($cm get $name($f));
         impl_bools!($cm set $name($f));
     };

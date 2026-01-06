@@ -47,7 +47,7 @@ impl ::core::fmt::Debug for InterruptFrame {
 
 #[allow(unused)]
 macro_rules! int {
-    ( $x:expr_2021) => {
+    ( $x:expr) => {
         {
             unsafe {
                 core::arch::asm!("int {0}", const $x);

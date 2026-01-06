@@ -18,13 +18,13 @@ use crate::kernel::task::{ArcTask, Task};
 
 #[macro_export]
 macro_rules! switch {
-    ($ctx1: expr_2021, $ctx2: expr_2021) => {
+    ($ctx1: expr, $ctx2: expr) => {
         $crate::arch::task::switch(&mut $ctx1.arch_task_mut(), &$ctx2.arch_task());
     };
 }
 #[macro_export]
 macro_rules! activate_task {
-    ($ctx1: expr_2021) => {
+    ($ctx1: expr) => {
         $crate::arch::task::activate_task(&$ctx1.arch_task());
     };
 }

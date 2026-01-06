@@ -170,8 +170,8 @@ pub fn log_fmt_disabled(_args: core::fmt::Arguments) -> core::fmt::Result {
 
 #[macro_export]
 macro_rules! println {
-    ($fmt:expr_2021) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[macro_export]
@@ -183,8 +183,8 @@ macro_rules! print {
 
 #[macro_export]
 macro_rules! logln_disabled {
-    ($fmt:expr_2021) => (log_disabled!(concat!($fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (log_disabled!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (log_disabled!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log_disabled!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[macro_export]
@@ -198,8 +198,8 @@ macro_rules! log_disabled {
 
 #[macro_export]
 macro_rules! logln {
-    ($fmt:expr_2021) => (log!(concat!($fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (log!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (log!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[macro_export]
@@ -211,8 +211,8 @@ macro_rules! log {
 }
 #[macro_export]
 macro_rules! logln2 {
-    ($fmt:expr_2021) => (log2!(concat!($fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (log2!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (log2!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log2!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[macro_export]
@@ -224,8 +224,8 @@ macro_rules! log2 {
 }
 #[macro_export]
 macro_rules! logln3 {
-    ($fmt:expr_2021) => (log3!(concat!($fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (log3!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (log3!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log3!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[macro_export]
@@ -238,8 +238,8 @@ macro_rules! log3 {
 
 #[macro_export]
 macro_rules! logln4 {
-    ($fmt:expr_2021) => (log4!(concat!("[log4]: ", $fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (log4!(concat!("[log4]: ", $fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (log4!(concat!("[log4]: ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log4!(concat!("[log4]: ", $fmt, "\n"), $($arg)*));
 }
 
 #[macro_export]
@@ -252,8 +252,8 @@ macro_rules! log4 {
 
 #[macro_export]
 macro_rules! logln5 {
-    ($fmt:expr_2021) => (log5!(concat!("[log5]: ", $fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (log5!(concat!("[log5]: ", $fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (log5!(concat!("[log5]: ", $fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log5!(concat!("[log5]: ", $fmt, "\n"), $($arg)*));
 }
 
 #[macro_export]
@@ -266,8 +266,8 @@ macro_rules! log5 {
 
 #[macro_export]
 macro_rules! logln6 {
-    ($fmt:expr_2021) => (log6!(concat!($fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (log6!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (log6!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log6!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[macro_export]

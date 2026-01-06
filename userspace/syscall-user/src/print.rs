@@ -25,6 +25,6 @@ macro_rules! log {
 
 #[macro_export]
 macro_rules! logln {
-    ($fmt:expr_2021) => (log!(concat!($fmt, "\n")));
-    ($fmt:expr_2021, $($arg:tt)*) => (log!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => (log!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (log!(concat!($fmt, "\n"), $($arg)*));
 }

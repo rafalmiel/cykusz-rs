@@ -54,8 +54,7 @@ cp sysroot/assets/opeth.mp3 mnt/
 if ! [ -f sysroot/assets/FluidR3_GM.sf2 ]; then
     pushd .
     cd sysroot/assets || exit 1
-    wget https://keymusician01.s3.amazonaws.com/FluidR3_GM.zip
-    unzip FluidR3_GM.zip
+    wget https://musical-artifacts.com/artifacts/738/FluidR3_GM.sf2
     sync
     popd || exit 1
 fi

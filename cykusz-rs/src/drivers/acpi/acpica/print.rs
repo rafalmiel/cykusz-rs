@@ -7,9 +7,9 @@ fn get_uint(Args: &mut core::ffi::VaList, size: usize) -> u64 {
     // (uncheckable) SAFE: Could over-read from stack, returning junk
     unsafe {
         match size {
-            0 => Args.arg::<u32>() as u64,
-            1 => Args.arg::<u32>() as u64,
-            2 => Args.arg::<u64>(),
+            0 => Args.next_arg::<u32>() as u64,
+            1 => Args.next_arg::<u32>() as u64,
+            2 => Args.next_arg::<u64>(),
             _ => unreachable!(),
         }
     }
@@ -19,9 +19,9 @@ fn get_int(Args: &mut core::ffi::VaList, size: usize) -> i64 {
     // (uncheckable) SAFE: Could over-read from stack, returning junk
     unsafe {
         match size {
-            0 => Args.arg::<i32>() as i64,
-            1 => Args.arg::<i32>() as i64,
-            2 => Args.arg::<i64>(),
+            0 => Args.next_arg::<i32>() as i64,
+            1 => Args.next_arg::<i32>() as i64,
+            2 => Args.next_arg::<i64>(),
             _ => unreachable!(),
         }
     }
@@ -134,16 +134,16 @@ extern "C" fn AcpiOsVprintf(Format: *const i8, mut Args: core::ffi::VaList) {
                 }
                 'p' => {
                     // (uncheckable) SAFE: Could over-read from stack, returning junk
-                    let _ = write!(&mut out, "{:p}", unsafe { Args.arg::<*const u8>() });
+                    let _ = write!(&mut out, "{:p}", unsafe { Args.next_arg::<*const u8>() });
                 }
                 'c' => {
                     // (uncheckable) SAFE: Could over-read from stack, returning junk
-                    let _ = write!(&mut out, "{}", unsafe { Args.arg::<u32>() as u8 as char });
+                    let _ = write!(&mut out, "{}", unsafe { Args.next_arg::<u32>() as u8 as char });
                 }
                 's' => {
                     // SAFE: Does as much validation as possible, if ACPICA misbehaves... well, we're in trouble
                     let slice = unsafe {
-                        let ptr = Args.arg::<*const u8>();
+                        let ptr = Args.next_arg::<*const u8>();
                         if precision < !0 {
                             ::core::str::from_utf8(::core::slice::from_raw_parts(
                                 ptr,

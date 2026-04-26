@@ -3,6 +3,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let ref dg_src_dir = std::path::PathBuf::from("doomgeneric/doomgeneric");
     let mut dg_c_paths = vec![];
     let mut dg_h_paths = vec![];
@@ -43,6 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     bindgen::Builder::default()
         .rust_target("1.91.1".parse()?)
+        .clang_args(["-isystem", format!("{manifest_dir}/../../sysroot/cross/usr/lib/clang/21/include").as_str()])
         .header("bindwrap.h")
         .allowlist_file(".*doomgeneric.*")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

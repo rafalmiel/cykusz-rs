@@ -153,23 +153,23 @@ vdi: $(vdi)
 cargo_kernel:
 ifdef dev
 ifdef logs
-	cd cykusz-rs && cargo build --verbose -F logs -F debug_build && cd ../
+	cd cykusz-rs && cargo build -Zjson-target-spec --verbose -F logs -F debug_build && cd ../
 else
-	cd cykusz-rs && cargo build --verbose -F debug_build && cd ../
+	cd cykusz-rs && cargo build -Zjson-target-spec --verbose -F debug_build && cd ../
 endif
 else
 ifdef logs
-	cd cykusz-rs && cargo build --release --verbose -F logs && cd ../
+	cd cykusz-rs && cargo build -Zjson-target-spec --release --verbose -F logs && cd ../
 else
-	cd cykusz-rs && cargo build --release --verbose && cd ../
+	cd cykusz-rs && cargo build -Zjson-target-spec --release --verbose && cd ../
 endif
 endif
 
 cargo_user:
 ifdef dev
-	cd userspace && cargo build --verbose && cd ../
+	cd userspace && cargo build -Zjson-target-spec --verbose && cd ../
 else
-	cd userspace && cargo build --release --verbose && cd ../
+	cd userspace && cargo build -Zjson-target-spec --release --verbose && cd ../
 endif
 
 toolchain: $(cross_cpp)

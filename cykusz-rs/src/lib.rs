@@ -48,6 +48,7 @@ pub mod lang_items;
 #[thread_local]
 static mut CPU_ID: u8 = 0;
 
+
 static mut DEBUG: bool = false;
 
 pub fn enable_debug() {

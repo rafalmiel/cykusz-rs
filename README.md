@@ -84,7 +84,8 @@ You will need following packages to compile and run the os:
 
 (!!) Please make sure your user is part of the disk and docker groups
 ```bash
-sudo usermod -aG disk docker
+sudo usermod -aG disk $(logname)
+sudo usermod -aG docker $(logname)
 newgrp - # or relogin
 ```
 

@@ -619,6 +619,54 @@ impl<'a> AnsiEscape<'a> {
     fn update_delta(&self) -> OutputUpdate {
         self.update
     }
+
+    fn set_color(&mut self, color: RGB, foreground: bool) {
+        dbgln!(
+            vti,
+            "set color: {:?}, foreground: {}, reverse: {}",
+            color,
+            foreground,
+            self.output.reverse_colors
+        );
+        if foreground || (!foreground && self.output.reverse_colors) {
+            self.output.color.set_foreground(color)
+        } else {
+            self.output.color.set_background(color)
+        }
+    }
+
+    fn process_truecolor_change(&mut self, mut iter: vte::ParamsIter, foreground: bool) {
+        dbgln!(vti, "process truecolor change");
+        if let Some(&[mode]) = iter.next() {
+            match mode {
+                2 => {
+                    let color = (iter.next(), iter.next(), iter.next());
+                    if let (Some(&[r]), Some(&[g]), Some(&[b])) = color {
+                        let rgb = RGB::new(r as u8, g as u8, b as u8);
+
+                        self.set_color(rgb, foreground);
+                    } else {
+                        dbgln!(vti, "Invalid rgb color value {:?}", color);
+                    }
+                }
+                5 => {
+                    // Direct 0-255 color
+                    let color = iter.next();
+
+                    if let Some(&[value]) = color {
+                        self.set_color(Ansi256::new(value as u8).into(), foreground);
+                    } else {
+                        dbgln!(vti, "Invalid direct color value {:?}", color);
+                    }
+                }
+                mode => {
+                    dbgln!(vti, "Unhandled truecolor mode: {}", mode);
+                }
+            }
+        } else {
+            dbgln!(vti, "no truecolor mode found...");
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -767,6 +815,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                 let mut dim = false;
 
                 while let Some(m) = iter.next() {
+                    dbgln!(vti, "m: {:?}", m);
                     match m {
                         &[0] => {
                             bright = false;
@@ -784,6 +833,17 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                             dim = true;
                             bright = false;
                         }
+                        &[38] => {
+                            // foreground mode
+                            self.process_truecolor_change(iter, true);
+                            return;
+                        }
+                        &[48] => {
+                            // background mode
+                            self.process_truecolor_change(iter, false);
+                            return;
+                        }
+                        #[cfg(false)]
                         &[v @ 38 | v @ 48, 5, color] => {
                             if v == 38 {
                                 if !self.output.reverse_colors {
@@ -807,21 +867,11 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                                 }
                             }
                         }
+                        #[cfg(false)]
                         &[v @ 38 | v @ 48, 2, r, g, b] => {
                             let rgb = RGB::new(r as u8, g as u8, b as u8);
-                            if v == 38 {
-                                if !self.output.reverse_colors {
-                                    self.output.color.set_foreground(rgb)
-                                } else {
-                                    self.output.color.set_background(rgb)
-                                }
-                            } else if v == 48 {
-                                if !self.output.reverse_colors {
-                                    self.output.color.set_background(rgb)
-                                } else {
-                                    self.output.color.set_foreground(rgb)
-                                }
-                            }
+
+                            self.set_color(rgb, v == 38);
                         }
                         &[7] => {
                             self.output.reverse_colors = true;
@@ -841,11 +891,8 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                                         c = c.brighten();
                                     }
 
-                                    if !self.output.reverse_colors {
-                                        self.output.color.set_background(c);
-                                    } else {
-                                        self.output.color.set_foreground(c);
-                                    }
+                                    self.set_color(c.into(), false);
+
                                     dbgln!(vti, "Set background: {:?}", c);
                                 }
                                 ParsedColor::Foreground(mut c) => {
@@ -855,11 +902,8 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                                         c = c.brighten();
                                     }
 
-                                    if !self.output.reverse_colors {
-                                        self.output.color.set_foreground(c);
-                                    } else {
-                                        self.output.color.set_background(c);
-                                    }
+                                    self.set_color(c.into(), true);
+
                                     dbgln!(vti, "Set foreground: {:?}", c);
                                 }
                                 ParsedColor::Unknown => {

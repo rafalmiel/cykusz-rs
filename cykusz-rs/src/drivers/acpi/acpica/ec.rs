@@ -13,7 +13,7 @@ impl GlobalLockGuard {
 
         assert_eq!(
             unsafe {
-                acpica::AcpiAcquireGlobalLock(u16::max_value() as i16, &mut lock.handle as *mut i32)
+                acpica::AcpiAcquireGlobalLock(u16::MAX as i16, &mut lock.handle as *mut i32)
             },
             acpica::AE_OK
         );

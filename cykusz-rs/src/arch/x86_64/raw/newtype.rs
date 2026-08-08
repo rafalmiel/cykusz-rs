@@ -198,20 +198,25 @@ macro_rules! enable_unsigned_ops {
             /// Returns `None` if it is not possible to calculate `steps_between`
             /// without overflow.
             fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
-                if start <= end {
-                    let diff = end.0 - start.0;
-                    return (diff, Some(diff));
-                } else {
-                    (0, None)
-                }
+                usize::steps_between(&start.0, &end.0)
             }
 
             fn forward_checked(start: Self, count: usize) -> Option<Self> {
-                Some($type_(start.0 + count))
+                Some($type_(usize::forward_checked(start.0, count)?))
             }
 
             fn backward_checked(start: Self, count: usize) -> Option<Self> {
-                Some($type_(start.0 - count))
+                Some($type_(usize::backward_checked(start.0, count)?))
+            }
+
+            fn forward_overflowing(start: Self, count: usize) -> (Self, bool) {
+                let (res, overflow) = usize::forward_overflowing(start.0, count);
+                ($type_(res), overflow)
+            }
+
+            fn backward_overflowing(start: Self, count: usize) -> (Self, bool) {
+                let (res, overflow) = usize::backward_overflowing(start.0, count);
+                ($type_(res), overflow)
             }
 /*
             /// Replaces this step with `1`, returning itself

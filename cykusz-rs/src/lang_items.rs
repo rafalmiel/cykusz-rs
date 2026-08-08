@@ -7,7 +7,7 @@ use core::panic::PanicInfo;
 extern "C" fn eh_personality() {}
 
 #[cfg(not(test))]
-#[lang = "panic_impl"]
+#[panic_handler]
 pub fn panic_impl(pi: &PanicInfo) -> ! {
     println!("{} PANIC: {:?}", crate::cpu_id(), pi);
     logln!("PANIC: {:?}", pi);

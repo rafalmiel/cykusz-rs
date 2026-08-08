@@ -1,6 +1,5 @@
 #![no_std]
 #![allow(internal_features, incomplete_features)]
-#![feature(c_variadic)]
 #![feature(generic_const_exprs)]
 #![feature(lang_items)]
 #![feature(linkage)]

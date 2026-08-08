@@ -104,7 +104,7 @@ impl DirEntry {
     }
 
     pub fn set_name(&mut self, name: &str) {
-        let name_len = core::cmp::min(u8::max_value() as usize, name.len());
+        let name_len = core::cmp::min(u8::MAX as usize, name.len());
 
         let req_size = (8 + name_len).align_up(4);
 

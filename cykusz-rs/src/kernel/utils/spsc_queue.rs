@@ -1,26 +1,16 @@
 use bbqueue::nicknames::Churrasco;
 
 use core::fmt::Debug;
-use core::marker::PhantomData;
 use core::mem::{MaybeUninit, size_of};
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+/// Inline Storage, Atomics, Polling, Borrowed
 type Queue<T: Sized + Debug, const N: usize> = Churrasco<{ N * size_of::<T>() }>;
-
-unsafe impl<T: Sized + Debug, const N: usize> Sync for SPSCQueue<T, N> where
-    [(); N * size_of::<T>()]:
-{
-}
-unsafe impl<T: Sized + Debug, const N: usize> Send for SPSCQueue<T, N> where
-    [(); N * size_of::<T>()]:
-{
-}
 
 pub struct SPSCQueue<T: Sized + Debug, const N: usize>
 where
     [(); N * size_of::<T>()]:,
 {
-    p_data: PhantomData<T>,
     queue: Queue<T, N>,
 
     data_count: AtomicUsize,
@@ -34,7 +24,6 @@ where
         let bb = Queue::<T, N>::new();
 
         let spsc = SPSCQueue {
-            p_data: PhantomData::default(),
             queue: bb,
             data_count: AtomicUsize::new(0),
         };
@@ -80,9 +69,9 @@ where
 
         let res = Some(unsafe { item.assume_init() });
 
-        grant.release();
-
         self.data_count.fetch_sub(1, Ordering::Relaxed);
+
+        grant.release();
 
         res
     }

@@ -34,8 +34,6 @@ use syscall_defs::OpenFlags;
 #[global_allocator]
 static HEAP: kernel::mm::heap::LockedHeap = kernel::mm::heap::LockedHeap::empty();
 
-#[cfg(feature = "debug_build")]
-mod externs;
 #[macro_use]
 pub mod arch;
 #[macro_use]

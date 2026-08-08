@@ -845,27 +845,7 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                         }
                         #[cfg(false)]
                         &[v @ 38 | v @ 48, 5, color] => {
-                            if v == 38 {
-                                if !self.output.reverse_colors {
-                                    self.output
-                                        .color
-                                        .set_foreground(Ansi256::new(color as u8).into())
-                                } else {
-                                    self.output
-                                        .color
-                                        .set_background(Ansi256::new(color as u8).into())
-                                }
-                            } else if v == 48 {
-                                if !self.output.reverse_colors {
-                                    self.output
-                                        .color
-                                        .set_background(Ansi256::new(color as u8).into())
-                                } else {
-                                    self.output
-                                        .color
-                                        .set_foreground(Ansi256::new(color as u8).into())
-                                }
-                            }
+                            self.set_color(Ansi256::new(color as u8).into(), v == 38);
                         }
                         #[cfg(false)]
                         &[v @ 38 | v @ 48, 2, r, g, b] => {

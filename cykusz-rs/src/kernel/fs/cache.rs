@@ -182,7 +182,7 @@ impl<K: IsCacheKey, T: Cacheable<K>> ArcWrap<CacheItem<K, T>> {
 
 unsafe impl<K: IsCacheKey, T: Cacheable<K>> Sync for CacheItem<K, T> {}
 
-intrusive_adapter!(pub CacheItemAdapter<K, T> = Arc<CacheItem<K, T>> : CacheItem<K, T> { link: LinkedListLink } where K: IsCacheKey, T: Cacheable<K> );
+intrusive_adapter!(pub CacheItemAdapter<K, T> = Arc<CacheItem<K, T>> : CacheItem<K, T> { link => LinkedListLink } where K: IsCacheKey, T: Cacheable<K> );
 
 impl<K: IsCacheKey, T: Cacheable<K>> Deref for CacheItem<K, T> {
     type Target = T;
@@ -252,15 +252,16 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
                 None
             }
         } else {
-            match self.unused.pop(&key) { Some(e) => {
-                e.mark_used();
+            match self.unused.pop(&key) {
+                Some(e) => {
+                    e.mark_used();
 
-                self.used.insert(key, Arc::downgrade(&e));
+                    self.used.insert(key, Arc::downgrade(&e));
 
-                Some(e.into())
-            } _ => {
-                None
-            }}
+                    Some(e.into())
+                }
+                _ => None,
+            }
         }
     }
 
@@ -291,15 +292,18 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
     fn move_to_unused(&mut self, ent: ArcWrap<CacheItem<K, T>>) -> bool {
         let key = { ent.cache_key() };
 
-        match self.used.remove(&key) { Some(_e) => {
-            self.unused.put(key, ent.0.clone());
+        match self.used.remove(&key) {
+            Some(_e) => {
+                self.unused.put(key, ent.0.clone());
 
-            true
-        } _ => {
-            //println!("move_to_unused missing entry");
+                true
+            }
+            _ => {
+                //println!("move_to_unused missing entry");
 
-            false
-        }}
+                false
+            }
+        }
     }
 
     pub fn rehash(

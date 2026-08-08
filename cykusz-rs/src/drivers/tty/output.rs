@@ -843,11 +843,9 @@ impl<'a> vte::Perform for AnsiEscape<'a> {
                             self.process_truecolor_change(iter, false);
                             return;
                         }
-                        #[cfg(false)]
                         &[v @ 38 | v @ 48, 5, color] => {
                             self.set_color(Ansi256::new(color as u8).into(), v == 38);
                         }
-                        #[cfg(false)]
                         &[v @ 38 | v @ 48, 2, r, g, b] => {
                             let rgb = RGB::new(r as u8, g as u8, b as u8);
 

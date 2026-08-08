@@ -23,7 +23,7 @@ pub enum TaskIpiOperation {
     Continue,
 }
 
-intrusive_adapter!(TaskIpiAdapter = Box<TaskIpi> : TaskIpi { link: LinkedListLink });
+intrusive_adapter!(TaskIpiAdapter = Box<TaskIpi> : TaskIpi { link => LinkedListLink });
 
 struct TaskIpi {
     cmd: TaskIpiOperation,

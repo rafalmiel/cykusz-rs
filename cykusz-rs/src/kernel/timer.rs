@@ -100,7 +100,7 @@ impl Timer {
     }
 }
 
-intrusive_adapter!(TimerAdapter = Arc<Timer>: Timer {link: LinkedListLink});
+intrusive_adapter!(TimerAdapter = Arc<Timer>: Timer {link => LinkedListLink});
 
 lazy_static! {
     static ref TIMERS: Spin<LinkedList<TimerAdapter>> =

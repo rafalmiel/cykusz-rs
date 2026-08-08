@@ -26,7 +26,7 @@ struct MouseState {
     dev_id: DevId,
     self_ref: Weak<MouseState>,
 
-    spsc: SPSCQueue<'static, Event, 128>,
+    spsc: SPSCQueue<Event, 128>,
     wq: WaitQueue,
 }
 
@@ -252,8 +252,6 @@ pub fn init() {
             wq: WaitQueue::new(),
         })
     });
-
-    mouse().spsc.init();
 
     crate::kernel::device::register_device(mouse().clone())
         .expect("Failed to register keyboard device")

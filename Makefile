@@ -27,7 +27,7 @@ cross_cpp := sysroot/cross/bin/x86_64-cykusz-g++
 cross_clang := sysroot/cross/bin/clang --sysroot sysroot/cykusz/  -target x86_64-cykusz
 cross_clangpp := sysroot/cross/bin/clang++ --sysroot sysroot/cykusz/  -target x86_64-cykusz
 
-usb_dev := /dev/sdb1
+usb_dev := /dev/sda1
 
 .PHONY: all clean run ata bochs iso toolchain fsck
 

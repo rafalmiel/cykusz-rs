@@ -26,6 +26,7 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
+use core::ops::Not;
 use bit_field::BitField;
 use spin::Once;
 use syscall_defs::poll::PollEventFlags;
@@ -200,12 +201,12 @@ impl IntelHdaData {
         self.reg.intctl.set_sie(0b1111_1111_1111);
     }
 
-    fn enumerate_nodes(&mut self, codec: u32, range: core::ops::Range<u32>) {
+    fn enumerate_nodes(&mut self, node_group: Address, codec: u32, range: core::ops::Range<u32>) {
         for node in range {
             let address = Address::new(codec, node);
 
             dbgln!(audio, "===========");
-            let node = node::Node::new(address, true, &mut self.cmd);
+            let node = node::Node::new(address, true, Some(node_group), &mut self.cmd);
 
             match node.capabilities().typ() {
                 Some(GetParameterAudioWidgetCapReg::TYPE::Value::AudioOutput) => {
@@ -241,12 +242,12 @@ impl IntelHdaData {
         for node in range {
             let address = Address::new(codec, node as u32);
 
-            let node = node::Node::new(address, false, &mut self.cmd);
+            let node = node::Node::new(address, false, None, &mut self.cmd);
 
             let start_node = node.start_node();
             let last_node = start_node + node.node_count() as u32;
 
-            self.enumerate_nodes(codec, start_node..last_node);
+            self.enumerate_nodes(node.address(), codec, start_node..last_node);
         }
     }
 
@@ -292,7 +293,7 @@ impl IntelHdaData {
                 dbgln!(audio, "output pin: {:?}", cd.default_device());
             }
             use ConfigurationDefaultReg::DEFAULT_DEVICE;
-            let supported_devs = &[DEFAULT_DEVICE::Value::HPOut, DEFAULT_DEVICE::Value::Speaker];
+            let supported_devs = &[DEFAULT_DEVICE::Value::Speaker];
 
             for out in &self.output_pins {
                 let node = self.nodes.get(out).unwrap();
@@ -381,7 +382,31 @@ impl IntelHdaData {
         let pin = *path.first().unwrap();
         let dac = *path.last().unwrap();
 
+        let pin_caps = self.cmd.invoke::<GetParameterPinCap>(pin);
+
         dbgln!(audio, "Pin: {:?}, Dac: {:?}", pin, dac);
+
+        let mut reg = <SetPowerState as NodeCommand>::Data::new();
+
+        // Fully on
+        reg.set_ps_set(verb::PowerStateReg::PS_SET::Value::D0);
+        self.cmd.invoke_data::<SetPowerState>(Address::new(0, 1), reg);
+
+        let mut node_groups = hashbrown::HashSet::<Address>::new();
+
+        // Most likely just one node group but check all nodes in the path
+        path.iter().filter_map(|a| node_groups.contains(a).not().then(|| {
+            node_groups.insert(*a);
+            *a
+        })).for_each(|addr| {
+            // Power on node group before powering widgets on the path
+            dbgln!(audio, "Powering node group {:?}", addr);
+            let mut reg = <SetPowerState as NodeCommand>::Data::new();
+
+            // Node group fully on
+            reg.set_ps_set(verb::PowerStateReg::PS_SET::Value::D0);
+            self.cmd.invoke_data::<SetPowerState>(addr, reg);
+        });
 
         for &addr in &path {
             let mut reg = <SetPowerState as NodeCommand>::Data::new();
@@ -396,17 +421,20 @@ impl IntelHdaData {
         // Pin enable
         let mut reg = <SetPinWidgetControl as NodeCommand>::Data::new();
         reg.set_is_out_enabled(true);
-        reg.set_is_hphn_enabled(true);
+        // Do not enable headphones, might need to check capabilities whether it's available
+        reg.set_is_hphn_enabled(false);
         self.cmd.invoke_data::<SetPinWidgetControl>(pin, reg);
 
         dbgln!(audio, "Pin Enabled!");
 
-        // EAPD enable
-        let mut reg = <SetEAPDBTLEnable as NodeCommand>::Data::new();
-        reg.set_is_eapd(true);
-        self.cmd.invoke_data::<SetEAPDBTLEnable>(pin, reg);
+        if pin_caps.is_eapd_capable() {
+            // EAPD enable
+            let mut reg = <SetEAPDBTLEnable as NodeCommand>::Data::new();
+            reg.set_is_eapd(true);
+            self.cmd.invoke_data::<SetEAPDBTLEnable>(pin, reg);
 
-        dbgln!(audio, "EAPD Enabled!");
+            dbgln!(audio, "EAPD Enabled!");
+        }
 
         // Setup stream and channel (stream 0 is reserved by convention)
         let mut reg = <SetChannelStreamID as NodeCommand>::Data::new();
@@ -648,7 +676,9 @@ struct IntelHdaPciDevice {}
 impl PciDeviceHandle for IntelHdaPciDevice {
     fn handles(&self, pci_vendor_id: u64, pci_dev_id: u64) -> bool {
         match (pci_vendor_id, pci_dev_id) {
-            (0x8086, 0x2668) => true,
+            (0x8086, 0x2668) => true, // QEMU
+            (0x8086, 0x1c20) => true, // Thinkpad
+
             _ => false,
         }
     }

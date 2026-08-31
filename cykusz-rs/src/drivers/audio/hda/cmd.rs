@@ -58,6 +58,9 @@ impl Corb {
 
     fn reset_read_pointer(&self) {
         self.reg.rp.set_is_rp_reset(true);
+        while !self.reg.rp.is_rp_reset() {}
+        self.reg.rp.set_is_rp_reset(false);
+        while self.reg.rp.is_rp_reset() {}
     }
 
     fn set_address(&self, buffer: PhysAddr) {

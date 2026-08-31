@@ -1,19 +1,21 @@
 #![allow(dead_code)]
 
+use crate::drivers::audio::hda::Address;
 use crate::drivers::audio::hda::cmd::Command;
+use crate::drivers::audio::hda::reg::WrapLocal;
 use crate::drivers::audio::hda::reg::verb::{
     ConfigurationDefaultReg, ConnectionListEntryInt, ConnectionListEntryKind, FunctionGroupType,
     GetConfigurationDefault, GetConnectionListEntry, GetConnectionSelectionControl,
     GetParameterAudioWidgetCap, GetParameterAudioWidgetCapReg, GetParameterConnectionListLength,
     GetParameterConnectionListLengthReg, GetParameterFunctionGroupType, GetParameterNodeCount,
 };
-use crate::drivers::audio::hda::reg::WrapLocal;
-use crate::drivers::audio::hda::Address;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 pub struct Node {
     address: Address,
+    // Node group address if it's a widget
+    node_group_address: Option<Address>,
 
     start_node: u32,
     node_count: usize,
@@ -27,7 +29,12 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(addr: Address, is_widget: bool, command: &mut Command) -> Node {
+    pub fn new(
+        addr: Address,
+        is_widget: bool,
+        node_group: Option<Address>,
+        command: &mut Command,
+    ) -> Node {
         let node_count_reg = command.invoke::<GetParameterNodeCount>(addr);
         let function_group = command
             .invoke::<GetParameterFunctionGroupType>(addr)
@@ -43,6 +50,7 @@ impl Node {
 
         let mut node = Node {
             address: addr,
+            node_group_address: node_group,
             start_node: node_count_reg.starting_node() as u32,
             node_count: node_count_reg.total_count() as usize,
             function_group_type: function_group,
@@ -122,6 +130,10 @@ impl Node {
 
     pub fn address(&self) -> Address {
         self.address
+    }
+
+    pub fn node_group_address(&self) -> Option<Address> {
+        self.node_group_address
     }
 
     pub fn start_node(&self) -> u32 {

@@ -386,12 +386,6 @@ impl IntelHdaData {
 
         dbgln!(audio, "Pin: {:?}, Dac: {:?}", pin, dac);
 
-        let mut reg = <SetPowerState as NodeCommand>::Data::new();
-
-        // Fully on
-        reg.set_ps_set(verb::PowerStateReg::PS_SET::Value::D0);
-        self.cmd.invoke_data::<SetPowerState>(Address::new(0, 1), reg);
-
         let mut node_groups = hashbrown::HashSet::<Address>::new();
 
         // Most likely just one node group but check all nodes in the path

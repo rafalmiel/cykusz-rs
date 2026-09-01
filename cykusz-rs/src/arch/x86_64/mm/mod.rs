@@ -76,3 +76,9 @@ pub fn init(mboot: &multiboot2::Info) {
 
     println!("[ OK ] PAT Initialised");
 }
+
+pub fn init_ap() {
+    pat::init();
+
+    println!("[ OK ] AP PAT Initialised");
+}

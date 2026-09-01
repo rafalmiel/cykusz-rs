@@ -89,6 +89,8 @@ pub extern "C" fn x86_64_rust_main_ap() {
 
     idt::init_ap();
 
+    mm::init_ap();
+
     dev::init_ap();
 
     let trampoline = crate::arch::smp::Trampoline::get();

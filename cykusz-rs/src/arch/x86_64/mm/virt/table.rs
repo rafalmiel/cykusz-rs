@@ -356,13 +356,14 @@ impl Table<Level4> {
 
     pub fn ref_table(&self) {
         if let Some(page) = self.phys_page() {
-            page.lock_pt().as_cache_meta().inc_vm_use_count();
+            page.inc_vm_use_count()
         }
     }
 
     pub fn unref_table(&self) {
         if let Some(page) = self.phys_page() {
-            let cnt = page.lock_pt().as_cache_meta().dec_vm_use_count();
+            let cnt = page.dec_vm_use_count();
+
             if cnt == 0 {
                 let frame = Frame::new(self.phys_addr());
 
@@ -373,7 +374,8 @@ impl Table<Level4> {
 
     pub fn unref_table_with(&mut self, f: impl Fn(&mut P4Table)) {
         if let Some(page) = self.phys_page() {
-            let cnt = page.lock_pt().as_cache_meta().dec_vm_use_count();
+            let cnt = page.dec_vm_use_count();
+
             if cnt == 0 {
                 f(self);
 

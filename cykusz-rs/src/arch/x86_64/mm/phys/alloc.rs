@@ -1,4 +1,8 @@
-use crate::arch::mm::phys::buddy;
+use super::buddy::BuddyAlloc;
+use super::iter::RangeMemIterator;
+use super::slab::SlabAlloc;
+use crate::arch::mm::VirtAddr;
+use crate::arch::mm::phys::{MemZone, buddy};
 use crate::drivers::multiboot2;
 use crate::drivers::multiboot2::memory::MemoryIter;
 use crate::kernel::mm::{Frame, PAGE_SIZE};
@@ -7,21 +11,44 @@ use crate::kernel::sync::{LockApi, Spin};
 use core::sync::atomic::AtomicU64;
 use core::sync::atomic::Ordering;
 
-use super::buddy::BuddyAlloc;
-use super::iter::RangeMemIterator;
-
 pub static NUM_PAGES: AtomicU64 = AtomicU64::new(0);
 
 static BUDDY: Spin<BuddyAlloc> = Spin::new(BuddyAlloc::new());
+
+static SLAB: spin::Once<Spin<SlabAlloc>> = spin::Once::new();
+
+pub fn allocate_slab(size: usize) -> Option<VirtAddr> {
+    allocate_slab_zone(size, MemZone::ZoneNormal)
+}
+
+pub fn allocate_slab_zone(size: usize, zone: MemZone) -> Option<VirtAddr> {
+    let mut slab = unsafe { SLAB.get_unchecked().lock_irq() };
+
+    slab.allocate_zone(size, zone)
+}
+
+pub fn free_slab(addr: VirtAddr) {
+    let mut slab = unsafe { SLAB.get_unchecked().lock_irq() };
+
+    slab.free(addr);
+}
 
 pub fn allocate() -> Option<Frame> {
     allocate_order(0)
 }
 
+pub fn allocate_zone(zone: MemZone) -> Option<Frame> {
+    allocate_order_zone(0, zone)
+}
+
 pub fn allocate_order(order: usize) -> Option<Frame> {
+    allocate_order_zone(order, MemZone::ZoneNormal)
+}
+
+pub fn allocate_order_zone(order: usize, zone: MemZone) -> Option<Frame> {
     let mut bdy = BUDDY.lock_irq();
 
-    if let Some(addr) = bdy.alloc(order) {
+    if let Some(addr) = bdy.alloc_zone(order, zone) {
         Some(Frame::new(addr))
     } else {
         None
@@ -74,6 +101,10 @@ pub fn free_mem() -> usize {
     bdy.free_mem()
 }
 
+fn init_slab() {
+    SLAB.call_once(|| Spin::new(SlabAlloc::new()));
+}
+
 pub fn init(mboot_info: &multiboot2::Info) {
     let mem = mboot_info
         .memory_map_tag()
@@ -120,4 +151,6 @@ pub fn init(mboot_info: &multiboot2::Info) {
     }
 
     NUM_PAGES.store((mem_end.0 / PAGE_SIZE) as u64, Ordering::SeqCst);
+
+    init_slab();
 }

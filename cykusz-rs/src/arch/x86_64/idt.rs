@@ -570,7 +570,8 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
 
         if let Some(p) = virt.to_phys_pagewalk() {
             if let Some(i) = p.to_phys_page() {
-                if let Some(h) = i.lock_pt().as_cache_meta().page_item() {
+                if let Some(h) = i.lock_pt().try_as_cache_meta().and_then(|c| c.page_item()) {
+                    // notify dirty if this page has attached page cache item
                     h.notify_dirty(&h, None);
 
                     return;

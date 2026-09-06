@@ -87,7 +87,7 @@ impl Entry {
     pub fn unref_phys_page(&self) -> bool {
         if self.address() != PhysAddr(0) {
             if let Some(page) = self.address().to_phys_page() {
-                let cnt = page.lock_pt().as_cache_meta().dec_vm_use_count();
+                let cnt = page.dec_vm_use_count();
                 if cnt == 0 {
                     deallocate_order(&Frame::new(self.address()), 0);
 
@@ -102,7 +102,7 @@ impl Entry {
     pub fn ref_phys_page(&self) {
         if self.address() != PhysAddr(0) {
             if let Some(page) = self.address().to_phys_page() {
-                page.lock_pt().as_cache_meta().inc_vm_use_count();
+                page.inc_vm_use_count()
             }
         }
     }

@@ -122,11 +122,11 @@ pub fn rust_main(stack_top: VirtAddr) {
 
     dbgln!(
         page_size,
-        "Page size: {}",
-        core::mem::size_of::<crate::arch::mm::phys::PhysPage>()
+        "Page size: {}, total size: {}",
+        core::mem::size_of::<crate::arch::mm::phys::PhysPage>(),
+        size_of::<crate::arch::mm::phys::PhysPage>()
+            * crate::arch::mm::phys::pages().unwrap().len()
     );
-
-    assert_eq!(32, core::mem::size_of::<crate::arch::mm::phys::PhysPage>());
 
     idle();
 }

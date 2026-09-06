@@ -433,7 +433,7 @@ impl Mapping {
             if let Some(phys_page) = phys.to_phys_page() {
                 // If there is more than one process mapping this page, make a private copy
                 // Otherwise, this page is not shared with anyone, so just make it writable
-                if do_copy || phys_page.lock_pt().as_cache_meta().vm_use_count() > 1 {
+                if do_copy || phys_page.vm_use_count() > 1 {
                     logln_disabled!("mmap cow: map_copy {}", bytes);
                     Self::map_copy(addr_aligned, addr_aligned, bytes, self.prot);
                 } else {

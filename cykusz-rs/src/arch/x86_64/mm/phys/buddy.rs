@@ -1,6 +1,6 @@
-use bit_field::BitField;
-
+use crate::arch::mm::phys::MemZone;
 use crate::kernel::mm::PhysAddr;
+use bit_field::BitField;
 
 use super::bump;
 
@@ -19,23 +19,6 @@ pub struct BuddyAlloc {
 
 pub static BSIZE: [usize; BUDDY_COUNT] =
     [0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000, 0x40000];
-
-#[allow(dead_code)]
-pub enum Zone {
-    ZoneDma,    // Below 16MB
-    ZoneDma32,  // Below 4GB
-    ZoneNormal, // All the rest
-}
-
-impl Zone {
-    fn in_zone(&self, addr: PhysAddr) -> bool {
-        match self {
-            Zone::ZoneDma => addr.0 <= 16 * 1024 * 1024,
-            Zone::ZoneDma32 => addr.0 <= 4 * 1024 * 1024 * 1024,
-            Zone::ZoneNormal => true,
-        }
-    }
-}
 
 impl BuddyAlloc {
     pub const fn new() -> BuddyAlloc {
@@ -143,7 +126,7 @@ impl BuddyAlloc {
         panic!("Unexpected!!!");
     }
 
-    pub fn alloc_zone(&mut self, order: usize, zone: Zone) -> Option<PhysAddr> {
+    pub fn alloc_zone(&mut self, order: usize, zone: MemZone) -> Option<PhysAddr> {
         let size = BSIZE[order];
 
         for (i, &s) in BSIZE[order..].iter().enumerate() {
@@ -174,10 +157,6 @@ impl BuddyAlloc {
         }
 
         None
-    }
-
-    pub fn alloc(&mut self, order: usize) -> Option<PhysAddr> {
-        self.alloc_zone(order, Zone::ZoneNormal)
     }
 
     fn get_byte_bit(&self, addr: PhysAddr, order: usize) -> (usize, usize) {

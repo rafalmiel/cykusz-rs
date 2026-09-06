@@ -1,9 +1,10 @@
+use crate::arch::mm::phys::MemZone;
 use crate::arch::mm::virt::map_to_flags;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::block::ata::AtaCommand;
 use crate::drivers::block::ata::request::DmaBuf;
-use crate::kernel::mm::allocate_order;
 use crate::kernel::mm::virt::PageFlags;
+use crate::kernel::mm::{allocate_order, allocate_slab_zone};
 use tock_registers::interfaces::Readable;
 
 impl HbaPort {
@@ -77,18 +78,13 @@ impl HbaPort {
             addr.to_virt().as_bytes_mut(8092).fill(0);
         }
 
-        let cba = allocate_order(0).unwrap().address();
-        map_to_flags(
-            cba.to_virt(),
-            cba,
-            PageFlags::WRITABLE | PageFlags::NO_CACHE,
-        );
+        let cba = allocate_slab_zone(4096, MemZone::ZoneDma32).unwrap();
         unsafe {
-            cba.to_virt().as_bytes_mut(4096).fill(0);
+            cba.as_bytes_mut(4096).fill(0);
         }
 
-        self.set_clb(cba);
-        self.set_fb(cba + 1024);
+        self.set_clb(cba.to_phys());
+        self.set_fb(cba.to_phys() + 1024);
 
         for i in 0..32 {
             let cmd_hdr = self.cmd_header_at(i);

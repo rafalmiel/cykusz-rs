@@ -11,7 +11,8 @@ use syscall_defs::poll::PollEventFlags;
 use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::device::dev_t::DevId;
-use crate::kernel::device::{alloc_id, Device};
+use crate::kernel::device::{Device, alloc_id};
+use crate::kernel::fs::FsDevice;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemInt, INodeItemStruct};
@@ -20,7 +21,6 @@ use crate::kernel::fs::pcache::MappedAccess;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::Result;
 use crate::kernel::fs::vfs::{FsError, Metadata};
-use crate::kernel::fs::FsDevice;
 use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::sync::{LockApi, RwSpin, Spin};
 use crate::kernel::utils::types::CeilDiv;

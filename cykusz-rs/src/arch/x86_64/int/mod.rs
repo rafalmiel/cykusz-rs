@@ -18,7 +18,7 @@ pub fn is_enabled() -> bool {
     unsafe {
         let r: usize;
         asm!("pushfq", "pop {r}", r = out(reg) r);
-        return (r & (1usize << 9)) > 0;
+        (r & (1usize << 9)) > 0
     }
 }
 

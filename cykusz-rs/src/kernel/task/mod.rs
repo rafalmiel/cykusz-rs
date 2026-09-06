@@ -15,8 +15,8 @@ use crate::arch::mm::VirtAddr;
 use crate::arch::task::Task as ArchTask;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::root_dentry;
-use crate::kernel::sched::{current_task_ref, new_task_tid, SleepFlags};
-use crate::kernel::signal::{SignalResult, Signals, KSIGSTOPTHR};
+use crate::kernel::sched::{SleepFlags, current_task_ref, new_task_tid};
+use crate::kernel::signal::{KSIGSTOPTHR, SignalResult, Signals};
 use crate::kernel::sync::{LockApi, RwSpin, Spin, SpinGuard};
 use crate::kernel::task::children_events::WaitPidEvents;
 use crate::kernel::task::cwd::Cwd;
@@ -324,13 +324,14 @@ impl Task {
     }
 
     pub fn me(&self) -> ArcTask {
-        match self.sref.upgrade() { Some(t) => {
-            t
-        } _ => {
-            dbgln!(sched_v, "Task::me == nullptr");
-            crate::lang_items::print_current_backtrace();
-            loop {}
-        }}
+        match self.sref.upgrade() {
+            Some(t) => t,
+            _ => {
+                dbgln!(sched_v, "Task::me == nullptr");
+                crate::lang_items::print_current_backtrace();
+                loop {}
+            }
+        }
     }
 
     pub fn remove_child(&self, child: &Task) {
@@ -364,17 +365,20 @@ impl Task {
     }
 
     pub fn remove_from_parent(&self) {
-        match self.get_parent() { Some(parent) => {
-            dbgln!(
-                task,
-                "task {} remove from parent {}",
-                self.tid(),
-                parent.tid()
-            );
-            parent.remove_child(self);
-        } _ => {
-            dbgln!(task, "task {} remove from parent NOT FOUND", self.tid());
-        }}
+        match self.get_parent() {
+            Some(parent) => {
+                dbgln!(
+                    task,
+                    "task {} remove from parent {}",
+                    self.tid(),
+                    parent.tid()
+                );
+                parent.remove_child(self);
+            }
+            _ => {
+                dbgln!(task, "task {} remove from parent NOT FOUND", self.tid());
+            }
+        }
     }
 
     pub fn add_child(&self, child: ArcTask) {
@@ -583,11 +587,10 @@ impl Task {
         if self.is_process_leader() {
             false
         } else {
-            match self.get_parent() { Some(p) => {
-                p.is_terminatng()
-            } _ => {
-                false
-            }}
+            match self.get_parent() {
+                Some(p) => p.is_terminatng(),
+                _ => false,
+            }
         }
     }
 
@@ -713,11 +716,14 @@ impl Task {
                     poweroff,
                     "sigkill to {} {}",
                     c.pid(),
-                    match c.exe() { Some(e) => {
-                        e.full_path()
-                    } _ => {
-                        String::new()
-                    }}
+                    match c.exe() {
+                        Some(e) => {
+                            e.full_path()
+                        }
+                        _ => {
+                            String::new()
+                        }
+                    }
                 );
                 to_kill.push(c.me());
             }
@@ -790,11 +796,14 @@ impl Task {
                     task,
                     "sigkillthr to {} {}",
                     c.tid(),
-                    match c.exe() { Some(e) => {
-                        e.full_path()
-                    } _ => {
-                        String::new()
-                    }}
+                    match c.exe() {
+                        Some(e) => {
+                            e.full_path()
+                        }
+                        _ => {
+                            String::new()
+                        }
+                    }
                 );
                 c.signal_thread(crate::kernel::signal::KSIGKILLTHR);
             }
@@ -931,13 +940,13 @@ impl Task {
         crate::kernel::sched::wake_as_next(self.me());
     }
 
-    pub unsafe fn arch_task_mut(&self) -> &mut ArchTask { unsafe {
-        &mut (*self.arch_task.get())
-    }}
+    pub unsafe fn arch_task_mut(&self) -> &mut ArchTask {
+        unsafe { &mut (*self.arch_task.get()) }
+    }
 
-    pub unsafe fn arch_task(&self) -> &ArchTask { unsafe {
-        &(*self.arch_task.get())
-    }}
+    pub unsafe fn arch_task(&self) -> &ArchTask {
+        unsafe { &(*self.arch_task.get()) }
+    }
 
     pub fn sleep(&self, time_ns: usize) -> SignalResult<()> {
         crate::kernel::sched::sleep(Some(time_ns), SleepFlags::empty())

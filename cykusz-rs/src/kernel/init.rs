@@ -1,7 +1,7 @@
 use spin::Once;
 
 use crate::kernel::fs::path::Path;
-use crate::kernel::fs::{lookup_by_real_path, root_dentry, LookupMode};
+use crate::kernel::fs::{LookupMode, lookup_by_real_path, root_dentry};
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::task::ArcTask;
 

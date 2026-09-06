@@ -14,11 +14,11 @@ use crate::kernel::net::ip::{Ip, Ip4, IpHeader};
 use crate::kernel::net::socket::{NetSocketService, SocketService};
 use crate::kernel::net::tcp::{Tcp, TcpHeader};
 use crate::kernel::net::{
-    default_driver, Packet, PacketDownHierarchy, PacketHeader, PacketTrait, PacketUpHierarchy,
+    Packet, PacketDownHierarchy, PacketHeader, PacketTrait, PacketUpHierarchy, default_driver,
 };
 use crate::kernel::sched::current_task;
 use crate::kernel::sync::{LockApi, Mutex, Spin};
-use crate::kernel::timer::{create_timer, current_ns, Timer, TimerCallback};
+use crate::kernel::timer::{Timer, TimerCallback, create_timer, current_ns};
 use crate::kernel::utils::buffer::{Buffer, BufferQueue};
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
 

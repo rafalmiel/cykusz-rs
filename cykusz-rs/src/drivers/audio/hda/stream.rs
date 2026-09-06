@@ -6,8 +6,8 @@ use crate::drivers::audio::hda::reg::{
     BufferDescriptorListEntry, StreamControl, StreamFormat, StreamStatus, WrapLocal,
 };
 use bit_field::BitField;
-use tock_registers::interfaces::{Readable, Writeable};
 use tock_registers::LocalRegisterCopy;
+use tock_registers::interfaces::{Readable, Writeable};
 
 #[derive(Copy, Clone)]
 pub struct Stream {
@@ -25,7 +25,7 @@ pub struct SampleRate {
 }
 
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{allocate_order, deallocate_order, map_to_flags, Frame, PAGE_SIZE};
+use crate::kernel::mm::{Frame, PAGE_SIZE, allocate_order, deallocate_order, map_to_flags};
 use StreamFormat::MULT::Value::*;
 use {StreamFormat::BASE::Value::KHZ44, StreamFormat::BASE::Value::KHZ48};
 

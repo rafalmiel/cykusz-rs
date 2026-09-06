@@ -1,4 +1,4 @@
-use syscall_defs::{SyscallError, SyscallInto, SyscallResult, SYSCALL_STRING};
+use syscall_defs::{SYSCALL_STRING, SyscallError, SyscallInto, SyscallResult};
 
 use crate::arch::idt::RegsFrame;
 use crate::arch::signal::arch_sys_check_signals;

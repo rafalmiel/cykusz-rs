@@ -453,7 +453,8 @@ fn invalid_opcode(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame) {
     if frame.is_user() {
         let task = current_task_ref();
 
-        dbgln!(exc,
+        dbgln!(
+            exc,
             "[ SIGILL ] Task {} invalid_opcode error {:#x}",
             task.tid(),
             frame.ip
@@ -490,7 +491,11 @@ fn segment_not_present(frame: &mut idt::InterruptFrame, _regs: &mut RegsFrame, e
     if frame.is_user() {
         let task = current_task_ref();
 
-        dbgln!(exc, "[ SIGSEGV ] Task {} segment_not_present error", task.tid());
+        dbgln!(
+            exc,
+            "[ SIGSEGV ] Task {} segment_not_present error",
+            task.tid()
+        );
         task.signal(syscall_defs::signal::SIGSEGV);
 
         return;
@@ -516,7 +521,8 @@ fn general_protection_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFram
     if frame.is_user() {
         let task = current_task_ref();
 
-        dbgln!(exc,
+        dbgln!(
+            exc,
             "[ SIGBUS ] Task {} general_protecion error {:#x} {:?}",
             task.tid(),
             frame.ip,
@@ -544,7 +550,7 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
         // let the task try handle it
         let task = current_task_ref();
 
-        //println!("user pagefault {:#x} {} {:?} pid: {}", frame.ip, virt, reason, task.tid());
+        //dbgln!(pf, "user pagefault {:#x} {} {:?} pid: {}", frame.ip, virt, reason, task.tid());
         if task.handle_pagefault(reason, virt) {
             return;
         } else {
@@ -564,7 +570,7 @@ fn page_fault(frame: &mut idt::InterruptFrame, regs: &mut RegsFrame, err: u64) {
 
         if let Some(p) = virt.to_phys_pagewalk() {
             if let Some(i) = p.to_phys_page() {
-                if let Some(h) = i.page_item() {
+                if let Some(h) = i.lock_pt().as_cache_meta().page_item() {
                     h.notify_dirty(&h, None);
 
                     return;

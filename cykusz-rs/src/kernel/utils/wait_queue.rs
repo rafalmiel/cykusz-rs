@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
-use syscall_defs::net::MsgFlags;
 use syscall_defs::OpenFlags;
+use syscall_defs::net::MsgFlags;
 
-use crate::kernel::sched::{current_task, SleepFlags};
+use crate::kernel::sched::{SleepFlags, current_task};
 use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, LockApi, LockGuard, Spin};
 use crate::kernel::task::ArcTask;

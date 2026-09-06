@@ -1,13 +1,11 @@
 use ::alloc::vec::Vec;
-use core::cell::UnsafeCell;
 use core::sync::atomic::Ordering;
-
 use spin::Once;
 
 use crate::drivers::multiboot2;
 use crate::kernel::fs::cache::{ArcWrap, WeakWrap};
 use crate::kernel::fs::pcache::{PageCacheItemArc, PageCacheItemWeak};
-use crate::kernel::mm::{PhysAddr, PAGE_SIZE};
+use crate::kernel::mm::{PAGE_SIZE, PhysAddr};
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 pub use self::alloc::allocate;
@@ -23,15 +21,92 @@ mod buddy;
 mod bump;
 mod iter;
 
-struct PhysPageData {
+bitflags! {
+    #[derive(Copy, Clone)]
+    pub struct PageKind: u8 {
+        const PAGE_CACHE    = 1 << 0;
+        const SLAB_META     = 1 << 1;
+    }
+}
+
+pub struct PhysPageData {
+    variant: PhysPageDataVariant,
+    flags: PageKind,
+}
+
+impl Default for PhysPageData {
+    fn default() -> Self {
+        PhysPageData {
+            variant: PhysPageDataVariant { empty: () },
+            flags: PageKind::empty(),
+        }
+    }
+}
+
+impl PhysPageData {
+    pub fn as_cache_meta(&mut self) -> &mut PageCacheMeta {
+        assert!(self.flags.is_empty() || self.flags.bits() == PageKind::PAGE_CACHE.bits());
+
+        unsafe {
+            if self.flags.is_empty() {
+                self.variant.cache = core::mem::ManuallyDrop::new(PageCacheMeta {
+                    p_cache: PageCacheItemWeak::empty(),
+                    vm_use_count: 0,
+                });
+                self.flags = PageKind::PAGE_CACHE;
+            }
+            &mut self.variant.cache
+        }
+    }
+}
+
+#[allow(dead_code)]
+union PhysPageDataVariant {
+    empty: (),
+    cache: core::mem::ManuallyDrop<PageCacheMeta>,
+    slab: core::mem::ManuallyDrop<SlabMeta>,
+}
+
+pub struct PageCacheMeta {
     p_cache: PageCacheItemWeak,
     vm_use_count: u32,
 }
 
+impl PageCacheMeta {
+    pub fn unlink_page_cache(&mut self) {
+        self.p_cache = WeakWrap::empty();
+    }
+
+    pub fn link_page_cache(&mut self, page: &PageCacheItemArc) {
+        self.p_cache = ArcWrap::downgrade(page);
+    }
+
+    pub fn page_item(&self) -> Option<PageCacheItemArc> {
+        self.p_cache.upgrade()
+    }
+
+    pub fn inc_vm_use_count(&mut self) {
+        self.vm_use_count += 1;
+    }
+
+    pub fn dec_vm_use_count(&mut self) -> usize {
+        if self.vm_use_count > 0 {
+            self.vm_use_count -= 1;
+        }
+
+        self.vm_use_count as usize
+    }
+
+    pub fn vm_use_count(&self) -> usize {
+        self.vm_use_count as usize
+    }
+}
+
+struct SlabMeta {}
+
 #[repr(C)]
 pub struct PhysPage {
-    pt_lock: Spin<()>,
-    data: UnsafeCell<PhysPageData>,
+    pt_lock: Spin<PhysPageData>,
 }
 
 unsafe impl Sync for PhysPage {}
@@ -49,75 +124,22 @@ impl PhysPage {
         (self.this_addr() - Self::base_addr()) / core::mem::size_of::<Self>() * PAGE_SIZE
     }
 
-    pub fn lock_pt(&self) -> SpinGuard<'_, ()> {
+    pub fn lock_pt(&self) -> SpinGuard<'_, PhysPageData> {
         self.pt_lock.lock()
     }
 
-    pub fn unlink_page_cache(&self) {
-        let _lock = self.lock_pt();
+    pub fn mark_unused(&self) {
+        let mut lock = self.pt_lock.lock();
 
-        unsafe {
-            let this = self.this();
-            this.p_cache = WeakWrap::empty();
-        }
-    }
-
-    unsafe fn this(&self) -> &mut PhysPageData { unsafe {
-        self.data.get().as_mut().unwrap()
-    }}
-
-    pub fn link_page_cache(&self, page: &PageCacheItemArc) {
-        let _lock = self.lock_pt();
-
-        unsafe {
-            let this = self.this();
-            this.p_cache = ArcWrap::downgrade(&page);
-        }
-    }
-
-    pub fn page_item(&self) -> Option<PageCacheItemArc> {
-        let _lock = self.lock_pt();
-
-        unsafe { self.this().p_cache.upgrade() }
-    }
-
-    pub fn inc_vm_use_count(&self) {
-        let _lock = self.lock_pt();
-
-        unsafe {
-            self.this().vm_use_count += 1;
-        }
-    }
-
-    pub fn dec_vm_use_count(&self) -> usize {
-        let _lock = self.lock_pt();
-
-        unsafe {
-            let this = self.this();
-
-            if this.vm_use_count > 0 {
-                this.vm_use_count -= 1;
-            }
-
-            this.vm_use_count as usize
-        }
-    }
-
-    pub fn vm_use_count(&self) -> usize {
-        let _lock = self.lock_pt();
-
-        unsafe { self.this().vm_use_count as usize }
+        lock.variant.empty = ();
+        lock.flags = PageKind::empty();
     }
 }
 
 impl Default for PhysPage {
     fn default() -> Self {
         PhysPage {
-            pt_lock: Spin::new(()),
-            data: UnsafeCell::new(PhysPageData {
-                p_cache: PageCacheItemWeak::empty(),
-                vm_use_count: 0,
-            }),
+            pt_lock: Spin::new(PhysPageData::default()),
         }
     }
 }

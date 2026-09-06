@@ -129,9 +129,5 @@ pub static MAP_L2: [KeyCode; 127] = {
 };
 
 pub fn get(sc: usize, l2: bool) -> KeyCode {
-    if !l2 {
-        MAP_L1[sc]
-    } else {
-        MAP_L2[sc]
-    }
+    if !l2 { MAP_L1[sc] } else { MAP_L2[sc] }
 }

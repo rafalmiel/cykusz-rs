@@ -11,14 +11,13 @@ pub struct Cwd {
 
 impl Cwd {
     pub fn new(dentry: DirEntryItem) -> Option<Cwd> {
-        match dentry.inode().fs().unwrap().upgrade() { Some(fs) => {
-            Some(Cwd {
+        match dentry.inode().fs().unwrap().upgrade() {
+            Some(fs) => Some(Cwd {
                 dentry: dentry.clone(),
                 fs,
-            })
-        } _ => {
-            None
-        }}
+            }),
+            _ => None,
+        }
     }
 
     pub fn pwd(&self) -> String {

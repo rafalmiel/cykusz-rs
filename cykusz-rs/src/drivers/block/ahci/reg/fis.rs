@@ -3,7 +3,7 @@ use bit_field::BitField;
 use tock_registers::fields::FieldValue;
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 use tock_registers::registers::ReadWrite;
-use tock_registers::{register_bitfields, register_structs, RegisterLongName, UIntLike};
+use tock_registers::{RegisterLongName, UIntLike, register_bitfields, register_structs};
 
 register_bitfields! [
     u8,

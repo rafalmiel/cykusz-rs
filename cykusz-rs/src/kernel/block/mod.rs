@@ -11,7 +11,8 @@ use uuid::Uuid;
 use crate::kernel::block::mbr::Partition;
 use crate::kernel::device;
 use crate::kernel::device::dev_t::DevId;
-use crate::kernel::device::{alloc_id, register_device, Device};
+use crate::kernel::device::{Device, alloc_id, register_device};
+use crate::kernel::fs::FsDevice;
 use crate::kernel::fs::cache::{ArcWrap, Cacheable};
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
@@ -19,10 +20,9 @@ use crate::kernel::fs::pcache::{
     CachedAccess, CachedBlockDev, PageCacheItem, PageCacheItemArc, PageCacheItemWeak, PageCacheKey,
     RawAccess,
 };
-use crate::kernel::fs::FsDevice;
 use crate::kernel::params::params;
 use crate::kernel::sync::{IrqGuard, LockApi, Mutex, MutexGuard};
-use crate::kernel::timer::{create_timer, Timer, TimerCallback};
+use crate::kernel::timer::{Timer, TimerCallback, create_timer};
 use crate::kernel::utils::types::CeilDiv;
 
 mod mbr;

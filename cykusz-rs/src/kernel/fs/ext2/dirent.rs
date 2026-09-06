@@ -3,12 +3,12 @@ use core::marker::PhantomData;
 
 use crate::arch::raw::mm::VirtAddr;
 use crate::kernel::fs::dirent::DirEntryItem;
+use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::ext2::buf_block::BufBlock;
 use crate::kernel::fs::ext2::disk::dirent::{DirEntTypeIndicator, DirEntry};
 use crate::kernel::fs::ext2::disk::inode::FileType;
 use crate::kernel::fs::ext2::idata::INodeData;
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
-use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::vfs::{FsError, Result};
 use crate::kernel::sched::current_task_ref;
@@ -252,10 +252,6 @@ impl<'a> Iterator for DirEntIter<'a> {
             }
         };
 
-        if ent.ent_size() != 0 {
-            Some(ent)
-        } else {
-            None
-        }
+        if ent.ent_size() != 0 { Some(ent) } else { None }
     }
 }

@@ -9,7 +9,7 @@ use core::ops::{Deref, DerefMut};
 use tock_registers::interfaces::{ReadWriteable, Readable};
 use tock_registers::registers::{ReadOnly, ReadWrite};
 use tock_registers::{
-    register_bitfields, register_structs, LocalRegisterCopy, RegisterLongName, UIntLike,
+    LocalRegisterCopy, RegisterLongName, UIntLike, register_bitfields, register_structs,
 };
 
 register_bitfields! [

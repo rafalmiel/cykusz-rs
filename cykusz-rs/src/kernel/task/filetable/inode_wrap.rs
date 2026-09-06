@@ -27,11 +27,10 @@ fn get_dev_inode(inode: &DirEntryItem) -> Option<Arc<dyn INode>> {
 
     match fs_inode.ftype() {
         Ok(FileType::Fifo) => {
-            match crate::kernel::fs::pipe::pipes().get_or_insert_default(&fs_inode) { Some(ino) => {
-                Some(ino)
-            } _ => {
-                None
-            }}
+            match crate::kernel::fs::pipe::pipes().get_or_insert_default(&fs_inode) {
+                Some(ino) => Some(ino),
+                _ => None,
+            }
         }
         Ok(FileType::Socket) => Some(crate::kernel::net::unix::sockets().get(&fs_inode)?.clone()),
         Ok(FileType::Char) | Ok(FileType::Block) => {

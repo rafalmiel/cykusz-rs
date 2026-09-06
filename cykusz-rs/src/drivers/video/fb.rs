@@ -6,16 +6,16 @@ use bit_field::BitField;
 use spin::Once;
 
 use crate::arch::mm::VirtAddr;
-use crate::arch::output::{register_video_driver, Character, VideoDriver};
+use crate::arch::output::{Character, VideoDriver, register_video_driver};
 use crate::drivers::multiboot2::framebuffer_info::{FramebufferInfo, FramebufferType};
-use crate::drivers::tty::color::{ColorCode, RGB, Ansi16};
-use crate::kernel::device::dev_t::DevId;
+use crate::drivers::tty::color::{Ansi16, ColorCode, RGB};
 use crate::kernel::device::Device;
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, MappedAccess, PageDirectItemStruct};
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{map_to_flags, virt, MappedAddr, PhysAddr, PAGE_SIZE};
+use crate::kernel::mm::{MappedAddr, PAGE_SIZE, PhysAddr, map_to_flags, virt};
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::TimerObject;
 use crate::kernel::utils::types::Align;
@@ -448,8 +448,9 @@ impl State {
         self.buffer.fill(0);
         self.char_cache.fill(Character::new_vga16(
             b' ',
-            ColorCode::Black, ColorCode::Black)
-        );
+            ColorCode::Black,
+            ColorCode::Black,
+        ));
     }
 
     fn cursor_blink_timer(&mut self) {

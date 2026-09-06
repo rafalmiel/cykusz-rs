@@ -5,8 +5,8 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use downcast_rs::DowncastSync;
 use spin::Once;
 
-use syscall_defs::exec::ExeArgs;
 use syscall_defs::SyscallError;
+use syscall_defs::exec::ExeArgs;
 
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::mm::VirtAddr;
@@ -181,9 +181,14 @@ impl Scheduler {
         if task.is_process_leader() {
             dbgln!(task_stop, "cont threads!");
             self.sched.cont(task.clone());
-        } else { match task.get_parent() { Some(parent) => {
-            cont(parent);
-        } _ => {}}}
+        } else {
+            match task.get_parent() {
+                Some(parent) => {
+                    cont(parent);
+                }
+                _ => {}
+            }
+        }
     }
 
     fn debug(&self) {

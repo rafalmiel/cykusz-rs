@@ -1,5 +1,5 @@
 use crate::arch::int;
-use crate::drivers::ps2::{controller, Command, Error, PS};
+use crate::drivers::ps2::{Command, Error, PS, controller};
 
 mod handler;
 

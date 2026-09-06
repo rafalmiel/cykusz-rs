@@ -3,7 +3,7 @@ use crate::kernel::mm::PhysAddr;
 use bit_field::BitField;
 use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 use tock_registers::registers::ReadWrite;
-use tock_registers::{register_bitfields, register_structs, LocalRegisterCopy};
+use tock_registers::{LocalRegisterCopy, register_bitfields, register_structs};
 
 register_bitfields! [
     u16,

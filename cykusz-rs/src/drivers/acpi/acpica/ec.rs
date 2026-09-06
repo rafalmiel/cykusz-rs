@@ -12,9 +12,7 @@ impl GlobalLockGuard {
         let mut lock = GlobalLockGuard { handle: 0 };
 
         assert_eq!(
-            unsafe {
-                acpica::AcpiAcquireGlobalLock(u16::MAX as i16, &mut lock.handle as *mut i32)
-            },
+            unsafe { acpica::AcpiAcquireGlobalLock(u16::MAX as i16, &mut lock.handle as *mut i32) },
             acpica::AE_OK
         );
 
@@ -39,65 +37,67 @@ pub unsafe extern "C" fn embedded_ctl(
     Value: *mut acpica::UINT64,
     _HandlerContext: *mut ::core::ffi::c_void,
     _RegionContext: *mut ::core::ffi::c_void,
-) -> acpica::ACPI_STATUS { unsafe {
-    let mut data = Port::<u8>::new(62);
-    let mut cmd = Port::<u8>::new(66);
-
-    let wait_for = |mask, value| -> bool {
+) -> acpica::ACPI_STATUS {
+    unsafe {
+        let mut data = Port::<u8>::new(62);
         let mut cmd = Port::<u8>::new(66);
-        for _ in 0..1000 {
-            if cmd.read() & mask == value {
-                return true;
-            } else {
-                busy_sleep(100000);
+
+        let wait_for = |mask, value| -> bool {
+            let mut cmd = Port::<u8>::new(66);
+            for _ in 0..1000 {
+                if cmd.read() & mask == value {
+                    return true;
+                } else {
+                    busy_sleep(100000);
+                }
             }
+
+            //println!("EC: Wait Failed");
+            return false;
+        };
+
+        let _lock = GlobalLockGuard::new();
+
+        if BitWidth != 8 {
+            panic!("Unsupported BitWidth {}", BitWidth);
         }
 
-        //println!("EC: Wait Failed");
-        return false;
-    };
+        if Function == 0 {
+            //Read
+            if !wait_for(0b10, 0) {
+                *Value = 0xFF;
+                return AE_OK;
+            }
+            cmd.write(0x80);
+            if !wait_for(0b10, 0) {
+                *Value = 0xFF;
+                return AE_OK;
+            }
+            data.write(Address as u8);
+            if !wait_for(0b1, 0b1) {
+                *Value = 0xFF;
+                return AE_OK;
+            }
+            *Value = data.read() as i64;
+        } else {
+            //Write
+            if !wait_for(0b10, 0) {
+                return AE_OK;
+            }
+            cmd.write(0x81);
+            if !wait_for(0b10, 0) {
+                return AE_OK;
+            }
+            data.write(Address as u8);
+            if !wait_for(0b10, 0) {
+                return AE_OK;
+            }
+            data.write(*Value as u8);
+        }
 
-    let _lock = GlobalLockGuard::new();
-
-    if BitWidth != 8 {
-        panic!("Unsupported BitWidth {}", BitWidth);
+        acpica::AE_OK
     }
-
-    if Function == 0 {
-        //Read
-        if !wait_for(0b10, 0) {
-            *Value = 0xFF;
-            return AE_OK;
-        }
-        cmd.write(0x80);
-        if !wait_for(0b10, 0) {
-            *Value = 0xFF;
-            return AE_OK;
-        }
-        data.write(Address as u8);
-        if !wait_for(0b1, 0b1) {
-            *Value = 0xFF;
-            return AE_OK;
-        }
-        *Value = data.read() as i64;
-    } else {
-        //Write
-        if !wait_for(0b10, 0) {
-            return AE_OK;
-        }
-        cmd.write(0x81);
-        if !wait_for(0b10, 0) {
-            return AE_OK;
-        }
-        data.write(Address as u8);
-        if !wait_for(0b10, 0) {
-            return AE_OK;
-        }
-        data.write(*Value as u8);
-    }
-
-    acpica::AE_OK
-}}
+}
 
 #[allow(non_snake_case)]
 #[allow(unused_variables)]

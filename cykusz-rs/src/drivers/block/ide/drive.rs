@@ -4,7 +4,7 @@ use alloc::sync::Arc;
 use crate::drivers::block::ata::request::DmaRequest;
 use crate::drivers::block::ide::channel::IdeChannel;
 use crate::drivers::pci::{BarAddress, PciHeader, ProgInterface};
-use crate::kernel::block::{register_blkdev, BlockDev, BlockDevice};
+use crate::kernel::block::{BlockDev, BlockDevice, register_blkdev};
 use crate::kernel::utils::types::CeilDiv;
 
 pub struct IdeDrive {

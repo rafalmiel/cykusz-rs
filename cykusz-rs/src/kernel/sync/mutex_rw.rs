@@ -65,7 +65,7 @@ impl<T> RwMutex<T> {
         RwMutex::<T> {
             reader_wait_queue: WaitQueue::new(),
             writer_wait_queue: WaitQueue::new(),
-            mutex: RwSpin::new_no_notify(user_data),
+            mutex: RwSpin::new(user_data),
         }
     }
 
@@ -83,15 +83,18 @@ impl<T> RwMutex<T> {
         self.reader_wait_queue.add_task(task.clone());
 
         loop {
-            match self.mutex.try_read() { Some(g) => {
-                self.reader_wait_queue.remove_task(task);
-                return RwMutexReadGuard::<T> {
-                    g: Some(g),
-                    m: &self,
-                };
-            } _ => {
-                let _ = WaitQueue::task_wait();
-            }}
+            match self.mutex.try_read_no_notify() {
+                Some(g) => {
+                    self.reader_wait_queue.remove_task(task);
+                    return RwMutexReadGuard::<T> {
+                        g: Some(g),
+                        m: &self,
+                    };
+                }
+                _ => {
+                    let _ = WaitQueue::task_wait();
+                }
+            }
         }
     }
 
@@ -101,15 +104,18 @@ impl<T> RwMutex<T> {
         self.reader_wait_queue.add_task(task.clone());
 
         loop {
-            match self.mutex.try_read_irq() { Some(g) => {
-                self.reader_wait_queue.remove_task(task);
-                return RwMutexReadGuard::<T> {
-                    g: Some(g),
-                    m: &self,
-                };
-            } _ => {
-                let _ = WaitQueue::task_wait();
-            }}
+            match self.mutex.try_read_irq() {
+                Some(g) => {
+                    self.reader_wait_queue.remove_task(task);
+                    return RwMutexReadGuard::<T> {
+                        g: Some(g),
+                        m: &self,
+                    };
+                }
+                _ => {
+                    let _ = WaitQueue::task_wait();
+                }
+            }
         }
     }
 
@@ -119,15 +125,18 @@ impl<T> RwMutex<T> {
         self.reader_wait_queue.add_task(task.clone());
 
         loop {
-            match self.mutex.try_read_upgradeable() { Some(g) => {
-                self.reader_wait_queue.remove_task(task);
-                return RwMutexUpgradeableGuard::<T> {
-                    g: Some(g),
-                    m: &self,
-                };
-            } _ => {
-                let _ = WaitQueue::task_wait();
-            }}
+            match self.mutex.try_read_upgradeable_no_notify() {
+                Some(g) => {
+                    self.reader_wait_queue.remove_task(task);
+                    return RwMutexUpgradeableGuard::<T> {
+                        g: Some(g),
+                        m: &self,
+                    };
+                }
+                _ => {
+                    let _ = WaitQueue::task_wait();
+                }
+            }
         }
     }
 
@@ -137,15 +146,18 @@ impl<T> RwMutex<T> {
         self.reader_wait_queue.add_task(task.clone());
 
         loop {
-            match self.mutex.try_read_upgradeable_irq() { Some(g) => {
-                self.reader_wait_queue.remove_task(task);
-                return RwMutexUpgradeableGuard::<T> {
-                    g: Some(g),
-                    m: &self,
-                };
-            } _ => {
-                let _ = WaitQueue::task_wait();
-            }}
+            match self.mutex.try_read_upgradeable_irq() {
+                Some(g) => {
+                    self.reader_wait_queue.remove_task(task);
+                    return RwMutexUpgradeableGuard::<T> {
+                        g: Some(g),
+                        m: &self,
+                    };
+                }
+                _ => {
+                    let _ = WaitQueue::task_wait();
+                }
+            }
         }
     }
 
@@ -155,15 +167,18 @@ impl<T> RwMutex<T> {
         self.writer_wait_queue.add_task(task.clone());
 
         loop {
-            match self.mutex.try_write() { Some(g) => {
-                self.writer_wait_queue.remove_task(task);
-                return RwMutexWriteGuard::<T> {
-                    g: Some(g),
-                    m: &self,
-                };
-            } _ => {
-                let _ = WaitQueue::task_wait();
-            }}
+            match self.mutex.try_write_no_notify() {
+                Some(g) => {
+                    self.writer_wait_queue.remove_task(task);
+                    return RwMutexWriteGuard::<T> {
+                        g: Some(g),
+                        m: &self,
+                    };
+                }
+                _ => {
+                    let _ = WaitQueue::task_wait();
+                }
+            }
         }
     }
 
@@ -173,15 +188,18 @@ impl<T> RwMutex<T> {
         self.writer_wait_queue.add_task(task.clone());
 
         loop {
-            match self.mutex.try_write_irq() { Some(g) => {
-                self.writer_wait_queue.remove_task(task);
-                return RwMutexWriteGuard::<T> {
-                    g: Some(g),
-                    m: &self,
-                };
-            } _ => {
-                let _ = WaitQueue::task_wait();
-            }}
+            match self.mutex.try_write_irq() {
+                Some(g) => {
+                    self.writer_wait_queue.remove_task(task);
+                    return RwMutexWriteGuard::<T> {
+                        g: Some(g),
+                        m: &self,
+                    };
+                }
+                _ => {
+                    let _ = WaitQueue::task_wait();
+                }
+            }
         }
     }
 }

@@ -6,7 +6,6 @@ use crate::kernel::int;
 use crate::kernel::sync::{IrqGuard, LockApi, LockGuard};
 
 pub struct Spin<T: ?Sized> {
-    notify: bool,
     l: M<T>,
 }
 
@@ -25,36 +24,26 @@ pub struct SpinGuard<'a, T: 'a + ?Sized> {
 
 impl<'a, T: 'a + ?Sized> LockGuard for SpinGuard<'a, T> {}
 
-impl<T> Spin<T> {
+impl<'a, T> Spin<T> {
     pub const fn new(user_data: T) -> Spin<T> {
         Spin {
-            notify: true,
             l: M::new(user_data),
         }
     }
+}
 
-    pub const fn new_no_notify(user_data: T) -> Spin<T> {
-        Spin {
-            notify: false,
-            l: M::new(user_data),
-        }
-    }
-
+impl<'a, T: ?Sized + 'a> Spin<T> {
     #[inline(never)]
     pub fn is_locked(&self) -> bool {
         self.l.is_locked()
     }
-}
 
-impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
-    type Guard = SpinGuard<'a, T>;
-
-    fn lock(&'a self) -> Self::Guard {
-        let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
+    fn do_lock(&'a self, with_notify: bool) -> SpinGuard<'a, T> {
+        let notify = with_notify && crate::kernel::sync::maybe_preempt_disable();
 
         let lock = self.l.lock();
 
-        Self::Guard {
+        SpinGuard {
             g: Some(lock),
             irq: false,
             notify,
@@ -62,8 +51,50 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
         }
     }
 
+    pub fn lock_no_notify(&'a self) -> SpinGuard<'a, T> {
+        self.do_lock(false)
+    }
+
+    pub fn do_try_lock(&'a self, with_notify: bool) -> Option<SpinGuard<'a, T>> {
+        let notify = with_notify && crate::kernel::sync::maybe_preempt_disable();
+
+        let lock = match self.l.try_lock() {
+            Some(l) => Some(l),
+            None => {
+                if notify {
+                    crate::kernel::sched::preempt_enable();
+                }
+
+                None
+            }
+        };
+
+        if let Some(g) = lock {
+            Some(SpinGuard {
+                g: Some(g),
+                irq: false,
+                notify,
+                debug: 0,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn try_lock_no_notify(&'a self) -> Option<SpinGuard<'a, T>> {
+        self.do_try_lock(false)
+    }
+}
+
+impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
+    type Guard = SpinGuard<'a, T>;
+
+    fn lock(&'a self) -> Self::Guard {
+        self.do_lock(true)
+    }
+
     fn lock_debug(&'a self, id: usize) -> Self::Guard {
-        let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
+        let notify = crate::kernel::sync::maybe_preempt_disable();
 
         dbgln!(lock, "l: - {}", id);
         let lock = self.l.lock();
@@ -78,29 +109,7 @@ impl<'a, T: ?Sized + 'a> LockApi<'a, T> for Spin<T> {
     }
 
     fn try_lock(&'a self) -> Option<Self::Guard> {
-        let notify = self.notify && crate::kernel::sync::maybe_preempt_disable();
-
-        let lock = match self.l.try_lock() {
-            Some(l) => Some(l),
-            None => {
-                if notify {
-                    crate::kernel::sched::preempt_enable();
-                }
-
-                None
-            }
-        };
-
-        if let Some(g) = lock {
-            Some(Self::Guard {
-                g: Some(g),
-                irq: false,
-                notify,
-                debug: 0,
-            })
-        } else {
-            None
-        }
+        self.do_try_lock(true)
     }
 
     fn lock_irq(&'a self) -> Self::Guard {

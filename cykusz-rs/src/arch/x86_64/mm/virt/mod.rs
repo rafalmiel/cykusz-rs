@@ -1,7 +1,7 @@
 use crate::arch::raw::ctrlregs;
 use crate::arch::raw::mm;
-use crate::kernel::mm::virt;
 use crate::kernel::mm::PAGE_SIZE;
+use crate::kernel::mm::virt;
 use crate::kernel::mm::{PhysAddr, VirtAddr};
 
 use self::table::*;
@@ -79,9 +79,11 @@ pub fn to_phys(addr: VirtAddr) -> Option<PhysAddr> {
     current_p4_table().to_phys(addr)
 }
 
-pub unsafe fn activate_table(table: &P4Table) { unsafe {
-    ctrlregs::cr3_write(table.phys_addr().0 as u64);
-}}
+pub unsafe fn activate_table(table: &P4Table) {
+    unsafe {
+        ctrlregs::cr3_write(table.phys_addr().0 as u64);
+    }
+}
 
 fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
     let table = P4Table::new();

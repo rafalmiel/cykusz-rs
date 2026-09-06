@@ -7,8 +7,8 @@ use core::ops::IndexMut;
 use bit_field::BitField;
 use spin::Once;
 
-use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
 use crate::kernel::fs::ext2::Ext2Filesystem;
+use crate::kernel::fs::ext2::disk::blockgroup::BlockGroupDescriptor;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 use crate::kernel::utils::slice::{ToBytes, ToBytesMut};
@@ -349,11 +349,14 @@ impl BlockGroupDescriptors {
     }
 
     pub fn sync_d_inode(&self, id: usize) {
-        match self.try_get_d_inode(id) { Some(ind) => {
-            ind.sync();
-        } _ => {
-            self.fs().sync_block(self.get_inode_block(id));
-        }}
+        match self.try_get_d_inode(id) {
+            Some(ind) => {
+                ind.sync();
+            }
+            _ => {
+                self.fs().sync_block(self.get_inode_block(id));
+            }
+        }
     }
 
     pub fn debug(&self) {

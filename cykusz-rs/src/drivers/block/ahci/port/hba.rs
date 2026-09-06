@@ -1,7 +1,7 @@
 use crate::arch::mm::virt::map_to_flags;
 use crate::drivers::block::ahci::reg::*;
-use crate::drivers::block::ata::request::DmaBuf;
 use crate::drivers::block::ata::AtaCommand;
+use crate::drivers::block::ata::request::DmaBuf;
 use crate::kernel::mm::allocate_order;
 use crate::kernel::mm::virt::PageFlags;
 use tock_registers::interfaces::Readable;

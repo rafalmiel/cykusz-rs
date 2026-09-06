@@ -2,7 +2,7 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::fs::{LookupMode, lookup_by_path};
 use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::net::socket::SocketService;
 use crate::kernel::sync::{LockApi, Mutex};
@@ -86,11 +86,12 @@ impl Socket {
     }
 
     fn target(&self) -> Arc<Socket> {
-        match &*self.data.lock() { SocketState::Connected(s) => {
-            s.clone()
-        } _ => {
-            panic!("socket not connected")
-        }}
+        match &*self.data.lock() {
+            SocketState::Connected(s) => s.clone(),
+            _ => {
+                panic!("socket not connected")
+            }
+        }
     }
 
     fn self_ref(&self) -> Arc<Socket> {
@@ -287,11 +288,12 @@ impl SocketService for Socket {
             .get(&dir.inode().inode_arc())
             .ok_or(SyscallError::EADDRNOTAVAIL)?;
 
-        match &mut *target.data.lock() { SocketState::Listening(queue) => {
-            queue.queue.push(self.self_ref().clone())
-        } _ => {
-            return Err(SyscallError::ECONNREFUSED);
-        }}
+        match &mut *target.data.lock() {
+            SocketState::Listening(queue) => queue.queue.push(self.self_ref().clone()),
+            _ => {
+                return Err(SyscallError::ECONNREFUSED);
+            }
+        }
 
         target.wq.notify_all();
 
@@ -375,11 +377,12 @@ impl INode for Socket {
         buf: &[u8],
         flags: OpenFlags,
     ) -> crate::kernel::fs::vfs::Result<usize> {
-        let target = match &*self.data.lock() { SocketState::Connected(target) => {
-            target.clone()
-        } _ => {
-            return Err(FsError::NotSupported);
-        }};
+        let target = match &*self.data.lock() {
+            SocketState::Connected(target) => target.clone(),
+            _ => {
+                return Err(FsError::NotSupported);
+            }
+        };
 
         dbgln!(unix, "Writing {} data", buf.len());
 
@@ -395,11 +398,12 @@ impl INode for Socket {
     ) -> crate::kernel::fs::vfs::Result<PollEventFlags> {
         let mut res_flags = PollEventFlags::empty();
         let target = if flags.contains(PollEventFlags::WRITE) {
-            match &*self.data.lock() { SocketState::Connected(target) => {
-                Some(target.clone())
-            } _ => {
-                return Err(FsError::NotSupported);
-            }}
+            match &*self.data.lock() {
+                SocketState::Connected(target) => Some(target.clone()),
+                _ => {
+                    return Err(FsError::NotSupported);
+                }
+            }
         } else {
             None
         };

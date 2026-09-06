@@ -138,7 +138,9 @@ extern "C" fn AcpiOsVprintf(Format: *const i8, mut Args: core::ffi::VaList) {
                 }
                 'c' => {
                     // (uncheckable) SAFE: Could over-read from stack, returning junk
-                    let _ = write!(&mut out, "{}", unsafe { Args.next_arg::<u32>() as u8 as char });
+                    let _ = write!(&mut out, "{}", unsafe {
+                        Args.next_arg::<u32>() as u8 as char
+                    });
                 }
                 's' => {
                     // SAFE: Does as much validation as possible, if ACPICA misbehaves... well, we're in trouble

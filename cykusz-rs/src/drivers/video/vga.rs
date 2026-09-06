@@ -5,7 +5,7 @@ use bit_field::BitField;
 use crate::arch::mm::PhysAddr;
 use crate::arch::output::{Character, VideoDriver};
 use crate::arch::raw::cpuio::Port;
-use crate::drivers::tty::color::{ColorCode as AnsiColorCode, Ansi16};
+use crate::drivers::tty::color::{Ansi16, ColorCode as AnsiColorCode};
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::sync::{LockApi, Spin};
 
@@ -34,25 +34,24 @@ pub struct ColorCode(u8);
 
 const fn map_to_vga(color: Ansi16) -> u8 {
     match color.color() {
-        AnsiColorCode::Black => { 0 }
-        AnsiColorCode::Red => { 4 }
-        AnsiColorCode::Green => { 2 }
-        AnsiColorCode::Yellow => { 6 }
-        AnsiColorCode::Blue => { 1 }
-        AnsiColorCode::Magenta => { 5 }
-        AnsiColorCode::Cyan => { 3 }
-        AnsiColorCode::White => { 7 }
-        AnsiColorCode::LightBlack => { 8 }
-        AnsiColorCode::LightRed => { 12 }
-        AnsiColorCode::LightGreen => { 10 }
-        AnsiColorCode::LightYellow => { 14 }
-        AnsiColorCode::LightBlue => { 9 }
-        AnsiColorCode::LightMagenta => { 13 }
-        AnsiColorCode::LightCyan => { 11 }
-        AnsiColorCode::LightWhite => { 15 }
+        AnsiColorCode::Black => 0,
+        AnsiColorCode::Red => 4,
+        AnsiColorCode::Green => 2,
+        AnsiColorCode::Yellow => 6,
+        AnsiColorCode::Blue => 1,
+        AnsiColorCode::Magenta => 5,
+        AnsiColorCode::Cyan => 3,
+        AnsiColorCode::White => 7,
+        AnsiColorCode::LightBlack => 8,
+        AnsiColorCode::LightRed => 12,
+        AnsiColorCode::LightGreen => 10,
+        AnsiColorCode::LightYellow => 14,
+        AnsiColorCode::LightBlue => 9,
+        AnsiColorCode::LightMagenta => 13,
+        AnsiColorCode::LightCyan => 11,
+        AnsiColorCode::LightWhite => 15,
     }
 }
-
 
 impl ColorCode {
     pub const fn new(foreground: Ansi16, background: Ansi16) -> ColorCode {
@@ -77,7 +76,7 @@ impl From<Character> for ScreenChar {
     fn from(value: Character) -> Self {
         ScreenChar {
             char: value.character(),
-            color: ColorCode::new(value.foreground().into(), value.background().into())
+            color: ColorCode::new(value.foreground().into(), value.background().into()),
         }
     }
 }
@@ -229,17 +228,18 @@ impl VideoDriver for Writer {
         let len = core::cmp::min(BUFFER_HEIGHT * BUFFER_WIDTH - offset, buf.len());
 
         let mut state = self.state.lock();
-        let chars = unsafe {
-            &mut state.buffer.as_mut().chars
-        };
+        let chars = unsafe { &mut state.buffer.as_mut().chars };
         for (buf_i, dest_i) in (offset..offset + len).enumerate() {
             chars[dest_i] = buf[buf_i].into();
         }
     }
 }
 
-static VGA: Writer = Writer::new(Ansi16::new(AnsiColorCode::LightGreen),
-                                 Ansi16::new(AnsiColorCode::Black), VGA_BUFFER);
+static VGA: Writer = Writer::new(
+    Ansi16::new(AnsiColorCode::LightGreen),
+    Ansi16::new(AnsiColorCode::Black),
+    VGA_BUFFER,
+);
 
 // References:
 // - http://www.osdever.net/FreeVGA/vga/attrreg.htm#10

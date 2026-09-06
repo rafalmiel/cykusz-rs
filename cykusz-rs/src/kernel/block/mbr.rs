@@ -2,8 +2,8 @@
 
 use bit_field::BitField;
 
-use crate::kernel::mm::heap::{allocate_align, deallocate_align};
 use crate::kernel::mm::VirtAddr;
+use crate::kernel::mm::heap::{allocate_align, deallocate_align};
 
 pub struct Mbr {
     data: VirtAddr,

@@ -1,6 +1,6 @@
 use crate::arch::mm::VirtAddr;
-use crate::drivers::elf::types::AuxvType;
 use crate::drivers::elf::ElfHeader;
+use crate::drivers::elf::types::AuxvType;
 use crate::kernel::utils::slice::ToBytes;
 use crate::kernel::utils::types::Align;
 
@@ -21,55 +21,67 @@ impl<'a> StackHelper<'a> {
         *self.ptr -= by;
     }
 
-    pub unsafe fn write<T: Sized>(&mut self, val: T) { unsafe {
-        self.skip_by(core::mem::size_of::<T>() as u64);
+    pub unsafe fn write<T: Sized>(&mut self, val: T) {
+        unsafe {
+            self.skip_by(core::mem::size_of::<T>() as u64);
 
-        (*self.ptr as *mut T).write(val);
-    }}
+            (*self.ptr as *mut T).write(val);
+        }
+    }
 
     pub fn align_down(&mut self) {
         *self.ptr = (*self.ptr).align_down(16);
     }
 
-    pub unsafe fn write_bytes(&mut self, bytes: &[u8]) { unsafe {
-        self.skip_by(bytes.len() as u64);
+    pub unsafe fn write_bytes(&mut self, bytes: &[u8]) {
+        unsafe {
+            self.skip_by(bytes.len() as u64);
 
-        (*self.ptr as *mut u8).copy_from(bytes.as_ptr(), bytes.len());
-    }}
+            (*self.ptr as *mut u8).copy_from(bytes.as_ptr(), bytes.len());
+        }
+    }
 
-    pub unsafe fn write_slice<T: Sized>(&mut self, slice: &[T]) { unsafe {
-        self.write_bytes(slice.to_bytes());
-    }}
+    pub unsafe fn write_slice<T: Sized>(&mut self, slice: &[T]) {
+        unsafe {
+            self.write_bytes(slice.to_bytes());
+        }
+    }
 
-    pub unsafe fn next<T: Sized>(&mut self) -> &mut T { unsafe {
-        self.skip_by(core::mem::size_of::<T>() as u64);
+    pub unsafe fn next<T: Sized>(&mut self) -> &mut T {
+        unsafe {
+            self.skip_by(core::mem::size_of::<T>() as u64);
 
-        &mut *(*self.ptr as *mut T)
-    }}
+            &mut *(*self.ptr as *mut T)
+        }
+    }
 
     pub fn restore_by(&mut self, by: u64) {
         *self.ptr += by;
     }
 
-    pub unsafe fn restore<'b, T: Sized>(&mut self) -> &'b mut T { unsafe {
-        let v = &mut *(*self.ptr as *mut T);
+    pub unsafe fn restore<'b, T: Sized>(&mut self) -> &'b mut T {
+        unsafe {
+            let v = &mut *(*self.ptr as *mut T);
 
-        self.restore_by(core::mem::size_of::<T>() as u64);
+            self.restore_by(core::mem::size_of::<T>() as u64);
 
-        v
-    }}
+            v
+        }
+    }
 
-    pub unsafe fn write_aux(&mut self, hdr: &ElfHeader, base_addr: VirtAddr, path_ptr: u64) { unsafe {
-        let hdr: [(AuxvType, usize); 5] = [
-            (AuxvType::AtPhdr, hdr.e_phoff as usize + base_addr.0),
-            (AuxvType::AtPhEnt, hdr.e_phentsize as usize),
-            (AuxvType::AtPhNum, hdr.e_phnum as usize),
-            (AuxvType::AtEntry, hdr.e_entry as usize),
-            (AuxvType::AtExecFn, path_ptr as usize),
-        ];
+    pub unsafe fn write_aux(&mut self, hdr: &ElfHeader, base_addr: VirtAddr, path_ptr: u64) {
+        unsafe {
+            let hdr: [(AuxvType, usize); 5] = [
+                (AuxvType::AtPhdr, hdr.e_phoff as usize + base_addr.0),
+                (AuxvType::AtPhEnt, hdr.e_phentsize as usize),
+                (AuxvType::AtPhNum, hdr.e_phnum as usize),
+                (AuxvType::AtEntry, hdr.e_entry as usize),
+                (AuxvType::AtExecFn, path_ptr as usize),
+            ];
 
-        self.write(0usize); // Make it 16 bytes aligned
-        self.write(AuxvType::AtNull);
-        self.write(hdr);
-    }}
+            self.write(0usize); // Make it 16 bytes aligned
+            self.write(AuxvType::AtNull);
+            self.write(hdr);
+        }
+    }
 }

@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 use bit_field::BitField;
-use tock_registers::{register_bitfields, RegisterLongName};
+use tock_registers::{RegisterLongName, register_bitfields};
 // This is way too overengineered but who cares
 
 register_bitfields! [

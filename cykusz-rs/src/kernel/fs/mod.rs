@@ -9,7 +9,7 @@ use syscall_defs::stat::Mode;
 use syscall_defs::{FileType, OpenFlags};
 
 use crate::kernel::block::{get_blkdev_by_name, get_blkdev_by_uuid};
-use crate::kernel::device::{register_device_listener, Device, DeviceListener};
+use crate::kernel::device::{Device, DeviceListener, register_device_listener};
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::{Filesystem, FilesystemKind};
@@ -285,12 +285,15 @@ fn lookup_by_path_from(
         }
         //println!("is cur mountpoint? {}", cur.is_mountpoint());
         if cur.is_mountpoint() {
-            match mount::find_mount(&cur) { Ok(mp) => {
-                cur = mp.root_entry();
-            //println!("is mountpoint");
-            } _ => {
-                panic!("No mountpoint?");
-            }}
+            match mount::find_mount(&cur) {
+                Ok(mp) => {
+                    cur = mp.root_entry();
+                    //println!("is mountpoint");
+                }
+                _ => {
+                    panic!("No mountpoint?");
+                }
+            }
         }
     }
 
@@ -307,12 +310,15 @@ pub fn lookup_by_path_at(
         Some(dir)
     } else {
         root_dentry().cloned()
-    } { Some(cur) => {
-        //dbgln!(getdir, "lookup {}", path.str());
-        lookup_by_path_from(path, lookup_mode, cur, get_symlink_entry, 0)
-    } _ => {
-        return Err(FsError::NotSupported);
-    }}
+    } {
+        Some(cur) => {
+            //dbgln!(getdir, "lookup {}", path.str());
+            lookup_by_path_from(path, lookup_mode, cur, get_symlink_entry, 0)
+        }
+        _ => {
+            return Err(FsError::NotSupported);
+        }
+    }
 }
 
 pub fn lookup_by_path(path: &Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
@@ -320,11 +326,12 @@ pub fn lookup_by_path(path: &Path, lookup_mode: LookupMode) -> Result<DirEntryIt
         current_task().get_dent()
     } else {
         root_dentry().cloned()
-    } { Some(cur) => {
-        lookup_by_path_from(path, lookup_mode, cur, false, 0)
-    } _ => {
-        return Err(FsError::NotSupported);
-    }}
+    } {
+        Some(cur) => lookup_by_path_from(path, lookup_mode, cur, false, 0),
+        _ => {
+            return Err(FsError::NotSupported);
+        }
+    }
 }
 
 pub fn lookup_by_real_path(path: &Path, lookup_mode: LookupMode) -> Result<DirEntryItem> {
@@ -332,9 +339,10 @@ pub fn lookup_by_real_path(path: &Path, lookup_mode: LookupMode) -> Result<DirEn
         current_task().get_dent()
     } else {
         root_dentry().cloned()
-    } { Some(cur) => {
-        lookup_by_path_from(path, lookup_mode, cur, true, 0)
-    } _ => {
-        return Err(FsError::NotSupported);
-    }}
+    } {
+        Some(cur) => lookup_by_path_from(path, lookup_mode, cur, true, 0),
+        _ => {
+            return Err(FsError::NotSupported);
+        }
+    }
 }

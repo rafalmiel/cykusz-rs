@@ -12,7 +12,7 @@ pub use debug_disabled as debug;
 use core::fmt::Error;
 
 use crate::drivers::multiboot2::framebuffer_info::FramebufferInfo;
-use crate::drivers::tty::color::{ColorCode, RGB, Ansi16};
+use crate::drivers::tty::color::{Ansi16, ColorCode, RGB};
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 
 #[derive(Copy, Clone, Debug)]
@@ -58,7 +58,9 @@ impl CharacterColor {
 impl Character {
     pub fn new(char: u8, color: CharacterColor) -> Character {
         Character {
-            char, character_color: color, _pad: 0
+            char,
+            character_color: color,
+            _pad: 0,
         }
     }
 

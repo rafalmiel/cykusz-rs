@@ -6,10 +6,10 @@ use regs::*;
 
 use crate::arch::idt::add_shared_irq_handler;
 use crate::arch::int::{set_active_high, set_irq_dest};
-use crate::drivers::block::ata::request::{DmaBuf, DmaRequest};
 use crate::drivers::block::ata::AtaCommand;
+use crate::drivers::block::ata::request::{DmaBuf, DmaRequest};
 use crate::drivers::block::ide::ata_handler;
-use crate::kernel::mm::{allocate_order, PhysAddr};
+use crate::kernel::mm::{PhysAddr, allocate_order};
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::busy_sleep;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};

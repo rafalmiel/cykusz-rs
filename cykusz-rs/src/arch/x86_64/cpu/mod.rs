@@ -11,7 +11,7 @@ pub fn has_x2apic() -> bool {
 }
 
 fn enable_nxe_bit() {
-    use crate::arch::raw::msr::{rdmsr, wrmsr, IA32_EFER};
+    use crate::arch::raw::msr::{IA32_EFER, rdmsr, wrmsr};
 
     let nxe_bit = 1 << 11;
     unsafe {
@@ -21,7 +21,7 @@ fn enable_nxe_bit() {
 }
 
 fn enable_write_protect_bit() {
-    use crate::arch::raw::ctrlregs::{cr0, cr0_write, Cr0};
+    use crate::arch::raw::ctrlregs::{Cr0, cr0, cr0_write};
 
     unsafe { cr0_write(cr0() | Cr0::CR0_WRITE_PROTECT) };
 }

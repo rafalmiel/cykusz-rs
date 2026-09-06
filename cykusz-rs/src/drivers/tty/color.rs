@@ -33,9 +33,7 @@ impl From<u8> for ColorCode {
             panic!("Invalid usize to ColorCode conversion, value: {}", value)
         }
 
-        unsafe {
-            core::mem::transmute(value as u8)
-        }
+        unsafe { core::mem::transmute(value as u8) }
     }
 }
 
@@ -57,7 +55,7 @@ fn find_closest(rgb: &RGB, palette: &[RGB]) -> usize {
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct Ansi16 {
-    c: ColorCode
+    c: ColorCode,
 }
 
 impl From<Ansi256> for Ansi16 {
@@ -69,16 +67,14 @@ impl From<Ansi256> for Ansi16 {
 impl From<RGB> for Ansi16 {
     fn from(value: RGB) -> Self {
         Ansi16 {
-            c: find_closest(&value, &palette()[0..16]).into()
+            c: find_closest(&value, &palette()[0..16]).into(),
         }
     }
 }
 
 impl Ansi16 {
     pub const fn new(c: ColorCode) -> Ansi16 {
-        Ansi16 {
-            c
-        }
+        Ansi16 { c }
     }
 
     pub const fn color(&self) -> ColorCode {
@@ -95,7 +91,7 @@ pub struct Ansi256 {
 impl From<Ansi16> for Ansi256 {
     fn from(value: Ansi16) -> Self {
         Ansi256 {
-            c: value.color() as u8
+            c: value.color() as u8,
         }
     }
 }
@@ -103,7 +99,7 @@ impl From<Ansi16> for Ansi256 {
 impl From<RGB> for Ansi256 {
     fn from(value: RGB) -> Self {
         Ansi256 {
-            c: find_closest(&value, palette()) as u8
+            c: find_closest(&value, palette()) as u8,
         }
     }
 }
@@ -144,14 +140,12 @@ impl From<Ansi256> for RGB {
 
 impl RGB {
     pub const fn new(r: u8, g: u8, b: u8) -> RGB {
-        RGB {
-            colors: [r, g, b]
-        }
+        RGB { colors: [r, g, b] }
     }
 
     pub const fn from_slice(colors: &[u8]) -> RGB {
         RGB {
-            colors: [colors[0], colors[1], colors[2]]
+            colors: [colors[0], colors[1], colors[2]],
         }
     }
 

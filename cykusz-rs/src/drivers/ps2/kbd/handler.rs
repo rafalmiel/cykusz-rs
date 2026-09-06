@@ -3,14 +3,14 @@ use alloc::sync::{Arc, Weak};
 
 use spin::Once;
 
+use syscall_defs::OpenFlags;
 use syscall_defs::events::{Event, EventType};
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::time::Timeval;
-use syscall_defs::OpenFlags;
 
-use crate::drivers::ps2::{controller, Error};
-use crate::kernel::device::dev_t::DevId;
+use crate::drivers::ps2::{Error, controller};
 use crate::kernel::device::Device;
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs::FsError;

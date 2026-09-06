@@ -4,16 +4,15 @@ use core::fmt::Debug;
 use core::fmt::{Error, Formatter};
 
 use input::*;
+use syscall_defs::OpenFlags;
 use syscall_defs::events::keys::KeyCode;
 use syscall_defs::ioctl::tty;
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::signal::{SIGHUP, SIGINT, SIGQUIT, SIGTSTP};
-use syscall_defs::OpenFlags;
 
-use crate::arch::output::{video, ConsoleWriter};
-use color::ColorCode;
-use crate::kernel::device::dev_t::DevId;
+use crate::arch::output::{ConsoleWriter, video};
 use crate::kernel::device::Device;
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::fs::vfs;
@@ -21,19 +20,20 @@ use crate::kernel::fs::vfs::FsError;
 use crate::kernel::kbd::KeyListener;
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
-use crate::kernel::session::{sessions, Group};
+use crate::kernel::session::{Group, sessions};
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 use crate::kernel::task::ArcTask;
 use crate::kernel::tty::TerminalDevice;
 use crate::kernel::utils::types::Prefault;
 use crate::kernel::utils::wait_queue::{WaitQueue, WaitQueueFlags};
+use color::ColorCode;
 
 use self::output::OutputBuffer;
 
+pub mod color;
 mod input;
 mod keymap;
 mod output;
-pub mod color;
 pub mod palette;
 
 const BACKLOG_SIZE: usize = 0;
@@ -616,13 +616,16 @@ impl INode for Tty {
 
                 if let Some(ctrl) = self.ctrl_task.lock_irq().as_ref() {
                     if ctrl.sid() == task.sid() {
-                        match sessions().get_group(task.sid(), gid as usize) { Some(group) => {
-                            self.set_fg_group(group);
+                        match sessions().get_group(task.sid(), gid as usize) {
+                            Some(group) => {
+                                self.set_fg_group(group);
 
-                            return Ok(0);
-                        } _ => {
-                            logln2!("group {} not found", gid);
-                        }}
+                                return Ok(0);
+                            }
+                            _ => {
+                                logln2!("group {} not found", gid);
+                            }
+                        }
                     } else {
                         logln2!("diff sid {} {}", ctrl.sid(), task.sid());
                     }

@@ -120,22 +120,25 @@ fn check_timers() {
         .unwrap();
 
     loop {
-        match timers.pop_front() { Some(timer) => {
-            if timer.timeout() <= time {
-                let t = timer.self_ref.upgrade().unwrap();
+        match timers.pop_front() {
+            Some(timer) => {
+                if timer.timeout() <= time {
+                    let t = timer.self_ref.upgrade().unwrap();
 
-                drop(timers);
+                    drop(timers);
 
-                t.call();
+                    t.call();
 
-                timers = TIMERS.lock();
-            } else {
-                timers.push_front(timer);
+                    timers = TIMERS.lock();
+                } else {
+                    timers.push_front(timer);
+                    break;
+                }
+            }
+            _ => {
                 break;
             }
-        } _ => {
-            break;
-        }}
+        }
     }
 }
 

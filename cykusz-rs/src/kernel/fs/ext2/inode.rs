@@ -13,10 +13,10 @@ use crate::arch::mm::PAGE_SIZE;
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::cache::Cacheable;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
+use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::ext2::dirent::{DirEntIter, SysDirEntIter};
 use crate::kernel::fs::ext2::disk;
 use crate::kernel::fs::ext2::idata::INodeData;
-use crate::kernel::fs::ext2::Ext2Filesystem;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::inode::INode;
@@ -47,10 +47,9 @@ impl LockedExt2INode {
 
         let fsg: Weak<dyn Filesystem> = fs.clone();
 
-        match cache.get(INodeItemStruct::make_key(&fsg, id)) { Some(e) => {
-            e
-        } _ => {
-            cache.make_item(INodeItemStruct::from(Arc::new_cyclic(|me| {
+        match cache.get(INodeItemStruct::make_key(&fsg, id)) {
+            Some(e) => e,
+            _ => cache.make_item(INodeItemStruct::from(Arc::new_cyclic(|me| {
                 LockedExt2INode {
                     node: RwMutex::new(Ext2INode::new(fs.clone(), id)),
                     fs,
@@ -60,8 +59,8 @@ impl LockedExt2INode {
                     )),
                     device_lock: Mutex::new(()),
                 }
-            })))
-        }}
+            }))),
+        }
     }
 
     pub fn mk_dirent(&self, parent: DirEntryItem, de: &disk::dirent::DirEntry) -> DirEntryItem {
@@ -698,11 +697,10 @@ impl INode for LockedExt2INode {
             } else {
                 None
             }
-        }) { Some(e) => {
-            Ok(e)
-        } _ => {
-            Err(FsError::EntryNotFound)
-        }}
+        }) {
+            Some(e) => Ok(e),
+            _ => Err(FsError::EntryNotFound),
+        }
     }
 
     fn mkdir(&self, name: &str) -> Result<INodeItem> {
@@ -761,13 +759,10 @@ impl INode for LockedExt2INode {
             return Err(FsError::NotSupported);
         }
 
-        if let Some(parent) =
-            match DirEntIter::new(self.self_ref()).find(|e| e.name() == "..") { Some(e) => {
-                Some(self.ext2_fs().get_inode(e.inode() as usize))
-            } _ => {
-                None
-            }}
-        {
+        if let Some(parent) = match DirEntIter::new(self.self_ref()).find(|e| e.name() == "..") {
+            Some(e) => Some(self.ext2_fs().get_inode(e.inode() as usize)),
+            _ => None,
+        } {
             let mut iter = DirEntIter::new(self.self_ref());
 
             iter.remove_dir_entry(".")?;
@@ -1016,21 +1011,24 @@ impl INode for LockedExt2INode {
             return Err(FsError::EntryExists);
         }
 
-        match old.parent() { Some(old_parent) => {
-            if old_parent.inode().ftype()? != FileType::Dir {
-                return Err(FsError::NotDir);
+        match old.parent() {
+            Some(old_parent) => {
+                if old_parent.inode().ftype()? != FileType::Dir {
+                    return Err(FsError::NotDir);
+                }
+
+                let mut iter = DirEntIter::new_no_skip(self.self_ref());
+
+                iter.add_dir_entry(old.inode().as_ext2_inode(), new_name)?;
+
+                iter = DirEntIter::new_no_skip(old_parent.inode().as_ext2_inode_arc());
+
+                iter.remove_dir_entry(old.name().as_str())?;
             }
-
-            let mut iter = DirEntIter::new_no_skip(self.self_ref());
-
-            iter.add_dir_entry(old.inode().as_ext2_inode(), new_name)?;
-
-            iter = DirEntIter::new_no_skip(old_parent.inode().as_ext2_inode_arc());
-
-            iter.remove_dir_entry(old.name().as_str())?;
-        } _ => {
-            return Err(FsError::NotSupported);
-        }}
+            _ => {
+                return Err(FsError::NotSupported);
+            }
+        }
 
         Ok(())
     }
@@ -1142,11 +1140,7 @@ impl INode for LockedExt2INode {
 
         let id = self.node.read().d_inode().get_rdevid();
 
-        if id != 0 {
-            Some(id)
-        } else {
-            None
-        }
+        if id != 0 { Some(id) } else { None }
     }
 
     fn sync(&self) -> Result<()> {

@@ -5,7 +5,7 @@ use alloc::sync::Arc;
 use spin::Once;
 
 use crate::drivers::block::ide::drive::IdeDevice;
-use crate::drivers::pci::{register_pci_device, PciDeviceHandle, PciHeader};
+use crate::drivers::pci::{PciDeviceHandle, PciHeader, register_pci_device};
 use crate::kernel::sync::{LockApi, Spin};
 
 mod channel;

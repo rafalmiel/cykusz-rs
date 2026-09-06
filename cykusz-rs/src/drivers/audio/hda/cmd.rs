@@ -2,7 +2,7 @@
 
 use super::reg::verb;
 use crate::arch::mm::{PhysAddr, VirtAddr};
-use crate::drivers::audio::hda::{reg, Address};
+use crate::drivers::audio::hda::{Address, reg};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{allocate_order, map_to_flags};
 use bit_field::BitField;

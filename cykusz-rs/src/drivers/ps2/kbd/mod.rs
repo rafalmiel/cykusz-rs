@@ -1,6 +1,6 @@
 use crate::arch::int;
 use crate::drivers::ps2::PS;
-use crate::drivers::ps2::{controller, Command, Error};
+use crate::drivers::ps2::{Command, Error, controller};
 
 pub mod handler;
 mod scancode;

@@ -4,12 +4,12 @@ use core::mem::size_of;
 
 pub use cache::get as cache_get;
 pub use cache::insert as cache_insert;
-use syscall_defs::net::{NetU16, NetU8};
+use syscall_defs::net::{NetU8, NetU16};
 
 use crate::kernel::net::eth::{Eth, EthType};
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::{
-    default_driver, ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy,
+    ConstPacketKind, Packet, PacketDownHierarchy, PacketHeader, PacketUpHierarchy, default_driver,
 };
 
 pub mod cache;

@@ -78,14 +78,15 @@ impl FutexContainer {
 
     pub fn wake(&self, addr: VirtAddr) -> SyscallResult {
         if let Some(phys) = addr.to_phys_pagewalk() {
-            match self.get(phys) { Some(futex) => {
-                if futex.wq.notify_all() {
-                    crate::kernel::sched::reschedule();
+            match self.get(phys) {
+                Some(futex) => {
+                    if futex.wq.notify_all() {
+                        crate::kernel::sched::reschedule();
+                    }
+                    Ok(0)
                 }
-                Ok(0)
-            } _ => {
-                Ok(0)
-            }}
+                _ => Ok(0),
+            }
         } else {
             Err(SyscallError::EINVAL)
         }

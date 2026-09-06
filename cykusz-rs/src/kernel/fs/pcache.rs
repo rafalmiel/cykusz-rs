@@ -4,11 +4,11 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::arch::raw::mm::UserAddr;
 use crate::kernel::device::dev_t::DevId;
-use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, CacheItemAdapter, Cacheable, WeakWrap};
 use crate::kernel::fs::FsDevice;
+use crate::kernel::fs::cache::{ArcWrap, Cache, CacheItem, CacheItemAdapter, Cacheable, WeakWrap};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{
-    allocate_order, get_flags, map_flags, map_to_flags, unmap, PhysAddr, PAGE_SIZE,
+    PAGE_SIZE, PhysAddr, allocate_order, get_flags, map_flags, map_to_flags, unmap,
 };
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, MutexGuard, Spin};
@@ -29,7 +29,11 @@ impl Cacheable<PageCacheKey> for PageCacheItemStruct {
                 cached.sync_page(me);
             }
         }
-        self.page.to_phys_page().unwrap().unlink_page_cache();
+        {
+            let mut meta = self.page.to_phys_page().unwrap().lock_pt();
+            meta.as_cache_meta().unlink_page_cache();
+        }
+
         unmap(self.page.to_virt());
     }
 }
@@ -212,7 +216,8 @@ impl PageCacheItemArc {
     fn link_with_page(&self) {
         let page = self.page.to_phys_page().unwrap();
 
-        page.link_page_cache(self);
+        let mut meta = page.lock_pt();
+        meta.as_cache_meta().link_page_cache(self);
     }
 }
 
@@ -327,20 +332,23 @@ pub trait CachedAccess: RawAccess {
             if current_task_ref().locks() > 0 {
                 logln!("read_cached: locks > 0");
             }
-            match self.get_mmap_page(offset, true) { Some(MMapPageStruct(MMapPage::Cached(page))) => {
-                use core::cmp::min;
+            match self.get_mmap_page(offset, true) {
+                Some(MMapPageStruct(MMapPage::Cached(page))) => {
+                    use core::cmp::min;
 
-                let page_offset = offset % PAGE_SIZE;
-                let to_copy = min(PAGE_SIZE - page_offset, dest.len() - dest_offset);
+                    let page_offset = offset % PAGE_SIZE;
+                    let to_copy = min(PAGE_SIZE - page_offset, dest.len() - dest_offset);
 
-                dest[dest_offset..dest_offset + to_copy]
-                    .copy_from_slice(&page.data()[page_offset..page_offset + to_copy]);
+                    dest[dest_offset..dest_offset + to_copy]
+                        .copy_from_slice(&page.data()[page_offset..page_offset + to_copy]);
 
-                dest_offset += to_copy;
-                offset = (offset + PAGE_SIZE).align(PAGE_SIZE);
-            } _ => {
-                break;
-            }}
+                    dest_offset += to_copy;
+                    offset = (offset + PAGE_SIZE).align(PAGE_SIZE);
+                }
+                _ => {
+                    break;
+                }
+            }
         }
 
         Some(dest_offset)
@@ -370,24 +378,27 @@ pub trait CachedAccess: RawAccess {
             if current_task_ref().locks() > 0 {
                 logln!("update_cached_synced: locks > 0");
             }
-            match self.get_mmap_page(offset, true) { Some(MMapPageStruct(MMapPage::Cached(page))) => {
-                use core::cmp::min;
+            match self.get_mmap_page(offset, true) {
+                Some(MMapPageStruct(MMapPage::Cached(page))) => {
+                    use core::cmp::min;
 
-                let page_offset = offset % PAGE_SIZE;
-                let to_copy = min(PAGE_SIZE - page_offset, buf.len() - copied);
+                    let page_offset = offset % PAGE_SIZE;
+                    let to_copy = min(PAGE_SIZE - page_offset, buf.len() - copied);
 
-                page.data_mut()[page_offset..page_offset + to_copy]
-                    .copy_from_slice(&buf[copied..copied + to_copy]);
+                    page.data_mut()[page_offset..page_offset + to_copy]
+                        .copy_from_slice(&buf[copied..copied + to_copy]);
 
-                copied += to_copy;
-                offset = (offset + PAGE_SIZE).align(PAGE_SIZE);
+                    copied += to_copy;
+                    offset = (offset + PAGE_SIZE).align(PAGE_SIZE);
 
-                if sync {
-                    page.sync_to_storage(&page);
+                    if sync {
+                        page.sync_to_storage(&page);
+                    }
                 }
-            } _ => {
-                break;
-            }}
+                _ => {
+                    break;
+                }
+            }
         }
 
         Some(copied)

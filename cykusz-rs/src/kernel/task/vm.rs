@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
-use alloc::collections::linked_list::CursorMut;
 use alloc::collections::LinkedList;
+use alloc::collections::linked_list::CursorMut;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::ops::Range;
@@ -9,18 +9,18 @@ use syscall_defs::{MMapFlags, MMapProt, OpenFlags, SyscallError, SyscallResult};
 
 use crate::arch::mm::{MMAP_USER_ADDR, PAGE_SIZE};
 use crate::arch::raw::mm::UserAddr;
-use crate::drivers::elf::types::{BinType, ProgramFlags, ProgramType};
 use crate::drivers::elf::ElfHeader;
+use crate::drivers::elf::types::{BinType, ProgramFlags, ProgramType};
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::pcache::{
     MMapPage, MMapPageStruct, MappedAccess, PageCacheItemArc, PageDirectItemStruct,
 };
-use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::fs::{LookupMode, lookup_by_path};
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{
-    allocate_order, map_flags, map_to_flags, unmap, update_flags, PhysAddr, VirtAddr, MAX_USER_ADDR,
+    MAX_USER_ADDR, PhysAddr, VirtAddr, allocate_order, map_flags, map_to_flags, unmap, update_flags,
 };
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, Mutex};
@@ -364,63 +364,65 @@ impl Mapping {
 
             let mappable = f.file.get_dir_item().inode().as_mappable().unwrap();
 
-            match mappable.get_mmap_page(offset, false)
-            { Some(MMapPageStruct(MMapPage::Cached(p))) => {
-                if !reason.contains(PageFaultReason::WRITE)
-                    && !reason.contains(PageFaultReason::PRESENT)
-                {
-                    if bytes == PAGE_SIZE {
-                        // Page is not present and we are reading from it, so map it readable
-                        f.active_mappings.insert(addr_aligned, p.clone());
+            match mappable.get_mmap_page(offset, false) {
+                Some(MMapPageStruct(MMapPage::Cached(p))) => {
+                    if !reason.contains(PageFaultReason::WRITE)
+                        && !reason.contains(PageFaultReason::PRESENT)
+                    {
+                        if bytes == PAGE_SIZE {
+                            // Page is not present and we are reading from it, so map it readable
+                            f.active_mappings.insert(addr_aligned, p.clone());
 
-                        dbgln!(vm, "map read {}", addr_aligned);
+                            dbgln!(vm, "map read {}", addr_aligned);
 
-                        let mut flags: PageFlags = PageFlags::USER | self.prot.into();
-                        flags.remove(PageFlags::WRITABLE);
+                            let mut flags: PageFlags = PageFlags::USER | self.prot.into();
+                            flags.remove(PageFlags::WRITABLE);
 
-                        map_to_flags(addr_aligned, p.page(), flags);
-                    } else {
-                        dbgln!(vm, "map read copy {} {}", addr_aligned, bytes);
+                            map_to_flags(addr_aligned, p.page(), flags);
+                        } else {
+                            dbgln!(vm, "map read copy {} {}", addr_aligned, bytes);
+
+                            Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
+
+                            f.active_mappings.remove(&addr_aligned);
+                        }
+                    } else if reason.contains(PageFaultReason::WRITE)
+                        && !reason.contains(PageFaultReason::PRESENT)
+                    {
+                        // We are writing to private file mapping so copy the content of the page.
+                        // Changes made to private mapping should not be persistent
+
+                        dbgln!(vm, "map copy {} {}", addr_aligned, bytes);
 
                         Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
 
                         f.active_mappings.remove(&addr_aligned);
+                    } else if reason.contains(PageFaultReason::PRESENT)
+                        && reason.contains(PageFaultReason::WRITE)
+                    {
+                        dbgln!(vm, "map: handle cow priv file");
+
+                        return if self.handle_cow(addr_aligned, true, PAGE_SIZE) {
+                            self.mmaped_file
+                                .as_mut()
+                                .expect("unreachable")
+                                .active_mappings
+                                .remove(&addr_aligned);
+
+                            true
+                        } else {
+                            false
+                        };
                     }
-                } else if reason.contains(PageFaultReason::WRITE)
-                    && !reason.contains(PageFaultReason::PRESENT)
-                {
-                    // We are writing to private file mapping so copy the content of the page.
-                    // Changes made to private mapping should not be persistent
 
-                    dbgln!(vm, "map copy {} {}", addr_aligned, bytes);
-
-                    Self::map_copy(addr_aligned, p.page().to_virt(), bytes, self.prot);
-
-                    f.active_mappings.remove(&addr_aligned);
-                } else if reason.contains(PageFaultReason::PRESENT)
-                    && reason.contains(PageFaultReason::WRITE)
-                {
-                    dbgln!(vm, "map: handle cow priv file");
-
-                    return if self.handle_cow(addr_aligned, true, PAGE_SIZE) {
-                        self.mmaped_file
-                            .as_mut()
-                            .expect("unreachable")
-                            .active_mappings
-                            .remove(&addr_aligned);
-
-                        true
-                    } else {
-                        false
-                    };
+                    true
                 }
-
-                true
-            } _ => {
-                //println!("failed to get mmap page");
-                //map_flags(addr.align_down(PAGE_SIZE), PageFlags::USER | self.prot.into());
-                false
-            }}
+                _ => {
+                    //println!("failed to get mmap page");
+                    //map_flags(addr.align_down(PAGE_SIZE), PageFlags::USER | self.prot.into());
+                    false
+                }
+            }
         } else {
             false
         }
@@ -431,7 +433,7 @@ impl Mapping {
             if let Some(phys_page) = phys.to_phys_page() {
                 // If there is more than one process mapping this page, make a private copy
                 // Otherwise, this page is not shared with anyone, so just make it writable
-                if phys_page.vm_use_count() > 1 || do_copy {
+                if do_copy || phys_page.lock_pt().as_cache_meta().vm_use_count() > 1 {
                     logln_disabled!("mmap cow: map_copy {}", bytes);
                     Self::map_copy(addr_aligned, addr_aligned, bytes, self.prot);
                 } else {

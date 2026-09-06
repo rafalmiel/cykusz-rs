@@ -64,12 +64,14 @@ macro_rules! platform_2_fini {
     };
 }
 
-unsafe fn run_range(start: VirtAddr, end: VirtAddr) { unsafe {
-    (start..end).step_by(8).for_each(|ptr| {
-        let f = ptr.read::<fn()>();
-        f();
-    });
-}}
+unsafe fn run_range(start: VirtAddr, end: VirtAddr) {
+    unsafe {
+        (start..end).step_by(8).for_each(|ptr| {
+            let f = ptr.read::<fn()>();
+            f();
+        });
+    }
+}
 
 pub fn init_all() {
     unsafe extern "C" {

@@ -46,49 +46,51 @@ fn call_pic1() {
 unsafe extern "C" fn get_irq_resource(
     Resource: *mut ACPI_RESOURCE,
     Context: *mut ::core::ffi::c_void,
-) -> ACPI_STATUS { unsafe {
-    let res = &*Resource;
-    let data = &*(Context as *mut ResData);
+) -> ACPI_STATUS {
+    unsafe {
+        let res = &*Resource;
+        let data = &*(Context as *mut ResData);
 
-    let tbl = &*data.tbl;
-    let bridge = &mut *data.bridge;
+        let tbl = &*data.tbl;
+        let bridge = &mut *data.bridge;
 
-    match res.Type as u32 {
-        ACPI_RESOURCE_TYPE_IRQ => {
-            //println!("I Count {}", res.Data.Irq.InterruptCount);
-            bridge.add_irq(
-                tbl.Address as u64 >> 16,
-                tbl.Pin as u8,
-                *res.Data
-                    .Irq
-                    .as_ref()
-                    .Interrupts
-                    .Interrupts
-                    .as_ref()
-                    .Interrupts
-                    .as_ptr()
-                    .offset(tbl.SourceIndex as u8 as isize) as u32,
-            );
+        match res.Type as u32 {
+            ACPI_RESOURCE_TYPE_IRQ => {
+                //println!("I Count {}", res.Data.Irq.InterruptCount);
+                bridge.add_irq(
+                    tbl.Address as u64 >> 16,
+                    tbl.Pin as u8,
+                    *res.Data
+                        .Irq
+                        .as_ref()
+                        .Interrupts
+                        .Interrupts
+                        .as_ref()
+                        .Interrupts
+                        .as_ptr()
+                        .offset(tbl.SourceIndex as u8 as isize) as u32,
+                );
+            }
+            ACPI_RESOURCE_TYPE_EXTENDED_IRQ => {
+                //println!("I Count {}", res.Data.ExtendedIrq.InterruptCount);
+                use core::mem::size_of;
+
+                // Hack to silence unaligned reference warning
+                let mut ptr = &res.Data.ExtendedIrq as *const _ as *const u8;
+                ptr = ptr.offset(
+                    size_of::<ACPI_RESOURCE_EXTENDED_IRQ>() as isize - size_of::<u32>() as isize,
+                );
+                let int = (ptr as *const u32)
+                    .offset(tbl.SourceIndex as u8 as isize)
+                    .read_unaligned();
+                bridge.add_irq(tbl.Address as u64 >> 16, tbl.Pin as u8, int);
+            }
+            _ => {}
         }
-        ACPI_RESOURCE_TYPE_EXTENDED_IRQ => {
-            //println!("I Count {}", res.Data.ExtendedIrq.InterruptCount);
-            use core::mem::size_of;
 
-            // Hack to silence unaligned reference warning
-            let mut ptr = &res.Data.ExtendedIrq as *const _ as *const u8;
-            ptr = ptr.offset(
-                size_of::<ACPI_RESOURCE_EXTENDED_IRQ>() as isize - size_of::<u32>() as isize,
-            );
-            let int = (ptr as *const u32)
-                .offset(tbl.SourceIndex as u8 as isize)
-                .read_unaligned();
-            bridge.add_irq(tbl.Address as u64 >> 16, tbl.Pin as u8, int);
-        }
-        _ => {}
+        AE_OK
     }
-
-    AE_OK
-}}
+}
 
 #[allow(non_snake_case)]
 #[allow(unused_variables)]
@@ -97,50 +99,57 @@ unsafe extern "C" fn add_pci_dev(
     NestingLevel: UINT32,
     Context: *mut ::core::ffi::c_void,
     ReturnValue: *mut *mut ::core::ffi::c_void,
-) -> ACPI_STATUS { unsafe {
-    let bridge = &mut *(Context as *mut PciBridge);
-    let mut parent: ACPI_HANDLE = null_mut();
+) -> ACPI_STATUS {
+    unsafe {
+        let bridge = &mut *(Context as *mut PciBridge);
+        let mut parent: ACPI_HANDLE = null_mut();
 
-    if Object == root_handle() || Object == bridge.acpi_handle {
+        if Object == root_handle() || Object == bridge.acpi_handle {
+            return AE_OK;
+        }
+
+        let mut new_bridge = PciBridge::new(Object);
+
+        assert_eq!(
+            AcpiGetParent(Object, &mut parent as *mut ACPI_HANDLE),
+            AE_OK
+        );
+
+        if parent != bridge.acpi_handle {
+            return AE_OK;
+        }
+
+        assert_eq!(
+            AcpiGetDevices(
+                null_mut(),
+                Some(add_pci_dev),
+                &mut new_bridge as *mut _ as *mut ::core::ffi::c_void,
+                null_mut()
+            ),
+            AE_OK
+        );
+
+        if new_bridge.init_irq_routing() {
+            let (dev, fun) = new_bridge.init_dev_fun();
+
+            let map = crate::drivers::pci::read(
+                0,
+                bridge.secondary as u16,
+                dev as u16,
+                fun as u16,
+                0x18,
+                32,
+            ) & 0xffff;
+
+            new_bridge.primary = (map & 0xff) as i8 as i32;
+            new_bridge.secondary = ((map >> 8) & 0xff) as i8 as i32;
+
+            bridge.add_child(dev, fun, new_bridge);
+        }
+
         return AE_OK;
     }
-
-    let mut new_bridge = PciBridge::new(Object);
-
-    assert_eq!(
-        AcpiGetParent(Object, &mut parent as *mut ACPI_HANDLE),
-        AE_OK
-    );
-
-    if parent != bridge.acpi_handle {
-        return AE_OK;
-    }
-
-    assert_eq!(
-        AcpiGetDevices(
-            null_mut(),
-            Some(add_pci_dev),
-            &mut new_bridge as *mut _ as *mut ::core::ffi::c_void,
-            null_mut()
-        ),
-        AE_OK
-    );
-
-    if new_bridge.init_irq_routing() {
-        let (dev, fun) = new_bridge.init_dev_fun();
-
-        let map =
-            crate::drivers::pci::read(0, bridge.secondary as u16, dev as u16, fun as u16, 0x18, 32)
-                & 0xffff;
-
-        new_bridge.primary = (map & 0xff) as i8 as i32;
-        new_bridge.secondary = ((map >> 8) & 0xff) as i8 as i32;
-
-        bridge.add_child(dev, fun, new_bridge);
-    }
-
-    return AE_OK;
-}}
+}
 
 #[derive(Copy, Clone)]
 struct AcpiHandle(ACPI_HANDLE);

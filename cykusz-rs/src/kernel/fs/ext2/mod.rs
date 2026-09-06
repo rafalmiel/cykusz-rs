@@ -5,13 +5,13 @@ use spin::Once;
 use uuid::Uuid;
 
 use crate::kernel::block::BlockDev;
+use crate::kernel::fs::FsDevice;
 use crate::kernel::fs::dirent::{DirEntry, DirEntryItem};
 use crate::kernel::fs::ext2::buf_block::{BufBlock, SliceBlock};
 use crate::kernel::fs::ext2::inode::LockedExt2INode;
 use crate::kernel::fs::filesystem::Filesystem;
 use crate::kernel::fs::icache::{INodeItem, INodeItemStruct};
 use crate::kernel::fs::pcache::CachedBlockDev;
-use crate::kernel::fs::FsDevice;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 use crate::kernel::utils::slice::ToBytesMut;
@@ -44,11 +44,7 @@ impl Ext2Filesystem {
             dir_lock: Mutex::new(()),
         });
 
-        if !a.init() {
-            None
-        } else {
-            Some(a)
-        }
+        if !a.init() { None } else { Some(a) }
     }
 
     pub fn try_get_uuid(dev: Arc<dyn BlockDev>) -> Option<Uuid> {

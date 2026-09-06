@@ -107,34 +107,36 @@ impl DirEntry {
     }
 
     pub fn new(parent: DirEntryItem, inode: INodeItem, name: String) -> DirEntryItem {
-        match crate::kernel::fs::dirent::get(parent.clone(), &name) { Some(e) => {
-            return e;
-        } _ => {
-            let do_cache = ![".", ".."].contains(&name.as_str());
+        match crate::kernel::fs::dirent::get(parent.clone(), &name) {
+            Some(e) => {
+                return e;
+            }
+            _ => {
+                let do_cache = ![".", ".."].contains(&name.as_str());
 
-            let e = DirEntry {
-                data: Spin::new(DirEntryData {
-                    parent: Some(parent.clone()),
-                    name,
-                    inode: inode.clone(),
-                }),
-                mountpoint: AtomicBool::new(false),
-                fs: match inode.fs() { Some(fs) => {
-                    Once::initialized(fs)
-                } _ => {
-                    Once::new()
-                }},
-                cache_marker: if do_cache { new_cache_marker() } else { 0 },
-            };
+                let e = DirEntry {
+                    data: Spin::new(DirEntryData {
+                        parent: Some(parent.clone()),
+                        name,
+                        inode: inode.clone(),
+                    }),
+                    mountpoint: AtomicBool::new(false),
+                    fs: match inode.fs() {
+                        Some(fs) => Once::initialized(fs),
+                        _ => Once::new(),
+                    },
+                    cache_marker: if do_cache { new_cache_marker() } else { 0 },
+                };
 
-            let res = if do_cache {
-                cache().make_item(e)
-            } else {
-                cache().make_item_no_cache(e)
-            };
+                let res = if do_cache {
+                    cache().make_item(e)
+                } else {
+                    cache().make_item_no_cache(e)
+                };
 
-            res
-        }}
+                res
+            }
+        }
     }
 
     pub fn new_no_cache(parent: DirEntryItem, inode: INodeItem, name: String) -> DirEntryItem {
@@ -145,11 +147,10 @@ impl DirEntry {
                 inode: inode.clone(),
             }),
             mountpoint: AtomicBool::new(false),
-            fs: match inode.fs() { Some(fs) => {
-                Once::initialized(fs)
-            } _ => {
-                Once::new()
-            }},
+            fs: match inode.fs() {
+                Some(fs) => Once::initialized(fs),
+                _ => Once::new(),
+            },
             cache_marker: 0,
         })
     }
@@ -172,11 +173,10 @@ impl DirEntry {
                 inode: inode.clone(),
             }),
             mountpoint: AtomicBool::new(false),
-            fs: match inode.fs() { Some(fs) => {
-                Once::initialized(fs)
-            } _ => {
-                Once::new()
-            }},
+            fs: match inode.fs() {
+                Some(fs) => Once::initialized(fs),
+                _ => Once::new(),
+            },
             cache_marker: 0,
         })
     }
@@ -256,15 +256,16 @@ pub fn cache() -> &'static Arc<Cache<CacheKey, DirEntry>> {
 pub fn get(parent: DirEntryItem, name: &String) -> Option<DirEntryItem> {
     let key = DirEntry::make_key(Some(&parent), &name);
 
-    match cache().get(key.clone()) { Some(e) => {
-        if e.parent().is_none() {
-            e.update_parent(Some(parent));
-        }
+    match cache().get(key.clone()) {
+        Some(e) => {
+            if e.parent().is_none() {
+                e.update_parent(Some(parent));
+            }
 
-        Some(e)
-    } _ => {
-        None
-    }}
+            Some(e)
+        }
+        _ => None,
+    }
 }
 
 pub fn init() {

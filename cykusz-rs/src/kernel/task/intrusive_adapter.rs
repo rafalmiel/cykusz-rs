@@ -35,9 +35,9 @@ unsafe impl PointerOps for TaskPointerOps<ArcType<Task>> {
     type Pointer = ArcType<Task>;
 
     #[inline]
-    unsafe fn from_raw(&self, raw: *const Task) -> ArcType<Task> { unsafe {
-        ArcType::<Task>::new(Arc::from_raw(raw))
-    }}
+    unsafe fn from_raw(&self, raw: *const Task) -> ArcType<Task> {
+        unsafe { ArcType::<Task>::new(Arc::from_raw(raw)) }
+    }
 
     #[inline]
     fn into_raw(&self, ptr: ArcType<Task>) -> *const Task {

@@ -54,6 +54,12 @@ pub fn deallocate_order(frame: &Frame, order: usize) {
     let mut bdy = BUDDY.lock_irq();
 
     bdy.dealloc(frame.address(), order);
+
+    let size = buddy::BSIZE[order];
+
+    for p in (frame.address()..frame.address() + size).step_by(PAGE_SIZE) {
+        p.to_phys_page().unwrap().mark_unused();
+    }
 }
 
 pub fn used_mem() -> usize {

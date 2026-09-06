@@ -19,9 +19,9 @@ struct ThreadPtr {
 }
 
 impl ThreadPtr {
-    pub unsafe fn new_at(addr: VirtAddr) -> &'static mut ThreadPtr { unsafe {
-        addr.read_mut::<ThreadPtr>()
-    }}
+    pub unsafe fn new_at(addr: VirtAddr) -> &'static mut ThreadPtr {
+        unsafe { addr.read_mut::<ThreadPtr>() }
+    }
 
     pub fn setup(&mut self) {
         self.self_ptr = VirtAddr(self as *mut _ as usize);

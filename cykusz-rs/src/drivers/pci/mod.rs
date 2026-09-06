@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use bit_field::BitField;
 
-use crate::arch::idt::{add_shared_irq_handler, InterruptFn, SharedInterruptFn};
+use crate::arch::idt::{InterruptFn, SharedInterruptFn, add_shared_irq_handler};
 use crate::arch::int::{set_active_high, set_irq_dest, set_level_triggered};
 use crate::kernel::mm::map_to_flags;
 use crate::kernel::mm::virt::PageFlags;

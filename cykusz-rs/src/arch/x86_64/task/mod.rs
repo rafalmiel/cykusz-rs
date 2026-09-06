@@ -18,8 +18,8 @@ use crate::arch::utils::StackHelper;
 use crate::drivers::elf::ElfHeader;
 use crate::kernel::fs::dirent::DirEntryItem;
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{allocate, VirtAddr, PAGE_SIZE};
 use crate::kernel::mm::{Frame, PhysAddr};
+use crate::kernel::mm::{PAGE_SIZE, VirtAddr, allocate};
 use crate::kernel::task::vm::{TlsVmInfo, VM};
 use syscall_defs::exec::ExeArgs;
 use syscall_defs::{MMapFlags, MMapProt, OpenFlags};
@@ -58,7 +58,7 @@ impl Context {
         let mut rbp = VirtAddr(unsafe { (&raw const self.rbp).read_unaligned() });
 
         while !rbp.is_user() {
-            dbgln!(sched_v, "{:#x}", unsafe {(rbp + 8).read::<u64>()});
+            dbgln!(sched_v, "{:#x}", unsafe { (rbp + 8).read::<u64>() });
 
             rbp = VirtAddr(unsafe { rbp.read::<usize>() });
         }
@@ -209,29 +209,31 @@ impl Task {
         sp: usize,
         cr3: PhysAddr,
         param: usize,
-    ) -> Unique<Context> { unsafe {
-        let mut sp_tmp = sp as u64;
+    ) -> Unique<Context> {
+        unsafe {
+            let mut sp_tmp = sp as u64;
 
-        let mut helper = StackHelper::new(&mut sp_tmp);
+            let mut helper = StackHelper::new(&mut sp_tmp);
 
-        let frame = helper.next::<KTaskInitFrame>();
+            let frame = helper.next::<KTaskInitFrame>();
 
-        frame.task_finished_fun = task_finished as *const () as usize;
-        frame.int.ss = ds.bits() as u64;
-        frame.int.sp = (sp - 8) as u64;
-        frame.int.cf = if int_enabled { 0x200 } else { 0x0 };
-        frame.int.cs = cs.bits() as u64;
-        frame.int.ip = fun as u64;
-        frame.rdi = param;
+            frame.task_finished_fun = task_finished as *const () as usize;
+            frame.int.ss = ds.bits() as u64;
+            frame.int.sp = (sp - 8) as u64;
+            frame.int.cf = if int_enabled { 0x200 } else { 0x0 };
+            frame.int.cs = cs.bits() as u64;
+            frame.int.ip = fun as u64;
+            frame.rdi = param;
 
-        let ctx = helper.next::<Context>();
+            let ctx = helper.next::<Context>();
 
-        *ctx = Context::empty();
-        ctx.rip = isr_return as *const () as usize;
-        ctx.cr3 = cr3.0;
+            *ctx = Context::empty();
+            ctx.rip = isr_return as *const () as usize;
+            ctx.cr3 = cr3.0;
 
-        Unique::new_unchecked(ctx as *mut Context)
-    }}
+            Unique::new_unchecked(ctx as *mut Context)
+        }
+    }
 
     unsafe fn prepare_sysretq_ctx(
         fun: usize,
@@ -239,88 +241,100 @@ impl Task {
         user_stack: Option<usize>,
         sp: usize,
         cr3: PhysAddr,
-    ) -> Unique<Context> { unsafe {
-        let mut sp = sp as u64;
+    ) -> Unique<Context> {
+        unsafe {
+            let mut sp = sp as u64;
 
-        let mut helper = StackHelper::new(&mut sp);
+            let mut helper = StackHelper::new(&mut sp);
 
-        let frame = helper.next::<SyscallFrame>();
+            let frame = helper.next::<SyscallFrame>();
 
-        frame.rsp = user_stack.unwrap() as u64;
-        frame.rflags = if int_enabled { 0x200 } else { 0x0 };
-        frame.rip = fun as u64;
+            frame.rsp = user_stack.unwrap() as u64;
+            frame.rflags = if int_enabled { 0x200 } else { 0x0 };
+            frame.rip = fun as u64;
 
-        let ctx = helper.next::<Context>();
+            let ctx = helper.next::<Context>();
 
-        *ctx = Context::empty();
-        ctx.rip = asm_sysretq_userinit as *const () as usize;
-        ctx.cr3 = cr3.0;
+            *ctx = Context::empty();
+            ctx.rip = asm_sysretq_userinit as *const () as usize;
+            ctx.cr3 = cr3.0;
 
-        Unique::new_unchecked(ctx as *mut Context)
-    }}
+            Unique::new_unchecked(ctx as *mut Context)
+        }
+    }
 
-    unsafe fn syscall_frame(&self) -> &SyscallFrame { unsafe {
-        VirtAddr(self.stack_top + self.stack_size - size_of::<SyscallFrame>())
-            .read_ref::<SyscallFrame>()
-    }}
+    unsafe fn syscall_frame(&self) -> &SyscallFrame {
+        unsafe {
+            VirtAddr(self.stack_top + self.stack_size - size_of::<SyscallFrame>())
+                .read_ref::<SyscallFrame>()
+        }
+    }
 
-    unsafe fn syscall_regs(&self) -> &RegsFrame { unsafe {
-        VirtAddr(
-            self.stack_top + self.stack_size - size_of::<SyscallFrame>() - size_of::<RegsFrame>(),
-        )
-        .read_ref::<RegsFrame>()
-    }}
+    unsafe fn syscall_regs(&self) -> &RegsFrame {
+        unsafe {
+            VirtAddr(
+                self.stack_top + self.stack_size
+                    - size_of::<SyscallFrame>()
+                    - size_of::<RegsFrame>(),
+            )
+            .read_ref::<RegsFrame>()
+        }
+    }
 
-    unsafe fn fork_ctx(&self, sp: usize, cr3: usize) -> Unique<Context> { unsafe {
-        let parent_sys_frame = self.syscall_frame();
-        let parent_regs_frame = self.syscall_regs();
+    unsafe fn fork_ctx(&self, sp: usize, cr3: usize) -> Unique<Context> {
+        unsafe {
+            let parent_sys_frame = self.syscall_frame();
+            let parent_regs_frame = self.syscall_regs();
 
-        let mut sp = sp as u64;
+            let mut sp = sp as u64;
 
-        let mut helper = StackHelper::new(&mut sp);
+            let mut helper = StackHelper::new(&mut sp);
 
-        *helper.next::<SyscallFrame>() = *parent_sys_frame;
+            *helper.next::<SyscallFrame>() = *parent_sys_frame;
 
-        let regs = helper.next::<RegsFrame>();
-        *regs = *parent_regs_frame;
-        regs.rax = 0;
+            let regs = helper.next::<RegsFrame>();
+            *regs = *parent_regs_frame;
+            regs.rax = 0;
 
-        let ctx = helper.next::<Context>();
+            let ctx = helper.next::<Context>();
 
-        *ctx = Context::empty();
-        ctx.rip = asm_sysretq_forkinit as *const () as usize;
-        ctx.cr3 = cr3;
+            *ctx = Context::empty();
+            ctx.rip = asm_sysretq_forkinit as *const () as usize;
+            ctx.cr3 = cr3;
 
-        Unique::new_unchecked(ctx as *mut Context)
-    }}
+            Unique::new_unchecked(ctx as *mut Context)
+        }
+    }
 
     unsafe fn fork_thread_ctx(
         &self,
         entry: usize,
         user_stack: usize,
         sp: usize,
-    ) -> Unique<Context> { unsafe {
-        let mut sp = sp as u64;
+    ) -> Unique<Context> {
+        unsafe {
+            let mut sp = sp as u64;
 
-        let mut helper = StackHelper::new(&mut sp);
+            let mut helper = StackHelper::new(&mut sp);
 
-        let sys_frame = helper.next::<SyscallFrame>();
+            let sys_frame = helper.next::<SyscallFrame>();
 
-        sys_frame.rip = entry as u64;
-        sys_frame.rflags = 0x200;
-        sys_frame.rsp = user_stack as u64;
+            sys_frame.rip = entry as u64;
+            sys_frame.rflags = 0x200;
+            sys_frame.rsp = user_stack as u64;
 
-        let regs = helper.next::<RegsFrame>();
-        *regs = RegsFrame::default();
+            let regs = helper.next::<RegsFrame>();
+            *regs = RegsFrame::default();
 
-        let ctx = helper.next::<Context>();
+            let ctx = helper.next::<Context>();
 
-        *ctx = Context::empty();
-        ctx.rip = asm_sysretq_forkinit as *const () as usize;
-        ctx.cr3 = self.cr3;
+            *ctx = Context::empty();
+            ctx.rip = asm_sysretq_forkinit as *const () as usize;
+            ctx.cr3 = self.cr3;
 
-        Unique::new_unchecked(ctx as *mut Context)
-    }}
+            Unique::new_unchecked(ctx as *mut Context)
+        }
+    }
 
     fn new_sp(
         fun: usize,

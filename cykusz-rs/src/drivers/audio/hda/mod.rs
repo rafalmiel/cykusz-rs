@@ -3,7 +3,7 @@ mod node;
 mod reg;
 mod stream;
 
-use crate::arch::mm::{PhysAddr, PAGE_SIZE};
+use crate::arch::mm::{PAGE_SIZE, PhysAddr};
 use crate::drivers::audio::hda::reg::verb;
 use crate::drivers::audio::hda::reg::verb::{
     ConfigurationDefaultReg, GetParameterAudioWidgetCapReg, GetParameterInputAmplifierCap,
@@ -11,14 +11,14 @@ use crate::drivers::audio::hda::reg::verb::{
     NodeCommand, SetAmplifierGainMute, SetChannelStreamID, SetConverterFormat, SetEAPDBTLEnable,
     SetPinWidgetControl, SetPowerState,
 };
-use crate::drivers::pci::{register_pci_device, PciDeviceHandle, PciHeader};
+use crate::drivers::pci::{PciDeviceHandle, PciHeader, register_pci_device};
 use crate::kernel::device::dev_t::DevId;
-use crate::kernel::device::{register_device, Device};
+use crate::kernel::device::{Device, register_device};
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, MappedAccess, PageDirectItemStruct};
 use crate::kernel::fs::poll::PollTable;
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{allocate_order, map_to_flags, VirtAddr};
+use crate::kernel::mm::{VirtAddr, allocate_order, map_to_flags};
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::types::Align;
 use crate::kernel::utils::wait_queue::WaitQueue;
@@ -26,8 +26,8 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
-use core::ops::Not;
 use bit_field::BitField;
+use core::ops::Not;
 use spin::Once;
 use syscall_defs::poll::PollEventFlags;
 use tock_registers::interfaces::Writeable;
@@ -389,18 +389,22 @@ impl IntelHdaData {
         let mut node_groups = hashbrown::HashSet::<Address>::new();
 
         // Most likely just one node group but check all nodes in the path
-        path.iter().filter_map(|a| node_groups.contains(a).not().then(|| {
-            node_groups.insert(*a);
-            *a
-        })).for_each(|addr| {
-            // Power on node group before powering widgets on the path
-            dbgln!(audio, "Powering node group {:?}", addr);
-            let mut reg = <SetPowerState as NodeCommand>::Data::new();
+        path.iter()
+            .filter_map(|a| {
+                node_groups.contains(a).not().then(|| {
+                    node_groups.insert(*a);
+                    *a
+                })
+            })
+            .for_each(|addr| {
+                // Power on node group before powering widgets on the path
+                dbgln!(audio, "Powering node group {:?}", addr);
+                let mut reg = <SetPowerState as NodeCommand>::Data::new();
 
-            // Node group fully on
-            reg.set_ps_set(verb::PowerStateReg::PS_SET::Value::D0);
-            self.cmd.invoke_data::<SetPowerState>(addr, reg);
-        });
+                // Node group fully on
+                reg.set_ps_set(verb::PowerStateReg::PS_SET::Value::D0);
+                self.cmd.invoke_data::<SetPowerState>(addr, reg);
+            });
 
         for &addr in &path {
             let mut reg = <SetPowerState as NodeCommand>::Data::new();

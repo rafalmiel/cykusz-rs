@@ -1,5 +1,5 @@
 use crate::kernel::device::dev_t::DevId;
-use crate::kernel::device::{register_device, Device};
+use crate::kernel::device::{Device, register_device};
 use crate::kernel::fs::inode::INode;
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};

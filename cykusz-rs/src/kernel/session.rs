@@ -331,26 +331,32 @@ impl Sessions {
         let process = if pid == 0 || pid == caller.pid() {
             caller.clone()
         } else {
-            match get_task(pid) { Some(task) => {
-                if !task.is_process_leader() {
-                    println!("not a process leader");
-                    return Err(SyscallError::EPERM);
-                }
-
-                match task.get_parent() { Some(parent) => {
-                    if parent.tid() != caller.tid() {
-                        println!("not a process child");
-                        return Err(SyscallError::ESRCH);
+            match get_task(pid) {
+                Some(task) => {
+                    if !task.is_process_leader() {
+                        println!("not a process leader");
+                        return Err(SyscallError::EPERM);
                     }
-                } _ => {
-                    println!("not parent");
-                    return Err(SyscallError::EPERM);
-                }}
 
-                task
-            } _ => {
-                return Err(SyscallError::ESRCH);
-            }}
+                    match task.get_parent() {
+                        Some(parent) => {
+                            if parent.tid() != caller.tid() {
+                                println!("not a process child");
+                                return Err(SyscallError::ESRCH);
+                            }
+                        }
+                        _ => {
+                            println!("not parent");
+                            return Err(SyscallError::EPERM);
+                        }
+                    }
+
+                    task
+                }
+                _ => {
+                    return Err(SyscallError::ESRCH);
+                }
+            }
         };
 
         if process.is_session_leader() {

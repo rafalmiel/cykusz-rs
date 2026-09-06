@@ -8,7 +8,6 @@ use crate::kernel;
 use crate::kernel::int;
 
 pub struct RwSpin<T: ?Sized> {
-    notify: bool,
     l: RW<T>,
 }
 
@@ -86,20 +85,12 @@ impl<T: ?Sized> RwSpin<T> {
 impl<T> RwSpin<T> {
     pub const fn new(user_data: T) -> RwSpin<T> {
         RwSpin {
-            notify: true,
-            l: RW::new(user_data),
-        }
-    }
-
-    pub const fn new_no_notify(user_data: T) -> RwSpin<T> {
-        RwSpin {
-            notify: false,
             l: RW::new(user_data),
         }
     }
 
     fn maybe_preempt_disable(&self) -> bool {
-        let notify = if self.notify && kernel::int::is_enabled() {
+        let notify = if kernel::int::is_enabled() {
             crate::kernel::sched::preempt_disable()
         } else {
             false
@@ -107,14 +98,22 @@ impl<T> RwSpin<T> {
         notify
     }
 
-    pub fn read(&self) -> RwSpinReadGuard<'_, T> {
-        let notify = self.notify && self.maybe_preempt_disable();
+    fn do_read(&self, with_notify: bool) -> RwSpinReadGuard<'_, T> {
+        let notify = with_notify && self.maybe_preempt_disable();
 
         RwSpinReadGuard {
             g: Some(self.l.read()),
             irq: false,
             notify,
         }
+    }
+
+    pub fn read_no_notify(&self) -> RwSpinReadGuard<'_, T> {
+        self.do_read(false)
+    }
+
+    pub fn read(&self) -> RwSpinReadGuard<'_, T> {
+        self.do_read(true)
     }
 
     pub fn read_irq(&self) -> RwSpinReadGuard<'_, T> {
@@ -127,13 +126,21 @@ impl<T> RwSpin<T> {
         }
     }
 
-    pub fn read_upgradeable(&self) -> RwSpinUpgradeableGuard<'_, T> {
-        let notify = self.notify && self.maybe_preempt_disable();
+    pub fn do_read_upgradeable(&self, with_notify: bool) -> RwSpinUpgradeableGuard<'_, T> {
+        let notify = with_notify && self.maybe_preempt_disable();
         RwSpinUpgradeableGuard {
             g: Some(self.l.upgradeable_read()),
             irq: false,
             notify,
         }
+    }
+
+    pub fn read_upgradeable_no_notify(&self) -> RwSpinUpgradeableGuard<'_, T> {
+        self.do_read_upgradeable(false)
+    }
+
+    pub fn read_upgradeable(&self) -> RwSpinUpgradeableGuard<'_, T> {
+        self.do_read_upgradeable(true)
     }
 
     pub fn read_upgradeable_irq(&self) -> RwSpinUpgradeableGuard<'_, T> {
@@ -146,8 +153,8 @@ impl<T> RwSpin<T> {
         }
     }
 
-    pub fn try_read(&self) -> Option<RwSpinReadGuard<'_, T>> {
-        let notify = self.notify && self.maybe_preempt_disable();
+    pub fn do_try_read(&self, with_notify: bool) -> Option<RwSpinReadGuard<'_, T>> {
+        let notify = with_notify && self.maybe_preempt_disable();
 
         let lock = match self.l.try_read() {
             Some(l) => Some(l),
@@ -169,6 +176,14 @@ impl<T> RwSpin<T> {
         } else {
             None
         }
+    }
+
+    pub fn try_read_no_notify(&self) -> Option<RwSpinReadGuard<'_, T>> {
+        self.do_try_read(false)
+    }
+
+    pub fn try_read(&self) -> Option<RwSpinReadGuard<'_, T>> {
+        self.do_try_read(true)
     }
 
     pub fn try_read_irq(&self) -> Option<RwSpinReadGuard<'_, T>> {
@@ -195,8 +210,11 @@ impl<T> RwSpin<T> {
         }
     }
 
-    pub fn try_read_upgradeable(&self) -> Option<RwSpinUpgradeableGuard<'_, T>> {
-        let notify = self.notify && self.maybe_preempt_disable();
+    pub fn do_try_read_upgradeable(
+        &self,
+        with_notify: bool,
+    ) -> Option<RwSpinUpgradeableGuard<'_, T>> {
+        let notify = with_notify && self.maybe_preempt_disable();
 
         let lock = match self.l.try_upgradeable_read() {
             Some(l) => Some(l),
@@ -218,6 +236,14 @@ impl<T> RwSpin<T> {
         } else {
             None
         }
+    }
+
+    pub fn try_read_upgradeable_no_notify(&self) -> Option<RwSpinUpgradeableGuard<'_, T>> {
+        self.do_try_read_upgradeable(false)
+    }
+
+    pub fn try_read_upgradeable(&self) -> Option<RwSpinUpgradeableGuard<'_, T>> {
+        self.do_try_read_upgradeable(true)
     }
 
     pub fn try_read_upgradeable_irq(&self) -> Option<RwSpinUpgradeableGuard<'_, T>> {
@@ -246,14 +272,22 @@ impl<T> RwSpin<T> {
         }
     }
 
-    pub fn write(&self) -> RwSpinWriteGuard<'_, T> {
-        let notify = self.maybe_preempt_disable();
+    pub fn do_write(&self, with_notify: bool) -> RwSpinWriteGuard<'_, T> {
+        let notify = with_notify && self.maybe_preempt_disable();
 
         RwSpinWriteGuard {
             g: Some(self.l.write()),
             irq: false,
             notify,
         }
+    }
+
+    pub fn write_no_notify(&self) -> RwSpinWriteGuard<'_, T> {
+        self.do_write(false)
+    }
+
+    pub fn write(&self) -> RwSpinWriteGuard<'_, T> {
+        self.do_write(true)
     }
 
     pub fn write_irq(&self) -> RwSpinWriteGuard<'_, T> {
@@ -266,8 +300,8 @@ impl<T> RwSpin<T> {
         }
     }
 
-    pub fn try_write(&self) -> Option<RwSpinWriteGuard<'_, T>> {
-        let notify = self.maybe_preempt_disable();
+    pub fn do_try_write(&self, with_notify: bool) -> Option<RwSpinWriteGuard<'_, T>> {
+        let notify = with_notify && self.maybe_preempt_disable();
 
         let lock = match self.l.try_write() {
             Some(l) => Some(l),
@@ -289,6 +323,14 @@ impl<T> RwSpin<T> {
         } else {
             None
         }
+    }
+
+    pub fn try_write_no_notify(&self) -> Option<RwSpinWriteGuard<'_, T>> {
+        self.do_try_write(false)
+    }
+
+    pub fn try_write(&self) -> Option<RwSpinWriteGuard<'_, T>> {
+        self.do_try_write(true)
     }
 
     pub fn try_write_irq(&self) -> Option<RwSpinWriteGuard<'_, T>> {

@@ -140,25 +140,27 @@ impl LockedHeap {
         LockedHeap(Spin::new(Heap::empty()))
     }
 
-    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, ()> { unsafe {
-        ALLOCED_MEM.fetch_add(layout.size(), Ordering::SeqCst);
-        heap.allocate_first_fit(layout.clone()).or_else(|_| {
-            let _ = &heap;
+    unsafe fn allocate(&self, heap: &mut Heap, layout: Layout) -> Result<NonNull<u8>, ()> {
+        unsafe {
+            ALLOCED_MEM.fetch_add(layout.size(), Ordering::SeqCst);
+            heap.allocate_first_fit(layout.clone()).or_else(|_| {
+                let _ = &heap;
 
-            let top = heap.top();
-            let req = layout.size().align_up(0x1000);
+                let top = heap.top();
+                let req = layout.size().align_up(0x1000);
 
-            if top as usize + req as usize > HEAP_END.0 {
-                panic!("Out of mem!");
-            }
+                if top as usize + req as usize > HEAP_END.0 {
+                    panic!("Out of mem!");
+                }
 
-            map_more_heap(top as *const u8, req);
+                map_more_heap(top as *const u8, req);
 
-            heap.extend(req);
+                heap.extend(req);
 
-            heap.allocate_first_fit(layout)
-        })
-    }}
+                heap.allocate_first_fit(layout)
+            })
+        }
+    }
 }
 
 impl Deref for LockedHeap {
@@ -196,40 +198,44 @@ impl Drop for HeapDebug {
 }
 
 unsafe impl GlobalAlloc for LockedHeap {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 { unsafe {
-        //let _sw = if crate::kernel::smp::is_smp_initialised() {
-        //    Some(crate::kernel::utils::stopwatch::StopWatch::new("alloc"))
-        //} else {
-        //    None
-        //};
-        let ptr = self
-            .allocate(&mut self.0.lock_irq(), layout)
-            .ok()
-            .map_or(0 as *mut u8, |alloc| alloc.as_ptr());
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        unsafe {
+            //let _sw = if crate::kernel::smp::is_smp_initialised() {
+            //    Some(crate::kernel::utils::stopwatch::StopWatch::new("alloc"))
+            //} else {
+            //    None
+            //};
+            let ptr = self
+                .allocate(&mut self.0.lock_irq(), layout)
+                .ok()
+                .map_or(0 as *mut u8, |alloc| alloc.as_ptr());
 
-        leak_catcher().track_alloc(ptr as usize, layout);
-        if HEAP_DEBUG.load(Ordering::SeqCst) {
-            println!("Alloc {:p} {}", ptr, layout.size());
-        };
+            leak_catcher().track_alloc(ptr as usize, layout);
+            if HEAP_DEBUG.load(Ordering::SeqCst) {
+                println!("Alloc {:p} {}", ptr, layout.size());
+            };
 
-        ptr
-    }}
+            ptr
+        }
+    }
 
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { unsafe {
-        //let _sw = if crate::kernel::smp::is_smp_initialised() {
-        //    Some(crate::kernel::utils::stopwatch::StopWatch::new("dealloc"))
-        //} else {
-        //    None
-        //};
-        leak_catcher().track_dealloc(ptr as usize);
-        if HEAP_DEBUG.load(Ordering::SeqCst) {
-            println!("Dealloc {:p} {}", ptr, layout.size());
-        };
-        ALLOCED_MEM.fetch_sub(layout.size(), Ordering::SeqCst);
-        self.0
-            .lock_irq()
-            .deallocate(NonNull::new_unchecked(ptr), layout)
-    }}
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe {
+            //let _sw = if crate::kernel::smp::is_smp_initialised() {
+            //    Some(crate::kernel::utils::stopwatch::StopWatch::new("dealloc"))
+            //} else {
+            //    None
+            //};
+            leak_catcher().track_dealloc(ptr as usize);
+            if HEAP_DEBUG.load(Ordering::SeqCst) {
+                println!("Dealloc {:p} {}", ptr, layout.size());
+            };
+            ALLOCED_MEM.fetch_sub(layout.size(), Ordering::SeqCst);
+            self.0
+                .lock_irq()
+                .deallocate(NonNull::new_unchecked(ptr), layout)
+        }
+    }
 }
 
 fn heap() -> &'static LockedHeap {

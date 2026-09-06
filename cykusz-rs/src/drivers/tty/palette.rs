@@ -1,5 +1,5 @@
-use spin::Once;
 use crate::drivers::tty::color::RGB;
+use spin::Once;
 
 pub const PALETTE_SIZE: usize = 256;
 
@@ -12,22 +12,22 @@ pub fn init_palette() {
     DEFAULT_PALETTE.call_once(|| {
         let mut palette = [RGB::new(0, 0, 0); PALETTE_SIZE];
 
-        palette[0] = RGB::new(0,0,0);       // Black
-        palette[1] = RGB::new(170,0,0);     // Red
-        palette[2] = RGB::new(0,170,0);     // Green
-        palette[3] = RGB::new(170,85,0);    // Yellow
-        palette[4] = RGB::new(0,0,170);     // Blue
-        palette[5] = RGB::new(170,0,170);   // Magenta
-        palette[6] = RGB::new(0,170,170);   // Cyan
-        palette[7] = RGB::new(170,170,170); // White
-        palette[8] = RGB::new(85,85,85);    // Bright Black
-        palette[9] = RGB::new(255,85,85);   // Bright Red
-        palette[10] = RGB::new(85,255,85);  // Bright Green
-        palette[11] = RGB::new(255,255,85); // Bright Yellow
-        palette[12] = RGB::new(85,85,255);  // Bright Blue
-        palette[13] = RGB::new(255,85,255); // Bright Magenta
-        palette[14] = RGB::new(85,255,255); // Bright Cyan
-        palette[15] = RGB::new(255,255,255);// Bright White
+        palette[0] = RGB::new(0, 0, 0); // Black
+        palette[1] = RGB::new(170, 0, 0); // Red
+        palette[2] = RGB::new(0, 170, 0); // Green
+        palette[3] = RGB::new(170, 85, 0); // Yellow
+        palette[4] = RGB::new(0, 0, 170); // Blue
+        palette[5] = RGB::new(170, 0, 170); // Magenta
+        palette[6] = RGB::new(0, 170, 170); // Cyan
+        palette[7] = RGB::new(170, 170, 170); // White
+        palette[8] = RGB::new(85, 85, 85); // Bright Black
+        palette[9] = RGB::new(255, 85, 85); // Bright Red
+        palette[10] = RGB::new(85, 255, 85); // Bright Green
+        palette[11] = RGB::new(255, 255, 85); // Bright Yellow
+        palette[12] = RGB::new(85, 85, 255); // Bright Blue
+        palette[13] = RGB::new(255, 85, 255); // Bright Magenta
+        palette[14] = RGB::new(85, 255, 255); // Bright Cyan
+        palette[15] = RGB::new(255, 255, 255); // Bright White
 
         for red in 0..6 {
             for green in 0..6 {
@@ -51,7 +51,5 @@ pub fn init_palette() {
 }
 
 pub fn palette() -> &'static Palette {
-    unsafe {
-        DEFAULT_PALETTE.get_unchecked()
-    }
+    unsafe { DEFAULT_PALETTE.get_unchecked() }
 }

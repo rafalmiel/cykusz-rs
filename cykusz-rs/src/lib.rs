@@ -21,7 +21,7 @@ extern crate lazy_static;
 
 use crate::arch::int;
 use crate::kernel::fs::path::Path;
-use crate::kernel::fs::{lookup_by_path, LookupMode};
+use crate::kernel::fs::{LookupMode, lookup_by_path};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::sched::current_task_ref;
 use crate::kernel::sync::IrqGuard;
@@ -43,7 +43,6 @@ pub mod lang_items;
 
 #[thread_local]
 static mut CPU_ID: u8 = 0;
-
 
 static mut DEBUG: bool = false;
 
@@ -120,6 +119,12 @@ pub fn rust_main(stack_top: VirtAddr) {
     println!("[ OK ] Local Timer Started");
 
     crate::kernel::sched::create_task(init_task);
+
+    dbgln!(
+        page_size,
+        "Page size: {}",
+        core::mem::size_of::<crate::arch::mm::phys::PhysPage>()
+    );
 
     idle();
 }

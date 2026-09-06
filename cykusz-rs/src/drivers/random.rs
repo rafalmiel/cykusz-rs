@@ -4,8 +4,8 @@ use alloc::sync::{Arc, Weak};
 use rand::{RngCore, SeedableRng};
 use syscall_defs::OpenFlags;
 
-use crate::kernel::device::dev_t::DevId;
 use crate::kernel::device::Device;
+use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::current_ns;

@@ -5,7 +5,7 @@ use bit_field::BitField;
 use crate::drivers::block::ahci::port::Port;
 use crate::drivers::block::ahci::reg::*;
 use crate::drivers::pci::PciHeader;
-use crate::kernel::block::{register_blkdev, BlockDevice};
+use crate::kernel::block::{BlockDevice, register_blkdev};
 use crate::kernel::mm::VirtAddr;
 
 pub struct AhciDevice {

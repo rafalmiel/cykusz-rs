@@ -3,8 +3,8 @@ use core::ops::*;
 
 use crate::arch::mm::virt::p4_table_addr;
 use crate::arch::mm::virt::table::P4Table;
-use crate::arch::x86_64::mm::phys::PhysPage;
 use crate::arch::x86_64::mm::PAGE_SIZE;
+use crate::arch::x86_64::mm::phys::PhysPage;
 use crate::kernel::mm::virt::PageFlags;
 
 #[derive(Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Debug, Default, Hash)]
@@ -98,16 +98,20 @@ impl UserAddr {
     }
 }
 
-pub unsafe fn flush(addr: usize) { unsafe {
-    asm!("invlpg [{0}]", in(reg) addr);
-}}
+pub unsafe fn flush(addr: usize) {
+    unsafe {
+        asm!("invlpg [{0}]", in(reg) addr);
+    }
+}
 
 /// Invalidate the TLB completely by reloading the CR3 register.
 ///
 /// # Safety
 /// This function is unsafe as it causes a general protection fault (GP) if the current privilege
 /// level is not 0.
-pub unsafe fn flush_all() { unsafe {
-    use crate::arch::raw::ctrlregs::{cr3, cr3_write};
-    cr3_write(cr3())
-}}
+pub unsafe fn flush_all() {
+    unsafe {
+        use crate::arch::raw::ctrlregs::{cr3, cr3_write};
+        cr3_write(cr3())
+    }
+}

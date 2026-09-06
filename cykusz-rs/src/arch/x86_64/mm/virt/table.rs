@@ -1,9 +1,9 @@
-use core::marker::PhantomData;
-
+use crate::arch::mm::phys::PhysPageData;
 use crate::arch::mm::virt::entry::Entry;
 use crate::arch::x86_64::mm::phys::PhysPage;
 use crate::kernel::mm::*;
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
+use core::marker::PhantomData;
 
 use super::page;
 
@@ -324,14 +324,20 @@ impl Table<Level1> {
     }
 }
 
+#[allow(dead_code)]
+enum PageLock {
+    Kernel(SpinGuard<'static, ()>),
+    Page(SpinGuard<'static, PhysPageData>),
+}
+
 impl Table<Level4> {
-    fn lock(&self, is_user: bool) -> Option<SpinGuard<'static, ()>> {
+    fn lock(&self, is_user: bool) -> Option<PageLock> {
         if !is_user {
-            return Some(KERNEL_PT_LOCK.lock());
+            return Some(PageLock::Kernel(KERNEL_PT_LOCK.lock()));
         }
 
         if let Some(pp) = self.phys_page() {
-            Some(pp.lock_pt())
+            Some(PageLock::Page(pp.lock_pt()))
         } else {
             dbgln!(ptable, "no lock obtained!");
             None
@@ -350,13 +356,14 @@ impl Table<Level4> {
 
     pub fn ref_table(&self) {
         if let Some(page) = self.phys_page() {
-            page.inc_vm_use_count();
+            page.lock_pt().as_cache_meta().inc_vm_use_count();
         }
     }
 
     pub fn unref_table(&self) {
         if let Some(page) = self.phys_page() {
-            if page.dec_vm_use_count() == 0 {
+            let cnt = page.lock_pt().as_cache_meta().dec_vm_use_count();
+            if cnt == 0 {
                 let frame = Frame::new(self.phys_addr());
 
                 crate::kernel::mm::deallocate(&frame);
@@ -366,7 +373,8 @@ impl Table<Level4> {
 
     pub fn unref_table_with(&mut self, f: impl Fn(&mut P4Table)) {
         if let Some(page) = self.phys_page() {
-            if page.dec_vm_use_count() == 0 {
+            let cnt = page.lock_pt().as_cache_meta().dec_vm_use_count();
+            if cnt == 0 {
                 f(self);
 
                 let frame = Frame::new(self.phys_addr());

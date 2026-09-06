@@ -6,7 +6,7 @@ use spin::Once;
 use crate::kernel::device::dev_t::DevId;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::vfs::FsError;
-use crate::kernel::fs::{lookup_by_real_path, LookupMode};
+use crate::kernel::fs::{LookupMode, lookup_by_real_path};
 use crate::kernel::session::Group;
 use crate::kernel::sync::{LockApi, RwSpin, Spin};
 use crate::kernel::task::{ArcTask, WeakTask};
@@ -60,11 +60,10 @@ pub fn get_tty_by_path(path: &str) -> Result<Arc<dyn TerminalDevice>, FsError> {
 
     let device = entry.inode().device_id().ok_or(FsError::EntryNotFound)?;
 
-    match get_tty_by_id(device) { Some(tty) => {
-        Ok(tty)
-    } _ => {
-        Err(FsError::EntryNotFound)
-    }}
+    match get_tty_by_id(device) {
+        Some(tty) => Ok(tty),
+        _ => Err(FsError::EntryNotFound),
+    }
 }
 
 impl Terminal {
@@ -100,25 +99,30 @@ impl Terminal {
         } else {
             let is_leader = task.is_session_leader();
 
-            match &terminal.ctrl_process() { Some(ctrl) => {
-                if !is_leader && ctrl.sid() == task.sid() {
-                    *term = Some(terminal);
+            match &terminal.ctrl_process() {
+                Some(ctrl) => {
+                    if !is_leader && ctrl.sid() == task.sid() {
+                        *term = Some(terminal);
 
-                    return true;
+                        return true;
+                    }
+
+                    false
                 }
+                _ => {
+                    if is_leader {
+                        if !terminal.attach(task) {
+                            return false;
+                        }
 
-                false
-            } _ => if is_leader {
-                if !terminal.attach(task) {
-                    return false;
+                        *term = Some(terminal);
+
+                        true
+                    } else {
+                        false
+                    }
                 }
-
-                *term = Some(terminal);
-
-                true
-            } else {
-                false
-            }}
+            }
         }
     }
 

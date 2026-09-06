@@ -11,10 +11,10 @@ use crate::kernel::sync::{LockApi, Mutex, MutexGuard};
 use crate::kernel::utils::buffer::BufferQueue;
 use crate::kernel::utils::node_map::{NodeMap, NodeMapItem};
 use crate::kernel::utils::wait_queue::WaitQueueFlags;
+use syscall_defs::OpenFlags;
 use syscall_defs::poll::PollEventFlags;
 use syscall_defs::signal::SIGPIPE;
 use syscall_defs::stat::{Mode, Stat};
-use syscall_defs::OpenFlags;
 
 pub struct Pipe {
     buf: BufferQueue,

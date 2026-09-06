@@ -18,11 +18,11 @@ use crate::kernel::fs::filesystem::FilesystemKind;
 use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::path::Path;
 use crate::kernel::fs::poll::PollTable;
-use crate::kernel::fs::{lookup_by_path, lookup_by_path_at, lookup_by_real_path, LookupMode};
+use crate::kernel::fs::{LookupMode, lookup_by_path, lookup_by_path_at, lookup_by_real_path};
 use crate::kernel::mm::VirtAddr;
 use crate::kernel::net::ip::Ip4;
 use crate::kernel::net::socket::SocketService;
-use crate::kernel::sched::{current_task, current_task_ref, SleepFlags};
+use crate::kernel::sched::{SleepFlags, current_task, current_task_ref};
 use crate::kernel::signal::SignalEntry;
 use crate::kernel::utils::node_map::NodeMapItem;
 use crate::kernel::utils::types::Prefault;
@@ -117,7 +117,13 @@ fn get_dir_entry(
 }
 
 pub fn sys_open(at: u64, path: u64, len: u64, mode: u64) -> SyscallResult {
-    dbgln!(sys_open, "sys_open {} {} {:x}", at, make_str(path, len), mode);
+    dbgln!(
+        sys_open,
+        "sys_open {} {} {:x}",
+        at,
+        make_str(path, len),
+        mode
+    );
     let flags = OpenFlags::from_bits(mode as usize).ok_or(SyscallError::EINVAL)?;
 
     let at = OpenFD::try_from(at)?;
@@ -179,17 +185,20 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     dbgln!(sys_write, "task {} fd {}", task.tid(), fd);
 
-    return match task.get_handle(fd) { Some(f) => {
-        if f.flags().is_writable() {
-            Ok(f.write(make_buf(buf, len))?)
-        } else {
-            logln4!("write fd {} = EACCESS", fd);
-            Err(SyscallError::EACCES)
+    return match task.get_handle(fd) {
+        Some(f) => {
+            if f.flags().is_writable() {
+                Ok(f.write(make_buf(buf, len))?)
+            } else {
+                logln4!("write fd {} = EACCESS", fd);
+                Err(SyscallError::EACCES)
+            }
         }
-    } _ => {
-        logln4!("write fd {} = EBADFD", fd);
-        Err(SyscallError::EBADFD)
-    }};
+        _ => {
+            logln4!("write fd {} = EBADFD", fd);
+            Err(SyscallError::EBADFD)
+        }
+    };
 }
 
 pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
@@ -199,17 +208,20 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> SyscallResult {
 
     logln4!("sys_read fd: {} len: {} task: {}", fd, len, task.tid());
 
-    return match task.get_handle(fd) { Some(f) => {
-        if f.flags().is_readable() {
-            Ok(f.read(make_buf_mut(buf, len))?)
-        } else {
-            logln2!("eaccess");
-            Err(SyscallError::EACCES)
+    return match task.get_handle(fd) {
+        Some(f) => {
+            if f.flags().is_readable() {
+                Ok(f.read(make_buf_mut(buf, len))?)
+            } else {
+                logln2!("eaccess");
+                Err(SyscallError::EACCES)
+            }
         }
-    } _ => {
-        logln2!("ebadfd");
-        Err(SyscallError::EBADFD)
-    }};
+        _ => {
+            logln2!("ebadfd");
+            Err(SyscallError::EBADFD)
+        }
+    };
 }
 
 pub fn sys_readlink(
@@ -253,33 +265,37 @@ pub fn sys_pread(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
 
     let task = current_task_ref();
 
-    match task.get_handle(fd) { Some(f) => {
-        if f.flags().is_readable() {
-            Ok(f.read_at(make_buf_mut(buf, len), offset as usize)?)
-        } else {
-            Err(SyscallError::EACCES)
+    match task.get_handle(fd) {
+        Some(f) => {
+            if f.flags().is_readable() {
+                Ok(f.read_at(make_buf_mut(buf, len), offset as usize)?)
+            } else {
+                Err(SyscallError::EACCES)
+            }
         }
-    } _ => {
-        Err(SyscallError::EBADFD)
-    }}
+        _ => Err(SyscallError::EBADFD),
+    }
 }
 
 pub fn sys_pwrite(fd: u64, buf: u64, len: u64, offset: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
-    match task.get_handle(fd) { Some(f) => {
-        if f.flags().is_writable() {
-            logln4!("pwrite fd {}", fd);
-            Ok(f.write_at(make_buf(buf, len), offset as usize)?)
-        } else {
-            logln4!("pwrite fd {} = EACCESS", fd);
-            Err(SyscallError::EACCES)
+    match task.get_handle(fd) {
+        Some(f) => {
+            if f.flags().is_writable() {
+                logln4!("pwrite fd {}", fd);
+                Ok(f.write_at(make_buf(buf, len), offset as usize)?)
+            } else {
+                logln4!("pwrite fd {} = EACCESS", fd);
+                Err(SyscallError::EACCES)
+            }
         }
-    } _ => {
-        logln4!("pwrite fd {} = EBADFD", fd);
-        Err(SyscallError::EBADFD)
-    }}
+        _ => {
+            logln4!("pwrite fd {} = EBADFD", fd);
+            Err(SyscallError::EBADFD)
+        }
+    }
 }
 
 pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
@@ -287,11 +303,10 @@ pub fn sys_seek(fd: u64, off: u64, whence: u64) -> SyscallResult {
     let off = off as isize;
 
     let task = current_task_ref();
-    match task.get_handle(fd) { Some(f) => {
-        Ok(f.seek(off, syscall_defs::SeekWhence::from(whence))?)
-    } _ => {
-        Err(SyscallError::EBADFD)
-    }}
+    match task.get_handle(fd) {
+        Some(f) => Ok(f.seek(off, syscall_defs::SeekWhence::from(whence))?),
+        _ => Err(SyscallError::EBADFD),
+    }
 }
 
 pub fn sys_access(at: u64, path: u64, path_len: u64, _mode: u64, _flags: u64) -> SyscallResult {
@@ -517,11 +532,10 @@ pub fn sys_getdents(fd: u64, buf: u64, len: u64) -> SyscallResult {
     let fd = fd as usize;
 
     let task = current_task_ref();
-    match task.get_handle(fd) { Some(f) => {
-        Ok(f.get_dents(make_buf_mut(buf, len))?)
-    } _ => {
-        Err(SyscallError::EBADFD)
-    }}
+    match task.get_handle(fd) {
+        Some(f) => Ok(f.get_dents(make_buf_mut(buf, len))?),
+        _ => Err(SyscallError::EBADFD),
+    }
 }
 
 pub fn sys_symlink(
@@ -598,17 +612,18 @@ pub fn sys_unlink(at: u64, path: u64, path_len: u64, flags: u64) -> SyscallResul
 
     let (_, name) = path.containing_dir();
 
-    match file.parent() { Some(dir) => {
-        if dir.inode().ftype()? == FileType::Dir && file.inode().ftype()? != FileType::Dir {
-            dir.inode().unlink(name.str())?;
+    match file.parent() {
+        Some(dir) => {
+            if dir.inode().ftype()? == FileType::Dir && file.inode().ftype()? != FileType::Dir {
+                dir.inode().unlink(name.str())?;
 
-            file.drop_from_cache();
+                file.drop_from_cache();
+            }
+
+            Ok(0)
         }
-
-        Ok(0)
-    } _ => {
-        Err(SyscallError::EFAULT)
-    }}
+        _ => Err(SyscallError::EFAULT),
+    }
 }
 
 pub fn sys_mknode(at: u64, path: u64, path_len: u64, mode: u64, devid: u64) -> SyscallResult {
@@ -1150,17 +1165,21 @@ pub fn sys_poll(fds: u64, nfds: u64, timeout: u64) -> SyscallResult {
                 fd.revents = PollEventFlags::empty();
                 continue;
             }
-            match task.get_handle(fd.fd as usize) { Some(handle) => {
-                let f = handle.poll(if first { Some(&mut poll_table) } else { None }, fd.events)?;
-                fd.revents = f;
-                if !f.is_empty() {
-                    found += 1;
+            match task.get_handle(fd.fd as usize) {
+                Some(handle) => {
+                    let f =
+                        handle.poll(if first { Some(&mut poll_table) } else { None }, fd.events)?;
+                    fd.revents = f;
+                    if !f.is_empty() {
+                        found += 1;
 
-                    dbgln!(poll, "found {}: {:?}", fd.fd, fd.revents);
+                        dbgln!(poll, "found {}: {:?}", fd.fd, fd.revents);
+                    }
                 }
-            } _ => {
-                fd.revents = PollEventFlags::NVAL;
-            }}
+                _ => {
+                    fd.revents = PollEventFlags::NVAL;
+                }
+            }
         }
 
         if found == 0 && !timed_out {
@@ -1315,11 +1334,10 @@ pub fn sys_getpid() -> SyscallResult {
 }
 
 pub fn sys_getppid() -> SyscallResult {
-    match &current_task_ref().get_parent() { Some(p) => {
-        Ok(p.pid())
-    } _ => {
-        Ok(0)
-    }}
+    match &current_task_ref().get_parent() {
+        Some(p) => Ok(p.pid()),
+        _ => Ok(0),
+    }
 }
 
 pub fn sys_getpgid(_pid: u64) -> SyscallResult {
@@ -1351,11 +1369,10 @@ pub fn sys_exit_thread() -> ! {
 pub fn sys_ioctl(fd: u64, cmd: u64, arg: u64) -> SyscallResult {
     let current = current_task_ref();
 
-    match current.get_handle(fd as usize) { Some(handle) => {
-        Ok(handle.ioctl(cmd as usize, arg as usize)?)
-    } _ => {
-        Err(SyscallError::EBADFD)
-    }}
+    match current.get_handle(fd as usize) {
+        Some(handle) => Ok(handle.ioctl(cmd as usize, arg as usize)?),
+        _ => Err(SyscallError::EBADFD),
+    }
 }
 
 pub fn sys_sigaction(sig: u64, sigact: u64, old: u64) -> SyscallResult {

@@ -3,9 +3,9 @@ use alloc::vec::Vec;
 
 use spin::Once;
 
+use crate::kernel::net::Packet;
 use crate::kernel::net::eth::Eth;
 use crate::kernel::net::ip::Ip4;
-use crate::kernel::net::Packet;
 use crate::kernel::sync::RwSpin;
 
 #[derive(Eq, PartialEq)]

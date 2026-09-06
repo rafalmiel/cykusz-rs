@@ -126,6 +126,8 @@ pub fn rust_main(stack_top: VirtAddr) {
         core::mem::size_of::<crate::arch::mm::phys::PhysPage>()
     );
 
+    assert_eq!(32, core::mem::size_of::<crate::arch::mm::phys::PhysPage>());
+
     idle();
 }
 

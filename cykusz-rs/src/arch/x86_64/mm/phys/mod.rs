@@ -21,50 +21,42 @@ mod buddy;
 mod bump;
 mod iter;
 
-bitflags! {
-    #[derive(Copy, Clone)]
-    pub struct PageKind: u8 {
-        const PAGE_CACHE    = 1 << 0;
-        const SLAB_META     = 1 << 1;
-    }
-}
 
 pub struct PhysPageData {
     variant: PhysPageDataVariant,
-    flags: PageKind,
+}
+
+enum PhysPageDataVariant {
+    Empty,
+    Cache(PageCacheMeta),
+    #[allow(unused)]
+    Slab(SlabMeta),
 }
 
 impl Default for PhysPageData {
     fn default() -> Self {
         PhysPageData {
-            variant: PhysPageDataVariant { empty: () },
-            flags: PageKind::empty(),
+            variant: PhysPageDataVariant::Empty,
         }
     }
 }
 
 impl PhysPageData {
     pub fn as_cache_meta(&mut self) -> &mut PageCacheMeta {
-        assert!(self.flags.is_empty() || self.flags.bits() == PageKind::PAGE_CACHE.bits());
+        assert!(matches!(self.variant, PhysPageDataVariant::Empty | PhysPageDataVariant::Cache(_)));
 
-        unsafe {
-            if self.flags.is_empty() {
-                self.variant.cache = core::mem::ManuallyDrop::new(PageCacheMeta {
-                    p_cache: PageCacheItemWeak::empty(),
-                    vm_use_count: 0,
-                });
-                self.flags = PageKind::PAGE_CACHE;
-            }
-            &mut self.variant.cache
+        if let PhysPageDataVariant::Empty = self.variant {
+            self.variant = PhysPageDataVariant::Cache(PageCacheMeta {
+                p_cache: PageCacheItemWeak::empty(),
+                vm_use_count: 0,
+            });
         }
-    }
-}
+        let PhysPageDataVariant::Cache(cache) = &mut self.variant else {
+            panic!("invalid PhysPageData variant");
+        };
 
-#[allow(dead_code)]
-union PhysPageDataVariant {
-    empty: (),
-    cache: core::mem::ManuallyDrop<PageCacheMeta>,
-    slab: core::mem::ManuallyDrop<SlabMeta>,
+        cache
+    }
 }
 
 pub struct PageCacheMeta {
@@ -131,8 +123,7 @@ impl PhysPage {
     pub fn mark_unused(&self) {
         let mut lock = self.pt_lock.lock();
 
-        lock.variant.empty = ();
-        lock.flags = PageKind::empty();
+        lock.variant = PhysPageDataVariant::Empty
     }
 }
 

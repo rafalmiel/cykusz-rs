@@ -4,6 +4,7 @@ use crate::kernel::ipi::IpiTarget;
 pub enum IpiKind {
     IpiTask = 82,
     IpiTest = 83,
+    IpiSync = 84,
 }
 
 impl IpiTarget {
@@ -20,7 +21,9 @@ impl IpiTarget {
 pub fn init() {
     // task ipi handler responsible for calling eoi
     crate::arch::idt::set_handler_eoi(IpiKind::IpiTask as usize);
+    crate::arch::idt::set_handler_eoi(IpiKind::IpiSync as usize);
     crate::arch::idt::set_handler(IpiKind::IpiTask as usize, ipi_task);
+    crate::arch::idt::set_handler(IpiKind::IpiSync as usize, ipi_sync);
     crate::arch::idt::set_handler(IpiKind::IpiTest as usize, ipi_test);
 }
 
@@ -30,6 +33,10 @@ pub fn send_ipi_to(target: IpiTarget, kind: IpiKind) {
 
 fn ipi_task() {
     crate::kernel::ipi::handle_ipi_task();
+}
+
+fn ipi_sync() {
+    crate::kernel::ipi::handle_ipi_sync();
 }
 
 fn ipi_test() {

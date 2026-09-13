@@ -6,6 +6,36 @@ pub struct PerCpu<T> {
     data: UnsafeCell<Unique<T>>,
 }
 
+pub struct PerCpuIter<'a, T> {
+    per_cpu: &'a PerCpu<T>,
+    current: usize,
+    skip_self: bool,
+}
+
+impl<T: Default> Default for PerCpu<T> {
+    fn default() -> Self {
+        PerCpu::new_fn(|| T::default())
+    }
+}
+
+impl<'a, T> Iterator for PerCpuIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let cpu = self.current;
+        self.current += 1;
+        if cpu >= crate::kernel::smp::cpu_count() {
+            None
+        } else {
+            if self.skip_self && cpu == crate::cpu_id() as usize {
+                return self.next()
+            }
+            let ret = self.per_cpu.cpu(cpu as isize);
+            Some(ret)
+        }
+    }
+}
+
 impl<T> PerCpu<T> {
     pub const fn empty() -> PerCpu<T> {
         PerCpu::<T> {
@@ -53,5 +83,21 @@ impl<T> PerCpu<T> {
 
     pub fn this_cpu_mut(&self) -> &mut T {
         self.cpu_mut(unsafe { crate::CPU_ID } as isize)
+    }
+
+    pub fn iter(&self) -> PerCpuIter<'_, T> {
+        PerCpuIter {
+            current: 0,
+            per_cpu: self,
+            skip_self: false
+        }
+    }
+
+    pub fn iter_all_but_this(&self) -> PerCpuIter<'_, T> {
+        PerCpuIter {
+            current: 0,
+            per_cpu: self,
+            skip_self: true,
+        }
     }
 }

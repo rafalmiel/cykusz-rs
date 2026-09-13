@@ -390,7 +390,11 @@ pub fn reschedule() -> bool {
         }
     }
 
-    scheduler.reschedule()
+    let res = scheduler.reschedule();
+
+    crate::kernel::int::with_int_enabled(|| crate::run_deferred_tasks("reschedule"));
+
+    res
 }
 
 pub fn internal() -> Arc<dyn SchedulerInterface> {

@@ -5,6 +5,7 @@ static SMP_INITIALISED: AtomicBool = AtomicBool::new(false);
 
 pub fn init() {
     crate::arch::smp::init();
+    crate::kernel::mm::smp_init_deferred();
 }
 
 pub fn start() {

@@ -1,4 +1,4 @@
-use crate::arch::mm::phys::PhysPageData;
+use crate::arch::mm::phys::{DeferredHead, PhysPageData};
 use crate::arch::mm::virt::entry::Entry;
 use crate::arch::x86_64::mm::phys::PhysPage;
 use crate::kernel::mm::*;
@@ -61,6 +61,31 @@ impl NotLastLevel for Level2 {
 pub struct Table<L: TableLevel> {
     entries: [Entry; ENTRIES_COUNT],
     level: PhantomData<L>,
+}
+
+#[derive(Default)]
+pub struct P4TableOperationContext {
+    num_deallocs: usize,
+    deallocs: DeferredHead,
+}
+
+impl P4TableOperationContext {
+    pub fn push_dealloc(&mut self, frame: DeferredFrame) {
+        self.deallocs.push(frame.phys_page(), frame.order() as u8);
+        self.num_deallocs += 1;
+    }
+
+    pub fn deallocate_all(&mut self) {
+        self.deallocs.drain();
+    }
+
+    pub fn frames(&mut self) -> DeferredHead {
+        core::mem::take(&mut self.deallocs)
+    }
+
+    pub fn num_deallocs(&self) -> usize {
+        self.num_deallocs
+    }
 }
 
 pub type P4Table = Table<Level4>;
@@ -176,7 +201,12 @@ where
         )))
     }
 
-    pub fn alloc_next_level(&mut self, idx: usize, user: bool) -> (bool, &mut Table<L::NextLevel>) {
+    pub fn alloc_next_level(
+        &mut self,
+        ctx: Option<&mut P4TableOperationContext>,
+        idx: usize,
+        user: bool,
+    ) -> (bool, &mut Table<L::NextLevel>) {
         let entry = &mut self.entries[idx];
 
         let was_alloc = if !entry.contains(Entry::PRESENT) {
@@ -184,7 +214,7 @@ where
 
             Table::<L::NextLevel>::new_at_frame_mut(&frame).clear();
 
-            entry.set_frame(&frame);
+            entry.set_frame(ctx, &frame);
 
             true
         } else {
@@ -221,13 +251,13 @@ where
         Table::<L>::new_from_frame(&Frame::new(addr))
     }
 
-    pub fn do_unmap(&mut self, idx: usize) -> bool {
+    pub fn do_unmap(&mut self, ctx: &mut P4TableOperationContext, idx: usize) -> bool {
         let entry = &mut self.entries[idx];
 
         entry.dec_entry_count();
 
         if entry.get_entry_count() == 0 {
-            entry.unref_phys_page();
+            entry.unref_phys_page(Some(ctx), Some(0));
 
             entry.clear();
 
@@ -242,11 +272,20 @@ impl<L> Table<L>
 where
     L: HugePageLevel,
 {
-    pub fn set_hugepage(&mut self, idx: usize, frame: &Frame) -> bool {
+    pub fn set_hugepage(
+        &mut self,
+        ctx: &mut P4TableOperationContext,
+        idx: usize,
+        frame: &Frame,
+    ) -> bool {
         let entry = &mut self.entries[idx];
 
         if !entry.contains(Entry::PRESENT) {
-            entry.set_frame_flags(&frame, Entry::PRESENT | Entry::WRITABLE | Entry::HUGE_PAGE);
+            entry.set_frame_flags(
+                Some(ctx),
+                &frame,
+                Entry::PRESENT | Entry::WRITABLE | Entry::HUGE_PAGE,
+            );
 
             true
         } else {
@@ -256,7 +295,7 @@ where
 }
 
 impl Table<Level1> {
-    pub fn alloc(&mut self, idx: usize) {
+    pub fn alloc(&mut self, ctx: &mut P4TableOperationContext, idx: usize) {
         let entry = &mut self.entries[idx];
 
         if !entry.contains(Entry::PRESENT) {
@@ -264,15 +303,15 @@ impl Table<Level1> {
 
             Self::new_at_frame_mut(&frame).clear();
 
-            entry.set_frame_flags(&frame, Entry::PRESENT | Entry::WRITABLE);
+            entry.set_frame_flags(Some(ctx), &frame, Entry::PRESENT | Entry::WRITABLE);
         }
     }
 
-    pub fn set(&mut self, idx: usize, frame: &Frame) -> bool {
+    pub fn set(&mut self, ctx: &mut P4TableOperationContext, idx: usize, frame: &Frame) -> bool {
         let entry = &mut self.entries[idx];
 
         if !entry.contains(Entry::PRESENT) {
-            entry.set_frame_flags(&frame, Entry::PRESENT | Entry::WRITABLE);
+            entry.set_frame_flags(Some(ctx), &frame, Entry::PRESENT | Entry::WRITABLE);
 
             true
         } else {
@@ -280,7 +319,12 @@ impl Table<Level1> {
         }
     }
 
-    pub fn alloc_set_flags(&mut self, idx: usize, flags: Entry) -> bool {
+    pub fn alloc_set_flags(
+        &mut self,
+        ctx: &mut P4TableOperationContext,
+        idx: usize,
+        flags: Entry,
+    ) -> bool {
         let entry = &mut self.entries[idx];
 
         if !entry.contains(Entry::PRESENT) {
@@ -288,32 +332,38 @@ impl Table<Level1> {
 
             frame.clear();
 
-            entry.set_frame_flags(&frame, flags | Entry::PRESENT);
+            entry.set_frame_flags(Some(ctx), &frame, flags | Entry::PRESENT);
 
             true
         } else {
             let frame = Frame::new(entry.address());
-            entry.set_frame_flags(&frame, flags | Entry::PRESENT);
+            entry.set_frame_flags(Some(ctx), &frame, flags | Entry::PRESENT);
 
             false
         }
     }
 
-    pub fn set_flags(&mut self, idx: usize, frame: &Frame, flags: Entry) -> bool {
+    pub fn set_flags(
+        &mut self,
+        ctx: Option<&mut P4TableOperationContext>,
+        idx: usize,
+        frame: &Frame,
+        flags: Entry,
+    ) -> bool {
         let entry = &mut self.entries[idx];
 
         let inc = !entry.contains(Entry::PRESENT);
 
-        entry.set_frame_flags(frame, Entry::PRESENT | flags);
+        entry.set_frame_flags(ctx, frame, Entry::PRESENT | flags);
 
         inc
     }
 
-    pub fn do_unmap(&mut self, idx: usize) -> bool {
+    pub fn do_unmap(&mut self, ctx: &mut P4TableOperationContext, idx: usize, leaf_order: Option<usize>) -> bool {
         let entry = &mut self.entries[idx];
 
         if entry.contains(Entry::PRESENT) {
-            entry.unref_phys_page();
+            entry.unref_phys_page(Some(ctx), leaf_order);
 
             entry.clear();
 
@@ -367,7 +417,7 @@ impl Table<Level4> {
             if cnt == 0 {
                 let frame = Frame::new(self.phys_addr());
 
-                crate::kernel::mm::deallocate(&frame);
+                deallocate_order(&frame, 0);
             }
         }
     }
@@ -494,21 +544,27 @@ impl Table<Level4> {
         None
     }
 
-    pub fn map_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) {
+    pub fn map_flags(
+        &mut self,
+        addr: VirtAddr,
+        flags: virt::PageFlags,
+    ) -> P4TableOperationContext {
         let _g = self.lock(addr.is_user());
+
+        let mut ctx = P4TableOperationContext::default();
 
         let page = page::Page::new(addr);
 
         let user = page.p4_index() < 256;
 
-        let (_, l3) = self.alloc_next_level(page.p4_index(), user);
+        let (_, l3) = self.alloc_next_level(Some(&mut ctx), page.p4_index(), user);
 
-        let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
+        let (was_alloc_3, l2) = l3.alloc_next_level(Some(&mut ctx), page.p3_index(), user);
 
-        let (was_alloc_2, l1) = l2.alloc_next_level(page.p2_index(), user);
+        let (was_alloc_2, l1) = l2.alloc_next_level(Some(&mut ctx), page.p2_index(), user);
 
         dbgln!(virt, "map_flags {} {:?}", addr, flags);
-        if l1.alloc_set_flags(page.p1_index(), Entry::from_kernel_flags(flags)) {
+        if l1.alloc_set_flags(&mut ctx, page.p1_index(), Entry::from_kernel_flags(flags)) {
             l2.entries[page.p2_index()].inc_entry_count();
         }
 
@@ -519,20 +575,29 @@ impl Table<Level4> {
         if was_alloc_3 {
             self.entries[page.p4_index()].inc_entry_count();
         }
+
+        ctx
     }
 
-    pub fn map_to_flags(&mut self, virt: VirtAddr, phys: PhysAddr, flags: virt::PageFlags) {
+    pub fn map_to_flags(
+        &mut self,
+        virt: VirtAddr,
+        phys: PhysAddr,
+        flags: virt::PageFlags,
+    ) -> P4TableOperationContext {
         let _g = self.lock(virt.is_user());
+
+        let mut ctx = P4TableOperationContext::default();
 
         let page = page::Page::new(virt);
 
         let user = page.p4_index() < 256;
 
-        let (was_alloc_4, l3) = self.alloc_next_level(page.p4_index(), user);
+        let (was_alloc_4, l3) = self.alloc_next_level(Some(&mut ctx), page.p4_index(), user);
 
-        let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
+        let (was_alloc_3, l2) = l3.alloc_next_level(Some(&mut ctx), page.p3_index(), user);
 
-        let (was_alloc_2, l1) = l2.alloc_next_level(page.p2_index(), user);
+        let (was_alloc_2, l1) = l2.alloc_next_level(Some(&mut ctx), page.p2_index(), user);
 
         dbgln!(
             ptable,
@@ -548,6 +613,7 @@ impl Table<Level4> {
         );
 
         if l1.set_flags(
+            Some(&mut ctx),
             page.p1_index(),
             &Frame::new(phys),
             Entry::from_kernel_flags(flags),
@@ -562,22 +628,26 @@ impl Table<Level4> {
         if was_alloc_3 {
             self.entries[page.p4_index()].inc_entry_count();
         }
+
+        ctx
     }
 
-    pub fn map_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
+    pub fn map_to(&mut self, virt: VirtAddr, phys: PhysAddr) -> P4TableOperationContext {
         let _g = self.lock(virt.is_user());
+
+        let mut ctx = P4TableOperationContext::default();
 
         let page = page::Page::new(virt);
 
         let user = page.p4_index() < 256;
 
-        let (_, l3) = self.alloc_next_level(page.p4_index(), user);
+        let (_, l3) = self.alloc_next_level(Some(&mut ctx), page.p4_index(), user);
 
-        let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
+        let (was_alloc_3, l2) = l3.alloc_next_level(Some(&mut ctx), page.p3_index(), user);
 
-        let (was_alloc_2, l1) = l2.alloc_next_level(page.p2_index(), user);
+        let (was_alloc_2, l1) = l2.alloc_next_level(Some(&mut ctx), page.p2_index(), user);
 
-        if l1.set(page.p1_index(), &Frame::new(phys)) {
+        if l1.set(&mut ctx, page.p1_index(), &Frame::new(phys)) {
             l2.entries[page.p2_index()].inc_entry_count();
         }
 
@@ -588,47 +658,66 @@ impl Table<Level4> {
         if was_alloc_3 {
             self.entries[page.p4_index()].inc_entry_count();
         }
+
+        ctx
     }
 
-    pub fn map_hugepage_to(&mut self, virt: VirtAddr, phys: PhysAddr) {
+    pub fn map_hugepage_to(
+        &mut self,
+        virt: VirtAddr,
+        phys: PhysAddr,
+    ) -> P4TableOperationContext {
         let _g = self.lock(virt.is_user());
+
+        let mut ctx = P4TableOperationContext::default();
 
         let page = page::Page::new(virt);
 
         let user = page.p4_index() < 256;
 
-        let (_, l3) = self.alloc_next_level(page.p4_index(), user);
+        let (_, l3) = self.alloc_next_level(Some(&mut ctx), page.p4_index(), user);
 
-        let (was_alloc_3, l2) = l3.alloc_next_level(page.p3_index(), user);
+        let (was_alloc_3, l2) = l3.alloc_next_level(Some(&mut ctx), page.p3_index(), user);
 
-        if l2.set_hugepage(page.p2_index(), &Frame::new(phys)) {
+        if l2.set_hugepage(&mut ctx, page.p2_index(), &Frame::new(phys)) {
             l3.entries[page.p3_index()].inc_entry_count();
         }
 
         if was_alloc_3 {
             self.entries[page.p4_index()].inc_entry_count();
         }
+
+        ctx
     }
 
-    pub fn unmap(&mut self, virt: VirtAddr) {
+    pub fn unmap(&mut self, virt: VirtAddr, leaf_order: Option<usize>) -> P4TableOperationContext {
         let _g = self.lock(virt.is_user());
         if !virt.is_user() {
             dbgln!(ptable, "unmap {}", virt);
         }
+
+        let mut ctx = P4TableOperationContext::default();
 
         let page = page::Page::new(virt);
 
         if let Some(l3) = self.next_level_mut(page.p4_index()) {
             if let Some(l2) = l3.next_level_mut(page.p3_index()) {
                 if let Some(l1) = l2.next_level_mut(page.p2_index()) {
-                    if l1.do_unmap(page.p1_index()) {
-                        if l2.do_unmap(page.p2_index()) {
-                            l3.do_unmap(page.p3_index());
+                    dbgln!(pt, "do_unmap l1");
+                    if l1.do_unmap(&mut ctx, page.p1_index(), leaf_order) {
+                        dbgln!(pt, "do_unmap l2");
+                        if l2.do_unmap(&mut ctx, page.p2_index()) {
+                            dbgln!(pt, "do_unmap l3");
+                            l3.do_unmap(&mut ctx, page.p3_index());
                         }
                     }
                 }
             }
         }
+        // here we don't deallocate l4 leaf frame as it might have been user provided
+        // and allocated with different order
+
+        ctx
     }
 
     pub fn deallocate_user(&mut self) {
@@ -640,19 +729,19 @@ impl Table<Level4> {
             l3.for_entries_mut(flags, |_idx2, e2, l2| {
                 l2.for_entries_mut(flags, |_idx1, e1, l1| {
                     l1.for_entries_mut(flags, |_idx, e| {
-                        e.unref_phys_page();
+                        e.unref_phys_page(None, Some(0));
                         e.clear();
                     });
 
-                    e1.unref_phys_page();
+                    e1.unref_phys_page(None, Some(0));
                     e1.clear();
                 });
 
-                e2.unref_phys_page();
+                e2.unref_phys_page(None, Some(0));
                 e2.clear();
             });
 
-            e3.unref_phys_page();
+            e3.unref_phys_page(None, Some(0));
             e3.clear();
         });
     }
@@ -669,12 +758,12 @@ impl Table<Level4> {
         let flags = Entry::PRESENT | Entry::USER;
 
         self.for_entries_mut(flags, |idx4, _e4, l3| {
-            let n3 = new.alloc_next_level(idx4, true).1;
+            let n3 = new.alloc_next_level(None, idx4, true).1;
 
             let mut count_3 = 0;
 
             l3.for_entries_mut(flags, |idx3, _e3, l2| {
-                let (w2, n2) = n3.alloc_next_level(idx3, true);
+                let (w2, n2) = n3.alloc_next_level(None, idx3, true);
 
                 if w2 {
                     count_3 += 1;
@@ -683,7 +772,7 @@ impl Table<Level4> {
                 let mut count_2 = 0;
 
                 l2.for_entries_mut(flags, |idx2, _e2, l1| {
-                    let (w1, n1) = n2.alloc_next_level(idx2, true);
+                    let (w1, n1) = n2.alloc_next_level(None, idx2, true);
 
                     if w1 {
                         count_2 += 1;
@@ -694,7 +783,7 @@ impl Table<Level4> {
                     l1.for_entries_mut(flags, |idx1, e1| {
                         // Setup copy on write page
                         e1.remove(Entry::WRITABLE);
-                        n1.set_flags(idx1, &Frame::new(e1.address()), *e1);
+                        n1.set_flags(None, idx1, &Frame::new(e1.address()), *e1);
 
                         count_1 += 1;
                     });

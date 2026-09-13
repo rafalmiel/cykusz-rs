@@ -10,6 +10,7 @@ pub mod task;
 pub mod acpi;
 pub mod cpu;
 pub mod dev;
+pub mod events;
 pub mod gdt;
 pub mod idt;
 pub mod int;

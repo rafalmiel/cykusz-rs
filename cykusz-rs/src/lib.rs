@@ -177,6 +177,13 @@ fn init_task() {
         )
         .expect("Failed to open tty");
 
+    //for _i in 0..100 {
+    //    let ad = crate::kernel::mm::allocate_slab(1).unwrap();
+    //    crate::kernel::mm::free_slab(ad);
+
+    //    //dbgln!(slab, "recycled: {}", ad);
+    //}
+
     // Start shell on this cpu
     crate::kernel::init::exec();
 }
@@ -220,9 +227,16 @@ fn idle() -> ! {
         if kernel::sched::reschedule() {
             kernel::int::enable();
         } else {
+            crate::kernel::int::with_int_enabled(|| crate::run_deferred_tasks("timer"));
             kernel::int::enable_and_halt();
         }
     }
+}
+
+/// Run deferred tasks - to be called from safe contexts with ints disabled
+fn run_deferred_tasks(label: &'static str) {
+    // Deallocate all collected frames and run flush tlb ipi on other cpus
+    crate::kernel::mm::flush_deferred_frames(label);
 }
 
 fn sigexec_poweroff(_param: Arc<dyn Any + Send + Sync>) {

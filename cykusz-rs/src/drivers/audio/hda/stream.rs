@@ -24,8 +24,10 @@ pub struct SampleRate {
     div: u16,
 }
 
+use crate::arch::mm::phys::{MemZone, allocate_order_zone};
+use crate::arch::mm::virt::map_to_flags_range;
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{Frame, PAGE_SIZE, allocate_order, deallocate_order, map_to_flags};
+use crate::kernel::mm::{Frame, allocate_order, deallocate_order, map_to_flags};
 use StreamFormat::MULT::Value::*;
 use {StreamFormat::BASE::Value::KHZ44, StreamFormat::BASE::Value::KHZ48};
 
@@ -227,7 +229,7 @@ impl<const ENTRIES: usize, const ENTRY_SIZE: usize>
         assert_eq!(ENTRY_SIZE % 128, 0);
         assert!(ENTRIES <= 256);
 
-        let mem = allocate_order(0)?.address();
+        let mem = allocate_order_zone(0, MemZone::ZoneDma32)?.address();
 
         map_to_flags(
             mem.to_virt(),
@@ -249,15 +251,14 @@ impl<const ENTRIES: usize, const ENTRY_SIZE: usize>
             buf_mem.0 + size
         );
 
-        for page in (buf_mem..(buf_mem + size)).step_by(PAGE_SIZE) {
-            map_to_flags(
-                page.to_virt(),
-                page,
-                PageFlags::WRITABLE | PageFlags::NO_CACHE,
-            );
-            unsafe {
-                page.to_virt().as_slice_mut::<u8>(PAGE_SIZE).fill(0);
-            }
+        map_to_flags_range(
+            buf_mem.to_virt(),
+            buf_mem,
+            buf_mem.to_virt() + size,
+            PageFlags::WRITABLE | PageFlags::NO_CACHE,
+        );
+        unsafe {
+            buf_mem.to_virt().as_slice_mut::<u8>(size).fill(0);
         }
 
         let list = unsafe {

@@ -33,8 +33,8 @@ map_2mb_pages:
 
     ; Add offset from param
     add eax, ecx
-    ; Hugepage + writable + present
-    or eax, 0b10000011
+    ; Global + Hugepage + writable + present
+    or eax, 0b1_10000011
 
     ; Write page table entry
     mov [ebx + edx * 8], eax

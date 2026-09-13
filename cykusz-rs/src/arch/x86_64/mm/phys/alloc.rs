@@ -153,4 +153,6 @@ pub fn init(mboot_info: &multiboot2::Info) {
     NUM_PAGES.store((mem_end.0 / PAGE_SIZE) as u64, Ordering::SeqCst);
 
     init_slab();
+
+    println!("[ OK ] Slab Initialized")
 }

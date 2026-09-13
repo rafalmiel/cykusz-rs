@@ -416,6 +416,10 @@ impl Task {
             crate::kernel::int::is_enabled()
         );
 
+        if self.tid() == parent.tid() {
+            return;
+        }
+
         let mut children = self.children_debug(1);
 
         let mut cursor = children.front_mut();

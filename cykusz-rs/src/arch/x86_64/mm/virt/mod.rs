@@ -1,7 +1,8 @@
+use crate::arch::mm::phys::DeferredHead;
 use crate::arch::raw::ctrlregs;
 use crate::arch::raw::mm;
-use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::mm::virt;
+use crate::kernel::mm::PAGE_SIZE;
 use crate::kernel::mm::{PhysAddr, VirtAddr};
 
 use self::table::*;
@@ -35,15 +36,39 @@ pub fn flush_all() {
 }
 
 pub fn map_flags(virt: VirtAddr, flags: virt::PageFlags) {
-    current_p4_table().map_flags(virt, flags);
+    let mut ctx = current_p4_table().map_flags(virt, flags);
 
     flush(virt);
+
+    crate::kernel::mm::defer_flush_all_frames(ctx.frames());
 }
 
 pub fn map_to_flags(virt: VirtAddr, phys: PhysAddr, flags: virt::PageFlags) {
-    current_p4_table().map_to_flags(virt, phys, flags);
+    let mut ctx = current_p4_table().map_to_flags(virt, phys, flags);
 
     flush(virt);
+
+    crate::kernel::mm::defer_flush_all_frames(ctx.frames());
+}
+
+pub fn map_to_flags_range(virt: VirtAddr, phys: PhysAddr, last: VirtAddr, flags: virt::PageFlags) {
+    let p4 = current_p4_table();
+
+    let mut deferred = DeferredHead::default();
+
+    let mut offset = 0usize;
+
+    for v in (virt..last).step_by(PAGE_SIZE) {
+        let mut ctx = p4.map_to_flags(v, phys + offset, flags);
+
+        deferred.push_list(ctx.frames());
+
+        offset += PAGE_SIZE;
+
+        flush(v);
+    }
+
+    crate::kernel::mm::defer_flush_all_frames(deferred);
 }
 
 pub fn get_flags(virt: VirtAddr) -> Option<crate::arch::mm::virt::entry::Entry> {
@@ -55,24 +80,31 @@ pub fn update_flags(virt: VirtAddr, flags: virt::PageFlags) -> bool {
 
     flush(virt);
 
-    return res.is_some();
+    crate::kernel::mm::defer_flush_all();
+
+    res.is_some()
 }
 
 pub fn map(virt: VirtAddr) {
     map_flags(virt, virt::PageFlags::WRITABLE);
 }
 
-pub fn unmap(virt: VirtAddr) {
-    current_p4_table().unmap(virt);
+pub fn unmap(virt: VirtAddr, leaf_order: Option<usize>) {
+    dbgln!(ipi, "unmap {}", virt);
+    let mut ctx = current_p4_table().unmap(virt, leaf_order);
 
     flush(virt);
+
+    crate::kernel::mm::defer_flush_all_frames(ctx.frames())
 }
 
 #[allow(unused)]
 pub fn map_to(virt: VirtAddr, phys: PhysAddr) {
-    current_p4_table().map_to(virt, phys);
+    let mut ctx = current_p4_table().map_to(virt, phys);
 
     flush(virt);
+
+    crate::kernel::mm::defer_flush_all_frames(ctx.frames())
 }
 
 pub fn to_phys(addr: VirtAddr) -> Option<PhysAddr> {
@@ -101,13 +133,15 @@ fn remap(mboot_info: &crate::drivers::multiboot2::Info) {
         let flags = virt::PageFlags::from(elf.flags as ElfSectionFlags);
 
         for addr in (s..e).step_by(PAGE_SIZE) {
-            table.map_to_flags(addr, addr.to_phys(), flags);
+            let mut ctx = table.map_to_flags(addr, addr.to_phys(), flags);
+            ctx.deallocate_all();
         }
     }
 
     // Set physmap from previous mapping
     let orig = current_p4_table();
-    table.set_entry(256, orig.entry_at(256));
+
+    table.set_entry(256, &orig.entry_at(256));
 
     unsafe {
         activate_table(&table);

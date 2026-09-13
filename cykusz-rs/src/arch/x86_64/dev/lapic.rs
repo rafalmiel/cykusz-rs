@@ -184,6 +184,7 @@ impl LApic {
             while status > 0 {
                 status = self.reg_read(REG_CMD) & (1u32 << 12);
             }
+            dbgln!(ipi, "send_ipi exit, vec={}", vector);
         } else {
             unsafe {
                 msr::wrmsr(
@@ -196,6 +197,7 @@ impl LApic {
                 while status > 0 {
                     status = msr::rdmsr(msr::IA32_X2APIC_ICR) & (1u64 << 12);
                 }
+                dbgln!(ipi, "send_ipi exit, vec={}", vector);
             }
         }
     }

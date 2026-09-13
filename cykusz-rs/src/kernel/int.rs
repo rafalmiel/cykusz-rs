@@ -15,3 +15,13 @@ pub fn enable_and_halt() {
 pub fn finish() {
     crate::arch::int::end_of_int();
 }
+
+pub fn with_int_enabled<F: Fn() -> ()>(f: F) {
+    let was_disabled = !is_enabled();
+
+    enable();
+    f();
+    if was_disabled {
+        disable();
+    }
+}

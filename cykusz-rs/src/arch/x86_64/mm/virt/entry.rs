@@ -1,4 +1,5 @@
-use crate::kernel::mm::Frame;
+use crate::arch::mm::virt::table::P4TableOperationContext;
+use crate::kernel::mm::{Frame, DeferredFrame};
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
 use crate::kernel::mm::{deallocate_order, virt};
@@ -41,6 +42,9 @@ impl Entry {
         if flags.contains(virt::PageFlags::WRITABLE) {
             res.insert(Entry::WRITABLE);
         }
+        if flags.contains(virt::PageFlags::GLOBAL) {
+            res.insert(Entry::GLOBAL);
+        }
 
         res.insert(crate::arch::mm::pat::from_kernel_flags(false, flags));
 
@@ -79,17 +83,29 @@ impl Entry {
         }
     }
 
-    pub fn set_frame_flags(&mut self, frame: &Frame, flags: Entry) {
-        self.set_frame(frame);
+    pub fn set_frame_flags(&mut self, ctx: Option<&mut P4TableOperationContext>, frame: &Frame, flags: Entry) {
+        self.set_frame(ctx, frame);
         self.set_flags(flags);
     }
 
-    pub fn unref_phys_page(&self) -> bool {
+    pub fn unref_phys_page(&self, ctx: Option<&mut P4TableOperationContext>, order: Option<usize>) -> bool {
         if self.address() != PhysAddr(0) {
             if let Some(page) = self.address().to_phys_page() {
                 let cnt = page.dec_vm_use_count();
                 if cnt == 0 {
-                    deallocate_order(&Frame::new(self.address()), 0);
+                    page.mark_unused();
+
+                    let Some(order) = order else {
+                        return true
+                    };
+
+                    dbgln!(pt, "phys {} deallocating", self.address());
+                    let frame = Frame::new(self.address());
+                    if let Some(ctx) = ctx {
+                        ctx.push_dealloc(DeferredFrame::new(frame, order));
+                    } else {
+                        deallocate_order(&frame, order);
+                    }
 
                     return true;
                 }
@@ -107,11 +123,11 @@ impl Entry {
         }
     }
 
-    pub fn set_frame(&mut self, frame: &Frame) {
+    pub fn set_frame(&mut self, ctx: Option<&mut P4TableOperationContext>, frame: &Frame) {
         let ref_page = self.address() != frame.address();
 
         if ref_page {
-            self.unref_phys_page();
+            self.unref_phys_page(ctx, Some(0));
         }
 
         let mut bits = *self;

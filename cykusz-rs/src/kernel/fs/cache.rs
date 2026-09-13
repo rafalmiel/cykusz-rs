@@ -289,19 +289,19 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
         //}
     }
 
-    fn move_to_unused(&mut self, ent: ArcWrap<CacheItem<K, T>>) -> bool {
+    fn move_to_unused(&mut self, ent: ArcWrap<CacheItem<K, T>>) -> (bool, Option<(K, Arc<CacheItem<K ,T>>)>) {
         let key = { ent.cache_key() };
 
         match self.used.remove(&key) {
             Some(_e) => {
-                self.unused.put(key, ent.0.clone());
+                let evicted = self.unused.push(key, ent.0.clone());
 
-                true
+                (true, evicted)
             }
             _ => {
                 //println!("move_to_unused missing entry");
 
-                false
+                (false, None)
             }
         }
     }
@@ -377,9 +377,11 @@ impl<K: IsCacheKey, T: Cacheable<K>> Cache<K, T> {
     }
 
     pub fn move_to_unused(&self, ent: ArcWrap<CacheItem<K, T>>) {
-        if self.data.lock().move_to_unused(ent.clone()) {
+        let (success, evicted) = self.data.lock().move_to_unused(ent.clone());
+        if success {
             ent.notify_unused(&Arc::downgrade(&ent));
         }
+        drop(evicted);
     }
 
     pub fn make_item_locked(

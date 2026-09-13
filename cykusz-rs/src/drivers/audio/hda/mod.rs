@@ -299,7 +299,7 @@ impl IntelHdaData {
                 let node = self.nodes.get(out).unwrap();
                 let cd = node.config_default();
 
-                if cd.sequence() == 0 && supported_devs.contains(&cd.default_device().unwrap()) {
+                if supported_devs.contains(&cd.default_device().unwrap()) {
                     let pin_caps = self.cmd.invoke::<GetParameterPinCap>(*out);
 
                     if pin_caps.is_presence_detect_capable() {

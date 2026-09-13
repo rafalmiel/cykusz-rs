@@ -11,6 +11,7 @@ bitflags! {
         const NO_CACHE      = 1 << 4;
         const WRITE_COMBINE = 1 << 5;
         const WRITE_PROTECT = 1 << 6;
+        const GLOBAL        = 1 << 8;
     }
 }
 
@@ -32,7 +33,7 @@ impl From<crate::drivers::elf::types::ProgramFlags> for PageFlags {
 
 impl From<crate::drivers::multiboot2::elf::ElfSectionFlags> for PageFlags {
     fn from(p: ElfSectionFlags) -> Self {
-        let mut flags = PageFlags::empty();
+        let mut flags = PageFlags::GLOBAL;
 
         if p.contains(ElfSectionFlags::WRITABLE) {
             flags |= Self::WRITABLE;

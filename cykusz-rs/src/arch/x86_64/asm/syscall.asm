@@ -6,6 +6,7 @@ global asm_jmp_user
 
 extern fast_syscall_handler
 extern restore_user_fs
+extern on_user_enter
 
 global asm_update_kern_fs_base
 
@@ -78,13 +79,15 @@ asm_syscall_handler:
     cld
     call fast_syscall_handler
 
+    sti
+    call on_user_enter
     cli
+
     call restore_user_fs
 
     popAll
 
 asm_sysretq:
-
     pop r11     ; Restore rflags
     pop rcx     ; Restore rip
 
@@ -101,6 +104,8 @@ asm_sysretq:
     o64 sysret
 
 asm_sysretq_forkinit:
+    sti
+    call on_user_enter
     cli
     call restore_user_fs
 
@@ -109,6 +114,8 @@ asm_sysretq_forkinit:
     jmp asm_sysretq
 
 asm_sysretq_userinit:
+    sti
+    call on_user_enter
     cli
     call restore_user_fs
 
@@ -119,7 +126,10 @@ asm_jmp_user:
     push rsi    ; Param: entry
     push rdx    ; Param: rflags
 
+    sti
+    call on_user_enter
     cli
+
     call restore_user_fs
 
     pop r11

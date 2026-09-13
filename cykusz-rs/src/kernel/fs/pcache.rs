@@ -34,7 +34,7 @@ impl Cacheable<PageCacheKey> for PageCacheItemStruct {
             meta.as_cache_meta().unlink_page_cache();
         }
 
-        unmap(self.page.to_virt());
+        unmap(self.page.to_virt(), Some(0));
     }
 }
 

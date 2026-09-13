@@ -77,6 +77,7 @@ impl Corb {
     fn start(&self) {
         dbgln!(audio_v, "start corb");
         self.reg.ctl.set_is_run(true);
+        self.reg.ctl.set_is_cmeie(true);
 
         while !self.reg.ctl.is_run() {}
     }

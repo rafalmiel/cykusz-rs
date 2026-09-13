@@ -1,7 +1,7 @@
 use crate::drivers::multiboot2;
 use crate::kernel::fs::cache::{ArcWrap, WeakWrap};
 use crate::kernel::fs::pcache::{PageCacheItemArc, PageCacheItemWeak};
-use crate::kernel::mm::{PAGE_SIZE, PhysAddr};
+use crate::kernel::mm::{Frame, PAGE_SIZE, PhysAddr};
 use crate::kernel::sync::{LockApi, Spin, SpinGuard};
 use ::alloc::vec::Vec;
 use core::fmt::Formatter;
@@ -28,7 +28,7 @@ mod iter;
 mod slab;
 
 #[allow(dead_code)]
-#[derive(Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone)]
 #[repr(u8)]
 pub enum MemZone {
     ZoneDma = 0,   // Below 16MB
@@ -56,8 +56,8 @@ pub struct PhysPageData {
 enum PhysPageDataVariant {
     Empty,
     Cache(PageCacheMeta),
-    #[allow(unused)]
     Slab(SlabMeta),
+    Deferred(DeferredMeta),
 }
 
 impl core::fmt::Display for PhysPageDataVariant {
@@ -66,6 +66,7 @@ impl core::fmt::Display for PhysPageDataVariant {
             PhysPageDataVariant::Empty => f.write_str("Empty"),
             PhysPageDataVariant::Cache(_) => f.write_str("Cache"),
             PhysPageDataVariant::Slab(_) => f.write_str("Slab"),
+            PhysPageDataVariant::Deferred(_) => f.write_str("Deferred"),
         }
     }
 }
@@ -122,6 +123,23 @@ impl PhysPageData {
 
         slab
     }
+
+    pub fn as_deferred_meta(&mut self) -> &mut DeferredMeta {
+        //dbgln!(phys_page, "{:#p} -> Slab, {}", core::ptr::addr_of!(self), self.variant);
+        assert!(matches!(
+            self.variant,
+            PhysPageDataVariant::Empty | PhysPageDataVariant::Deferred(_)
+        ));
+
+        if let PhysPageDataVariant::Empty = self.variant {
+            self.variant = PhysPageDataVariant::Deferred(DeferredMeta::default());
+        }
+        let PhysPageDataVariant::Deferred(deferred) = &mut self.variant else {
+            panic!("as_deferred_meta: invalid PhysPageData variant");
+        };
+
+        deferred
+    }
 }
 
 pub struct PageCacheMeta {
@@ -157,6 +175,92 @@ pub struct SlabMeta {
     free_count: u16,
 }
 
+/// Head of a singly linked list of pages to deallocate
+#[derive(Default)]
+pub struct DeferredHead {
+    next: u32,
+    last: u32,
+    len: usize,
+}
+
+impl DeferredHead {
+    pub fn push(&mut self, page: &'static PhysPage, order: u8) {
+        {
+            let mut lock = page.lock_pt();
+            let deferred = lock.as_deferred_meta();
+
+            deferred.next = self.next;
+            deferred.order = order;
+        }
+        self.next = page.index() as u32;
+        if self.last == 0 {
+            self.last = self.next;
+        }
+        self.len += 1;
+    }
+
+    pub fn push_list(&mut self, other: DeferredHead) {
+        if other.next == 0 {
+            // The other is empty, do nothing
+            return;
+        }
+
+        if self.next == 0 {
+            // Our list is empty, just take the other
+            *self = other;
+            return;
+        }
+
+        // Both lists are not empty - point our tail to the other list head
+        let tail_page = PhysPage::from_index(self.last as usize);
+        {
+            let mut lock = tail_page.lock_pt();
+            lock.as_deferred_meta().next = other.next;
+        }
+        self.last = other.last;
+        self.len += other.len;
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Deallocate all frames in this list
+    pub fn drain(&mut self) {
+        let mut current = self.next;
+        self.next = 0;
+        self.last = 0;
+        self.len = 0;
+
+        while current != 0 {
+            let page = PhysPage::from_index(current as usize);
+
+            let (next, order) = {
+                let mut lock = page.lock_pt();
+
+                let (next, order) = {
+                    let deferred = lock.as_deferred_meta();
+
+                    (deferred.next, deferred.order)
+                };
+
+                lock.variant = PhysPageDataVariant::Empty;
+
+                (next, order)
+            };
+            deallocate_order(&Frame::new(page.to_phys_addr()), order as usize);
+            current = next;
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Default)]
+pub struct DeferredMeta {
+    next: u32,
+    order: u8,
+}
+
 #[repr(C)]
 pub struct PhysPage {
     pt_lock: Spin<PhysPageData>,
@@ -170,6 +274,11 @@ const _: () = assert!(32 == core::mem::size_of::<crate::arch::mm::phys::PhysPage
 unsafe impl Sync for PhysPage {}
 
 impl PhysPage {
+    fn from_index(index: usize) -> &'static PhysPage {
+        assert_ne!(index, 0, "from index sentiel value");
+        &pages().unwrap()[index]
+    }
+
     fn base_addr() -> PhysAddr {
         PhysAddr(&pages().unwrap()[0] as *const _ as usize)
     }
@@ -180,6 +289,10 @@ impl PhysPage {
 
     pub fn to_phys_addr(&self) -> PhysAddr {
         (self.this_addr() - Self::base_addr()) / core::mem::size_of::<Self>() * PAGE_SIZE
+    }
+
+    pub fn index(&self) -> usize {
+        (self.this_addr().0 - Self::base_addr().0) / size_of::<Self>()
     }
 
     pub fn lock_pt(&self) -> SpinGuard<'_, PhysPageData> {

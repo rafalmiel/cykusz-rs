@@ -1,6 +1,6 @@
 use crate::arch::mm::phys::{MemZone, PhysPage, allocate_zone};
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{Frame, PAGE_SIZE, VirtAddr, map_to_flags, unmap};
+use crate::kernel::mm::{map_to_flags, unmap, VirtAddr, PAGE_SIZE};
 use alloc::vec::Vec;
 
 const SLAB_COUNT: usize = 10; // 8 16 32 64 128 256 512 1024 2048 4096
@@ -41,6 +41,8 @@ impl Slab {
     fn new(chunk_size: usize, zone: MemZone) -> Option<Self> {
         let frame = allocate_zone(zone)?;
         let phys = frame.address();
+
+        dbgln!(pt, "allocated new slab frame {}", phys);
 
         let phys_page = frame.address().to_phys_page()?;
 
@@ -209,9 +211,7 @@ impl SlabAlloc {
 
             let phys_addr = phys_page.to_phys_addr();
             // Unmap the page
-            unmap(phys_addr.to_virt());
-            // Finally - deallocate the frame
-            crate::kernel::mm::deallocate(&Frame::new(phys_addr));
+            unmap(phys_addr.to_virt(), Some(0));
         }
 
         Some(())

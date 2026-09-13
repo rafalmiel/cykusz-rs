@@ -556,7 +556,7 @@ impl Mapping {
                     f.unmap(v);
                 }
 
-                unmap(v);
+                unmap(v, Some(0));
             }
         };
 

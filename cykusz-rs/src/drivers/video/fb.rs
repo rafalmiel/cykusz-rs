@@ -2,10 +2,8 @@ use alloc::string::String;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
-use bit_field::BitField;
-use spin::Once;
-
 use crate::arch::mm::VirtAddr;
+use crate::arch::mm::virt::map_to_flags_range;
 use crate::arch::output::{Character, VideoDriver, register_video_driver};
 use crate::drivers::multiboot2::framebuffer_info::{FramebufferInfo, FramebufferType};
 use crate::drivers::tty::color::{Ansi16, ColorCode, RGB};
@@ -15,10 +13,12 @@ use crate::kernel::fs::inode::INode;
 use crate::kernel::fs::pcache::{MMapPage, MMapPageStruct, MappedAccess, PageDirectItemStruct};
 use crate::kernel::fs::vfs::FsError;
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{MappedAddr, PAGE_SIZE, PhysAddr, map_to_flags, virt};
+use crate::kernel::mm::{MappedAddr, PAGE_SIZE, PhysAddr};
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::timer::TimerObject;
 use crate::kernel::utils::types::Align;
+use bit_field::BitField;
+use spin::Once;
 
 static FONT: &'static [u8] = &[
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -513,13 +513,12 @@ impl State {
 
         let total = self.pitch * 4 * self.height;
 
-        for off in (0..total).step_by(0x1000) {
-            map_to_flags(
-                buf_phys.to_virt() + off,
-                buf_phys + off,
-                virt::PageFlags::WRITABLE | virt::PageFlags::WRITE_COMBINE,
-            );
-        }
+        map_to_flags_range(
+            buf_phys.to_virt(),
+            buf_phys,
+            buf_phys.to_virt() + total,
+            PageFlags::WRITABLE | PageFlags::WRITE_COMBINE,
+        );
 
         self.buffer = unsafe {
             buf_phys

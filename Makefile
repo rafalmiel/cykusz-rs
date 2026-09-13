@@ -48,7 +48,7 @@ kvm_params :=
 endif
 
 ifdef debug
-debug_params := -no-reboot -s -S -monitor unix:qemu-monitor-socket,server,nowait
+debug_params := -d int,cpu_reset -D qemu.log -no-reboot -s -S -monitor unix:qemu-monitor-socket,server,nowait
 else
 debug_params :=
 endif
@@ -66,6 +66,7 @@ run: $(disk)
 		-display sdl \
 		-serial stdio \
 		-no-reboot \
+		-no-shutdown \
 		-m 5811 \
 		-audio driver=pipewire,model=hda \
 		-smp cpus=$(cpus) \

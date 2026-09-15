@@ -8,8 +8,8 @@ use crate::drivers::audio::hda::reg::verb;
 use crate::drivers::audio::hda::reg::verb::{
     ConfigurationDefaultReg, GetParameterAudioWidgetCapReg, GetParameterInputAmplifierCap,
     GetParameterNodeCount, GetParameterOutputAmplifierCap, GetParameterPinCap, GetPinSense,
-    NodeCommand, SetAmplifierGainMute, SetChannelStreamID, SetConverterFormat, SetEAPDBTLEnable,
-    SetPinWidgetControl, SetPowerState,
+    GetPowerState, NodeCommand, SetAmplifierGainMute, SetChannelStreamID, SetConverterFormat,
+    SetEAPDBTLEnable, SetPinWidgetControl, SetPowerState,
 };
 use crate::drivers::pci::{PciDeviceHandle, PciHeader, register_pci_device};
 use crate::kernel::device::dev_t::DevId;
@@ -20,6 +20,7 @@ use crate::kernel::fs::poll::PollTable;
 use crate::kernel::mm::virt::PageFlags;
 use crate::kernel::mm::{VirtAddr, allocate_order, map_to_flags};
 use crate::kernel::sync::{LockApi, Spin};
+use crate::kernel::timer::busy_sleep;
 use crate::kernel::utils::types::Align;
 use crate::kernel::utils::wait_queue::WaitQueue;
 use alloc::string::String;
@@ -367,6 +368,44 @@ impl IntelHdaData {
         init_streams(self.reg.gcap.bss() as usize);
     }
 
+    fn power_on(&mut self, addr: Address) {
+        let mut reg = <SetPowerState as NodeCommand>::Data::new();
+
+        // Node fully on
+        reg.set_ps_set(verb::PowerStateReg::PS_SET::Value::D0);
+        self.cmd.invoke_data::<SetPowerState>(addr, reg);
+
+        let timeout_ms = 500;
+        let mut trial = 0;
+
+        let mut ps = self.cmd.invoke::<GetPowerState>(addr);
+        let mut ps_act = ps.ps_act();
+        let mut ps_set = ps.ps_set();
+
+        // Wait until the node reaches D0 power state, panic if it fails within 500ms
+        // Panic is ok for now for hobby os
+        while ps_act != verb::PowerStateReg::PS_ACT::D0.value {
+            if trial > timeout_ms {
+                panic!("hda: Failed to power on node addr: {:?}", addr);
+            }
+            dbgln!(
+                audio,
+                "{:?}, ps_act: {}, ps_set: {:?}",
+                addr,
+                ps_act,
+                ps_set
+            );
+
+            // Sleep 1ms
+            busy_sleep(1_000_000);
+            trial += 1;
+
+            ps = self.cmd.invoke::<GetPowerState>(addr);
+            ps_act = ps.ps_act();
+            ps_set = ps.ps_set();
+        }
+    }
+
     fn configure(&mut self) {
         self.init_posbuf();
         self.init_stream_regs();
@@ -386,33 +425,25 @@ impl IntelHdaData {
 
         dbgln!(audio, "Pin: {:?}, Dac: {:?}", pin, dac);
 
-        let mut node_groups = hashbrown::HashSet::<Address>::new();
+        let mut seen = hashbrown::HashSet::<Address>::new();
 
         // Most likely just one node group but check all nodes in the path
-        path.iter()
+        let node_groups: Vec<Address> = path
+            .iter()
             .filter_map(|a| {
-                node_groups.contains(a).not().then(|| {
-                    node_groups.insert(*a);
-                    *a
+                let node_group = self.nodes.get(a)?.node_group_address()?;
+                seen.contains(&node_group).not().then(|| {
+                    seen.insert(node_group);
+                    node_group
                 })
             })
-            .for_each(|addr| {
-                // Power on node group before powering widgets on the path
-                dbgln!(audio, "Powering node group {:?}", addr);
-                let mut reg = <SetPowerState as NodeCommand>::Data::new();
+            .collect();
 
-                // Node group fully on
-                reg.set_ps_set(verb::PowerStateReg::PS_SET::Value::D0);
-                self.cmd.invoke_data::<SetPowerState>(addr, reg);
-            });
+        // Power on node groups first - most likely just one node group
+        node_groups.iter().for_each(|a| self.power_on(*a));
 
-        for &addr in &path {
-            let mut reg = <SetPowerState as NodeCommand>::Data::new();
-
-            // Fully on
-            reg.set_ps_set(verb::PowerStateReg::PS_SET::Value::D0);
-            self.cmd.invoke_data::<SetPowerState>(addr, reg);
-        }
+        // Power up widgets on the path
+        path.iter().for_each(|a| self.power_on(*a));
 
         dbgln!(audio, "Power State On!");
 

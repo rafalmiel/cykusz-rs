@@ -191,7 +191,13 @@ register_bitfields! [
             D3cold = 0b0100,
 
         ],
-        PS_ACT OFFSET(4) NUMBITS(4) [],
+        PS_ACT OFFSET(4) NUMBITS(4) [
+            D0 = 0b0000,
+            D1 = 0b0001,
+            D2 = 0b0010,
+            D3 = 0b0011,
+            D3cold = 0b0100,
+        ],
         PS_ERROR OFFSET(8) NUMBITS(1) [],
         PS_CLK_STOP_OK OFFSET(9) NUMBITS(1) [],
     ],

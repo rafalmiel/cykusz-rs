@@ -230,7 +230,7 @@ impl BuddyAlloc {
 
         self.ranges[..self.num_ranges]
             .iter()
-            .find(|(s, e)| *s <= addr && *e > end)
+            .find(|(s, e)| *s <= addr && *e >= end)
             .is_some()
     }
 

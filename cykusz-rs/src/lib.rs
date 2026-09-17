@@ -201,7 +201,7 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
 
     kernel::ipi::init_ap();
 
-    kernel::ipi::ipi_test();
+    kernel::ipi::send_test_ipi();
 
     println!("[ OK ] CPU {} Initialized", unsafe { crate::CPU_ID });
 

@@ -19,9 +19,6 @@ impl IpiTarget {
 }
 
 pub fn init() {
-    // task ipi handler responsible for calling eoi
-    crate::arch::idt::set_handler_eoi(IpiKind::IpiTask as usize);
-    crate::arch::idt::set_handler_eoi(IpiKind::IpiSync as usize);
     crate::arch::idt::set_handler(IpiKind::IpiTask as usize, ipi_task);
     crate::arch::idt::set_handler(IpiKind::IpiSync as usize, ipi_sync);
     crate::arch::idt::set_handler(IpiKind::IpiTest as usize, ipi_test);

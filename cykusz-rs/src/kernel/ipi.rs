@@ -202,8 +202,6 @@ pub fn handle_ipi_task() {
 
     let lock = ctx.task_ipi.this_cpu();
 
-    let mut cnt = 0;
-
     let _g = IrqGuard::new();
 
     let mut locked = lock.lock_irq();
@@ -214,8 +212,6 @@ pub fn handle_ipi_task() {
      * which guarantees elements added after while loop finishes will be processed on next interrupt
      */
     while let Some(el) = locked.pop_front() {
-        cnt += 1;
-
         drop(locked);
 
         //dbgln!(ipie, "handle {:?}", el.cmd);
@@ -223,17 +219,12 @@ pub fn handle_ipi_task() {
 
         locked = lock.lock_irq();
     }
-    drop(locked);
-
-    dbgln!(ipi_count, "handled {} ipis", cnt);
-    crate::arch::int::end_of_int();
 }
 
 pub fn handle_ipi_sync() {
     unsafe {
         FLUSH_ALL.get_unchecked().handle();
     }
-    crate::arch::int::end_of_int();
 }
 
 fn send_task_ipi(task_ipi: TaskIpiOperation, task: &ArcTask) {
@@ -263,6 +254,6 @@ fn send_sync_ipi() {
     exec_on_cpu(IpiTarget::AllButThis, IpiKind::IpiSync);
 }
 
-pub fn ipi_test() {
+pub fn send_test_ipi() {
     exec_on_cpu(IpiTarget::All, IpiKind::IpiTest);
 }

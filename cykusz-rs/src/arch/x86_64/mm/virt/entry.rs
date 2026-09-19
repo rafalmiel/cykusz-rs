@@ -1,7 +1,7 @@
 use crate::arch::mm::virt::table::P4TableOperationContext;
-use crate::kernel::mm::{Frame, DeferredFrame};
 use crate::kernel::mm::MappedAddr;
 use crate::kernel::mm::PhysAddr;
+use crate::kernel::mm::{DeferredFrame, Frame};
 use crate::kernel::mm::{deallocate_order, virt};
 
 bitflags! {
@@ -83,21 +83,28 @@ impl Entry {
         }
     }
 
-    pub fn set_frame_flags(&mut self, ctx: Option<&mut P4TableOperationContext>, frame: &Frame, flags: Entry) {
+    pub fn set_frame_flags(
+        &mut self,
+        ctx: Option<&mut P4TableOperationContext>,
+        frame: &Frame,
+        flags: Entry,
+    ) {
         self.set_frame(ctx, frame);
         self.set_flags(flags);
     }
 
-    pub fn unref_phys_page(&self, ctx: Option<&mut P4TableOperationContext>, order: Option<usize>) -> bool {
+    pub fn unref_phys_page(
+        &self,
+        ctx: Option<&mut P4TableOperationContext>,
+        order: Option<usize>,
+    ) -> bool {
         if self.address() != PhysAddr(0) {
             if let Some(page) = self.address().to_phys_page() {
                 let cnt = page.dec_vm_use_count();
                 if cnt == 0 {
                     page.mark_unused();
 
-                    let Some(order) = order else {
-                        return true
-                    };
+                    let Some(order) = order else { return true };
 
                     dbgln!(pt, "phys {} deallocating", self.address());
                     let frame = Frame::new(self.address());

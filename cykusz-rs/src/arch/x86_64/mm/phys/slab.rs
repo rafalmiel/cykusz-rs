@@ -1,6 +1,6 @@
 use crate::arch::mm::phys::{MemZone, PhysPage, allocate_zone};
 use crate::kernel::mm::virt::PageFlags;
-use crate::kernel::mm::{map_to_flags, unmap, VirtAddr, PAGE_SIZE};
+use crate::kernel::mm::{PAGE_SIZE, VirtAddr, map_to_flags, unmap};
 use alloc::vec::Vec;
 
 const SLAB_COUNT: usize = 10; // 8 16 32 64 128 256 512 1024 2048 4096

@@ -1,8 +1,10 @@
+use crate::kernel::ipi;
 use crate::kernel::ipi::IpiTarget;
 
+#[derive(Copy, Clone)]
 #[repr(u8)]
 pub enum IpiKind {
-    IpiTask = 82,
+    IpiAsync = 82,
     IpiTest = 83,
     IpiSync = 84,
 }
@@ -19,21 +21,21 @@ impl IpiTarget {
 }
 
 pub fn init() {
-    crate::arch::idt::set_handler(IpiKind::IpiTask as usize, ipi_task);
+    crate::arch::idt::set_handler(IpiKind::IpiAsync as usize, ipi_async);
     crate::arch::idt::set_handler(IpiKind::IpiSync as usize, ipi_sync);
     crate::arch::idt::set_handler(IpiKind::IpiTest as usize, ipi_test);
 }
 
-pub fn send_ipi_to(target: IpiTarget, kind: IpiKind) {
+pub fn send_ipi_to(target: ipi::IpiTarget, kind: IpiKind) {
     crate::arch::int::send_ipi(target, kind as u8);
 }
 
-fn ipi_task() {
-    crate::kernel::ipi::handle_ipi_task();
+fn ipi_async() {
+    ipi::r#async::handle_async_ipi();
 }
 
 fn ipi_sync() {
-    crate::kernel::ipi::handle_ipi_sync();
+    ipi::sync::handle_sync_ipi();
 }
 
 fn ipi_test() {

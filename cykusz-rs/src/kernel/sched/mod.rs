@@ -36,6 +36,7 @@ bitflags! {
     }
 }
 
+pub mod ipi;
 mod round_robin;
 mod task_container;
 

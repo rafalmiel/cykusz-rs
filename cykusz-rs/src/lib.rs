@@ -156,6 +156,8 @@ fn init_task() {
 
     kernel::futex::init();
 
+    kernel::ipi::send_test_ipi();
+
     println!("[ OK ] Futexes Initialized");
 
     current_task_ref()
@@ -200,8 +202,6 @@ pub fn rust_main_ap(stack_ptr: u64, cpu_num: u8) {
     kernel::sched::init_ap();
 
     kernel::ipi::init_ap();
-
-    kernel::ipi::send_test_ipi();
 
     println!("[ OK ] CPU {} Initialized", unsafe { crate::CPU_ID });
 

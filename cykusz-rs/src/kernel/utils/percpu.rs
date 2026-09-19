@@ -1,3 +1,4 @@
+use crate::kernel::ipi;
 use crate::kernel::mm::heap::allocate_align;
 use core::cell::UnsafeCell;
 use core::ptr::Unique;
@@ -9,12 +10,12 @@ pub struct PerCpu<T> {
 pub struct PerCpuIter<'a, T> {
     per_cpu: &'a PerCpu<T>,
     current: usize,
-    skip_self: bool,
+    target: ipi::IpiTarget,
 }
 
 impl<T: Default> Default for PerCpu<T> {
     fn default() -> Self {
-        PerCpu::new_fn(|| T::default())
+        PerCpu::new_fn(|_| T::default())
     }
 }
 
@@ -27,11 +28,19 @@ impl<'a, T> Iterator for PerCpuIter<'a, T> {
         if cpu >= crate::kernel::smp::cpu_count() {
             None
         } else {
-            if self.skip_self && cpu == crate::cpu_id() as usize {
-                return self.next()
+            let is_valid = match self.target {
+                ipi::IpiTarget::All => true,
+                ipi::IpiTarget::Cpu(c) if c == cpu => true,
+                ipi::IpiTarget::This if cpu == crate::cpu_id() as usize => true,
+                ipi::IpiTarget::AllButThis if cpu != crate::cpu_id() as usize => true,
+                _ => false,
+            };
+
+            if !is_valid {
+                return self.next();
             }
-            let ret = self.per_cpu.cpu(cpu as isize);
-            Some(ret)
+
+            Some(self.per_cpu.cpu(cpu as isize))
         }
     }
 }
@@ -43,7 +52,7 @@ impl<T> PerCpu<T> {
         }
     }
 
-    pub fn new_fn(init: fn() -> T) -> PerCpu<T> {
+    pub fn new_fn(init: fn(usize) -> T) -> PerCpu<T> {
         use crate::kernel::smp::cpu_count;
         use ::core::mem::size_of;
 
@@ -56,7 +65,7 @@ impl<T> PerCpu<T> {
 
         unsafe {
             for i in 0..cpu_count {
-                raw.offset(i as isize).write(init());
+                raw.offset(i as isize).write(init(i));
             }
 
             this.data = UnsafeCell::new(Unique::new_unchecked(raw));
@@ -89,15 +98,15 @@ impl<T> PerCpu<T> {
         PerCpuIter {
             current: 0,
             per_cpu: self,
-            skip_self: false
+            target: ipi::IpiTarget::All,
         }
     }
 
-    pub fn iter_all_but_this(&self) -> PerCpuIter<'_, T> {
+    pub fn iter_ipi_target(&self, target: ipi::IpiTarget) -> PerCpuIter<'_, T> {
         PerCpuIter {
             current: 0,
             per_cpu: self,
-            skip_self: true,
+            target,
         }
     }
 }

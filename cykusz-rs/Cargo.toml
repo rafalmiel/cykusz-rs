@@ -29,6 +29,7 @@ lru = "*"
 vte = { version = "*", default-features = false }
 linked_list_allocator = "*"
 bbqueue = "*"
+smallvec = "*"
 
 [dependencies.uuid]
 default-features = false

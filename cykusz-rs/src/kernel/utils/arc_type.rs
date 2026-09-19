@@ -77,6 +77,10 @@ impl<T: Uid> ArcType<T> {
 }
 
 impl<T: ?Sized + Uid> ArcType<T> {
+    pub unsafe fn from_raw(ptr: *const T) -> Self {
+        unsafe { ArcType(Arc::from_raw(ptr)) }
+    }
+
     pub fn into_raw(this: Self) -> *const T {
         let this = ManuallyDrop::new(this);
         Arc::as_ptr(&this.0)

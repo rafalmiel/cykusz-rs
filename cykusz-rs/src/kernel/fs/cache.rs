@@ -289,7 +289,10 @@ impl<K: IsCacheKey, T: Cacheable<K>> CacheData<K, T> {
         //}
     }
 
-    fn move_to_unused(&mut self, ent: ArcWrap<CacheItem<K, T>>) -> (bool, Option<(K, Arc<CacheItem<K ,T>>)>) {
+    fn move_to_unused(
+        &mut self,
+        ent: ArcWrap<CacheItem<K, T>>,
+    ) -> (bool, Option<(K, Arc<CacheItem<K, T>>)>) {
         let key = { ent.cache_key() };
 
         match self.used.remove(&key) {

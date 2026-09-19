@@ -1,6 +1,5 @@
 use crate::kernel::task::Task;
 use crate::kernel::utils::arc_type::ArcType;
-use alloc::sync::Arc;
 use core::marker::PhantomData;
 use intrusive_collections::PointerOps;
 
@@ -36,7 +35,7 @@ unsafe impl PointerOps for TaskPointerOps<ArcType<Task>> {
 
     #[inline]
     unsafe fn from_raw(&self, raw: *const Task) -> ArcType<Task> {
-        unsafe { ArcType::<Task>::new(Arc::from_raw(raw)) }
+        unsafe { ArcType::<Task>::from_raw(raw) }
     }
 
     #[inline]

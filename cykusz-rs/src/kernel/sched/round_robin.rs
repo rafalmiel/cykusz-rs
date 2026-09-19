@@ -1,4 +1,4 @@
-use crate::kernel::sched::{SchedulerInterface, SleepFlags};
+use crate::kernel::sched;
 use crate::kernel::signal::{SignalError, SignalResult};
 use crate::kernel::sync::{IrqGuard, LockApi, Spin, SpinGuard};
 use crate::kernel::task::{ArcTask, SchedTaskAdapter, Task, TaskState};
@@ -78,7 +78,7 @@ impl Queues {
 
         assert_eq!(prev_id, prev.tid());
 
-        crate::kernel::sched::finalize();
+        sched::finalize();
 
         dbgln!(sched, "{} -> {}", prev.tid(), to.tid());
 
@@ -205,7 +205,7 @@ impl Queues {
     fn sleep(
         &mut self,
         time_ns: Option<usize>,
-        flags: SleepFlags,
+        flags: sched::SleepFlags,
         lock: SpinGuard<()>,
     ) -> SignalResult<()> {
         let task = get_current();
@@ -223,7 +223,7 @@ impl Queues {
             return Ok(());
         }
 
-        if !flags.contains(SleepFlags::NON_INTERRUPTIBLE) && task.signals().has_pending() {
+        if !flags.contains(sched::SleepFlags::NON_INTERRUPTIBLE) && task.signals().has_pending() {
             return Err(SignalError::Interrupted);
         }
 
@@ -456,13 +456,13 @@ pub struct RRScheduler {
 unsafe impl Send for RRScheduler {}
 unsafe impl Sync for RRScheduler {}
 
-impl SchedulerInterface for RRScheduler {
+impl sched::SchedulerInterface for RRScheduler {
     fn init(&self) {
         let (_, queue) = self.queues.this_cpu();
 
         set_current(queue.idle_task.clone());
 
-        crate::kernel::sched::register_task(&queue.idle_task);
+        sched::register_task(&queue.idle_task);
     }
 
     fn reschedule(&self) -> bool {
@@ -482,7 +482,7 @@ impl SchedulerInterface for RRScheduler {
             RRScheduler::alloc_cpu(&task);
         }
 
-        if Self::maybe_do_ipi(&task, crate::kernel::ipi::queue) {
+        if sched::ipi::maybe_do_ipi(&task, sched::ipi::send_ipi_queue) {
             return;
         }
 
@@ -495,7 +495,7 @@ impl SchedulerInterface for RRScheduler {
         queue.queue_task(task, lock);
     }
 
-    fn sleep(&self, until: Option<usize>, flags: SleepFlags) -> SignalResult<()> {
+    fn sleep(&self, until: Option<usize>, flags: sched::SleepFlags) -> SignalResult<()> {
         let (lock, queue) = self.queues.this_cpu_mut();
 
         let lock = lock.lock_irq();
@@ -504,11 +504,11 @@ impl SchedulerInterface for RRScheduler {
     }
 
     fn wake(&self, task: ArcTask) {
-        if Self::maybe_do_ipi(&task, crate::kernel::ipi::wake_up) {
+        if sched::ipi::maybe_do_ipi(&task, sched::ipi::send_ipi_wake_up) {
             return;
         }
 
-        //assert!(task.is_on_this_cpu());
+        assert!(task.is_on_this_cpu());
 
         let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
 
@@ -518,11 +518,11 @@ impl SchedulerInterface for RRScheduler {
     }
 
     fn wake_as_next(&self, task: ArcTask) {
-        if Self::maybe_do_ipi(&task, crate::kernel::ipi::wake_up_next) {
+        if sched::ipi::maybe_do_ipi(&task, sched::ipi::send_ipi_wake_up_next) {
             return;
         }
 
-        //assert!(task.is_on_this_cpu());
+        assert!(task.is_on_this_cpu());
 
         let (lock, queue) = self.queues.cpu_mut(task.on_cpu() as isize);
 
@@ -532,11 +532,11 @@ impl SchedulerInterface for RRScheduler {
     }
 
     fn cont(&self, task: ArcTask) {
-        if Self::maybe_do_ipi(&task, crate::kernel::ipi::cont) {
+        if sched::ipi::maybe_do_ipi(&task, sched::ipi::send_ipi_cont) {
             return;
         }
 
-        //assert!(task.is_on_this_cpu());
+        assert!(task.is_on_this_cpu());
         if task.is_process_leader() {
             task.cont_threads();
         }
@@ -587,20 +587,11 @@ impl SchedulerInterface for RRScheduler {
 impl RRScheduler {
     pub fn new() -> Arc<RRScheduler> {
         Arc::new(RRScheduler {
-            queues: PerCpu::new_fn(|| (Spin::new(()), Queues::default())),
+            queues: PerCpu::new_fn(|_| (Spin::new(()), Queues::default())),
         })
     }
 
     fn alloc_cpu(task: &ArcTask) {
         task.set_on_cpu(task.tid() % crate::kernel::smp::cpu_count());
-    }
-
-    fn maybe_do_ipi(task: &ArcTask, fun: fn(&ArcTask)) -> bool {
-        if task.is_on_this_cpu() {
-            return false;
-        }
-
-        fun(task);
-        true
     }
 }

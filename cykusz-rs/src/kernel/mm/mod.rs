@@ -11,6 +11,7 @@ pub use crate::arch::mm::phys::deallocate_order;
 pub use crate::arch::mm::phys::free_mem;
 pub use crate::arch::mm::phys::free_slab;
 pub use crate::arch::mm::phys::used_mem;
+use crate::arch::mm::phys::{DeferredHead, PhysPage};
 pub use crate::arch::mm::virt::get_flags;
 pub use crate::arch::mm::virt::map;
 pub use crate::arch::mm::virt::map_flags;
@@ -20,11 +21,12 @@ pub use crate::arch::mm::virt::to_phys;
 pub use crate::arch::mm::virt::unmap;
 pub use crate::arch::mm::virt::update_flags;
 pub use crate::arch::mm::{MappedAddr, PhysAddr, VirtAddr};
+use crate::kernel::ipi::IpiTarget;
+use crate::kernel::ipi::sync::SyncIpiOp;
 use crate::kernel::sync::{LockApi, Spin};
 use crate::kernel::utils::PerCpu;
 use core::sync::atomic::{AtomicBool, Ordering};
 use spin::Once;
-use crate::arch::mm::phys::{DeferredHead, PhysPage};
 
 #[derive(Copy, Clone)]
 pub struct DeferredFrame {
@@ -97,7 +99,7 @@ impl DeferredTlbFlush {
         assert!(crate::kernel::int::is_enabled(), "{}", label);
 
         // here goes the actual ipi to call flush on other cpus
-        crate::kernel::ipi::tlb_flush_all();
+        crate::kernel::ipi::sync::call_sync(IpiTarget::AllButThis, SyncIpiOp::FlushTlbAll);
 
         // All cpus have flushed their tlb - safe to deallocate frames now
         frames.drain();

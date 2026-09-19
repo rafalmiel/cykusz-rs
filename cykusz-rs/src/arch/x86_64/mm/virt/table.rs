@@ -359,7 +359,12 @@ impl Table<Level1> {
         inc
     }
 
-    pub fn do_unmap(&mut self, ctx: &mut P4TableOperationContext, idx: usize, leaf_order: Option<usize>) -> bool {
+    pub fn do_unmap(
+        &mut self,
+        ctx: &mut P4TableOperationContext,
+        idx: usize,
+        leaf_order: Option<usize>,
+    ) -> bool {
         let entry = &mut self.entries[idx];
 
         if entry.contains(Entry::PRESENT) {
@@ -544,11 +549,7 @@ impl Table<Level4> {
         None
     }
 
-    pub fn map_flags(
-        &mut self,
-        addr: VirtAddr,
-        flags: virt::PageFlags,
-    ) -> P4TableOperationContext {
+    pub fn map_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) -> P4TableOperationContext {
         let _g = self.lock(addr.is_user());
 
         let mut ctx = P4TableOperationContext::default();
@@ -662,11 +663,7 @@ impl Table<Level4> {
         ctx
     }
 
-    pub fn map_hugepage_to(
-        &mut self,
-        virt: VirtAddr,
-        phys: PhysAddr,
-    ) -> P4TableOperationContext {
+    pub fn map_hugepage_to(&mut self, virt: VirtAddr, phys: PhysAddr) -> P4TableOperationContext {
         let _g = self.lock(virt.is_user());
 
         let mut ctx = P4TableOperationContext::default();

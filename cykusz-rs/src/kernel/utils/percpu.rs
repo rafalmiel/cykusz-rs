@@ -23,24 +23,23 @@ impl<'a, T> Iterator for PerCpuIter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let cpu = self.current;
-        self.current += 1;
-        if cpu >= crate::kernel::smp::cpu_count() {
-            None
-        } else {
-            let is_valid = match self.target {
-                ipi::IpiTarget::All => true,
-                ipi::IpiTarget::Cpu(c) if c == cpu => true,
-                ipi::IpiTarget::This if cpu == crate::cpu_id() as usize => true,
-                ipi::IpiTarget::AllButThis if cpu != crate::cpu_id() as usize => true,
-                _ => false,
-            };
+        loop {
+            let cpu = self.current;
+            self.current += 1;
+            if cpu >= crate::kernel::smp::cpu_count() {
+                return None
+            } else {
+                let is_valid = match self.target {
+                    ipi::IpiTarget::All => true,
+                    ipi::IpiTarget::Cpu(c) => c == cpu,
+                    ipi::IpiTarget::This => cpu == crate::cpu_id() as usize,
+                    ipi::IpiTarget::AllButThis => cpu != crate::cpu_id() as usize,
+                };
 
-            if !is_valid {
-                return self.next();
+                if is_valid {
+                    return Some(self.per_cpu.cpu(cpu as isize))
+                }
             }
-
-            Some(self.per_cpu.cpu(cpu as isize))
         }
     }
 }
@@ -62,6 +61,7 @@ impl<T> PerCpu<T> {
 
         let size = size_of::<T>() * cpu_count;
         let raw = allocate_align(size, align_of::<T>()).unwrap() as *mut T;
+        assert_eq!(raw as usize % align_of::<T>(), 0, "PerCpu misaligned");
 
         unsafe {
             for i in 0..cpu_count {

@@ -70,6 +70,10 @@ impl UserAddr {
             unsafe { flush(self.addr.0) }
         }
 
+        if res.is_some() {
+            crate::kernel::mm::defer_flush(self.addr);
+        }
+
         res
     }
 
@@ -82,6 +86,10 @@ impl UserAddr {
             unsafe { flush(self.addr.0) }
         }
 
+        if res.is_some() {
+            crate::kernel::mm::defer_flush(self.addr);
+        }
+
         res
     }
 
@@ -92,6 +100,10 @@ impl UserAddr {
 
         if p4_table_addr() == self.page_table {
             unsafe { flush(self.addr.0) }
+        }
+
+        if res.is_some() {
+            crate::kernel::mm::defer_flush(self.addr);
         }
 
         res

@@ -54,9 +54,27 @@ impl DeferredFrame {
 }
 
 #[derive(Default)]
+struct DeferredTlbFlushPages {
+    pages: [VirtAddr; 32],
+    is_flush_all: bool,
+    count: usize,
+}
+
+impl DeferredTlbFlushPages {
+    fn flush_page(&mut self, page: VirtAddr) {
+        if self.count >= 32 {
+            self.is_flush_all = true;
+        } else {
+            self.pages[self.count] = page;
+            self.count += 1;
+        }
+    }
+}
+
+#[derive(Default)]
 struct DeferredTlbFlush {
     /// (needs flush, frames to dealloc)
-    unmaps: PerCpu<(AtomicBool, Spin<DeferredHead>)>,
+    unmaps: PerCpu<(AtomicBool, Spin<(DeferredTlbFlushPages, DeferredHead)>)>,
 
     in_flush: PerCpu<AtomicBool>,
 }
@@ -65,6 +83,18 @@ unsafe impl Sync for DeferredTlbFlush {}
 
 struct DeferredTlbFlushGuard<'a> {
     owner: &'a DeferredTlbFlush,
+}
+
+impl<'a> DeferredTlbFlushGuard<'a> {
+    fn try_new(me: &'a DeferredTlbFlush) -> Option<Self> {
+        if me.in_flush.this_cpu().swap(true, Ordering::AcqRel) {
+            // Already doing flush, maybe int has fired and we reentered here
+            return None;
+        }
+        Some(Self {
+            owner: me,
+        })
+    }
 }
 
 impl<'a> Drop for DeferredTlbFlushGuard<'a> {
@@ -76,42 +106,113 @@ impl<'a> Drop for DeferredTlbFlushGuard<'a> {
     }
 }
 
+fn flush_pages(arg: crate::kernel::ipi::sync::SyncIpiArg) {
+    let deferred = unsafe { &*(arg as *const DeferredTlbFlushPages) };
+
+    for i in 0..deferred.count {
+        crate::arch::mm::virt::flush(deferred.pages[i]);
+    }
+}
+
 impl DeferredTlbFlush {
     fn flush_all(&self, label: &'static str) {
-        if self.in_flush.this_cpu().swap(true, Ordering::AcqRel) {
-            // Already doing flush, maybe int has fired and we reentered here
+        // Clears in_flush flag on drop
+        let Some(_guard) = DeferredTlbFlushGuard::try_new(self) else {
             return;
-        }
-        let _guard = DeferredTlbFlushGuard { owner: self };
-        let (flag, unmaps) = self.unmaps.this_cpu();
-        let mut frames = {
-            if !flag.fetch_and(false, Ordering::AcqRel) {
-                return;
-            }
-
-            let mut lock = unmaps.lock_irq();
-
-            core::mem::take(&mut *lock)
         };
 
-        dbgln!(ipi_flush, "flush_deferred_frames");
+        let (flag, unmaps) = self.unmaps.this_cpu();
+        while flag.load(Ordering::Acquire) {
+            let (deferred_flush, mut frames) = {
+                if !flag.fetch_and(false, Ordering::AcqRel) {
+                    return;
+                }
 
-        assert!(crate::kernel::int::is_enabled(), "{}", label);
+                let mut lock = unmaps.lock_irq();
 
-        // here goes the actual ipi to call flush on other cpus
-        crate::kernel::ipi::sync::call_sync(IpiTarget::AllButThis, SyncIpiOp::FlushTlbAll);
+                core::mem::take(&mut *lock)
+            };
 
-        // All cpus have flushed their tlb - safe to deallocate frames now
-        frames.drain();
+            dbgln!(ipi_flush, "flush_deferred_frames");
+
+            assert!(crate::kernel::int::is_enabled(), "{}", label);
+
+            // here goes the actual ipi to call flush on other cpus
+            if deferred_flush.is_flush_all {
+                crate::kernel::ipi::sync::call_sync(IpiTarget::AllButThis, SyncIpiOp::FlushTlbAll);
+            } else {
+                crate::kernel::ipi::sync::call_sync(
+                    IpiTarget::AllButThis,
+                    SyncIpiOp::Run(flush_pages, &deferred_flush as *const _ as *mut ()),
+                )
+            }
+
+            // All cpus have flushed their tlb - safe to deallocate frames now
+            frames.drain();
+        }
+    }
+
+    /// Add page flush addr and append frames to deallocate and set flush pending flag
+    fn defer_many_flush_frames(&self, pages: &[VirtAddr], dealloc_frames: DeferredHead) {
+        if pages.is_empty() && dealloc_frames.len() == 0 {
+            return;
+        }
+        let (flag, data) = self.unmaps.this_cpu();
+
+        {
+            let mut lock = data.lock_irq();
+            for p in pages {
+                lock.0.flush_page(*p);
+            }
+            lock.1.push_list(dealloc_frames);
+        }
+
+        flag.store(true, Ordering::Release)
+    }
+
+    /// Add page flush addr and append frames to deallocate and set flush pending flag
+    fn defer_flush_frames(&self, page: VirtAddr, dealloc_frames: DeferredHead) {
+        let (flag, data) = self.unmaps.this_cpu();
+
+        {
+            let mut lock = data.lock_irq();
+            lock.0.flush_page(page);
+            lock.1.push_list(dealloc_frames);
+        }
+
+        flag.store(true, Ordering::Release)
     }
 
     /// Set flush pending flag and append frames to deallocate
     fn defer_flush_all_frames(&self, dealloc_frames: DeferredHead) {
         let (flag, data) = self.unmaps.this_cpu();
-        if dealloc_frames.len() > 0 {
-            let mut lock = data.lock_irq();
 
-            lock.push_list(dealloc_frames);
+        let mut lock = data.lock_irq();
+        lock.0.is_flush_all = true;
+        lock.1.push_list(dealloc_frames);
+
+        flag.store(true, Ordering::Release)
+    }
+
+    /// Append frames to deallocate
+    fn defer_frames(&self, dealloc_frames: DeferredHead) {
+        if dealloc_frames.len() == 0 {
+            return;
+        }
+        let (flag, data) = self.unmaps.this_cpu();
+
+        let mut lock = data.lock_irq();
+        lock.1.push_list(dealloc_frames);
+
+        flag.store(true, Ordering::Release)
+    }
+
+    /// Add flush page addr and set pending flag
+    fn defer_flush(&self, page: VirtAddr) {
+        let (flag, data) = self.unmaps.this_cpu();
+        {
+            let mut lock = data.lock_irq();
+            lock.0.flush_page(page);
         }
 
         flag.store(true, Ordering::Release)
@@ -119,7 +220,9 @@ impl DeferredTlbFlush {
 
     /// Set flush pending flag
     fn defer_flush_all(&self) {
-        self.unmaps.this_cpu().0.store(true, Ordering::Release)
+        let (flag, data) = self.unmaps.this_cpu();
+        data.lock_irq().0.is_flush_all = true;
+        flag.store(true, Ordering::Release)
     }
 }
 
@@ -129,11 +232,41 @@ pub mod virt;
 
 static DEFERRED_TLB_FLUSH: Once<DeferredTlbFlush> = Once::new();
 
+pub fn defer_flush_frames(page: VirtAddr, mut frames: DeferredHead) {
+    if let Some(f) = DEFERRED_TLB_FLUSH.get() {
+        f.defer_flush_frames(page, frames);
+    } else {
+        frames.drain();
+    }
+}
+
+pub fn defer_many_flush_frames(page: &[VirtAddr], mut frames: DeferredHead) {
+    if let Some(f) = DEFERRED_TLB_FLUSH.get() {
+        f.defer_many_flush_frames(page, frames);
+    } else {
+        frames.drain();
+    }
+}
+
 pub fn defer_flush_all_frames(mut frames: DeferredHead) {
     if let Some(f) = DEFERRED_TLB_FLUSH.get() {
         f.defer_flush_all_frames(frames);
     } else {
         frames.drain();
+    }
+}
+
+pub fn defer_frames(mut frames: DeferredHead) {
+    if let Some(f) = DEFERRED_TLB_FLUSH.get() {
+        f.defer_frames(frames);
+    } else {
+        frames.drain();
+    }
+}
+
+pub fn defer_flush(page: VirtAddr) {
+    if let Some(f) = DEFERRED_TLB_FLUSH.get() {
+        f.defer_flush(page);
     }
 }
 

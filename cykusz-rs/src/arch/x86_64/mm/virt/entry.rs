@@ -95,11 +95,14 @@ impl Entry {
 
     pub fn unref_phys_page(
         &self,
-        ctx: Option<&mut P4TableOperationContext>,
+        mut ctx: Option<&mut P4TableOperationContext>,
         order: Option<usize>,
     ) -> bool {
         if self.address() != PhysAddr(0) {
             if let Some(page) = self.address().to_phys_page() {
+                if let Some(ref mut ctx) = ctx {
+                    ctx.set_needs_flush();
+                }
                 let cnt = page.dec_vm_use_count();
                 if cnt == 0 {
                     page.mark_unused();

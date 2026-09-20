@@ -524,6 +524,13 @@ pub fn preempt_enable() {
     }
 }
 
+pub fn preempt_enable_no_resched() {
+    if lock_protection_ready() {
+        let current = scheduler().current_task();
+        current.dec_locks();
+    }
+}
+
 pub fn enable_lock_protection() {
     LOCK_PROTECTION.store(true, Ordering::SeqCst);
 }

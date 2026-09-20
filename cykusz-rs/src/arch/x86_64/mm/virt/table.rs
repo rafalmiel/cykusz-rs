@@ -67,12 +67,14 @@ pub struct Table<L: TableLevel> {
 pub struct P4TableOperationContext {
     num_deallocs: usize,
     deallocs: DeferredHead,
+    needs_flush: bool,
 }
 
 impl P4TableOperationContext {
     pub fn push_dealloc(&mut self, frame: DeferredFrame) {
         self.deallocs.push(frame.phys_page(), frame.order() as u8);
         self.num_deallocs += 1;
+        self.needs_flush = true;
     }
 
     pub fn deallocate_all(&mut self) {
@@ -85,6 +87,14 @@ impl P4TableOperationContext {
 
     pub fn num_deallocs(&self) -> usize {
         self.num_deallocs
+    }
+
+    pub fn needs_flush(&self) -> bool {
+        self.needs_flush
+    }
+
+    pub fn set_needs_flush(&mut self) {
+        self.needs_flush = true;
     }
 }
 
@@ -507,12 +517,12 @@ impl Table<Level4> {
 
         let entry = l1.entry_at_mut(page.p1_index());
 
-        return if entry.contains(Entry::PRESENT) {
+        if entry.contains(Entry::PRESENT) {
             fun(entry);
             Some(entry.address() + (addr.0 & 0xFFF))
         } else {
             None
-        };
+        }
     }
 
     pub fn update_flags(&mut self, addr: VirtAddr, flags: virt::PageFlags) -> Option<PhysAddr> {
@@ -567,6 +577,9 @@ impl Table<Level4> {
         dbgln!(virt, "map_flags {} {:?}", addr, flags);
         if l1.alloc_set_flags(&mut ctx, page.p1_index(), Entry::from_kernel_flags(flags)) {
             l2.entries[page.p2_index()].inc_entry_count();
+        } else {
+            // Entry was present, and we changed its flags, needs flush
+            ctx.set_needs_flush();
         }
 
         if was_alloc_2 {
@@ -620,6 +633,9 @@ impl Table<Level4> {
             Entry::from_kernel_flags(flags),
         ) {
             l2.entries[page.p2_index()].inc_entry_count();
+        } else {
+            // Entry was present, and we changed its flag, needs flush
+            ctx.set_needs_flush();
         }
 
         if was_alloc_2 {

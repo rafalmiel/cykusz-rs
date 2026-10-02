@@ -384,7 +384,9 @@ function _prepare_libidn2 {
 
         pushd .
         cd $LIBIDN2_SRC_DIR
-        ./bootstrap
+        rm -rf ./gnulib
+        git clone https://github.com/rafalmiel/gnulib.git -b cykusz
+        GNULIB_SRCDIR=$(realpath ./gnulib) ./bootstrap
         cp config.sub.cykusz gnulib/build-aux/config.sub
         cp config.sub.cykusz build-aux/config.sub
         popd

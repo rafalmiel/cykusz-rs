@@ -3,10 +3,10 @@
 set -e
 
 lo=$(losetup -f)
+trap 'losetup -d $lo 2>/dev/null || true' EXIT
 losetup -P $lo disk.img
+udevadm settle
 
-sudo fsck.ext2 "$lo"p1 -f -v -y
-sudo fsck.ext2 "$lo"p2 -f -v -y
-sudo fsck.ext2 "$lo"p3 -f -v -y
-
-losetup -d $lo
+fsck.ext2 "$lo"p1 -f -v -y
+fsck.ext2 "$lo"p2 -f -v -y
+fsck.ext2 "$lo"p3 -f -v -y

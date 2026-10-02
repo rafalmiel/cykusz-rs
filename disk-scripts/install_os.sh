@@ -3,8 +3,10 @@
 set -x
 
 lo=$(losetup -f)
+trap 'losetup -d $lo 2>/dev/null || true' EXIT
 u=$(logname)
 losetup -P $lo disk.img
+udevadm settle
 
 mkdir -p mnt
 sudo mount "$lo"p1 mnt
@@ -79,5 +81,3 @@ cp sysroot/cfg/.bashrc mnt/root
 cp sysroot/cfg/.nanorc mnt/root
 
 sudo umount mnt
-
-losetup -d $lo

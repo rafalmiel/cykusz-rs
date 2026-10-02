@@ -3,8 +3,10 @@
 set -ex
 
 lo=$(losetup -f)
+trap 'losetup -d $lo 2>/dev/null || true' EXIT
 u=$(logname)
 losetup -P $lo disk.img
+udevadm settle
 
 mkdir -p mnt
 sudo mount "$lo"p1 mnt
@@ -22,5 +24,3 @@ mkdir -p mnt/dev
 mkdir -p mnt/bin
 
 sudo umount mnt
-
-losetup -d $lo
